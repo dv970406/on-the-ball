@@ -1,0 +1,202 @@
+/* =========================================================
+   Tifo — Design Tokens
+   Inspired by Supabaze's design language.
+   Brand: Korean football news / gossip / debate.
+   Display + UI font: Inter (substitute for proprietary Circular).
+   ========================================================= */
+
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap");
+
+/* Pretendard — primary brand display + body. Variable woff2 covers both Latin and Hangul,
+   replacing both the Inter and Noto Sans KR substitutes used during preview. */
+@font-face {
+  font-family: "Pretendard";
+  src: url("fonts/PretendardVariable.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* ---------- Colors: Brand & accent ---------- */
+  --primary:        #3ecf8e;   /* signature emerald — sole chromatic event */
+  --primary-deep:   #24b47e;   /* pressed */
+  --primary-soft:   #4ade80;   /* chart / soft accent */
+  --on-primary:     #171717;   /* near-black on emerald (NOT white) */
+
+  /* Rare accents — only for tags / chart points / club colors, never CTAs */
+  --accent-purple:        #6b01c2;
+  --accent-violet:        #644fc1;
+  --accent-purple-soft:   #eddbf9;
+  --accent-yellow:        #ffdb13;
+  --accent-tomato:        #ff2201;
+  --accent-pink:          #c7007e;
+  --accent-indigo:        #054cff;
+  --accent-crimson:       #e2005a;
+
+  /* ---------- Colors: Surfaces ---------- */
+  --canvas:             #ffffff;
+  --canvas-soft:        #fafafa;
+  --canvas-night:       #1c1c1c;
+  --canvas-night-soft:  #202020;
+
+  /* ---------- Colors: Hairlines / borders ---------- */
+  --hairline:           #dfdfdf;
+  --hairline-strong:    #c7c7c7;
+  --hairline-cool:      #ededed;
+  --hairline-cool-2:    #efefef;
+  --hairline-cool-3:    #d4d4d4;
+
+  /* ---------- Colors: Ink (text) ---------- */
+  --ink:                #171717;  /* default body — near-black, never pure */
+  --ink-secondary:      #212121;
+  --ink-mute:           #707070;
+  --ink-mute-2:         #9a9a9a;
+  --ink-faint:          #b2b2b2;
+  --on-dark:            #ffffff;
+
+  /* ---------- Semantic aliases ---------- */
+  --fg1: var(--ink);
+  --fg2: var(--ink-mute);
+  --fg3: var(--ink-mute-2);
+  --fg-faint: var(--ink-faint);
+  --bg1: var(--canvas);
+  --bg2: var(--canvas-soft);
+  --bg-dark: var(--canvas-night);
+  --border: var(--hairline);
+  --border-soft: var(--hairline-cool);
+  --border-strong: var(--hairline-strong);
+
+  /* ---------- Typography: families ---------- */
+  --font-display: "Pretendard", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-body:    "Pretendard", "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
+  /* ---------- Typography: scale (size / weight / line-height / tracking) ---------- */
+  --display-xxl-size: 64px;   --display-xxl-weight: 500; --display-xxl-lh: 1.1;  --display-xxl-track: -1.92px;
+  --display-xl-size:  48px;   --display-xl-weight:  500; --display-xl-lh:  1.1;  --display-xl-track:  -1.44px;
+  --display-lg-size:  36px;   --display-lg-weight:  500; --display-lg-lh:  1.15; --display-lg-track:  -0.72px;
+  --display-md-size:  28px;   --display-md-weight:  500; --display-md-lh:  1.2;  --display-md-track:  -0.42px;
+  --heading-lg-size:  22px;   --heading-lg-weight:  500; --heading-lg-lh:  1.2;  --heading-lg-track:  0;
+  --heading-md-size:  18px;   --heading-md-weight:  500; --heading-md-lh:  1.4;  --heading-md-track:  0;
+  --body-lg-size:     18px;   --body-lg-weight:     400; --body-lg-lh:     1.55; --body-lg-track:     0;
+  --body-md-size:     16px;   --body-md-weight:     400; --body-md-lh:     1.5;  --body-md-track:     0;
+  --button-md-size:   14px;   --button-md-weight:   500; --button-md-lh:   1.0;  --button-md-track:   0;
+  --caption-size:     13px;   --caption-weight:     400; --caption-lh:     1.45; --caption-track:     0;
+  --micro-size:       12px;   --micro-weight:       400; --micro-lh:       1.45; --micro-track:       0;
+  --code-size:        14px;   --code-weight:        400; --code-lh:        1.5;  --code-track:        0;
+
+  /* ---------- Spacing ---------- */
+  --space-xxs: 2px;
+  --space-xs:  4px;
+  --space-sm:  8px;
+  --space-md:  12px;
+  --space-lg:  16px;
+  --space-xl:  24px;
+  --space-xxl: 32px;
+  --space-huge: 64px;
+
+  /* ---------- Radii ---------- */
+  --radius-xs:  4px;
+  --radius-sm:  6px;   /* signature button radius */
+  --radius-md:  8px;
+  --radius-lg:  12px;
+  --radius-xl:  16px;
+  --radius-full: 9999px;
+
+  /* ---------- Elevation ---------- */
+  --shadow-0: none;
+  --shadow-1: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-2: 0 8px 24px rgba(0,0,0,0.08);  /* floating product mockups */
+  --shadow-3: 0 16px 48px rgba(0,0,0,0.12); /* modals */
+}
+
+/* =========================================================
+   Base elements
+   ========================================================= */
+html, body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--body-md-size);
+  font-weight: var(--body-md-weight);
+  line-height: var(--body-md-lh);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection { background: var(--primary); color: var(--on-primary); }
+
+/* Display */
+.t-display-xxl { font-family: var(--font-display); font-size: var(--display-xxl-size); font-weight: var(--display-xxl-weight); line-height: var(--display-xxl-lh); letter-spacing: var(--display-xxl-track); }
+.t-display-xl  { font-family: var(--font-display); font-size: var(--display-xl-size);  font-weight: var(--display-xl-weight);  line-height: var(--display-xl-lh);  letter-spacing: var(--display-xl-track); }
+.t-display-lg  { font-family: var(--font-display); font-size: var(--display-lg-size);  font-weight: var(--display-lg-weight);  line-height: var(--display-lg-lh);  letter-spacing: var(--display-lg-track); }
+.t-display-md  { font-family: var(--font-display); font-size: var(--display-md-size);  font-weight: var(--display-md-weight);  line-height: var(--display-md-lh);  letter-spacing: var(--display-md-track); }
+
+/* Headings */
+.t-heading-lg { font-family: var(--font-display); font-size: var(--heading-lg-size); font-weight: var(--heading-lg-weight); line-height: var(--heading-lg-lh); }
+.t-heading-md { font-family: var(--font-display); font-size: var(--heading-md-size); font-weight: var(--heading-md-weight); line-height: var(--heading-md-lh); }
+
+/* Body */
+.t-body-lg { font-family: var(--font-body); font-size: var(--body-lg-size); font-weight: var(--body-lg-weight); line-height: var(--body-lg-lh); }
+.t-body-md { font-family: var(--font-body); font-size: var(--body-md-size); font-weight: var(--body-md-weight); line-height: var(--body-md-lh); }
+
+/* UI */
+.t-button   { font-family: var(--font-display); font-size: var(--button-md-size); font-weight: var(--button-md-weight); line-height: var(--button-md-lh); }
+.t-caption  { font-family: var(--font-body); font-size: var(--caption-size); font-weight: var(--caption-weight); line-height: var(--caption-lh); color: var(--ink-mute); }
+.t-micro    { font-family: var(--font-body); font-size: var(--micro-size); font-weight: var(--micro-weight); line-height: var(--micro-lh); }
+.t-code     { font-family: var(--font-mono); font-size: var(--code-size); font-weight: var(--code-weight); line-height: var(--code-lh); }
+
+/* Semantic mapping (HTML default elements) */
+h1 { font-family: var(--font-display); font-size: var(--display-xl-size); font-weight: 500; line-height: 1.1;  letter-spacing: var(--display-xl-track); color: var(--ink); margin: 0; }
+h2 { font-family: var(--font-display); font-size: var(--display-lg-size); font-weight: 500; line-height: 1.15; letter-spacing: var(--display-lg-track); color: var(--ink); margin: 0; }
+h3 { font-family: var(--font-display); font-size: var(--display-md-size); font-weight: 500; line-height: 1.2;  letter-spacing: var(--display-md-track); color: var(--ink); margin: 0; }
+h4 { font-family: var(--font-display); font-size: var(--heading-lg-size); font-weight: 500; line-height: 1.2; color: var(--ink); margin: 0; }
+h5 { font-family: var(--font-display); font-size: var(--heading-md-size); font-weight: 500; line-height: 1.4; color: var(--ink); margin: 0; }
+p  { font-family: var(--font-body); font-size: var(--body-md-size); line-height: 1.5; color: var(--ink); margin: 0; }
+small { font-size: var(--caption-size); color: var(--ink-mute); }
+code, kbd, pre { font-family: var(--font-mono); font-size: var(--code-size); }
+a  { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; text-decoration-color: var(--hairline-strong); }
+a:hover { text-decoration-color: var(--ink); }
+
+/* =========================================================
+   Component classes (reusable)
+   ========================================================= */
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-family: var(--font-display); font-size: var(--button-md-size); font-weight: 500; line-height: 1; border-radius: var(--radius-sm); padding: 10px 16px; border: 1px solid transparent; cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease; white-space: nowrap; }
+.btn-primary  { background: var(--primary); color: var(--on-primary); }
+.btn-primary:hover  { background: var(--primary-deep); }
+.btn-primary:active { background: var(--primary-deep); }
+.btn-secondary { background: var(--canvas); color: var(--ink); border-color: var(--hairline-strong); }
+.btn-secondary:hover { border-color: var(--ink); }
+.btn-on-dark { background: var(--canvas-night); color: var(--on-dark); }
+.btn-on-dark:hover { background: var(--canvas-night-soft); }
+.btn-link { background: transparent; padding: 0; color: var(--ink); border: 0; border-radius: var(--radius-xs); }
+.btn-link:hover { text-decoration: underline; }
+.btn-sm { padding: 6px 10px; font-size: 13px; }
+
+/* Inputs */
+.input { background: var(--canvas); color: var(--ink); font-family: var(--font-body); font-size: var(--body-md-size); border: 1px solid var(--hairline); border-radius: var(--radius-sm); padding: 8px 12px; line-height: 1.4; }
+.input:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px rgba(23,23,23,0.06); }
+.input::placeholder { color: var(--ink-faint); }
+
+/* Cards */
+.card { background: var(--canvas); border: 1px solid var(--hairline); border-radius: var(--radius-lg); padding: var(--space-xxl); }
+.card-dark { background: var(--canvas-night); color: var(--on-dark); border: 1px solid var(--canvas-night-soft); border-radius: var(--radius-lg); padding: var(--space-xxl); }
+.card-flat { background: var(--canvas); border: 1px solid var(--hairline); border-radius: var(--radius-md); padding: var(--space-lg); }
+
+/* Pills / tags */
+.pill { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-body); font-size: var(--micro-size); line-height: 1; padding: 4px 8px; border-radius: var(--radius-full); }
+.pill-green { background: var(--primary); color: var(--on-primary); font-weight: 500; }
+.pill-soft  { background: var(--canvas-soft); color: var(--ink); border: 1px solid var(--hairline-cool); }
+.pill-outline { background: transparent; color: var(--ink-mute); border: 1px solid var(--hairline); }
+
+/* Code block */
+.code-block { background: var(--canvas-night); color: var(--on-dark); font-family: var(--font-mono); font-size: var(--code-size); line-height: 1.5; padding: var(--space-lg); border-radius: var(--radius-sm); overflow: auto; }
+
+/* Hairline divider */
+.divider { height: 1px; background: var(--hairline); border: 0; }
+
+/* Container */
+.container { max-width: 1280px; margin: 0 auto; padding: 0 var(--space-xl); }
