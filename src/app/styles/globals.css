@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+/* =========================================================
+   Tifo 디자인 토큰 — design_handoff_ontheball/prototype/design/colors_and_type.css 기준
+   규칙: 한 뷰포트당 컬러 이벤트는 에메랄드 1개, 에메랄드 위 텍스트는 항상 ink(#171717),
+        버튼 라운드 6px, 그림자 대신 1px 헤어라인, 이징 cubic-bezier(0.2,0,0,1)
+   ⚠ 이 블록은 파운데이션 이후 동결 — 필요한 특수값은 arbitrary value로 사용
+   ========================================================= */
+@theme {
+  /* 브랜드 & 액센트 */
+  --color-primary: #3ecf8e;
+  --color-primary-deep: #24b47e;
+  --color-primary-soft: #4ade80;
+  --color-on-primary: #171717;
+  --color-crimson: #e2005a; /* "거짓"/오답 — 콘텐츠 컬러로만 사용 */
+  --color-accent-yellow: #ffdb13; /* 트로피/힌트 — 콘텐츠 컬러로만 사용 */
+
+  /* 잉크(텍스트) */
+  --color-ink: #171717;
+  --color-ink-secondary: #212121;
+  --color-ink-mute: #707070;
+  --color-ink-mute-2: #9a9a9a;
+  --color-ink-faint: #b2b2b2;
+
+  /* 서피스 */
+  --color-canvas: #ffffff;
+  --color-canvas-soft: #fafafa;
+  --color-canvas-night: #1c1c1c;
+  --color-canvas-night-soft: #202020;
+
+  /* 헤어라인 */
+  --color-hairline: #dfdfdf;
+  --color-hairline-strong: #c7c7c7;
+  --color-hairline-cool: #ededed;
+  --color-hairline-cool-2: #efefef;
+  --color-hairline-cool-3: #d4d4d4;
+
+  /* 라디우스 (--radius-sm 6px = 시그니처 버튼 라운드) */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* 이징 — 바운스/스프링 금지, 150–350ms */
+  --ease-otb: cubic-bezier(0.2, 0, 0, 1);
+
+  /* 애니메이션 */
+  --animate-fade-up: fade-up 0.35s cubic-bezier(0.2, 0, 0, 1) both;
+  --animate-otb-pulse: otb-pulse 1.6s ease-in-out infinite;
+  --animate-vs-pop: vs-pop 0.5s cubic-bezier(0.2, 0, 0, 1) both;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes otb-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.06);
+    }
+  }
+
+  /* vs-pop: 중앙 absolute(translate -50%,-50%) 배치 요소 전용 */
+  @keyframes vs-pop {
+    0% {
+      transform: translate(-50%, -50%) rotate(-12deg) scale(0.8);
+      opacity: 0;
+    }
+    60% {
+      transform: translate(-50%, -50%) rotate(-8deg) scale(1.1);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(-50%, -50%) rotate(-12deg) scale(1);
+    }
+  }
+}
+
+/* next/font 변수 연결 */
+@theme inline {
+  --font-sans: var(--font-pretendard), "Pretendard", "Apple SD Gothic Neo",
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace,
+    Menlo, Monaco, Consolas, monospace;
+}
+
+/* =========================================================
+   베이스
+   ========================================================= */
+html,
+body {
+  background: var(--color-canvas-soft);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+button {
+  cursor: pointer;
+}
+
+/* 모션 최소화 환경 존중 — 트랜지션/애니메이션 0ms */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0ms !important;
+  }
+}
+
+/* =========================================================
+   커스텀 유틸리티
+   ========================================================= */
+
+/* 숫자 고정폭 정렬 (mono 숫자·통계와 함께 사용) */
+@utility tnum {
+  font-feature-settings: "tnum";
+}
+
+/* 스크롤바 숨김 (모바일 스크롤 영역·가로 캐러셀) */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
