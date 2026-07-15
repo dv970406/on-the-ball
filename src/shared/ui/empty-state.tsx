@@ -1,0 +1,36 @@
+import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
+import { cn } from "@/shared/lib";
+import { Icon } from "./icon";
+
+type EmptyStateProps = {
+  icon?: LucideIcon;
+  title: string;
+  description?: string;
+  /** 하단 액션 (버튼 등) */
+  action?: ReactNode;
+  className?: string;
+};
+
+/** 빈 상태·오류·설정 안내 공용 컴포넌트 */
+export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
+  return (
+    <div
+      className={cn(
+        "flex flex-col items-center justify-center gap-2 px-8 py-14 text-center",
+        className,
+      )}
+    >
+      {icon ? (
+        <span className="mb-1 flex size-11 items-center justify-center rounded-full border border-hairline-cool bg-canvas-soft text-ink-mute">
+          <Icon as={icon} size={20} />
+        </span>
+      ) : null}
+      <p className="text-[15px] font-medium text-ink">{title}</p>
+      {description ? (
+        <p className="text-[13px] leading-relaxed text-ink-mute">{description}</p>
+      ) : null}
+      {action ? <div className="mt-3">{action}</div> : null}
+    </div>
+  );
+}
