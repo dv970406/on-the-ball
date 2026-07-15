@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // 디자인 핸드오프 레퍼런스 (구현 대상 아님 — 린트 제외)
+    "design_handoff_ontheball/**",
   ]),
 ]);
 
