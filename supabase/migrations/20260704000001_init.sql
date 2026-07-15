@@ -1,0 +1,585 @@
+-- =====================================================================
+-- 온더볼 (On the Ball) — 초기 스키마
+--
+-- 설계 원칙
+--  * polls/poll_options/votes: 밸런스·랭킹·유니폼·TMI 4종 투표를 하나의
+--    파이프라인으로 처리 (타입별 표현 차이는 meta jsonb로 흡수)
+--  * 퀴즈는 정답이 존재하므로 별도 테이블 (quizzes/lineups/quiz_choices/quiz_attempts)
+--  * 쓰기 정책(중복 방지·24h 변경 제한·스트릭·뱃지)은 SECURITY DEFINER RPC로
+--    원자 처리 → API Route는 세션 쿠키 기반 클라이언트로 RPC만 호출
+--  * 집계는 SECURITY DEFINER 뷰로 공개하되 개별 투표 행은 본인만 조회 가능
+--  * 정답(is_correct)·해설(answer_text)은 컬럼 권한으로 숨기고,
+--    시도한 사용자에게만 quiz_reveal 뷰로 공개 (치팅 방지)
+-- =====================================================================
+
+-- ========== 프로필 ==========
+create table public.profiles (
+  id uuid primary key references auth.users (id) on delete cascade,
+  nickname text not null,
+  fan_team text,
+  -- 연령대·지역: 추후 입력 UI 추가 예정 (지금은 null 허용만)
+  age_group text,
+  region text,
+  current_streak int not null default 0,
+  best_streak int not null default 0,
+  last_quiz_date date,
+  -- "나의 축구 성향" 카드 (v1은 기본 문구, 추후 실집계 갱신)
+  trait_title text,
+  trait_text text,
+  created_at timestamptz not null default now()
+);
+
+comment on table public.profiles is '사용자 프로필 — 익명 가입 시 트리거로 자동 생성';
+
+-- 익명 가입 포함, auth.users 생성 시 프로필 자동 생성
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.profiles (id, nickname)
+  values (new.id, '익명의 축덕 ' || (1000 + floor(random() * 9000))::int);
+  return new;
+end;
+$$;
+
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- ========== 투표 컨테이너 (밸런스·랭킹·유니폼·TMI 공통) ==========
+create table public.polls (
+  id text primary key, -- slug: 'goat', 'ballon-2026', 'kit-2526', 'tmi-son-tottenham' ...
+  type text not null check (type in ('balance', 'ranking', 'kit', 'tmi')),
+  title text not null,
+  subtitle text,
+  tag text,
+  closes_at timestamptz,
+  featured boolean not null default false, -- 홈 히어로 노출 여부
+  position int not null default 0,         -- 리스트/덱 정렬 순서
+  meta jsonb not null default '{}'::jsonb, -- 타입별 표현값 (홈 요약 카피, TMI 카드 내용, 트렌딩 델타 등)
+  created_at timestamptz not null default now()
+);
+
+create table public.poll_options (
+  id text primary key, -- '{poll_id}:{key}' 관례 (예: 'goat:a', 'ballon-2026:mbappe')
+  poll_id text not null references public.polls (id) on delete cascade,
+  position int not null default 0,
+  label text not null, -- 표시 이름 (메시 / 음바페 / 맨유 / 진실 ...)
+  sublabel text,       -- 라틴 표기·클럽명·시즌 등 보조 라벨
+  seed_votes int not null default 0, -- 연출용 초기 득표 (실투표는 votes에 누적)
+  meta jsonb not null default '{}'::jsonb, -- tone/text/stats/blurb/flag/hue/stripe 등
+  unique (poll_id, position)
+);
+
+create index poll_options_poll_id_idx on public.poll_options (poll_id);
+
+-- ========== 실제 투표 ==========
+create table public.votes (
+  id bigint generated always as identity primary key,
+  poll_id text not null references public.polls (id) on delete cascade,
+  option_id text not null references public.poll_options (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  changed_count int not null default 0, -- "24시간 안에 한 번만 변경" 정책 카운터
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (poll_id, user_id)
+);
+
+create index votes_poll_id_idx on public.votes (poll_id);
+create index votes_option_id_idx on public.votes (option_id);
+create index votes_user_id_idx on public.votes (user_id);
+
+-- ========== 댓글 ("한 줄 거들기") ==========
+create table public.comments (
+  id bigint generated always as identity primary key,
+  poll_id text not null references public.polls (id) on delete cascade,
+  user_id uuid references public.profiles (id) on delete set null,
+  -- 시드 댓글용 비정규화 필드 (user_id가 없는 행)
+  display_name text,
+  display_tag text,
+  body text not null check (char_length(body) between 1 and 500),
+  seed_likes int not null default 0, -- 시드 댓글의 연출용 동감 수
+  created_at timestamptz not null default now()
+);
+
+create index comments_poll_id_idx on public.comments (poll_id);
+
+create table public.comment_likes (
+  comment_id bigint not null references public.comments (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (comment_id, user_id)
+);
+
+-- ========== 라인업 & 퀴즈 ==========
+create table public.lineups (
+  id text primary key,
+  formation text not null, -- '4-3-3'
+  caption text,            -- '4-3-3 · 11 caps · 7 nations'
+  rows jsonb not null      -- [[{"pos":"GK","flag":"BE"}], [...4명], [...3명], [...3명]] (GK줄부터)
+);
+
+create table public.quizzes (
+  id text primary key, -- slug: 'lineup-rm-1718'
+  kind text not null default 'lineup',
+  title text not null,
+  subtitle text,
+  hint text,          -- 힌트 토글로 노출 (시도 전 공개 허용)
+  answer_text text,   -- 정답 명기 — 컬럼 권한으로 숨기고 quiz_reveal로만 공개
+  lineup_id text references public.lineups (id),
+  opens_on date not null, -- 매일 오전 8시 오픈 개념의 날짜 (오늘 = 오늘의 문제)
+  created_at timestamptz not null default now()
+);
+
+create table public.quiz_choices (
+  id text primary key, -- '{quiz_id}:{key}'
+  quiz_id text not null references public.quizzes (id) on delete cascade,
+  position int not null default 0,
+  team text not null,
+  season text,
+  is_correct boolean not null default false, -- 컬럼 권한으로 숨김
+  seed_picks int not null default 0,         -- 연출용 초기 선택 수
+  unique (quiz_id, position)
+);
+
+create index quiz_choices_quiz_id_idx on public.quiz_choices (quiz_id);
+
+create table public.quiz_attempts (
+  id bigint generated always as identity primary key,
+  quiz_id text not null references public.quizzes (id) on delete cascade,
+  choice_id text not null references public.quiz_choices (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  is_correct boolean not null,
+  created_at timestamptz not null default now(),
+  unique (quiz_id, user_id)
+);
+
+create index quiz_attempts_choice_id_idx on public.quiz_attempts (choice_id);
+create index quiz_attempts_user_id_idx on public.quiz_attempts (user_id);
+
+-- ========== 뱃지 ==========
+create table public.badges (
+  id text primary key, -- 'streak10', 'first100', ...
+  label text not null,
+  description text,
+  color text,
+  position int not null default 0
+);
+
+create table public.user_badges (
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  badge_id text not null references public.badges (id) on delete cascade,
+  earned_at timestamptz not null default now(),
+  primary key (user_id, badge_id)
+);
+
+-- ========== 시드 통계 (연령대별 응답·지역별 1위) ==========
+-- v1은 시드 값 노출. 추후 profiles.age_group/region 입력이 생기면
+-- votes ⨝ profiles 실집계로 교체 가능한 자리.
+create table public.poll_demographics (
+  id bigint generated always as identity primary key,
+  poll_id text not null references public.polls (id) on delete cascade,
+  dimension text not null check (dimension in ('age', 'region')),
+  bucket text not null,   -- '20대' / '유럽' ...
+  option_id text references public.poll_options (id) on delete cascade,
+  ratio numeric not null check (ratio >= 0 and ratio <= 1),
+  position int not null default 0
+);
+
+create index poll_demographics_poll_id_idx on public.poll_demographics (poll_id);
+
+-- ========== 홈 트렌딩 ("지금 뜨거운 떡밥" — v1 시드 전용) ==========
+create table public.trending_items (
+  id bigint generated always as identity primary key,
+  position int not null,
+  title text not null,
+  vote_count int not null default 0,
+  delta text not null check (delta in ('up', 'down', 'new')), -- 상승/하락/NEW pill
+  poll_id text references public.polls (id) on delete set null
+);
+
+-- =====================================================================
+-- 집계 뷰 (SECURITY DEFINER — 개별 행 비공개 유지하며 합계만 공개)
+-- =====================================================================
+
+-- 옵션별 득표 = 시드 + 실투표
+create view public.poll_results
+with (security_invoker = off)
+as
+select
+  o.poll_id,
+  o.id as option_id,
+  o.seed_votes + count(v.id) as votes
+from public.poll_options o
+left join public.votes v on v.option_id = o.id
+group by o.poll_id, o.id, o.seed_votes;
+
+-- 퀴즈 선택지별 픽 수 — "해당 퀴즈를 시도한 사용자"에게만 행이 보임.
+-- ⚠ 공개 정답률(quiz_stats.accuracy_pct)과 보기별 픽 분포를 조합하면
+--   시도 전에 정답이 역산되므로(점유율 == 정답률인 보기가 정답) 게이트 필수.
+create view public.quiz_choice_stats
+with (security_invoker = off)
+as
+select
+  c.quiz_id,
+  c.id as choice_id,
+  c.seed_picks + count(a.id) as picks
+from public.quiz_choices c
+left join public.quiz_attempts a on a.choice_id = c.id
+where exists (
+  select 1
+  from public.quiz_attempts me
+  where me.quiz_id = c.quiz_id
+    and me.user_id = auth.uid()
+)
+group by c.quiz_id, c.id, c.seed_picks;
+
+-- 퀴즈별 도전자 수·정답률 — 리스트 노출용이라 전체 공개.
+-- (게이트된 quiz_choice_stats를 경유하지 않고 원본 테이블에서 직접 집계)
+create view public.quiz_stats
+with (security_invoker = off)
+as
+select
+  c.quiz_id,
+  sum(c.seed_picks + coalesce(a.cnt, 0))::int as attempts,
+  coalesce(
+    round(
+      100.0 * sum(c.seed_picks + coalesce(a.cnt, 0)) filter (where c.is_correct)
+      / nullif(sum(c.seed_picks + coalesce(a.cnt, 0)), 0)
+    ),
+    0
+  )::int as accuracy_pct
+from public.quiz_choices c
+left join (
+  select choice_id, count(*)::int as cnt
+  from public.quiz_attempts
+  group by choice_id
+) a on a.choice_id = c.id
+group by c.quiz_id;
+
+-- 정답 리빌 — 해당 퀴즈를 "시도한 사용자"에게만 행이 보이는 게이트
+create view public.quiz_reveal
+with (security_invoker = off)
+as
+select
+  c.quiz_id,
+  c.id as choice_id,
+  c.is_correct,
+  q.answer_text
+from public.quiz_choices c
+join public.quizzes q on q.id = c.quiz_id
+where exists (
+  select 1
+  from public.quiz_attempts a
+  where a.quiz_id = c.quiz_id
+    and a.user_id = auth.uid()
+);
+
+-- =====================================================================
+-- RPC — 쓰기 정책의 단일 진입점
+-- =====================================================================
+
+-- 투표: 중복 방지 + 마감 검증 + (유니폼) 재탭 취소 + 24시간 내 1회 변경 + 뱃지
+create or replace function public.cast_vote(p_poll_id text, p_option_id text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_poll public.polls;
+  v_existing public.votes;
+  v_total_votes int;
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED';
+  end if;
+
+  select * into v_poll from public.polls where id = p_poll_id;
+  if not found then
+    raise exception 'POLL_NOT_FOUND';
+  end if;
+  if v_poll.closes_at is not null and v_poll.closes_at < now() then
+    raise exception 'POLL_CLOSED';
+  end if;
+
+  if not exists (
+    select 1 from public.poll_options
+    where id = p_option_id and poll_id = p_poll_id
+  ) then
+    raise exception 'INVALID_OPTION';
+  end if;
+
+  -- 동시 요청 직렬화 — 같은 유저의 기존 표를 잠그고 검사
+  select * into v_existing
+  from public.votes
+  where poll_id = p_poll_id and user_id = v_user
+  for update;
+
+  if not found then
+    begin
+      insert into public.votes (poll_id, option_id, user_id)
+      values (p_poll_id, p_option_id, v_user);
+    exception when unique_violation then
+      -- 첫 투표 동시 경합 — 먼저 기록된 표를 유지하고 멱등 응답
+      select * into v_existing
+      from public.votes
+      where poll_id = p_poll_id and user_id = v_user;
+      return jsonb_build_object('status', 'unchanged', 'option_id', v_existing.option_id);
+    end;
+  elsif v_existing.option_id = p_option_id then
+    -- 같은 선택지 재탭: 유니폼 투표만 취소 허용 (그 외 타입은 변경 없음)
+    if v_poll.type = 'kit' then
+      delete from public.votes where id = v_existing.id;
+      return jsonb_build_object('status', 'cancelled');
+    end if;
+    return jsonb_build_object('status', 'unchanged', 'option_id', p_option_id);
+  else
+    -- 선택 변경: 첫 투표 후 24시간 안에 1회만
+    if v_existing.changed_count >= 1 then
+      raise exception 'CHANGE_LIMIT';
+    end if;
+    if v_existing.created_at < now() - interval '24 hours' then
+      raise exception 'CHANGE_WINDOW_OVER';
+    end if;
+    update public.votes
+    set option_id = p_option_id,
+        changed_count = changed_count + 1,
+        updated_at = now()
+    where id = v_existing.id;
+  end if;
+
+  -- 뱃지: 첫 투표 / 100번째 투표
+  select count(*) into v_total_votes from public.votes where user_id = v_user;
+  if v_total_votes >= 1 then
+    insert into public.user_badges (user_id, badge_id)
+    values (v_user, 'first-vote')
+    on conflict do nothing;
+  end if;
+  if v_total_votes >= 100 then
+    insert into public.user_badges (user_id, badge_id)
+    values (v_user, 'first100')
+    on conflict do nothing;
+  end if;
+
+  return jsonb_build_object('status', 'voted', 'option_id', p_option_id);
+end;
+$$;
+
+-- 퀴즈 시도: 중복 방지 + 오픈일 검증 + 정답 판정 + 스트릭 증감 + 뱃지
+create or replace function public.submit_quiz_attempt(p_quiz_id text, p_choice_id text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_quiz public.quizzes;
+  v_correct boolean;
+  v_correct_choice text;
+  v_profile public.profiles;
+  v_base_streak int;
+  v_new_streak int;
+begin
+  if v_user is null then
+    raise exception 'AUTH_REQUIRED';
+  end if;
+
+  select * into v_quiz from public.quizzes where id = p_quiz_id;
+  if not found then
+    raise exception 'QUIZ_NOT_FOUND';
+  end if;
+  if v_quiz.opens_on > current_date then
+    raise exception 'QUIZ_LOCKED';
+  end if;
+
+  select is_correct into v_correct
+  from public.quiz_choices
+  where id = p_choice_id and quiz_id = p_quiz_id;
+  if not found then
+    raise exception 'INVALID_CHOICE';
+  end if;
+
+  if exists (
+    select 1 from public.quiz_attempts
+    where quiz_id = p_quiz_id and user_id = v_user
+  ) then
+    raise exception 'ALREADY_ATTEMPTED';
+  end if;
+
+  begin
+    insert into public.quiz_attempts (quiz_id, choice_id, user_id, is_correct)
+    values (p_quiz_id, p_choice_id, v_user, v_correct);
+  exception when unique_violation then
+    -- 동시 제출 경합 — 위 exists 검사를 빠져나간 경우도 동일 에러로 매핑
+    raise exception 'ALREADY_ATTEMPTED';
+  end;
+
+  -- 스트릭은 "하루 1회"만 반영:
+  --   오늘 이미 반영됐으면 유지(지난 문제 몰아풀기로 +N 방지),
+  --   하루 이상 건너뛰었으면 0에서 시작, 오답이면 0으로 리셋
+  select * into v_profile from public.profiles where id = v_user for update;
+
+  if v_profile.last_quiz_date = current_date then
+    v_new_streak := v_profile.current_streak;
+  else
+    v_base_streak := v_profile.current_streak;
+    if v_profile.last_quiz_date is not null
+       and v_profile.last_quiz_date < current_date - 1 then
+      v_base_streak := 0;
+    end if;
+
+    if v_correct then
+      v_new_streak := v_base_streak + 1;
+    else
+      v_new_streak := 0;
+    end if;
+  end if;
+
+  update public.profiles
+  set current_streak = v_new_streak,
+      best_streak = greatest(best_streak, v_new_streak),
+      last_quiz_date = current_date
+  where id = v_user;
+
+  -- 뱃지: 연속 10일 / 연속 30일
+  if v_new_streak >= 10 then
+    insert into public.user_badges (user_id, badge_id)
+    values (v_user, 'streak10') on conflict do nothing;
+  end if;
+  if v_new_streak >= 30 then
+    insert into public.user_badges (user_id, badge_id)
+    values (v_user, 'streak30') on conflict do nothing;
+  end if;
+
+  select id into v_correct_choice
+  from public.quiz_choices
+  where quiz_id = p_quiz_id and is_correct
+  limit 1;
+
+  return jsonb_build_object(
+    'is_correct', v_correct,
+    'correct_choice_id', v_correct_choice,
+    'answer_text', v_quiz.answer_text,
+    'streak', v_new_streak
+  );
+end;
+$$;
+
+-- =====================================================================
+-- RLS
+-- =====================================================================
+alter table public.profiles enable row level security;
+alter table public.polls enable row level security;
+alter table public.poll_options enable row level security;
+alter table public.votes enable row level security;
+alter table public.comments enable row level security;
+alter table public.comment_likes enable row level security;
+alter table public.lineups enable row level security;
+alter table public.quizzes enable row level security;
+alter table public.quiz_choices enable row level security;
+alter table public.quiz_attempts enable row level security;
+alter table public.badges enable row level security;
+alter table public.user_badges enable row level security;
+alter table public.poll_demographics enable row level security;
+alter table public.trending_items enable row level security;
+
+-- 공개 읽기 콘텐츠
+create policy "profiles_select_all" on public.profiles for select using (true);
+create policy "polls_select_all" on public.polls for select using (true);
+create policy "poll_options_select_all" on public.poll_options for select using (true);
+create policy "comments_select_all" on public.comments for select using (true);
+create policy "comment_likes_select_all" on public.comment_likes for select using (true);
+create policy "lineups_select_all" on public.lineups for select using (true);
+create policy "quizzes_select_all" on public.quizzes for select using (true);
+create policy "quiz_choices_select_all" on public.quiz_choices for select using (true);
+create policy "badges_select_all" on public.badges for select using (true);
+create policy "poll_demographics_select_all" on public.poll_demographics for select using (true);
+create policy "trending_items_select_all" on public.trending_items for select using (true);
+
+-- 본인 것만 읽기
+create policy "votes_select_own" on public.votes
+  for select using (user_id = auth.uid());
+create policy "quiz_attempts_select_own" on public.quiz_attempts
+  for select using (user_id = auth.uid());
+create policy "user_badges_select_own" on public.user_badges
+  for select using (user_id = auth.uid());
+
+-- 본인 프로필 수정 (연령대·지역 입력 등 향후 대비)
+create policy "profiles_update_own" on public.profiles
+  for update using (id = auth.uid()) with check (id = auth.uid());
+
+-- 댓글: 해당 투표에 참여한 사용자만 작성 가능 (결과 게이팅과 동일 규칙을 DB에서 강제)
+create policy "comments_insert_voter_only" on public.comments
+  for insert with check (
+    user_id = auth.uid()
+    and exists (
+      select 1 from public.votes v
+      where v.poll_id = comments.poll_id and v.user_id = auth.uid()
+    )
+  );
+create policy "comments_delete_own" on public.comments
+  for delete using (user_id = auth.uid());
+
+-- 동감(좋아요) 토글
+create policy "comment_likes_insert_own" on public.comment_likes
+  for insert with check (user_id = auth.uid());
+create policy "comment_likes_delete_own" on public.comment_likes
+  for delete using (user_id = auth.uid());
+
+-- votes / quiz_attempts / user_badges 의 쓰기는 정책 없음 → RPC(SECURITY DEFINER)로만 가능
+
+-- =====================================================================
+-- 컬럼 권한 — 정답·해설 숨김 (RPC/quiz_reveal 뷰로만 공개)
+-- ⚠ 이 두 테이블은 select 시 반드시 컬럼을 명시해야 함 (select * 불가)
+-- =====================================================================
+revoke select on public.quizzes from anon, authenticated;
+grant select (id, kind, title, subtitle, hint, lineup_id, opens_on, created_at)
+  on public.quizzes to anon, authenticated;
+
+-- seed_picks도 차단 — 공개 정답률과 픽 분포를 조합한 정답 역산 방지
+revoke select on public.quiz_choices from anon, authenticated;
+grant select (id, quiz_id, position, team, season)
+  on public.quiz_choices to anon, authenticated;
+
+-- =====================================================================
+-- profiles 컬럼 권한 — 스트릭·뱃지 위조 및 개인 필드 노출 차단
+--   읽기: 공개 표시용 컬럼만 (댓글 작성자 닉네임·팬 태그)
+--   쓰기: 사용자 편집 허용 컬럼만 — 스트릭·last_quiz_date·trait_* 는
+--        SECURITY DEFINER RPC(submit_quiz_attempt)로만 변경 가능
+-- =====================================================================
+revoke select on public.profiles from anon, authenticated;
+grant select (id, nickname, fan_team, created_at)
+  on public.profiles to anon, authenticated;
+
+revoke update on public.profiles from anon, authenticated;
+grant update (nickname, fan_team, age_group, region)
+  on public.profiles to authenticated;
+
+revoke insert, delete on public.profiles from anon, authenticated;
+
+-- 본인 전체 프로필 — auth.uid() 행만 반환하는 definer 뷰 (API의 /me 계열이 사용)
+create view public.my_profile
+with (security_invoker = off)
+as
+select *
+from public.profiles
+where id = auth.uid();
+
+-- =====================================================================
+-- comments 컬럼 권한 — 시드 전용 필드(seed_likes·display_*)·작성 시각 위조 차단
+-- =====================================================================
+revoke insert on public.comments from anon, authenticated;
+grant insert (poll_id, user_id, body) on public.comments to authenticated;
+
+-- 집계 뷰 읽기 권한
+grant select on public.poll_results to anon, authenticated;
+grant select on public.quiz_choice_stats to anon, authenticated;
+grant select on public.quiz_stats to anon, authenticated;
+grant select on public.quiz_reveal to anon, authenticated;
+grant select on public.my_profile to anon, authenticated;
