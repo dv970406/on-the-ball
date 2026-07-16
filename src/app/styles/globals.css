@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./pretendard-subset.css";
 
 /* =========================================================
    Tifo 디자인 토큰 — design_handoff_ontheball/prototype/design/colors_and_type.css 기준
@@ -87,10 +88,13 @@
   }
 }
 
-/* next/font 변수 연결 */
+/* 폰트 패밀리 연결
+   - sans: 자체 호스팅 동적 서브셋(pretendard-subset.css의 "Pretendard Variable")
+           → CLS 보정 fallback("Pretendard Fallback") → 시스템 한글 순
+   - mono: JetBrains Mono는 next/font/local 변수(--font-jetbrains-mono) 유지 */
 @theme inline {
-  --font-sans: var(--font-pretendard), "Pretendard", "Apple SD Gothic Neo",
-    "Helvetica Neue", Arial, sans-serif;
+  --font-sans: "Pretendard Variable", "Pretendard Fallback",
+    "Apple SD Gothic Neo", "Helvetica Neue", Arial, sans-serif;
   --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace,
     Menlo, Monaco, Consolas, monospace;
 }

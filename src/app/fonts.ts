@@ -1,17 +1,10 @@
 import localFont from "next/font/local";
 
 /**
- * Pretendard Variable — 디스플레이/본문 공용 (핸드오프 동봉본, SIL OFL)
- * 디자인 규칙: display 500 / body 400
- */
-export const pretendard = localFont({
-  src: "./fonts/PretendardVariable.woff2",
-  weight: "45 920",
-  display: "swap",
-  variable: "--font-pretendard",
-});
-
-/**
+ * Pretendard는 next/font가 아니라 자체 호스팅 동적 서브셋으로 로드한다.
+ * → src/app/styles/pretendard-subset.css (public/fonts/pretendard/*.woff2, unicode-range 92조각)
+ * 단일 2MB 통짜 로드를 피하고, 화면에 등장한 글자 범위만 받는다.
+ *
  * JetBrains Mono — 숫자·통계·포지션 라벨용 (tnum과 함께 사용)
  * next/font/google은 빌드 시 네트워크 의존이라 로컬 파일로 통일
  */
