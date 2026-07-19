@@ -193,12 +193,14 @@ export function mapDemographic(row: PollDemographicRow): PollDemographic {
   };
 }
 
+/** 실사용자·시드 댓글 공통 폴백 닉네임 */
+const FALLBACK_NICKNAME = "익명의 축덕";
+
 /** comments 조인 행 → PollComment (viewerId = 세션 uid, 없으면 null) */
 export function mapComment(row: CommentRow, viewerId: string | null): PollComment {
   // 실사용자 댓글은 프로필, 시드 댓글(user_id null)은 display_* 비정규화 필드 사용
-  const name = row.user_id
-    ? (row.profiles?.nickname ?? "익명의 축덕")
-    : (row.display_name ?? "익명의 축덕");
+  const name =
+    (row.user_id ? row.profiles?.nickname : row.display_name) ?? FALLBACK_NICKNAME;
   const tag = row.user_id ? (row.profiles?.fan_team ?? null) : row.display_tag;
 
   return {

@@ -11,9 +11,7 @@ import {
   type PollResultRow,
   type PollRow,
 } from "@/entities/poll/api/mappers";
-import type { PollListItem, PollType } from "@/entities/poll/model/types";
-
-const POLL_TYPES: readonly PollType[] = ["balance", "ranking", "kit", "tmi"];
+import { POLL_TYPES, type PollListItem, type PollType } from "@/entities/poll/model/types";
 
 /**
  * GET /api/polls?type=balance|ranking|kit|tmi — 투표 리스트 (position asc)

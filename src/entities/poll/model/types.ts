@@ -3,8 +3,9 @@
  * DB(polls/poll_options/votes)의 snake_case를 camelCase로 매핑한 형태.
  */
 
-/** 투표 4종 — polls.type */
-export type PollType = "balance" | "ranking" | "kit" | "tmi";
+/** 투표 4종 — polls.type (런타임 검증·순회의 단일 소스) */
+export const POLL_TYPES = ["balance", "ranking", "kit", "tmi"] as const;
+export type PollType = (typeof POLL_TYPES)[number];
 
 /** poll_options.meta (balance side) — sublabel 컬럼 = 라틴 표기 */
 export type BalanceSideMeta = {
