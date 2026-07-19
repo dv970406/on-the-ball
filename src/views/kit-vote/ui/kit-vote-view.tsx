@@ -105,7 +105,7 @@ function KitVoteBody({ poll }: { poll: PollDetail }) {
         </div>
 
         {/* 투표 확인 스트립 — 재탭 취소 안내 */}
-        {myKit && !isClosed && (
+        {myKit && !closed && (
           <div className="mt-5 flex animate-fade-up items-center gap-2.5 rounded-lg border border-hairline-cool bg-canvas-soft p-3.5">
             <Icon as={CheckCircle2} size={16} className="shrink-0 text-primary-deep" aria-hidden />
             <p className="flex-1 text-xs text-ink">
