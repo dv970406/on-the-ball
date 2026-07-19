@@ -16,9 +16,7 @@ export const quizQueryKeys = {
 export function useQuizListQuery() {
   return useQuery({
     queryKey: quizQueryKeys.list(),
-    queryFn: () => apiFetch<QuizListData>("/api/quizzes"),
-    staleTime: 30_000,
-  });
+    queryFn: () => apiFetch<QuizListData>("/api/quizzes"),  });
 }
 
 /** 퀴즈 디테일 — 라인업·보기·내 도전 기록 포함 */
@@ -26,7 +24,5 @@ export function useQuizDetailQuery(id: string) {
   return useQuery({
     queryKey: quizQueryKeys.detail(id),
     queryFn: () => apiFetch<QuizDetailData>(`/api/quizzes/${id}`),
-    enabled: id.length > 0,
-    staleTime: 30_000,
-  });
+    enabled: id.length > 0,  });
 }

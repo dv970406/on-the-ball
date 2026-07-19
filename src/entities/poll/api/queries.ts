@@ -19,9 +19,7 @@ export function usePollsQuery(type?: PollType) {
   return useQuery({
     queryKey: pollQueryKeys.list(type),
     queryFn: () =>
-      apiFetch<PollListItem[]>(type ? `/api/polls?type=${type}` : "/api/polls"),
-    staleTime: 30_000,
-  });
+      apiFetch<PollListItem[]>(type ? `/api/polls?type=${type}` : "/api/polls"),  });
 }
 
 /** 투표 디테일 — 응답자 분석·댓글 수 포함 */
@@ -29,9 +27,7 @@ export function usePollDetailQuery(id: string) {
   return useQuery({
     queryKey: pollQueryKeys.detail(id),
     queryFn: () => apiFetch<PollDetail>(`/api/polls/${id}`),
-    enabled: id.length > 0,
-    staleTime: 30_000,
-  });
+    enabled: id.length > 0,  });
 }
 
 /** "한 줄 거들기" 댓글 목록 (최신순) */

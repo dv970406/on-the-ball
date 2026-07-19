@@ -26,6 +26,5 @@ export function useMyActivityQuery() {
       await ensureAnonymousSession();
       return apiFetch<MyActivity | null>("/api/me/activity");
     },
-    staleTime: 30_000,
   });
 }

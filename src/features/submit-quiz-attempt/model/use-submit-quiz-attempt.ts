@@ -23,9 +23,13 @@ export function useSubmitQuizAttempt(quizId: string) {
       });
     },
     onSuccess: () => {
-      // 선택률·내 도전 기록이 바뀌므로 퀴즈 전체 + 스트릭 갱신으로 유저도 무효화
-      void queryClient.invalidateQueries({ queryKey: quizQueryKeys.all });
-      void queryClient.invalidateQueries({ queryKey: userQueryKeys.all });
+      // 선택률·내 도전 기록이 바뀌므로 퀴즈 전체 + 스트릭 갱신으로 유저도 무효화.
+      // 리빌이 재조회 결과에 의존하므로 cast-vote와 동일하게 Promise를 반환해
+      // 리페치 완료까지 isPending을 유지 → 리페치 전 재제출 레이스를 막는다.
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: quizQueryKeys.all }),
+        queryClient.invalidateQueries({ queryKey: userQueryKeys.all }),
+      ]);
     },
   });
 }

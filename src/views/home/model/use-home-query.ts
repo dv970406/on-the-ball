@@ -19,6 +19,5 @@ export function useHomeQuery() {
       await ensureAnonymousSession();
       return apiFetch<HomeFeed>("/api/home");
     },
-    staleTime: 30_000,
   });
 }
