@@ -1,3 +1,4 @@
+import { COLOR } from "@/shared/config";
 import type { BalanceSideMeta, PollOption } from "../model/types";
 
 /**
@@ -12,7 +13,7 @@ export function readSideMeta(option: PollOption): BalanceSideMeta {
   return {
     side: meta.side === "b" ? "b" : "a",
     metaLine: typeof meta.metaLine === "string" ? meta.metaLine : "",
-    tone: typeof meta.tone === "string" ? meta.tone : "#171717",
+    tone: typeof meta.tone === "string" ? meta.tone : COLOR.ink,
     text: typeof meta.text === "string" ? meta.text : "#fff",
     accent: typeof meta.accent === "string" ? meta.accent : null,
     stats: Array.isArray(meta.stats) ? meta.stats : [],

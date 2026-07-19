@@ -35,7 +35,7 @@ function StreakCard() {
           ▸ STREAK
         </div>
         <div className="text-[17px] font-semibold">연속 정답 {streak}일째</div>
-        <div className="mt-0.5 text-[11px] text-[#9a9a9a]">
+        <div className="mt-0.5 text-[11px] text-ink-mute-2">
           상위 4% · 한 번이라도 틀리면 0으로 리셋
         </div>
       </div>

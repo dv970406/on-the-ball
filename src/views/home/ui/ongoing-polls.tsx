@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Trophy } from "lucide-react";
-import { Icon, Pill, SectionHead, Shirt } from "@/shared/ui";
+import { Icon, LiveStatusPill, Pill, SectionHead, Shirt } from "@/shared/ui";
 import { cn, formatCount, formatDday, isClosed } from "@/shared/lib";
 import { ROUTES } from "@/shared/config";
 import type { PollListItem } from "@/entities/poll";
@@ -45,9 +45,7 @@ function OngoingPollCard({ poll }: { poll: PollListItem }) {
       <span className="min-w-0 flex-1">
         {/* 상태 pill 줄 — 내가 투표한 폴이면 '참여함' */}
         <span className="mb-2 flex flex-wrap gap-1.5">
-          <Pill variant="green" dot="#171717">
-            진행 중
-          </Pill>
+          <LiveStatusPill>진행 중</LiveStatusPill>
           {poll.tag ? <Pill variant="soft">{poll.tag}</Pill> : null}
           {poll.myVote ? <Pill variant="soft">참여함</Pill> : null}
         </span>

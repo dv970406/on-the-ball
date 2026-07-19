@@ -2,8 +2,9 @@
 
 import { useMemo } from "react";
 import { CheckCircle2 } from "lucide-react";
-import { Icon, Pill, RatioBar } from "@/shared/ui";
+import { Icon, LiveStatusPill, RatioBar } from "@/shared/ui";
 import { cn, formatCount, formatDday, formatPct, isClosed } from "@/shared/lib";
+import { COLOR } from "@/shared/config";
 import { readSideMeta, type BalanceSideMeta, type PollDetail, type PollOption } from "@/entities/poll";
 import { RevealRatioBar } from "./reveal-ratio-bar";
 import { CommentSection } from "./comment-section";
@@ -50,9 +51,7 @@ export function BalanceRevealView({ poll, a, b, mySide }: BalanceRevealViewProps
     <div className="animate-fade-up px-5 pb-6 pt-3">
       {/* 메타 pill 줄 */}
       <div className="mb-2.5 flex flex-wrap items-center gap-2">
-        <Pill variant="green" dot="#171717">
-          결과 공개
-        </Pill>
+        <LiveStatusPill>결과 공개</LiveStatusPill>
         <span className="whitespace-nowrap text-[12px] text-ink-mute">
           <span className="tnum font-mono text-ink">{formatCount(poll.totalVotes)}</span>명 투표
         </span>
@@ -115,8 +114,8 @@ export function BalanceRevealView({ poll, a, b, mySide }: BalanceRevealViewProps
                 </div>
                 <RatioBar
                   segments={[
-                    { ratio: row.aRatio, color: "#171717" },
-                    { ratio: row.bRatio, color: "#dfdfdf" },
+                    { ratio: row.aRatio, color: COLOR.ink },
+                    { ratio: row.bRatio, color: COLOR.hairline },
                   ]}
                   height={8}
                   trackColor="var(--color-canvas-soft)"

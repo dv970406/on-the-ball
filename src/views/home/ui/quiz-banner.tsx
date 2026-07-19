@@ -21,7 +21,7 @@ export function QuizBanner({ quiz }: { quiz: HomeTodayQuiz }) {
           <span className="font-mono text-[11px] uppercase tracking-[0.8px] text-primary">
             ▸ 오늘의 퀴즈
           </span>
-          <span className="tnum text-[11px] text-[#9a9a9a]">
+          <span className="tnum text-[11px] text-ink-mute-2">
             정답률 <span className="font-mono">{quiz.accuracyPct}%</span>
           </span>
         </span>
@@ -54,7 +54,7 @@ export function QuizBanner({ quiz }: { quiz: HomeTodayQuiz }) {
           <span className="inline-flex items-center rounded-sm bg-primary px-3 py-2 text-[13px] font-medium leading-none text-on-primary">
             맞춰보기 →
           </span>
-          <span className="text-[11px] text-[#9a9a9a]">
+          <span className="text-[11px] text-ink-mute-2">
             <span className="tnum font-mono">{formatCount(quiz.attempts)}</span>명 도전 중
           </span>
         </span>

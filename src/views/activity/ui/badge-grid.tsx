@@ -1,8 +1,6 @@
 import { cn } from "@/shared/lib";
+import { COLOR } from "@/shared/config";
 import type { ActivityBadge } from "../model/use-my-activity";
-
-/** 미획득 뱃지 아이콘 배경 (hairline-strong) */
-const LOCKED_COLOR = "#c7c7c7";
 
 /** 뱃지 3열 그리드 — 미획득은 opacity 0.55 + '?' */
 export function BadgeGrid({ badges }: { badges: ActivityBadge[] }) {
@@ -22,7 +20,7 @@ export function BadgeGrid({ badges }: { badges: ActivityBadge[] }) {
               "mx-auto mb-2 flex size-9 items-center justify-center rounded-[9px] text-sm font-bold",
               badge.earned ? "text-white" : "text-ink-mute",
             )}
-            style={{ background: badge.earned ? badge.color : LOCKED_COLOR }}
+            style={{ background: badge.earned ? badge.color : COLOR.hairlineStrong }}
           >
             {badge.earned ? "✓" : "?"}
           </span>

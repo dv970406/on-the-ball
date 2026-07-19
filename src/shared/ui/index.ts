@@ -7,6 +7,7 @@ export { Shirt, type ShirtStripe } from "./shirt";
 export { Avatar } from "./avatar";
 export { SectionHead } from "./section-head";
 export { LiveDot } from "./live-dot";
+export { LiveStatusPill } from "./live-status-pill";
 export { Wordmark } from "./wordmark";
 export { RatioBar, type RatioSegment } from "./ratio-bar";
 export { Skeleton } from "./skeleton";

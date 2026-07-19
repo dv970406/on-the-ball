@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Pill, RatioBar } from "@/shared/ui";
 import { formatCount, formatDday } from "@/shared/lib";
 import { readSideMeta, VsBadge, type PollListItem, type PollOption } from "@/entities/poll";
-import { ROUTES } from "@/shared/config";
+import { COLOR, ROUTES } from "@/shared/config";
 
 type BalanceListCardProps = {
   poll: PollListItem;
@@ -57,7 +57,7 @@ export function BalanceListCard({ poll, a, b }: BalanceListCardProps) {
 
         {/* 4px 비율 바 — 다크 = A 점유율 */}
         <RatioBar
-          segments={[{ ratio: a.ratio, color: "#171717" }]}
+          segments={[{ ratio: a.ratio, color: COLOR.ink }]}
           height={4}
           trackColor="#f1f1f1"
         />

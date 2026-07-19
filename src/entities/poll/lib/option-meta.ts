@@ -1,3 +1,4 @@
+import { COLOR } from "@/shared/config";
 import type {
   KitMeta,
   PollOption,
@@ -17,7 +18,7 @@ export function readKitMeta(option: PollOption): KitMeta {
   const meta = option.meta as Partial<KitMeta>;
   const stripe = meta.stripe;
   return {
-    tone: typeof meta.tone === "string" ? meta.tone : "#dfdfdf",
+    tone: typeof meta.tone === "string" ? meta.tone : COLOR.hairline,
     stripe:
       stripe === "sash" || stripe === "h" || stripe === "v" ? stripe : null,
     dark: meta.dark === true,

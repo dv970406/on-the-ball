@@ -10,7 +10,7 @@ import {
 } from "@/entities/poll";
 import { useCastVote } from "@/features/cast-vote";
 import { SubHeader } from "@/widgets/sub-header";
-import { Button, EmptyState, Flag, Icon, Pill, RatioBar, Skeleton } from "@/shared/ui";
+import { Button, EmptyState, Flag, Icon, LiveStatusPill, Pill, RatioBar, Skeleton } from "@/shared/ui";
 import { ApiError } from "@/shared/api";
 import { cn, formatCount, formatDday, formatPct, isClosed } from "@/shared/lib";
 import { COLOR } from "@/shared/config";
@@ -80,9 +80,7 @@ function RankingDetailBody({ poll }: { poll: PollDetail }) {
               마감
             </Pill>
           ) : (
-            <Pill variant="green" dot="#171717">
-              진행 중
-            </Pill>
+            <LiveStatusPill>진행 중</LiveStatusPill>
           )}
           {poll.closesAt && !closed && (
             <span className="text-[11px] text-ink-mute-2">

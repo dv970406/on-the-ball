@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CircleAlert, Lightbulb, LightbulbOff, Share2 } from "lucide-react";
 import { SubHeader } from "@/widgets/sub-header";
-import { Button, EmptyState, Icon, Pill, Skeleton } from "@/shared/ui";
+import { Button, EmptyState, Icon, LiveStatusPill, Pill, Skeleton } from "@/shared/ui";
 import { cn, formatCount, formatPct } from "@/shared/lib";
 import { ROUTES } from "@/shared/config";
 import { QuizPitch } from "./quiz-pitch";
@@ -91,9 +91,7 @@ export function QuizDetailView({ id }: { id: string }) {
           {done ? (
             <Pill variant="soft">도전 완료</Pill>
           ) : (
-            <Pill variant="green" dot="#171717">
-              진행 중
-            </Pill>
+            <LiveStatusPill>진행 중</LiveStatusPill>
           )}
           <span className="tnum text-xs text-ink-mute">
             정답률{" "}
@@ -217,7 +215,7 @@ export function QuizDetailView({ id }: { id: string }) {
               <div
                 className={cn(
                   "mt-1 text-[13px] leading-normal",
-                  isCorrect ? "text-[#9a9a9a]" : "text-ink-mute",
+                  isCorrect ? "text-ink-mute-2" : "text-ink-mute",
                 )}
               >
                 정답은{" "}

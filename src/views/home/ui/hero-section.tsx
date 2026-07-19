@@ -45,7 +45,7 @@ export function HeroSection({ poll }: { poll: PollListItem }) {
           <Pill variant="soft">마감</Pill>
         ) : (
           <Pill variant="green">
-            <LiveDot color="#171717" />
+            <LiveDot tone="ink" />
             진행 중
           </Pill>
         )}

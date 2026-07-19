@@ -9,7 +9,16 @@ import {
 } from "@/entities/poll";
 import { useCastVote } from "@/features/cast-vote";
 import { SubHeader } from "@/widgets/sub-header";
-import { Button, EmptyState, Icon, Pill, RatioBar, Shirt, Skeleton } from "@/shared/ui";
+import {
+  Button,
+  EmptyState,
+  Icon,
+  LiveStatusPill,
+  Pill,
+  RatioBar,
+  Shirt,
+  Skeleton,
+} from "@/shared/ui";
 import { ApiError } from "@/shared/api";
 import { cn, formatCount, formatDday, formatPct, isClosed } from "@/shared/lib";
 import { COLOR } from "@/shared/config";
@@ -70,9 +79,7 @@ function KitVoteBody({ poll }: { poll: PollDetail }) {
           {closed ? (
             <Pill variant="outline">마감</Pill>
           ) : (
-            <Pill variant="green" dot="#171717">
-              진행 중
-            </Pill>
+            <LiveStatusPill>진행 중</LiveStatusPill>
           )}
           <span className="text-xs text-ink-mute">
             <span className="font-mono tnum">{formatCount(poll.totalVotes)}</span>명 투표

@@ -25,7 +25,7 @@ export function BalanceVoteView({ poll, a, b, picked, onPick, voteError }: Balan
       {/* 메타 pill 줄 */}
       <div className="mb-2.5 flex flex-wrap items-center gap-2">
         <Pill variant="green">
-          <LiveDot color="#171717" />
+          <LiveDot tone="ink" />
           진행 중
         </Pill>
         <span className="whitespace-nowrap text-[12px] text-ink-mute">
