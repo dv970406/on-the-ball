@@ -3,10 +3,13 @@ import { fail, ok, withSupabase } from "@/shared/api/handler";
 import {
   POLL_OPTION_SELECT,
   POLL_SELECT,
+  buildLikesByPoll,
   buildPollListItem,
   buildVotesByOption,
+  fetchMyLikesByPoll,
   fetchMyVotesByPoll,
   groupOptionsByPoll,
+  type PollLikeStatsRow,
   type PollOptionRow,
   type PollResultRow,
   type PollRow,
@@ -42,8 +45,8 @@ export async function GET(request: NextRequest) {
 
     const pollIds = polls.map((p) => p.id);
 
-    // 2) 선택지 + 득표 집계(시드 + 실투표) 병렬 조회
-    const [optionsRes, resultsRes] = await Promise.all([
+    // 2) 선택지 + 득표 집계(시드 + 실투표) + 좋아요 수 병렬 조회
+    const [optionsRes, resultsRes, likesRes] = await Promise.all([
       supabase
         .from("poll_options")
         .select(POLL_OPTION_SELECT)
@@ -53,13 +56,20 @@ export async function GET(request: NextRequest) {
         .from("poll_results")
         .select("poll_id, option_id, votes")
         .in("poll_id", pollIds),
+      supabase
+        .from("poll_like_stats")
+        .select("poll_id, likes")
+        .in("poll_id", pollIds),
     ]);
-    if (optionsRes.error || resultsRes.error) {
+    if (optionsRes.error || resultsRes.error || likesRes.error) {
       return fail(500, "투표 목록을 불러오지 못했어요.");
     }
 
-    // 3) 내 투표 (세션 없으면 빈 맵 — RLS로 본인 행만 조회됨)
-    const myVoteByPoll = await fetchMyVotesByPoll(supabase, user?.id ?? null, pollIds);
+    // 3) 내 투표·내 좋아요 (세션 없으면 빈 값 — RLS로 본인 행만 조회됨)
+    const [myVoteByPoll, myLikedPolls] = await Promise.all([
+      fetchMyVotesByPoll(supabase, user?.id ?? null, pollIds),
+      fetchMyLikesByPoll(supabase, user?.id ?? null, pollIds),
+    ]);
 
     // 4) poll_id 기준으로 조합
     const optionsByPoll = groupOptionsByPoll(
@@ -68,6 +78,9 @@ export async function GET(request: NextRequest) {
     const votesByOption = buildVotesByOption(
       (resultsRes.data ?? []) as PollResultRow[],
     );
+    const likesByPoll = buildLikesByPoll(
+      (likesRes.data ?? []) as PollLikeStatsRow[],
+    );
 
     const items = polls.map((poll) =>
       buildPollListItem(
@@ -75,6 +88,8 @@ export async function GET(request: NextRequest) {
         optionsByPoll.get(poll.id) ?? [],
         votesByOption,
         myVoteByPoll.get(poll.id) ?? null,
+        likesByPoll.get(poll.id) ?? 0,
+        myLikedPolls.has(poll.id),
       ),
     );
 

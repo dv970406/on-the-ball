@@ -30,41 +30,43 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params;
+  const { id: slug } = await params;
 
   return withSupabase(async ({ supabase, user }) => {
+    // [id]는 slug — quizzes.slug로 조회해 정수 id 확보
     const { data: quizData, error: quizError } = await supabase
       .from("quizzes")
       .select(QUIZ_SELECT)
-      .eq("id", id)
+      .eq("slug", slug)
       .maybeSingle();
     if (quizError) return fail(500, "퀴즈를 불러오지 못했어요.");
     if (!quizData) return fail(404, "퀴즈를 찾을 수 없어요.");
 
     const quiz = quizData as QuizRow;
+    const quizId = quiz.id;
 
     // 미래 문제는 잠금 — 보기·라인업 노출 금지
     if (quiz.opens_on > todayUtc()) {
       return fail(423, "아직 열리지 않은 문제예요. 매일 오전 8시에 새 문제가 열려요.");
     }
 
-    // 보기·집계·라인업·내 시도·리빌 병렬 조회
+    // 보기·집계·라인업·내 시도·리빌 병렬 조회 (정수 quiz_id 기준)
     // quiz_reveal은 시도한 유저에게만 행이 보이므로 미시도면 빈 결과가 온다
     const [choicesRes, choiceStatsRes, statsRes, lineupRes, attemptRes, revealRes] =
       await Promise.all([
         supabase
           .from("quiz_choices")
           .select(QUIZ_CHOICE_SELECT)
-          .eq("quiz_id", id)
+          .eq("quiz_id", quizId)
           .order("position", { ascending: true }),
         supabase
           .from("quiz_choice_stats")
           .select(QUIZ_CHOICE_STATS_SELECT)
-          .eq("quiz_id", id),
+          .eq("quiz_id", quizId),
         supabase
           .from("quiz_stats")
           .select(QUIZ_STATS_SELECT)
-          .eq("quiz_id", id)
+          .eq("quiz_id", quizId)
           .maybeSingle(),
         quiz.lineup_id
           ? supabase
@@ -77,12 +79,12 @@ export async function GET(
           ? supabase
               .from("quiz_attempts")
               .select("quiz_id, choice_id, is_correct")
-              .eq("quiz_id", id)
+              .eq("quiz_id", quizId)
               .eq("user_id", user.id)
               .maybeSingle()
           : Promise.resolve({ data: null, error: null }),
         user
-          ? supabase.from("quiz_reveal").select(QUIZ_REVEAL_SELECT).eq("quiz_id", id)
+          ? supabase.from("quiz_reveal").select(QUIZ_REVEAL_SELECT).eq("quiz_id", quizId)
           : Promise.resolve({ data: [], error: null }),
       ]);
     if (
@@ -114,7 +116,7 @@ export async function GET(
     }
 
     return ok<QuizDetailData>({
-      id: quiz.id,
+      id: quiz.slug,
       kind: quiz.kind,
       title: quiz.title,
       subtitle: quiz.subtitle,

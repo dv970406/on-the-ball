@@ -28,8 +28,8 @@ export type ProfileRow = {
 };
 
 export type VoteRow = {
-  poll_id: string;
-  option_id: string;
+  poll_id: number;
+  option_id: number;
   created_at: string;
   polls: { type: PollType; title: string } | { type: PollType; title: string }[] | null;
   poll_options: { label: string } | { label: string }[] | null;
@@ -43,13 +43,13 @@ export type AttemptRow = {
 };
 
 export type BadgeRow = {
-  id: string;
+  id: number;
   label: string;
   description: string | null;
   color: string | null;
 };
 
-export type PollResultRow = { poll_id: string; option_id: string; votes: number };
+export type PollResultRow = { poll_id: number; option_id: number; votes: number };
 
 /** PostgREST to-one 임베드가 객체/배열 어느 쪽으로 와도 첫 행만 취한다 */
 function one<T>(rel: T | T[] | null): T | null {
@@ -107,7 +107,7 @@ export function buildActivityStats(
 /** 전체 뱃지 × 내 획득 여부 → 뱃지 목록 */
 export function buildActivityBadges(
   badgeRows: BadgeRow[],
-  myBadgeRows: { badge_id: string }[],
+  myBadgeRows: { badge_id: number }[],
 ): ActivityBadge[] {
   const earnedIds = new Set(myBadgeRows.map((b) => b.badge_id));
   return badgeRows.map((b) => ({
@@ -125,8 +125,8 @@ export function buildActivityRecent(
   attemptRows: AttemptRow[],
   pollResults: PollResultRow[],
 ): ActivityRecent[] {
-  const totalByPoll = new Map<string, number>();
-  const votesByOption = new Map<string, number>();
+  const totalByPoll = new Map<number, number>();
+  const votesByOption = new Map<number, number>();
   for (const row of pollResults) {
     totalByPoll.set(row.poll_id, (totalByPoll.get(row.poll_id) ?? 0) + row.votes);
     votesByOption.set(row.option_id, row.votes);

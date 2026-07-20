@@ -38,7 +38,8 @@ export type TmiPollMeta = { player: string; club: string; flag: string; detail: 
 
 /** 투표 선택지 — votes = poll_results 뷰(시드 + 실투표 합) */
 export type PollOption = {
-  id: string;
+  /** poll_options.id (정수 대리키) */
+  id: number;
   position: number;
   label: string;
   sublabel: string | null;
@@ -50,6 +51,7 @@ export type PollOption = {
 
 /** 리스트/덱 카드용 투표 아이템 */
 export type PollListItem = {
+  /** 공개 식별자 = polls.slug (URL·쿼리키에 사용) */
   id: string;
   type: PollType;
   title: string;
@@ -63,14 +65,18 @@ export type PollListItem = {
   totalVotes: number;
   options: PollOption[];
   /** 내가 투표한 option id (미투표·비로그인 시 null) */
-  myVote: string | null;
+  myVote: number | null;
+  /** 좋아요 수 (poll_like_stats) */
+  likes: number;
+  /** 내가 좋아요를 눌렀는지 (비로그인 시 false) */
+  likedByMe: boolean;
 };
 
 /** 응답자 분석 한 줄 (poll_demographics — v1 시드 값) */
 export type PollDemographic = {
   dimension: "age" | "region";
   bucket: string;
-  optionId: string | null;
+  optionId: number | null;
   ratio: number;
   position: number;
 };
@@ -96,5 +102,5 @@ export type PollComment = {
 /** cast_vote RPC 결과 — cancelled는 유니폼(kit) 재탭 취소 */
 export type CastVoteResult = {
   status: "voted" | "cancelled" | "unchanged";
-  optionId: string | null;
+  optionId: number | null;
 };

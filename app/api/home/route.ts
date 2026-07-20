@@ -2,10 +2,13 @@ import { fail, ok, withSupabase } from "@/shared/api/handler";
 import {
   POLL_OPTION_SELECT,
   POLL_SELECT,
+  buildLikesByPoll,
   buildPollListItem,
   buildVotesByOption,
+  fetchMyLikesByPoll,
   fetchMyVotesByPoll,
   groupOptionsByPoll,
+  type PollLikeStatsRow,
   type PollOptionRow,
   type PollResultRow,
   type PollRow,
@@ -21,14 +24,21 @@ import {
 import type { HomeFeed, HomeTrendingItem } from "@/views/home/model/types";
 import { todayUtc } from "@/shared/lib/format";
 
-/** trending_items 테이블 행 */
+/** trending_items 테이블 행 — 연결 poll의 slug를 임베드해 공개 식별자로 사용 */
 type TrendingRow = {
   position: number;
   title: string;
   vote_count: number;
   delta: "up" | "down" | "new";
-  poll_id: string | null;
+  polls: { slug: string } | { slug: string }[] | null;
 };
+
+/** PostgREST to-one 임베드가 객체/배열 어느 쪽으로 와도 첫 행만 취한다 */
+function oneSlug(rel: { slug: string } | { slug: string }[] | null): string | null {
+  if (rel == null) return null;
+  const row = Array.isArray(rel) ? (rel[0] ?? null) : rel;
+  return row?.slug ?? null;
+}
 
 const HOME_FETCH_ERROR = "홈 피드를 불러오지 못했어요.";
 
@@ -58,7 +68,7 @@ export async function GET() {
         .maybeSingle(),
       supabase
         .from("trending_items")
-        .select("position, title, vote_count, delta, poll_id")
+        .select("position, title, vote_count, delta, polls(slug)")
         .order("position", { ascending: true }),
     ]);
     if (pollsRes.error || quizRes.error || trendingRes.error) {
@@ -70,8 +80,8 @@ export async function GET() {
     const trendingRows = (trendingRes.data ?? []) as TrendingRow[];
     const pollIds = polls.map((p) => p.id);
 
-    // 2) 선택지·득표 집계 + 퀴즈 라인업·통계 병렬 조회 (폴이 없으면 빈 in() 쿼리 회피)
-    const [optionsRes, resultsRes, statsRes, lineupRes] = await Promise.all([
+    // 2) 선택지·득표 집계·좋아요 수 + 퀴즈 라인업·통계 병렬 조회 (폴이 없으면 빈 in() 쿼리 회피)
+    const [optionsRes, resultsRes, likesRes, statsRes, lineupRes] = await Promise.all([
       pollIds.length > 0
         ? supabase
             .from("poll_options")
@@ -83,6 +93,12 @@ export async function GET() {
         ? supabase
             .from("poll_results")
             .select("poll_id, option_id, votes")
+            .in("poll_id", pollIds)
+        : Promise.resolve({ data: [], error: null }),
+      pollIds.length > 0
+        ? supabase
+            .from("poll_like_stats")
+            .select("poll_id, likes")
             .in("poll_id", pollIds)
         : Promise.resolve({ data: [], error: null }),
       quiz
@@ -100,12 +116,21 @@ export async function GET() {
             .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
     ]);
-    if (optionsRes.error || resultsRes.error || statsRes.error || lineupRes.error) {
+    if (
+      optionsRes.error ||
+      resultsRes.error ||
+      likesRes.error ||
+      statsRes.error ||
+      lineupRes.error
+    ) {
       return fail(500, HOME_FETCH_ERROR);
     }
 
-    // 3) 내 투표 — 세션 유저 있을 때만 (RLS로 본인 행만, 빈 pollIds면 빈 맵)
-    const myVoteByPoll = await fetchMyVotesByPoll(supabase, user?.id ?? null, pollIds);
+    // 3) 내 투표·내 좋아요 — 세션 유저 있을 때만 (RLS로 본인 행만, 빈 pollIds면 빈 값)
+    const [myVoteByPoll, myLikedPolls] = await Promise.all([
+      fetchMyVotesByPoll(supabase, user?.id ?? null, pollIds),
+      fetchMyLikesByPoll(supabase, user?.id ?? null, pollIds),
+    ]);
 
     // 4) PollListItem 조합
     const optionsByPoll = groupOptionsByPoll(
@@ -114,6 +139,9 @@ export async function GET() {
     const votesByOption = buildVotesByOption(
       (resultsRes.data ?? []) as PollResultRow[],
     );
+    const likesByPoll = buildLikesByPoll(
+      (likesRes.data ?? []) as PollLikeStatsRow[],
+    );
 
     const items = polls.map((poll) =>
       buildPollListItem(
@@ -121,6 +149,8 @@ export async function GET() {
         optionsByPoll.get(poll.id) ?? [],
         votesByOption,
         myVoteByPoll.get(poll.id) ?? null,
+        likesByPoll.get(poll.id) ?? 0,
+        myLikedPolls.has(poll.id),
       ),
     );
 
@@ -137,7 +167,7 @@ export async function GET() {
     const lineup = (lineupRes.data ?? null) as LineupRow | null;
     const todayQuiz: HomeFeed["todayQuiz"] = quiz
       ? {
-          id: quiz.id,
+          id: quiz.slug,
           title: quiz.title,
           attempts: stats?.attempts ?? 0,
           accuracyPct: stats?.accuracy_pct ?? 0,
@@ -150,7 +180,7 @@ export async function GET() {
       title: row.title,
       voteCount: row.vote_count,
       delta: row.delta,
-      pollId: row.poll_id,
+      pollId: oneSlug(row.polls),
     }));
 
     return ok<HomeFeed>({ hero, quickPicks, todayQuiz, ongoing, trending });

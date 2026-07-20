@@ -50,7 +50,7 @@ export function RankingDetailView({ pollId }: RankingDetailViewProps) {
 
 function RankingDetailBody({ poll }: { poll: PollDetail }) {
   // 투표 전 radio 선택 — 로컬 상태
-  const [picked, setPicked] = useState<string | null>(null);
+  const [picked, setPicked] = useState<number | null>(null);
   const castVote = useCastVote(poll.id);
 
   // 마감이면 투표 불가 — 결과만 공개

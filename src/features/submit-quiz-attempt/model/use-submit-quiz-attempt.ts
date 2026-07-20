@@ -14,7 +14,7 @@ export function useSubmitQuizAttempt(quizId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (choiceId: string) => {
+    mutationFn: async (choiceId: number) => {
       // 익명 세션 보장 후 제출 — "세션 생성 전 뮤테이션" 레이스 방지
       await ensureAnonymousSession();
       return apiFetch<QuizAttemptResult>(`/api/quizzes/${quizId}/attempts`, {

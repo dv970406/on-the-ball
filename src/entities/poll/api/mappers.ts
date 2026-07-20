@@ -16,7 +16,7 @@ import type {
 // ---------------------------------------------------------------------------
 
 export const POLL_SELECT =
-  "id, type, title, subtitle, tag, closes_at, featured, position, meta";
+  "id, slug, type, title, subtitle, tag, closes_at, featured, position, meta";
 
 export const POLL_OPTION_SELECT = "id, poll_id, position, label, sublabel, meta";
 
@@ -34,9 +34,10 @@ export const COMMENT_SELECT =
 // DB 행 타입
 // ---------------------------------------------------------------------------
 
-/** polls 테이블 행 */
+/** polls 테이블 행 — id는 정수 대리키, slug는 공개 식별자 */
 export type PollRow = {
-  id: string;
+  id: number;
+  slug: string;
   type: PollType;
   title: string;
   subtitle: string | null;
@@ -49,8 +50,8 @@ export type PollRow = {
 
 /** poll_options 테이블 행 */
 export type PollOptionRow = {
-  id: string;
-  poll_id: string;
+  id: number;
+  poll_id: number;
   position: number;
   label: string;
   sublabel: string | null;
@@ -59,22 +60,28 @@ export type PollOptionRow = {
 
 /** poll_results 뷰 행 — votes = 시드 + 실투표 합 */
 export type PollResultRow = {
-  poll_id: string;
-  option_id: string;
+  poll_id: number;
+  option_id: number;
   votes: number;
+};
+
+/** poll_like_stats 뷰 행 — poll별 좋아요 수 */
+export type PollLikeStatsRow = {
+  poll_id: number;
+  likes: number;
 };
 
 /** votes 테이블 행 (내 투표 조회용) */
 export type VoteRow = {
-  poll_id: string;
-  option_id: string;
+  poll_id: number;
+  option_id: number;
 };
 
 /** poll_demographics 테이블 행 */
 export type PollDemographicRow = {
   dimension: "age" | "region";
   bucket: string;
-  option_id: string | null;
+  option_id: number | null;
   ratio: number;
   position: number;
 };
@@ -98,18 +105,39 @@ export type CommentRow = {
 // 매핑 함수
 // ---------------------------------------------------------------------------
 
+/** slug → poll 정수 id 해석 (없으면 null). 실패 시 throw. */
+export async function resolvePollIdBySlug(
+  supabase: SupabaseClient,
+  slug: string,
+): Promise<number | null> {
+  const { data, error } = await supabase
+    .from("polls")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? (data as { id: number }).id : null;
+}
+
 /** poll_results 행들을 option_id → votes 맵으로 변환 */
-export function buildVotesByOption(results: PollResultRow[]): Map<string, number> {
-  const map = new Map<string, number>();
+export function buildVotesByOption(results: PollResultRow[]): Map<number, number> {
+  const map = new Map<number, number>();
   for (const row of results) map.set(row.option_id, row.votes);
+  return map;
+}
+
+/** poll_like_stats 행들을 poll_id → likes 맵으로 변환 */
+export function buildLikesByPoll(rows: PollLikeStatsRow[]): Map<number, number> {
+  const map = new Map<number, number>();
+  for (const row of rows) map.set(row.poll_id, row.likes);
   return map;
 }
 
 /** poll_options 행들을 poll_id → 옵션 목록으로 그룹핑 (리스트/홈 라우트 공용) */
 export function groupOptionsByPoll(
   rows: PollOptionRow[],
-): Map<string, PollOptionRow[]> {
-  const map = new Map<string, PollOptionRow[]>();
+): Map<number, PollOptionRow[]> {
+  const map = new Map<number, PollOptionRow[]>();
   for (const row of rows) {
     const group = map.get(row.poll_id);
     if (group) group.push(row);
@@ -125,8 +153,8 @@ export function groupOptionsByPoll(
 export async function fetchMyVotesByPoll(
   supabase: SupabaseClient,
   userId: string | null,
-  pollIds: string[],
-): Promise<Map<string, string>> {
+  pollIds: number[],
+): Promise<Map<number, number>> {
   if (!userId || pollIds.length === 0) return new Map();
   const { data, error } = await supabase
     .from("votes")
@@ -139,12 +167,33 @@ export async function fetchMyVotesByPoll(
   );
 }
 
-/** polls + poll_options + poll_results + 내 투표 → PollListItem */
+/**
+ * 세션 유저가 좋아요한 poll_id 집합 (RLS로 본인 행만 반환).
+ * userId가 없거나 pollIds가 비면 빈 집합. 실패 시 throw.
+ */
+export async function fetchMyLikesByPoll(
+  supabase: SupabaseClient,
+  userId: string | null,
+  pollIds: number[],
+): Promise<Set<number>> {
+  if (!userId || pollIds.length === 0) return new Set();
+  const { data, error } = await supabase
+    .from("poll_likes")
+    .select("poll_id")
+    .eq("user_id", userId)
+    .in("poll_id", pollIds);
+  if (error) throw error;
+  return new Set(((data ?? []) as { poll_id: number }[]).map((r) => r.poll_id));
+}
+
+/** polls + poll_options + poll_results + 내 투표 + 좋아요 → PollListItem */
 export function buildPollListItem(
   poll: PollRow,
   optionRows: PollOptionRow[],
-  votesByOption: Map<string, number>,
-  myVote: string | null,
+  votesByOption: Map<number, number>,
+  myVote: number | null,
+  likes: number,
+  likedByMe: boolean,
 ): PollListItem {
   const sorted = [...optionRows].sort((x, y) => x.position - y.position);
   const totalVotes = sorted.reduce(
@@ -167,7 +216,7 @@ export function buildPollListItem(
   });
 
   return {
-    id: poll.id,
+    id: poll.slug,
     type: poll.type,
     title: poll.title,
     subtitle: poll.subtitle,
@@ -179,6 +228,8 @@ export function buildPollListItem(
     totalVotes,
     options,
     myVote,
+    likes,
+    likedByMe,
   };
 }
 

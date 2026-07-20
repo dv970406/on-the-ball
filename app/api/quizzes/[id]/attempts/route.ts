@@ -6,13 +6,14 @@ import {
   QUIZ_CHOICE_STATS_SELECT,
   buildPicksByChoice,
   buildQuizChoices,
+  resolveQuizIdBySlug,
   type QuizChoiceRow,
   type QuizChoiceStatsRow,
 } from "@/entities/quiz/api/mappers";
 import type { QuizAttemptResult, QuizChoice } from "@/entities/quiz/model/types";
 
 const bodySchema = z.object({
-  choiceId: z.string().min(1),
+  choiceId: z.number().int().positive(),
 });
 
 /** submit_quiz_attempt RPC의 raise exception 메시지 → HTTP 응답 매핑 */
@@ -27,7 +28,7 @@ const RPC_ERROR_MAP: [needle: string, status: number, message: string][] = [
 /** RPC(submit_quiz_attempt) 반환 jsonb 형태 */
 type RpcResult = {
   is_correct: boolean;
-  correct_choice_id: string | null;
+  correct_choice_id: number | null;
   answer_text: string | null;
   streak: number;
 };
@@ -40,7 +41,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params;
+  const { id: slug } = await params;
 
   const json = await request.json().catch(() => null);
   const parsed = bodySchema.safeParse(json);
@@ -50,8 +51,12 @@ export async function POST(
     // RPC도 AUTH_REQUIRED를 던지지만, 세션 없음은 왕복 전에 차단
     if (!user) return fail(401, "로그인 세션이 필요해요.");
 
+    // [id]는 slug — 정수 quiz id로 해석
+    const quizId = await resolveQuizIdBySlug(supabase, slug);
+    if (quizId === null) return fail(404, "퀴즈를 찾을 수 없어요.");
+
     const { data, error } = await supabase.rpc("submit_quiz_attempt", {
-      p_quiz_id: id,
+      p_quiz_id: quizId,
       p_choice_id: parsed.data.choiceId,
     });
 
@@ -73,12 +78,12 @@ export async function POST(
       supabase
         .from("quiz_choices")
         .select(QUIZ_CHOICE_SELECT)
-        .eq("quiz_id", id)
+        .eq("quiz_id", quizId)
         .order("position", { ascending: true }),
       supabase
         .from("quiz_choice_stats")
         .select(QUIZ_CHOICE_STATS_SELECT)
-        .eq("quiz_id", id),
+        .eq("quiz_id", quizId),
     ]);
     if (!choicesRes.error && !choiceStatsRes.error) {
       choices = buildQuizChoices(

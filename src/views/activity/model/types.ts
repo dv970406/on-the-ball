@@ -17,7 +17,7 @@ export type ActivityStats = {
 };
 
 export type ActivityBadge = {
-  id: string;
+  id: number;
   label: string;
   description: string | null;
   color: string;

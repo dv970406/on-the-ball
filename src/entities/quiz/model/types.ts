@@ -41,7 +41,8 @@ export type QuizLineup = {
 
 /** 4지선다 보기 — 정답 여부는 포함하지 않음 (치팅 방지) */
 export type QuizChoice = {
-  id: string;
+  /** quiz_choices.id (정수 대리키) */
+  id: number;
   position: number;
   team: string;
   season: string | null;
@@ -53,9 +54,9 @@ export type QuizChoice = {
 
 /** 내 도전 기록 — 정답 정보는 시도한 유저에게만 quiz_reveal로 공개 */
 export type QuizMyAttempt = {
-  choiceId: string;
+  choiceId: number;
   isCorrect: boolean;
-  correctChoiceId: string | null;
+  correctChoiceId: number | null;
   answerText: string | null;
 };
 
@@ -79,7 +80,7 @@ export type QuizDetailData = {
 /** POST /api/quizzes/[id]/attempts 응답 — RPC 판정 + 최신 선택률 */
 export type QuizAttemptResult = {
   isCorrect: boolean;
-  correctChoiceId: string | null;
+  correctChoiceId: number | null;
   answerText: string | null;
   /** 제출 직후의 연속 정답 일수 (오답이면 0) */
   streak: number;

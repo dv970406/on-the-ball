@@ -22,7 +22,7 @@ export function useQuizAttempt(id: string) {
   const { revealed, trigger, reset } = useDelayedReveal(380);
 
   /** 이번 세션에서 내가 고른 보기 — null이면 아직 미도전(또는 재방문) */
-  const [picked, setPicked] = useState<string | null>(null);
+  const [picked, setPicked] = useState<number | null>(null);
   const [result, setResult] = useState<QuizAttemptResult | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -54,7 +54,7 @@ export function useQuizAttempt(id: string) {
       ? `${correctChoice.team}${correctChoice.season ? ` · ${correctChoice.season}` : ""}`
       : "");
 
-  const handlePick = (choiceId: string) => {
+  const handlePick = (choiceId: number) => {
     if (done || picked !== null || submit.isPending) return;
     setSubmitError(null);
     setPicked(choiceId);

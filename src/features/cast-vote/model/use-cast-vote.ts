@@ -14,7 +14,7 @@ export function useCastVote(pollId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (optionId: string) => {
+    mutationFn: async (optionId: number) => {
       // 익명 세션 보장 후 투표 — "세션 생성 전 뮤테이션" 레이스 방지
       await ensureAnonymousSession();
       return apiFetch<CastVoteResult>(`/api/polls/${pollId}/votes`, {

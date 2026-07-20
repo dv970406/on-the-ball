@@ -9,7 +9,7 @@ export function tmiSideOption(poll: PollListItem, side: TmiSide): PollOption | n
 }
 
 /** optionId → 판정 면 */
-export function tmiSideOfOption(poll: PollListItem, optionId: string): TmiSide | null {
+export function tmiSideOfOption(poll: PollListItem, optionId: number): TmiSide | null {
   const option = poll.options.find((o) => o.id === optionId);
   if (!option) return null;
   return readTmiOptionMeta(option).verdict;

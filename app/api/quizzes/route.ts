@@ -35,7 +35,7 @@ export async function GET() {
     );
 
     // 2) 내 도전 기록 (RLS로 본인 행만 조회됨 — 세션 없으면 생략)
-    const attemptByQuiz = new Map<string, QuizAttemptRow>();
+    const attemptByQuiz = new Map<number, QuizAttemptRow>();
     if (user && quizzes.length > 0) {
       const { data: attemptData, error: attemptsError } = await supabase
         .from("quiz_attempts")

@@ -94,7 +94,7 @@ export async function GET() {
       stats: buildActivityStats(voteCountRes.count ?? 0, attemptStats, profile.current_streak),
       badges: buildActivityBadges(
         (badgesRes.data ?? []) as BadgeRow[],
-        (myBadgesRes.data ?? []) as { badge_id: string }[],
+        (myBadgesRes.data ?? []) as { badge_id: number }[],
       ),
       recent: buildActivityRecent(
         recentVotes,

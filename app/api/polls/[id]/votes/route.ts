@@ -1,10 +1,11 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { fail, ok, withSupabase } from "@/shared/api/handler";
+import { resolvePollIdBySlug } from "@/entities/poll/api/mappers";
 import type { CastVoteResult } from "@/entities/poll/model/types";
 
 const bodySchema = z.object({
-  optionId: z.string().min(1),
+  optionId: z.number().int().positive(),
 });
 
 /** cast_vote RPC의 raise exception 메시지 → HTTP 응답 매핑 */
@@ -25,7 +26,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params;
+  const { id: slug } = await params;
 
   const json = await request.json().catch(() => null);
   const parsed = bodySchema.safeParse(json);
@@ -35,8 +36,12 @@ export async function POST(
     // RPC도 AUTH_REQUIRED를 던지지만, 세션 없음은 왕복 전에 차단
     if (!user) return fail(401, "로그인 세션이 필요해요.");
 
+    // [id]는 slug — 정수 poll id로 해석
+    const pollId = await resolvePollIdBySlug(supabase, slug);
+    if (pollId === null) return fail(404, "투표를 찾을 수 없어요.");
+
     const { data, error } = await supabase.rpc("cast_vote", {
-      p_poll_id: id,
+      p_poll_id: pollId,
       p_option_id: parsed.data.optionId,
     });
 
@@ -51,7 +56,7 @@ export async function POST(
 
     const result = data as {
       status: CastVoteResult["status"];
-      option_id?: string | null;
+      option_id?: number | null;
     };
 
     return ok<CastVoteResult>({

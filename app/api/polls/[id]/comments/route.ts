@@ -4,6 +4,7 @@ import { fail, ok, withSupabase } from "@/shared/api/handler";
 import {
   COMMENT_SELECT,
   mapComment,
+  resolvePollIdBySlug,
   type CommentRow,
 } from "@/entities/poll/api/mappers";
 import type { PollComment } from "@/entities/poll/model/types";
@@ -16,13 +17,16 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params;
+  const { id: slug } = await params;
 
   return withSupabase(async ({ supabase, user }) => {
+    const pollId = await resolvePollIdBySlug(supabase, slug);
+    if (pollId === null) return fail(404, "투표를 찾을 수 없어요.");
+
     const { data, error } = await supabase
       .from("comments")
       .select(COMMENT_SELECT)
-      .eq("poll_id", id)
+      .eq("poll_id", pollId)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       // 응답 크기 상한 — 인기 폴의 댓글 누적 방어. 커서 페이지네이션은 후속 과제.
@@ -46,7 +50,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await params;
+  const { id: slug } = await params;
 
   const json = await request.json().catch(() => null);
   const parsed = bodySchema.safeParse(json);
@@ -55,9 +59,12 @@ export async function POST(
   return withSupabase(async ({ supabase, user }) => {
     if (!user) return fail(401, "로그인 세션이 필요해요.");
 
+    const pollId = await resolvePollIdBySlug(supabase, slug);
+    if (pollId === null) return fail(404, "투표를 찾을 수 없어요.");
+
     const { data, error } = await supabase
       .from("comments")
-      .insert({ poll_id: id, user_id: user.id, body: parsed.data.body })
+      .insert({ poll_id: pollId, user_id: user.id, body: parsed.data.body })
       .select(
         "id, user_id, display_name, display_tag, body, seed_likes, created_at, profiles!comments_user_id_fkey(nickname, fan_team)",
       )
