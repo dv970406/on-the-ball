@@ -31,6 +31,7 @@ shared ← entities ← features ← widgets ← views
 - 소비는 **슬라이스 루트**에서: `import { ROUTES } from "@/shared/config"`.
 - **deep import 금지**: `@/shared/config/palette` ❌ → `@/shared/config` ✅.
 - 이점: 캡슐화 / 파일 이동에 강함(배럴만 수정) / 단방향 의존 감시 용이.
+- Vercel `react-best-practices`의 `bundle-barrel-imports`는 **서드파티 라이브러리 배럴**(lucide-react·@mui 등, 최대 수천 개 재export) 대상이다. 내부 슬라이스 배럴은 위 deep-import 금지 규칙을 유지하고, 서드파티는 next.config `optimizePackageImports`로 최적화한다.
 
 ## 서버/클라이언트 경계 (배럴이 담당)
 
