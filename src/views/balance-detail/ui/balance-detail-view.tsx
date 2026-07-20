@@ -7,6 +7,7 @@ import { isClosed, useDelayedReveal } from "@/shared/lib";
 import { ROUTES } from "@/shared/config";
 import { pickSides, usePollDetailQuery } from "@/entities/poll";
 import { useCastVote } from "@/features/cast-vote";
+import { LikePollButton } from "@/features/like-poll";
 import { SubHeader } from "@/widgets/sub-header";
 import { BalanceVoteView } from "./balance-vote-view";
 import { BalanceRevealView } from "./balance-reveal-view";
@@ -77,6 +78,9 @@ export function BalanceDetailView({ id }: { id: string }) {
   return (
     <div className="min-h-full bg-canvas">
       <SubHeader title={poll.tag ?? "밸런스 게임"} fallbackHref={ROUTES.balanceList} />
+      <div className="flex justify-end px-5 pt-3">
+        <LikePollButton slug={poll.id} likes={poll.likes} likedByMe={poll.likedByMe} />
+      </div>
       {showReveal ? (
         <BalanceRevealView poll={poll} a={a} b={b} mySide={picked ?? serverSide} />
       ) : (
