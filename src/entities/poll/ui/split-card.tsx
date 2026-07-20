@@ -67,23 +67,6 @@ export function SplitCard({
         nameSize={nameSize}
       />
 
-      {/* 데코 헤어라인 — 시임을 암시하는 순수 장식 (탭 이벤트 차단 금지) */}
-      <svg
-        aria-hidden
-        className="pointer-events-none absolute inset-0 z-[2]"
-        viewBox="0 0 100 100"
-        preserveAspectRatio="none"
-      >
-        <line
-          x1="0"
-          y1="42"
-          x2="100"
-          y2="58"
-          stroke="rgba(255,255,255,0.18)"
-          strokeWidth="0.4"
-        />
-      </svg>
-
       <VsBadge animate={animateVs} />
     </div>
   );
@@ -91,10 +74,10 @@ export function SplitCard({
 
 /** 면별 clip-path — 두 대각선이 지그재그 시임을 형성 */
 const CLIP: Record<Side, string> = {
-  // A면: 왼쪽 아래 삼각형을 잘라내 시임 위쪽을 차지
-  a: "polygon(0 0, 100% 0, 100% 100%, 0 58%)",
-  // B면: 왼쪽 위 삼각형을 잘라내 시임 아래쪽을 차지
-  b: "polygon(0 42%, 100% 0, 100% 100%, 0 100%)",
+  // A면: 헤어라인(좌 42% → 우 58%) 위쪽을 차지
+  a: "polygon(0 0, 100% 0, 100% 58%, 0 42%)",
+  // B면: 헤어라인 아래쪽을 차지
+  b: "polygon(0 42%, 100% 58%, 100% 100%, 0 100%)",
 };
 
 type SideHalfProps = {
