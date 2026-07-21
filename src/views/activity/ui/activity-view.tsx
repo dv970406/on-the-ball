@@ -4,7 +4,6 @@ import { Settings, UserRound } from "lucide-react";
 import { Avatar, Button, EmptyState, Icon, Pill, SectionHead, Skeleton } from "@/shared/ui";
 import { formatCount } from "@/shared/lib";
 import { useMyActivityQuery, type ActivityTrait } from "../model/use-my-activity";
-import { BadgeGrid } from "./badge-grid";
 import { RecentList } from "./recent-list";
 
 // ---------------------------------------------------------------------------
@@ -57,7 +56,7 @@ function TraitCard({ trait }: { trait: ActivityTrait }) {
   );
 }
 
-/** 로딩 스켈레톤 — 프로필/스탯/뱃지/리스트 구조 유지 */
+/** 로딩 스켈레톤 — 프로필/스탯/리스트 구조 유지 */
 function ActivitySkeleton() {
   return (
     <div className="px-5 pt-14">
@@ -69,11 +68,6 @@ function ActivitySkeleton() {
         </div>
       </div>
       <Skeleton className="mt-5 h-[74px] rounded-[14px]" />
-      <div className="mt-6 grid grid-cols-3 gap-2.5">
-        {Array.from({ length: 6 }, (_, i) => (
-          <Skeleton key={i} className="h-[104px] rounded-lg" />
-        ))}
-      </div>
       <div className="mt-6 space-y-3">
         {Array.from({ length: 3 }, (_, i) => (
           <Skeleton key={i} className="h-14" />
@@ -119,7 +113,7 @@ export function ActivityView() {
     );
   }
 
-  const { profile, stats, badges, recent, trait } = data;
+  const { profile, stats, recent, trait } = data;
 
   const statCells: [label: string, value: string][] = [
     ["투표", formatCount(stats.votes)],
@@ -172,12 +166,6 @@ export function ActivityView() {
             </div>
           ))}
         </div>
-      </div>
-
-      {/* 뱃지 */}
-      <SectionHead title="뱃지" />
-      <div className="pb-6">
-        <BadgeGrid badges={badges} />
       </div>
 
       {/* 최근 한 표 */}

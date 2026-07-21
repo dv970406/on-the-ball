@@ -2,13 +2,11 @@ import { fail, ok, withSupabase } from "@/shared/api/handler";
 import type { MyActivity } from "@/views/activity/model/types";
 import {
   RECENT_LIMIT,
-  buildActivityBadges,
   buildActivityProfile,
   buildActivityRecent,
   buildActivityStats,
   buildActivityTrait,
   type AttemptRow,
-  type BadgeRow,
   type PollResultRow,
   type ProfileRow,
   type VoteRow,
@@ -28,8 +26,6 @@ export async function GET() {
       attemptStatsRes,
       recentVotesRes,
       recentAttemptsRes,
-      badgesRes,
-      myBadgesRes,
     ] = await Promise.all([
       // my_profile 뷰 — 본인 전체 행 (profiles 직접 조회는 공개 컬럼만 허용됨)
       supabase
@@ -51,11 +47,6 @@ export async function GET() {
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(RECENT_LIMIT),
-      supabase
-        .from("badges")
-        .select("id, label, description, color")
-        .order("position", { ascending: true }),
-      supabase.from("user_badges").select("badge_id").eq("user_id", user.id),
     ]);
 
     if (
@@ -63,9 +54,7 @@ export async function GET() {
       voteCountRes.error ||
       attemptStatsRes.error ||
       recentVotesRes.error ||
-      recentAttemptsRes.error ||
-      badgesRes.error ||
-      myBadgesRes.error
+      recentAttemptsRes.error
     ) {
       return fail(500, LOAD_FAIL);
     }
@@ -92,10 +81,6 @@ export async function GET() {
     return ok<MyActivity>({
       profile: buildActivityProfile(profile),
       stats: buildActivityStats(voteCountRes.count ?? 0, attemptStats, profile.current_streak),
-      badges: buildActivityBadges(
-        (badgesRes.data ?? []) as BadgeRow[],
-        (myBadgesRes.data ?? []) as { badge_id: number }[],
-      ),
       recent: buildActivityRecent(
         recentVotes,
         (recentAttemptsRes.data ?? []) as unknown as AttemptRow[],

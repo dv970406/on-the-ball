@@ -16,14 +16,6 @@ export type ActivityStats = {
   accuracyPct: number;
 };
 
-export type ActivityBadge = {
-  id: number;
-  label: string;
-  description: string | null;
-  color: string;
-  earned: boolean;
-};
-
 export type ActivityRecent = {
   kind: PollType | "quiz";
   title: string;
@@ -42,7 +34,6 @@ export type ActivityTrait = { title: string; text: string };
 export type MyActivity = {
   profile: ActivityProfile;
   stats: ActivityStats;
-  badges: ActivityBadge[];
   recent: ActivityRecent[];
   trait: ActivityTrait;
 };

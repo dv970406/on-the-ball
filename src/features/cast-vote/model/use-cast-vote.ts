@@ -23,7 +23,7 @@ export function useCastVote(pollId: string) {
       });
     },
     onSuccess: () => {
-      // 득표·내 표가 바뀌므로 디테일 + 모든 리스트, 뱃지 획득 가능성으로 유저도 무효화.
+      // 득표·내 표가 바뀌므로 디테일 + 모든 리스트, 활동 통계(투표수)로 유저도 무효화.
       // 리페치가 끝날 때까지 isPending을 유지해(Promise 반환) "성공했지만 화면은 미투표"인
       // 틈에 재탭(취소)·타 옵션 탭(변경 소진)이 일어나는 레이스를 막는다.
       return Promise.all([

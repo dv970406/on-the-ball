@@ -9,7 +9,6 @@ import type { MyActivity } from "./types";
 export type {
   ActivityProfile,
   ActivityStats,
-  ActivityBadge,
   ActivityRecent,
   ActivityTrait,
   MyActivity,

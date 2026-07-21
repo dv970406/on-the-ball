@@ -10,7 +10,6 @@
 --  * 밸런스 4건 / 랭킹 1건 / 유니폼 1건 / TMI 5건 → polls + poll_options
 --  * 시드 댓글 → comments (user_id null, display_* 비정규화 필드 사용)
 --  * 오늘의 퀴즈 + 예정 2건 + 지난 4건 → lineups / quizzes / quiz_choices
---  * 뱃지 7종 (프로토타입 6종 + RPC가 참조하는 first-vote)
 --  * 연령대·지역 시드 통계 → poll_demographics
 --  * 홈 트렌딩 5건 → trending_items
 -- =====================================================================
@@ -179,17 +178,6 @@ insert into public.quiz_choices (id, quiz_id, position, team, season, is_correct
   -- 정답률 12% · 3,017명: 362 / 2,655
   (71, 7, 0, '정답 보기', null, true,   362),
   (72, 7, 1, '오답 보기', null, false, 2655);
-
--- ========== badges ==========
--- screen-activity.jsx 6종 + RPC(cast_vote)가 참조하는 first-vote
-insert into public.badges (id, slug, label, description, color, position) values
-  (1, 'streak10',    '연속 10일',       '퀴즈',                  'var(--primary)',         0),
-  (2, 'first100',    '첫 100표',        '투표',                  '#171717',                1),
-  (3, 'derbyguy',    '북런던 더비러',   '아스널 vs 토트넘 5표',  '#9c0d1e',                2),
-  (4, 'streak30',    '연속 30일',       '퀴즈',                  'var(--hairline-strong)', 3),
-  (5, 'top1pct',     '상위 1%',         '주간',                  'var(--hairline-strong)', 4),
-  (6, 'kit-curator', '유니폼 큐레이터', '50표',                  'var(--hairline-strong)', 5),
-  (7, 'first-vote',  '첫 한 표',        '처음으로 투표에 참여',  '#171717',                6);
 
 -- ========== poll_demographics ==========
 -- 연령대별 응답 (BalanceRevealView 하드코딩 값 — 원본이 모든 밸런스 게임에 동일 적용)
