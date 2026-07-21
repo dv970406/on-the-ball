@@ -2,8 +2,13 @@
 
 import { Info } from "lucide-react";
 import { Icon, LiveDot, Pill } from "@/shared/ui";
-import { cn, formatCount, formatDday } from "@/shared/lib";
-import { SplitCard, type PollDetail, type PollOption } from "@/entities/poll";
+import { cn } from "@/shared/lib";
+import {
+  PollMetaStrip,
+  SplitCard,
+  type PollDetail,
+  type PollOption,
+} from "@/entities/poll";
 
 type Side = "a" | "b";
 
@@ -24,23 +29,17 @@ export function BalanceVoteView({ poll, a, b, picked, onPick, voteError }: Balan
     <article className="px-5 pb-6 pt-3">
       {/* 헤드라인 헤더 — 메타 pill 줄 + 헤드라인 + 서브카피 */}
       <header>
-        <div className="mb-2.5 flex flex-wrap items-center gap-2">
-          <Pill variant="green">
-            <LiveDot tone="ink" />
-            진행 중
-          </Pill>
-          <span className="whitespace-nowrap text-[12px] text-ink-mute">
-            <span className="tnum font-mono text-ink">{formatCount(poll.totalVotes)}</span>명 투표
-          </span>
-          {poll.closesAt ? (
-            <>
-              <span className="text-[12px] text-ink-mute-2">·</span>
-              <span className="whitespace-nowrap text-[12px] text-ink-mute">
-                마감 <time dateTime={poll.closesAt}>{formatDday(poll.closesAt)}</time>
-              </span>
-            </>
-          ) : null}
-        </div>
+        <PollMetaStrip
+          className="mb-2.5"
+          pill={
+            <Pill variant="green">
+              <LiveDot tone="ink" />
+              진행 중
+            </Pill>
+          }
+          totalVotes={poll.totalVotes}
+          closesAt={poll.closesAt}
+        />
 
         <h1
           className={cn(

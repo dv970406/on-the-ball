@@ -2,6 +2,7 @@
 
 import { CheckCircle2, SearchX } from "lucide-react";
 import {
+  PollMetaStrip,
   readKitMeta,
   usePollDetailQuery,
   type PollDetail,
@@ -10,7 +11,6 @@ import {
 import { useCastVote } from "@/features/cast-vote";
 import { SubHeader } from "@/widgets/sub-header";
 import {
-  Button,
   EmptyState,
   Icon,
   LiveStatusPill,
@@ -20,7 +20,7 @@ import {
   Skeleton,
 } from "@/shared/ui";
 import { ApiError } from "@/shared/api";
-import { cn, formatCount, formatDday, formatPct, isClosed } from "@/shared/lib";
+import { cn, formatCount, formatPct, isClosed } from "@/shared/lib";
 import { COLOR } from "@/shared/config";
 
 type KitVoteViewProps = {
@@ -44,13 +44,8 @@ export function KitVoteView({ pollId }: KitVoteViewProps) {
         description={
           error instanceof ApiError ? error.message : "유니폼 투표를 찾을 수 없어요."
         }
-        action={
-          error ? (
-            <Button variant="secondary" size="sm" onClick={() => void refetch()}>
-              다시 시도
-            </Button>
-          ) : undefined
-        }
+        retryVariant="secondary"
+        onRetry={error ? () => void refetch() : undefined}
       />
     </div>
   );
@@ -76,22 +71,18 @@ function KitVoteBody({ poll }: { poll: PollDetail }) {
       <article className="px-5 pb-10 pt-3">
         {/* 헤드라인 헤더 — 메타(상태 + 투표수 + D-day) + 제목 */}
         <header>
-          <div className="mb-2.5 flex items-center gap-2">
-            {closed ? (
-              <Pill variant="outline">마감</Pill>
-            ) : (
-              <LiveStatusPill>진행 중</LiveStatusPill>
-            )}
-            <span className="text-xs text-ink-mute">
-              <span className="font-mono tnum">{formatCount(poll.totalVotes)}</span>명 투표
-              {poll.closesAt && !closed && (
-                <>
-                  {" · 마감 "}
-                  <time dateTime={poll.closesAt}>{formatDday(poll.closesAt)}</time>
-                </>
-              )}
-            </span>
-          </div>
+          <PollMetaStrip
+            className="mb-2.5"
+            pill={
+              closed ? (
+                <Pill variant="outline">마감</Pill>
+              ) : (
+                <LiveStatusPill>진행 중</LiveStatusPill>
+              )
+            }
+            totalVotes={poll.totalVotes}
+            closesAt={poll.closesAt}
+          />
           <h1 className="text-2xl font-medium leading-[1.2] tracking-[-0.5px] text-ink">
             {poll.title}
           </h1>

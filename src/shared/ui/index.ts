@@ -6,6 +6,8 @@ export { PlayerSilhouette } from "./player-silhouette";
 export { Shirt, type ShirtStripe } from "./shirt";
 export { Avatar } from "./avatar";
 export { SectionHead } from "./section-head";
+export { TabHeader } from "./tab-header";
+export { NightCard } from "./night-card";
 export { LiveDot } from "./live-dot";
 export { LiveStatusPill } from "./live-status-pill";
 export { Wordmark } from "./wordmark";

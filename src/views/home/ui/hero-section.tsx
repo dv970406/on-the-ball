@@ -1,9 +1,14 @@
 import Link from "next/link";
 import { BarChart3, Hand } from "lucide-react";
 import { Icon, LiveDot, Pill } from "@/shared/ui";
-import { formatCount, formatDday, isClosed } from "@/shared/lib";
+import { isClosed } from "@/shared/lib";
 import { ROUTES } from "@/shared/config";
-import { SplitCard, type PollListItem, type PollOption } from "@/entities/poll";
+import {
+  PollMetaStrip,
+  SplitCard,
+  type PollListItem,
+  type PollOption,
+} from "@/entities/poll";
 import { pickSides, readHeroMeta } from "../model/poll-meta";
 
 /**
@@ -22,7 +27,6 @@ export function HeroSection({ poll }: { poll: PollListItem }) {
 
   const hero = readHeroMeta(poll.meta);
   const detailHref = ROUTES.balanceDetail(poll.id);
-  const dday = poll.closesAt ? formatDday(poll.closesAt) : null;
   const closed = isClosed(poll.closesAt);
 
   return (
@@ -40,28 +44,21 @@ export function HeroSection({ poll }: { poll: PollListItem }) {
       </h1>
 
       {/* 메타 줄 — 진행 중/마감 pill + 투표수 + 남은 기간 */}
-      <div className="mb-3.5 flex flex-wrap items-center gap-2">
-        {closed ? (
-          <Pill variant="soft">마감</Pill>
-        ) : (
-          <Pill variant="green">
-            <LiveDot tone="ink" />
-            진행 중
-          </Pill>
-        )}
-        <span className="whitespace-nowrap text-[12px] text-ink-mute">
-          <span className="tnum font-mono text-ink">{formatCount(poll.totalVotes)}</span>명
-          투표
-        </span>
-        {dday && !closed ? (
-          <>
-            <span className="text-[12px] text-ink-mute-2">·</span>
-            <span className="whitespace-nowrap text-[12px] text-ink-mute">
-              마감 <time dateTime={poll.closesAt ?? undefined}>{dday}</time>
-            </span>
-          </>
-        ) : null}
-      </div>
+      <PollMetaStrip
+        className="mb-3.5"
+        pill={
+          closed ? (
+            <Pill variant="soft">마감</Pill>
+          ) : (
+            <Pill variant="green">
+              <LiveDot tone="ink" />
+              진행 중
+            </Pill>
+          )
+        }
+        totalVotes={poll.totalVotes}
+        closesAt={poll.closesAt}
+      />
 
       {/* 대각선 스플릿 카드 — 탭 시 디테일 진입 (홈은 라틴 서브라벨 없이 46px 이름) */}
       <Link

@@ -9,7 +9,7 @@ import {
   Map as MapIcon,
   X,
 } from "lucide-react";
-import { EmptyState, Icon, Pill, SectionHead, Skeleton } from "@/shared/ui";
+import { EmptyState, Icon, NightCard, Pill, SectionHead, Skeleton, TabHeader } from "@/shared/ui";
 import { formatCount, formatDday } from "@/shared/lib";
 import { ROUTES } from "@/shared/config";
 import { useMyProfileQuery } from "@/entities/user";
@@ -26,7 +26,7 @@ function StreakCard() {
   const streak = profile?.currentStreak ?? 0;
 
   return (
-    <div className="flex items-center gap-3.5 rounded-xl bg-canvas-night p-[18px] text-white">
+    <NightCard className="flex items-center gap-3.5 p-[18px]">
       <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary font-mono text-[22px] font-bold text-on-primary">
         {streak}
       </div>
@@ -39,7 +39,7 @@ function StreakCard() {
           상위 4% · 한 번이라도 틀리면 0으로 리셋
         </div>
       </div>
-    </div>
+    </NightCard>
   );
 }
 
@@ -162,12 +162,7 @@ export function QuizListView() {
   return (
     <div>
       {/* 타이틀 */}
-      <header className="px-5 pb-3 pt-14">
-        <h1 className="text-[28px] font-bold tracking-[-0.6px] text-ink">축구 퀴즈</h1>
-        <p className="mt-1.5 text-[13px] text-ink-mute">
-          매일 오전 8시, 새 문제가 한 개씩 열려요.
-        </p>
-      </header>
+      <TabHeader title="축구 퀴즈" subtitle="매일 오전 8시, 새 문제가 한 개씩 열려요." />
 
       {/* Streak 카드 */}
       <div className="px-5 pb-5">

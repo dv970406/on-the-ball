@@ -1,7 +1,7 @@
 "use client";
 
 import { Settings, UserRound } from "lucide-react";
-import { Avatar, Button, EmptyState, Icon, Pill, SectionHead, Skeleton } from "@/shared/ui";
+import { Avatar, EmptyState, Icon, NightCard, Pill, SectionHead, Skeleton } from "@/shared/ui";
 import { formatCount } from "@/shared/lib";
 import { useMyActivityQuery, type ActivityTrait } from "../model/use-my-activity";
 import { RecentList } from "./recent-list";
@@ -41,7 +41,7 @@ function formatJoined(iso: string): string {
 function TraitCard({ trait }: { trait: ActivityTrait }) {
   return (
     <article className="px-5 py-6">
-      <div className="rounded-xl bg-canvas-night p-[18px] text-white">
+      <NightCard className="p-[18px]">
         <h2 className="mb-2 font-mono text-[10px] uppercase tracking-[0.6px] text-primary">
           ▸ 나의 축구 성향
         </h2>
@@ -51,7 +51,7 @@ function TraitCard({ trait }: { trait: ActivityTrait }) {
         <p className="font-mono text-[10px] text-ink-mute-2">
           최근 60일 데이터 기반 · 월 1회 갱신
         </p>
-      </div>
+      </NightCard>
     </article>
   );
 }
@@ -89,11 +89,7 @@ export function ActivityView() {
         icon={UserRound}
         title="내 활동을 불러오지 못했어요"
         description={error instanceof Error ? error.message : undefined}
-        action={
-          <Button variant="dark" size="sm" onClick={() => refetch()}>
-            다시 시도
-          </Button>
-        }
+        onRetry={() => refetch()}
       />
     );
   }
@@ -104,11 +100,7 @@ export function ActivityView() {
         icon={UserRound}
         title="세션을 만들지 못했어요"
         description="네트워크 상태를 확인한 뒤 다시 시도해 주세요."
-        action={
-          <Button variant="dark" size="sm" onClick={() => refetch()}>
-            다시 시도
-          </Button>
-        }
+        onRetry={() => refetch()}
       />
     );
   }

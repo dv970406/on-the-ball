@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Scale } from "lucide-react";
-import { EmptyState, Skeleton } from "@/shared/ui";
+import { EmptyState, Skeleton, TabHeader } from "@/shared/ui";
 import { cn } from "@/shared/lib";
 import { pickSides, usePollsQuery, type PollListItem } from "@/entities/poll";
 import { BalanceListCard } from "./balance-list-card";
@@ -31,10 +31,7 @@ export function BalanceListView() {
   return (
     <div>
       {/* 자체 헤더 — 프로토타입 BalanceListScreen 상단 */}
-      <header className="px-5 pb-3.5 pt-14">
-        <h1 className="text-[28px] font-bold tracking-[-0.6px] text-ink">밸런스 게임</h1>
-        <p className="mt-1.5 text-[13px] text-ink-mute">둘 중 하나만. 영혼을 걸 시간.</p>
-      </header>
+      <TabHeader title="밸런스 게임" subtitle="둘 중 하나만. 영혼을 걸 시간." />
 
       {error ? (
         <EmptyState

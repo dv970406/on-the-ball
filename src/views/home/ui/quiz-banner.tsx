@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Flag } from "@/shared/ui";
+import { Flag, NightCard } from "@/shared/ui";
 import { formatCount } from "@/shared/lib";
 import { ROUTES } from "@/shared/config";
 import type { HomeTodayQuiz } from "../model/types";
@@ -11,10 +10,10 @@ import type { HomeTodayQuiz } from "../model/types";
 export function QuizBanner({ quiz }: { quiz: HomeTodayQuiz }) {
   return (
     <section className="px-5">
-      <Link
+      <NightCard
         href={ROUTES.quizDetail(quiz.id)}
         aria-label={`오늘의 퀴즈: ${quiz.title}`}
-        className="relative block overflow-hidden rounded-xl bg-canvas-night p-5 text-white"
+        className="relative block overflow-hidden p-5"
       >
         {/* 라벨 줄 */}
         <span className="mb-2.5 flex items-center gap-2">
@@ -58,7 +57,7 @@ export function QuizBanner({ quiz }: { quiz: HomeTodayQuiz }) {
             <span className="tnum font-mono">{formatCount(quiz.attempts)}</span>명 도전 중
           </span>
         </span>
-      </Link>
+      </NightCard>
     </section>
   );
 }

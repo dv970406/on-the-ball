@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Flame, X } from "lucide-react";
-import { Button, EmptyState, Icon, Skeleton } from "@/shared/ui";
+import { Button, EmptyState, Icon, Skeleton, TabHeader } from "@/shared/ui";
 import { cn } from "@/shared/lib";
 import { useTmiDeck } from "../model/use-tmi-deck";
 import { TmiCard } from "./tmi-card";
@@ -61,11 +61,7 @@ export function TmiView() {
         icon={Flame}
         title="TMI 덱을 불러오지 못했어요"
         description={error instanceof Error ? error.message : undefined}
-        action={
-          <Button variant="dark" size="sm" onClick={() => refetch()}>
-            다시 시도
-          </Button>
-        }
+        onRetry={() => refetch()}
       />
     );
   }
@@ -83,12 +79,7 @@ export function TmiView() {
   return (
     <div>
       {/* 탭 헤더 — 타이틀 + 서브카피 */}
-      <header className="px-5 pb-3 pt-14">
-        <h1 className="text-[28px] font-bold tracking-[-0.6px] text-ink">선수 TMI</h1>
-        <p className="mt-1.5 text-[13px] text-ink-mute">
-          진짜? 거짓? 한 장씩 넘기면서 가려요.
-        </p>
-      </header>
+      <TabHeader title="선수 TMI" subtitle="진짜? 거짓? 한 장씩 넘기면서 가려요." />
 
       {/* 프로그레스 — 판정 완료=잉크 / 현재=에메랄드 / 남음=헤어라인 */}
       <div className="flex gap-1 px-5 pb-3" aria-hidden>
