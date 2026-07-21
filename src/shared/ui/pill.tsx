@@ -30,12 +30,12 @@ export function Pill({ variant = "soft", dot, className, style, children }: Pill
       )}
       style={style}
     >
-      {dot ? (
+      {dot && (
         <span
           className="mr-0.5 inline-block size-[5px] rounded-full"
           style={{ background: dot }}
         />
-      ) : null}
+      )}
       {children}
     </span>
   );

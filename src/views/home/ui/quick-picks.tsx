@@ -43,11 +43,11 @@ function MiniBalanceCard({ poll }: { poll: PollListItem }) {
       </span>
 
       <span className="block p-3">
-        {tag ? (
+        {tag && (
           <span className="mb-1 block font-mono text-[10px] uppercase tracking-[0.4px] text-ink-mute-2">
             {tag}
           </span>
-        ) : null}
+        )}
         <span className="block text-[12px] text-ink-mute">
           <span className="tnum font-mono text-ink">{formatCount(poll.totalVotes)}</span>명
           투표

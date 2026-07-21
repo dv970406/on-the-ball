@@ -49,9 +49,9 @@ export function BalanceVoteView({ poll, a, b, picked, onPick, voteError }: Balan
         >
           {poll.title}
         </h1>
-        {poll.subtitle ? (
+        {poll.subtitle && (
           <p className="mb-[18px] text-[13px] leading-[1.45] text-ink-mute">{poll.subtitle}</p>
-        ) : null}
+        )}
       </header>
 
       {/* 대각선 스플릿 — 탭 = 투표 */}
@@ -62,11 +62,11 @@ export function BalanceVoteView({ poll, a, b, picked, onPick, voteError }: Balan
       </p>
 
       {/* 투표 실패 인라인 메시지 */}
-      {voteError ? (
+      {voteError && (
         <p role="alert" className="mt-2 text-center text-[12px] text-crimson">
           {voteError}
         </p>
-      ) : null}
+      )}
 
       {/* 인포 스트립 — 결과/댓글 게이팅 안내 */}
       <div className="mt-[18px] flex items-start gap-2.5 rounded-lg border border-hairline-cool bg-canvas-soft p-3.5">

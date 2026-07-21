@@ -46,12 +46,12 @@ export function BalanceListCard({ poll, a, b }: BalanceListCardProps) {
       <div className="p-3.5">
         {/* 태그 / 마감 pill 줄 */}
         <div className="mb-2 flex gap-1.5">
-          {poll.tag ? <Pill variant="soft">{poll.tag}</Pill> : null}
-          {poll.closesAt ? (
+          {poll.tag && <Pill variant="soft">{poll.tag}</Pill>}
+          {poll.closesAt && (
             <Pill variant="outline">
               <time dateTime={poll.closesAt}>{formatDday(poll.closesAt)}</time>
             </Pill>
-          ) : null}
+          )}
         </div>
 
         {/* 제목 */}

@@ -39,10 +39,10 @@ export function HomeView() {
         />
       ) : (
         <div className="flex flex-col gap-8 pb-4">
-          {data.hero ? <HeroSection poll={data.hero} /> : null}
+          {data.hero && <HeroSection poll={data.hero} />}
           <QuickPicks polls={data.quickPicks} />
           {/* 오늘의 퀴즈가 없으면 섹션 자체를 숨긴다 */}
-          {data.todayQuiz ? <QuizBanner quiz={data.todayQuiz} /> : null}
+          {data.todayQuiz && <QuizBanner quiz={data.todayQuiz} />}
           <OngoingPolls polls={data.ongoing} />
           <TrendingList items={data.trending} pollTypeById={buildPollTypeMap(data)} />
           <TmiPromo />

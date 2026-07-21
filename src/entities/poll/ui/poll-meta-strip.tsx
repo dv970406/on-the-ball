@@ -33,14 +33,14 @@ export function PollMetaStrip({
         <span className="tnum font-mono text-ink">{formatCount(totalVotes)}</span>
         {countSuffix}
       </span>
-      {showDday ? (
+      {showDday && (
         <>
           <span className="text-[12px] text-ink-mute-2">·</span>
           <span className="whitespace-nowrap text-[12px] text-ink-mute">
             마감 <time dateTime={closesAt ?? undefined}>{formatDday(closesAt)}</time>
           </span>
         </>
-      ) : null}
+      )}
     </div>
   );
 }

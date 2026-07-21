@@ -31,7 +31,7 @@ export function QuizBanner({ quiz }: { quiz: HomeTodayQuiz }) {
         </h2>
 
         {/* 국기 프리뷰 — 라인업 없는 문제(비라인업 퀴즈)면 생략 */}
-        {quiz.lineupRows.length > 0 ? (
+        {quiz.lineupRows.length > 0 && (
           <span className="mb-3.5 flex flex-col gap-2.5 rounded-[10px] bg-white/[0.04] p-3.5">
             {quiz.lineupRows.map((row, rowIndex) => (
               <span key={rowIndex} className="flex justify-center gap-2">
@@ -46,7 +46,7 @@ export function QuizBanner({ quiz }: { quiz: HomeTodayQuiz }) {
               </span>
             ))}
           </span>
-        ) : null}
+        )}
 
         {/* CTA 줄 — 배너 전체가 링크라 버튼은 표시용 요소 */}
         <span className="flex items-center gap-3">

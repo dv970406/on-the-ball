@@ -111,27 +111,27 @@ export function QuizDetailView({ id }: { id: string }) {
           >
             {data.title}
           </h1>
-          {data.subtitle ? (
+          {data.subtitle && (
             <p className="mb-4 text-[13px] leading-normal text-ink-mute">
               {data.subtitle}
             </p>
-          ) : null}
+          )}
         </header>
 
         {/* 피치 뷰 + 캡션 */}
-        {data.lineup ? (
+        {data.lineup && (
           <figure>
             <QuizPitch lineup={data.lineup} reveal={done} />
-            {data.lineup.caption ? (
+            {data.lineup.caption && (
               <figcaption className="mt-2.5 text-center font-mono text-[11px] text-ink-mute-2">
                 {data.lineup.caption}
               </figcaption>
-            ) : null}
+            )}
           </figure>
-        ) : null}
+        )}
 
         {/* 힌트 토글 — 도전 전에만 */}
-        {!done && data.hint ? (
+        {!done && data.hint && (
           <div className="mt-3.5">
             <button
               type="button"
@@ -143,13 +143,13 @@ export function QuizDetailView({ id }: { id: string }) {
               <Icon as={hintOpen ? Lightbulb : LightbulbOff} size={12} />
               힌트 {hintOpen ? "닫기" : "보기"}
             </button>
-            {hintOpen ? (
+            {hintOpen && (
               <div className="animate-fade-up mt-2.5 rounded-[10px] border border-[#fff0a0] bg-[#fff8c5] p-3 text-[12.5px] leading-normal text-[#5a4a00]">
                 💡 {data.hint}
               </div>
-            ) : null}
+            )}
           </div>
-        ) : null}
+        )}
 
         {/* 4지선다 */}
         <ul className="mt-[18px] flex flex-col gap-2">
@@ -176,14 +176,14 @@ export function QuizDetailView({ id }: { id: string }) {
                 >
                   <span className="min-w-0">
                     <span className="block">{choice.team}</span>
-                    {done ? (
+                    {done && (
                       <span className="tnum mt-1 block text-[11px] font-normal text-ink-mute">
                         <span className="font-mono">{formatPct(choice.pickRatio)}</span>가
                         이걸 골랐어요
                       </span>
-                    ) : null}
+                    )}
                   </span>
-                  {choice.season ? (
+                  {choice.season && (
                     <span
                       className={cn(
                         "shrink-0 font-mono text-xs font-normal",
@@ -192,19 +192,19 @@ export function QuizDetailView({ id }: { id: string }) {
                     >
                       {choice.season}
                     </span>
-                  ) : null}
+                  )}
                 </button>
               </li>
             );
           })}
         </ul>
 
-        {submitError ? (
+        {submitError && (
           <p className="mt-2 text-xs text-crimson">{submitError}</p>
-        ) : null}
+        )}
 
         {/* 리빌 카드 + 스트릭 업데이트 */}
-        {done ? (
+        {done && (
           <div className="animate-fade-up mt-6">
             <div
               className={cn(
@@ -248,7 +248,7 @@ export function QuizDetailView({ id }: { id: string }) {
             </div>
 
             {/* 스트릭 업데이트 — RPC 반환 streak 사용 (제출 직후에만) */}
-            {fresh && result ? (
+            {fresh && result && (
               <div className="mt-4 flex items-center gap-3 rounded-lg border border-hairline bg-canvas p-3.5">
                 <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary font-mono text-base font-bold text-on-primary">
                   {result.streak}
@@ -264,9 +264,9 @@ export function QuizDetailView({ id }: { id: string }) {
                   </div>
                 </div>
               </div>
-            ) : null}
+            )}
           </div>
-        ) : null}
+        )}
       </article>
     </div>
   );

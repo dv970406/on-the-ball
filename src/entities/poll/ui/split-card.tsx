@@ -167,11 +167,11 @@ function SideHalf({ side, option, picked, onPick, showLatin, nameSize }: SideHal
         </span>
 
         {/* 라틴 서브라벨 */}
-        {showLatin && option.sublabel ? (
+        {showLatin && option.sublabel && (
           <span className="mb-1 block font-mono text-[10px] uppercase tracking-[0.6px] opacity-55">
             {option.sublabel}
           </span>
-        ) : null}
+        )}
 
         {/* 거대 이름 */}
         <span
@@ -182,9 +182,9 @@ function SideHalf({ side, option, picked, onPick, showLatin, nameSize }: SideHal
         </span>
 
         {/* 메타 라인 */}
-        {metaLine ? (
+        {metaLine && (
           <span className="mt-2 block text-[12px] opacity-70">{metaLine}</span>
-        ) : null}
+        )}
       </span>
     </div>
   );

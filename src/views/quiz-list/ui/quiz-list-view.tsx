@@ -197,7 +197,7 @@ export function QuizListView() {
           </section>
 
           {/* 예정된 문제 */}
-          {data.upcoming.length > 0 ? (
+          {data.upcoming.length > 0 && (
             <section>
               <SectionHead title="예정된 문제" />
               <ul className="flex flex-col gap-2.5 px-5 pb-6">
@@ -206,7 +206,7 @@ export function QuizListView() {
                 ))}
               </ul>
             </section>
-          ) : null}
+          )}
 
           {/* 지난 문제 보관함 */}
           <section>

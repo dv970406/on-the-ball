@@ -64,7 +64,7 @@ export function Button({
       className={buttonClassName({ variant, size, block, disabled, className })}
       {...props}
     >
-      {icon ? <Icon as={icon} size={size === "sm" ? 14 : 16} /> : null}
+      {icon && <Icon as={icon} size={size === "sm" ? 14 : 16} />}
       {children}
     </button>
   );

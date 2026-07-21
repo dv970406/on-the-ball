@@ -56,7 +56,7 @@ export function BalanceRevealView({ poll, a, b, mySide }: BalanceRevealViewProps
           <span className="whitespace-nowrap text-[12px] text-ink-mute">
             <span className="tnum font-mono text-ink">{formatCount(poll.totalVotes)}</span>명 투표
           </span>
-          {poll.closesAt ? (
+          {poll.closesAt && (
             <>
               <span className="text-[12px] text-ink-mute-2">·</span>
               <span className="whitespace-nowrap text-[12px] text-ink-mute">
@@ -70,7 +70,7 @@ export function BalanceRevealView({ poll, a, b, mySide }: BalanceRevealViewProps
                 )}
               </span>
             </>
-          ) : null}
+          )}
         </div>
 
         <h1 className="mb-3.5 text-[24px] font-bold leading-[1.2] tracking-[-0.5px] text-ink">
@@ -79,7 +79,7 @@ export function BalanceRevealView({ poll, a, b, mySide }: BalanceRevealViewProps
       </header>
 
       {/* 내 선택 칩 */}
-      {myChoice ? (
+      {myChoice && (
         <div className="mb-3.5 inline-flex items-center gap-1.5 rounded-full border border-hairline-cool bg-canvas-soft px-2.5 py-1.5 text-[12px] text-ink-mute">
           <Icon as={CheckCircle2} size={14} className="text-primary-deep" />
           <span>
@@ -87,19 +87,19 @@ export function BalanceRevealView({ poll, a, b, mySide }: BalanceRevealViewProps
             <strong className="ml-0.5 font-medium text-ink">{myChoice.label}</strong>
           </span>
         </div>
-      ) : null}
+      )}
 
       {/* 56px 비율 바 — 센터피스 */}
       <RevealRatioBar a={a} b={b} aMeta={aMeta} bMeta={bMeta} winner={winner} mySide={mySide} />
 
       {/* 스탯 비교 그리드 — 중앙 세로 헤어라인 */}
-      {statRowCount > 0 ? (
+      {statRowCount > 0 && (
         <div className="mt-6 grid grid-cols-[1fr_auto_1fr] items-stretch">
           {Array.from({ length: statRowCount }, (_, i) => (
             <StatRow key={i} aStat={aMeta.stats[i]} bStat={bMeta.stats[i]} />
           ))}
         </div>
-      ) : null}
+      )}
 
       {/* 양측 blurb 카드 — 승자는 2px 에메랄드 보더 */}
       <div className="mt-[18px] grid grid-cols-2 gap-2.5">
@@ -108,7 +108,7 @@ export function BalanceRevealView({ poll, a, b, mySide }: BalanceRevealViewProps
       </div>
 
       {/* 응답자 분석 — 연령대별 스택바 */}
-      {ageRows.length > 0 ? (
+      {ageRows.length > 0 && (
         <section className="mt-6">
           <h2 className="mb-2.5 text-[13px] font-semibold text-ink">응답자 분석</h2>
           <ul className="flex flex-col gap-2">
@@ -132,7 +132,7 @@ export function BalanceRevealView({ poll, a, b, mySide }: BalanceRevealViewProps
             ))}
           </ul>
         </section>
-      ) : null}
+      )}
 
       {/* 한 줄 거들기 */}
       <CommentSection pollId={poll.id} commentCount={poll.commentCount} />
@@ -159,12 +159,12 @@ function StatRow({ aStat, bStat }: StatRowProps) {
 function StatCell({ stat, side }: { stat?: [string, string]; side: Side }) {
   return (
     <div className={cn("py-2.5", side === "a" ? "pr-3 text-left" : "pl-3 text-right")}>
-      {stat ? (
+      {stat && (
         <>
           <div className="text-[11px] text-ink-mute-2">{stat[0]}</div>
           <div className="tnum mt-0.5 font-mono text-[18px] font-semibold text-ink">{stat[1]}</div>
         </>
-      ) : null}
+      )}
     </div>
   );
 }

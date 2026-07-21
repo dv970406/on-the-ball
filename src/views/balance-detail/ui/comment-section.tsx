@@ -58,11 +58,11 @@ export function CommentSection({ pollId, commentCount }: CommentSectionProps) {
           </Button>
         </div>
         {/* 작성 실패 인라인 메시지 (예: "투표한 뒤에 댓글을 남길 수 있어요.") */}
-        {writeComment.error ? (
+        {writeComment.error && (
           <p role="alert" className="mt-2 text-[12px] text-crimson">
             {writeComment.error.message}
           </p>
-        ) : null}
+        )}
       </div>
 
       {/* 댓글 리스트 */}
@@ -111,11 +111,11 @@ function CommentRow({ comment, index, onToggleLike }: CommentRowProps) {
         <div className="min-w-0 flex-1">
           <header className="mb-0.5 flex items-baseline gap-1.5">
             <span className="text-[13px] font-medium text-ink">{comment.author.name}</span>
-            {comment.author.tag ? (
+            {comment.author.tag && (
               <span className="whitespace-nowrap rounded-full border border-hairline-cool bg-canvas-soft px-1.5 py-px text-[10px] text-ink-mute">
                 {comment.author.tag}
               </span>
-            ) : null}
+            )}
             <span className="whitespace-nowrap text-[11px] text-ink-mute-2">
               · <time dateTime={comment.createdAt}>{formatRelativeTime(comment.createdAt)}</time>
             </span>

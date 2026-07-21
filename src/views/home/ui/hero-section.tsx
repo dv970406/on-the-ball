@@ -32,11 +32,11 @@ export function HeroSection({ poll }: { poll: PollListItem }) {
   return (
     <section className="px-5 pt-3.5">
       {/* 태그 — uppercase mono 10px */}
-      {poll.tag ? (
+      {poll.tag && (
         <div className="mb-2 font-mono text-[10px] font-medium uppercase tracking-[0.8px] text-ink-mute">
           {poll.tag}
         </div>
-      ) : null}
+      )}
 
       {/* 헤드라인 — 홈 전용 문구(meta.hero.title) 우선 */}
       <h1 className="mb-2 text-[26px] font-semibold leading-[1.2] tracking-[-0.6px] text-ink">

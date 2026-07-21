@@ -46,8 +46,8 @@ function OngoingPollCard({ poll }: { poll: PollListItem }) {
         {/* 상태 pill 줄 — 내가 투표한 폴이면 '참여함' */}
         <span className="mb-2 flex flex-wrap gap-1.5">
           <LiveStatusPill>진행 중</LiveStatusPill>
-          {poll.tag ? <Pill variant="soft">{poll.tag}</Pill> : null}
-          {poll.myVote ? <Pill variant="soft">참여함</Pill> : null}
+          {poll.tag && <Pill variant="soft">{poll.tag}</Pill>}
+          {poll.myVote != null && <Pill variant="soft">참여함</Pill>}
         </span>
 
         {/* 제목 — 홈 카드 전용 문구(meta.card.title) 우선 */}
@@ -59,16 +59,15 @@ function OngoingPollCard({ poll }: { poll: PollListItem }) {
           <span className="tnum font-mono text-ink">{formatCount(poll.totalVotes)}</span>명
           투표
           {/* 마감이 지나면 "마감 마감"이 되지 않도록 단독 표기 */}
-          {poll.closesAt ? (
-            isClosed(poll.closesAt) ? (
+          {poll.closesAt &&
+            (isClosed(poll.closesAt) ? (
               " · 마감"
             ) : (
               <>
                 {" · 마감 "}
                 <time dateTime={poll.closesAt}>{formatDday(poll.closesAt)}</time>
               </>
-            )
-          ) : null}
+            ))}
         </span>
       </div>
     </Link>

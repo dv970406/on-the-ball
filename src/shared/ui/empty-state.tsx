@@ -46,16 +46,16 @@ export function EmptyState({
         className,
       )}
     >
-      {icon ? (
+      {icon && (
         <span className="mb-1 flex size-11 items-center justify-center rounded-full border border-hairline-cool bg-canvas-soft text-ink-mute">
           <Icon as={icon} size={20} />
         </span>
-      ) : null}
+      )}
       <p className="text-[15px] font-medium text-ink">{title}</p>
-      {description ? (
+      {description && (
         <p className="text-[13px] leading-relaxed text-ink-mute">{description}</p>
-      ) : null}
-      {footer ? <div className="mt-3">{footer}</div> : null}
+      )}
+      {footer && <div className="mt-3">{footer}</div>}
     </div>
   );
 }

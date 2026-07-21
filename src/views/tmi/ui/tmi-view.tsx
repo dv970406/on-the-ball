@@ -104,10 +104,10 @@ export function TmiView() {
         <>
           {/* 카드 스택 — 현재 카드 + 다음 카드 peek */}
           <div className="relative mx-5 min-h-[460px]">
-            {peek ? (
+            {peek && (
               <TmiCard key={peek.id} poll={peek} order={cursor + 1} total={deck.length} peek />
-            ) : null}
-            {current ? (
+            )}
+            {current && (
               <TmiCard
                 key={current.id}
                 poll={current}
@@ -116,7 +116,7 @@ export function TmiView() {
                 resultSide={currentSide}
                 exitSide={exitSide}
               />
-            ) : null}
+            )}
           </div>
 
           {/* 판정 버튼 줄 */}
@@ -158,13 +158,13 @@ export function TmiView() {
             </div>
           )}
 
-          {inlineError ? (
+          {inlineError && (
             <div className="px-5 pb-2 text-center">
               <p role="alert" className="text-xs text-crimson">
                 {inlineError}
               </p>
               {/* 판정 불가 카드(마감 등)에서 덱이 막히지 않도록 탈출구 제공 */}
-              {currentSide === null ? (
+              {currentSide === null && (
                 <button
                   type="button"
                   className="mt-1 text-[11px] text-ink-mute underline underline-offset-2"
@@ -172,9 +172,9 @@ export function TmiView() {
                 >
                   이 카드 건너뛰기
                 </button>
-              ) : null}
+              )}
             </div>
-          ) : null}
+          )}
         </>
       )}
     </div>

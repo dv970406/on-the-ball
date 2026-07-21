@@ -9,7 +9,7 @@ export function TabHeader({ title, subtitle }: TabHeaderProps) {
   return (
     <header className="px-5 pb-3 pt-14">
       <h1 className="text-[28px] font-bold tracking-[-0.6px] text-ink">{title}</h1>
-      {subtitle ? <p className="mt-1.5 text-[13px] text-ink-mute">{subtitle}</p> : null}
+      {subtitle && <p className="mt-1.5 text-[13px] text-ink-mute">{subtitle}</p>}
     </header>
   );
 }

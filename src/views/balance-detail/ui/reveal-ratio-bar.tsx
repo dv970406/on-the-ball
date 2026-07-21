@@ -42,10 +42,10 @@ export function RevealRatioBar({ a, b, aMeta, bMeta, winner, mySide }: RevealRat
       <div className="mb-2 flex items-baseline">
         <div className="flex items-baseline gap-1.5">
           <span className="text-[16px] font-semibold text-ink">{a.label}</span>
-          {winner === "a" ? <WinPill /> : null}
+          {winner === "a" && <WinPill />}
         </div>
         <div className="ml-auto flex items-baseline gap-1.5">
-          {winner === "b" ? <WinPill /> : null}
+          {winner === "b" && <WinPill />}
           <span className="text-[16px] font-semibold text-ink">{b.label}</span>
         </div>
       </div>
@@ -81,7 +81,7 @@ export function RevealRatioBar({ a, b, aMeta, bMeta, winner, mySide }: RevealRat
       </div>
 
       {/* 내 표 위치 마커 — A/B 경계 기준 내 면 쪽 */}
-      {mySide ? (
+      {mySide && (
         <div className="relative mt-0.5 h-2">
           <span
             className="absolute -top-0.5 inline-flex items-center gap-[3px] whitespace-nowrap font-mono text-[10px] text-primary-deep"
@@ -95,7 +95,7 @@ export function RevealRatioBar({ a, b, aMeta, bMeta, winner, mySide }: RevealRat
             <Icon as={ArrowUp} size={10} />내 표
           </span>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
