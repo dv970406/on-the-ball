@@ -2,7 +2,7 @@
 
 import { Info } from "lucide-react";
 import { Icon, LiveDot, Pill } from "@/shared/ui";
-import { formatCount, formatDday } from "@/shared/lib";
+import { cn, formatCount, formatDday } from "@/shared/lib";
 import { SplitCard, type PollDetail, type PollOption } from "@/entities/poll";
 
 type Side = "a" | "b";
@@ -21,35 +21,39 @@ type BalanceVoteViewProps = {
 /** 투표 전 화면 — 메타 pill 줄 + 헤드라인 + 대각선 스플릿 + 안내/인포 스트립 */
 export function BalanceVoteView({ poll, a, b, picked, onPick, voteError }: BalanceVoteViewProps) {
   return (
-    <div className="px-5 pb-6 pt-3">
-      {/* 메타 pill 줄 */}
-      <div className="mb-2.5 flex flex-wrap items-center gap-2">
-        <Pill variant="green">
-          <LiveDot tone="ink" />
-          진행 중
-        </Pill>
-        <span className="whitespace-nowrap text-[12px] text-ink-mute">
-          <span className="tnum font-mono text-ink">{formatCount(poll.totalVotes)}</span>명 투표
-        </span>
-        {poll.closesAt ? (
-          <>
-            <span className="text-[12px] text-ink-mute-2">·</span>
-            <span className="whitespace-nowrap text-[12px] text-ink-mute">
-              마감 {formatDday(poll.closesAt)}
-            </span>
-          </>
-        ) : null}
-      </div>
+    <article className="px-5 pb-6 pt-3">
+      {/* 헤드라인 헤더 — 메타 pill 줄 + 헤드라인 + 서브카피 */}
+      <header>
+        <div className="mb-2.5 flex flex-wrap items-center gap-2">
+          <Pill variant="green">
+            <LiveDot tone="ink" />
+            진행 중
+          </Pill>
+          <span className="whitespace-nowrap text-[12px] text-ink-mute">
+            <span className="tnum font-mono text-ink">{formatCount(poll.totalVotes)}</span>명 투표
+          </span>
+          {poll.closesAt ? (
+            <>
+              <span className="text-[12px] text-ink-mute-2">·</span>
+              <span className="whitespace-nowrap text-[12px] text-ink-mute">
+                마감 <time dateTime={poll.closesAt}>{formatDday(poll.closesAt)}</time>
+              </span>
+            </>
+          ) : null}
+        </div>
 
-      {/* 헤드라인 + 서브카피 */}
-      <h1 className="mb-1.5 text-[24px] font-bold leading-[1.2] tracking-[-0.5px] text-ink">
-        {poll.title}
-      </h1>
-      {poll.subtitle ? (
-        <p className="mb-[18px] text-[13px] leading-[1.45] text-ink-mute">{poll.subtitle}</p>
-      ) : (
-        <div className="mb-[18px]" />
-      )}
+        <h1
+          className={cn(
+            "text-[24px] font-bold leading-[1.2] tracking-[-0.5px] text-ink",
+            poll.subtitle ? "mb-1.5" : "mb-[18px]",
+          )}
+        >
+          {poll.title}
+        </h1>
+        {poll.subtitle ? (
+          <p className="mb-[18px] text-[13px] leading-[1.45] text-ink-mute">{poll.subtitle}</p>
+        ) : null}
+      </header>
 
       {/* 대각선 스플릿 — 탭 = 투표 */}
       <SplitCard a={a} b={b} aspect="3/4" showLatin animateVs picked={picked} onPick={onPick} />
@@ -72,6 +76,6 @@ export function BalanceVoteView({ poll, a, b, picked, onPick, voteError }: Balan
           결과 그래프는 투표한 사람만 볼 수 있어요. 댓글은 결과 공개 후에 열려요.
         </p>
       </div>
-    </div>
+    </article>
   );
 }

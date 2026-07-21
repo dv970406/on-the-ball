@@ -27,7 +27,7 @@ export function HomeView() {
   const { data, isPending, isError, error } = useHomeQuery();
 
   return (
-    <div>
+    <>
       <AppBar />
       {isPending ? (
         <HomeSkeleton />
@@ -48,7 +48,7 @@ export function HomeView() {
           <TmiPromo />
         </div>
       )}
-    </div>
+    </>
   );
 }
 

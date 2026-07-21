@@ -92,15 +92,13 @@ export function TrendingList({ items, pollTypeById }: TrendingListProps) {
   return (
     <section>
       <SectionHead title="지금 뜨거운 떡밥" />
-      <div className="border-t border-hairline-cool">
+      <ol className="border-t border-hairline-cool">
         {items.map((item) => (
-          <TrendRow
-            key={item.position}
-            item={item}
-            href={trendHref(item.pollId, pollTypeById)}
-          />
+          <li key={item.position}>
+            <TrendRow item={item} href={trendHref(item.pollId, pollTypeById)} />
+          </li>
         ))}
-      </div>
+      </ol>
     </section>
   );
 }

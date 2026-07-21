@@ -73,43 +73,51 @@ function KitVoteBody({ poll }: { poll: PollDetail }) {
     <div>
       <SubHeader title={poll.tag ?? "유니폼"} />
 
-      <div className="px-5 pb-10 pt-3">
-        {/* 메타 — 진행 상태 + 총 투표수 + D-day */}
-        <div className="mb-2.5 flex items-center gap-2">
-          {closed ? (
-            <Pill variant="outline">마감</Pill>
-          ) : (
-            <LiveStatusPill>진행 중</LiveStatusPill>
+      <article className="px-5 pb-10 pt-3">
+        {/* 헤드라인 헤더 — 메타(상태 + 투표수 + D-day) + 제목 */}
+        <header>
+          <div className="mb-2.5 flex items-center gap-2">
+            {closed ? (
+              <Pill variant="outline">마감</Pill>
+            ) : (
+              <LiveStatusPill>진행 중</LiveStatusPill>
+            )}
+            <span className="text-xs text-ink-mute">
+              <span className="font-mono tnum">{formatCount(poll.totalVotes)}</span>명 투표
+              {poll.closesAt && !closed && (
+                <>
+                  {" · 마감 "}
+                  <time dateTime={poll.closesAt}>{formatDday(poll.closesAt)}</time>
+                </>
+              )}
+            </span>
+          </div>
+          <h1 className="text-2xl font-medium leading-[1.2] tracking-[-0.5px] text-ink">
+            {poll.title}
+          </h1>
+          {poll.subtitle && (
+            <p className="mt-1.5 text-[13px] leading-[1.45] text-ink-mute">{poll.subtitle}</p>
           )}
-          <span className="text-xs text-ink-mute">
-            <span className="font-mono tnum">{formatCount(poll.totalVotes)}</span>명 투표
-            {poll.closesAt && !closed && <> · 마감 {formatDday(poll.closesAt)}</>}
-          </span>
-        </div>
-        <h1 className="text-2xl font-medium leading-[1.2] tracking-[-0.5px] text-ink">
-          {poll.title}
-        </h1>
-        {poll.subtitle && (
-          <p className="mt-1.5 text-[13px] leading-[1.45] text-ink-mute">{poll.subtitle}</p>
-        )}
+        </header>
 
         {castVote.isError && (
           <p className="mt-2 text-[11px] text-crimson">{castVote.error.message}</p>
         )}
 
         {/* 2열 유니폼 카드 그리드 — 탭 = 투표, 재탭 = 취소(서버가 cancelled 처리) */}
-        <div className="mt-[18px] grid grid-cols-2 gap-3">
+        <ul className="mt-[18px] grid grid-cols-2 gap-3">
           {kits.map((kit) => (
-            <KitCard
-              key={kit.id}
-              option={kit}
-              isMine={poll.myVote === kit.id}
-              revealed={revealed}
-              disabled={closed || castVote.isPending}
-              onVote={() => castVote.mutate(kit.id)}
-            />
+            <li key={kit.id}>
+              <KitCard
+                option={kit}
+                isMine={poll.myVote === kit.id}
+                revealed={revealed}
+                disabled={closed || castVote.isPending}
+                onVote={() => castVote.mutate(kit.id)}
+              />
+            </li>
           ))}
-        </div>
+        </ul>
 
         {/* 투표 확인 스트립 — 재탭 취소 안내 */}
         {myKit && !closed && (
@@ -121,7 +129,7 @@ function KitVoteBody({ poll }: { poll: PollDetail }) {
             </p>
           </div>
         )}
-      </div>
+      </article>
     </div>
   );
 }
@@ -147,7 +155,7 @@ function KitCard({ option, isMine, revealed, disabled, onVote }: KitCardProps) {
       aria-pressed={isMine}
       aria-label={isMine ? `${option.label} 투표 취소` : `${option.label}에 투표`}
       className={cn(
-        "flex flex-col gap-2 rounded-lg border bg-canvas p-3 text-left transition-[border-color,box-shadow] duration-150 ease-otb",
+        "flex h-full w-full flex-col gap-2 rounded-lg border bg-canvas p-3 text-left transition-[border-color,box-shadow] duration-150 ease-otb",
         isMine
           ? "border-primary shadow-[inset_0_0_0_1px_#3ecf8e]"
           : "border-hairline",

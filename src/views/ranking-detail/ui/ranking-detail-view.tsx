@@ -72,6 +72,7 @@ function RankingDetailBody({ poll }: { poll: PollDetail }) {
     <div>
       <SubHeader title={poll.tag ?? "랭킹 투표"} dark />
 
+      <article>
       {/* 다크 히어로 — 다크 서브헤더와 이어지는 canvas-night 밴드 */}
       <section className="bg-canvas-night px-5 pb-7 pt-4">
         <div className="mb-3 flex items-center gap-2">
@@ -84,7 +85,7 @@ function RankingDetailBody({ poll }: { poll: PollDetail }) {
           )}
           {poll.closesAt && !closed && (
             <span className="text-[11px] text-ink-mute-2">
-              마감 {formatDday(poll.closesAt)}
+              마감 <time dateTime={poll.closesAt}>{formatDday(poll.closesAt)}</time>
             </span>
           )}
         </div>
@@ -144,11 +145,11 @@ function RankingDetailBody({ poll }: { poll: PollDetail }) {
         {revealed && regions.length > 0 && (
           <section className="mt-[18px]">
             <h2 className="mb-2.5 text-[13px] font-medium text-ink">지역별 1위</h2>
-            <div className="grid grid-cols-2 gap-2">
+            <ul className="grid grid-cols-2 gap-2">
               {regions.map((region) => {
                 const winner = poll.options.find((option) => option.id === region.optionId);
                 return (
-                  <div
+                  <li
                     key={region.bucket}
                     className="rounded-[10px] border border-hairline-cool p-2.5"
                   >
@@ -161,13 +162,14 @@ function RankingDetailBody({ poll }: { poll: PollDetail }) {
                     <p className="font-mono text-[11px] text-ink-mute tnum">
                       {formatPct(region.ratio)}
                     </p>
-                  </div>
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           </section>
         )}
       </div>
+      </article>
 
       {/* 하단 고정 CTA 스트립 — 디테일 화면엔 탭바가 없어 프레임 하단에 부착 */}
       {!revealed && (

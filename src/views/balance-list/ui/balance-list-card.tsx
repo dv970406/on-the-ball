@@ -47,13 +47,17 @@ export function BalanceListCard({ poll, a, b }: BalanceListCardProps) {
         {/* 태그 / 마감 pill 줄 */}
         <div className="mb-2 flex gap-1.5">
           {poll.tag ? <Pill variant="soft">{poll.tag}</Pill> : null}
-          {poll.closesAt ? <Pill variant="outline">{formatDday(poll.closesAt)}</Pill> : null}
+          {poll.closesAt ? (
+            <Pill variant="outline">
+              <time dateTime={poll.closesAt}>{formatDday(poll.closesAt)}</time>
+            </Pill>
+          ) : null}
         </div>
 
         {/* 제목 */}
-        <p className="mb-2 text-[15px] font-semibold leading-[1.35] tracking-[-0.3px] text-ink">
+        <h2 className="mb-2 text-[15px] font-semibold leading-[1.35] tracking-[-0.3px] text-ink">
           {poll.title}
-        </p>
+        </h2>
 
         {/* 4px 비율 바 — 다크 = A 점유율 */}
         <RatioBar

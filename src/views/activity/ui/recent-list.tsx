@@ -1,6 +1,4 @@
-"use client";
-
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   CircleCheck,
   CircleX,
@@ -12,7 +10,7 @@ import {
   Vote,
   type LucideIcon,
 } from "lucide-react";
-import { Button, EmptyState, Icon } from "@/shared/ui";
+import { buttonClassName, EmptyState, Icon } from "@/shared/ui";
 import { formatPct } from "@/shared/lib";
 import { ROUTES } from "@/shared/config";
 import type { ActivityRecent } from "../model/use-my-activity";
@@ -28,8 +26,6 @@ const KIND_ICON: Record<ActivityRecent["kind"], LucideIcon> = {
 
 /** 최근 한 표 리스트 — 폴은 동의율, 퀴즈는 정오답 표시 */
 export function RecentList({ items }: { items: ActivityRecent[] }) {
-  const router = useRouter();
-
   if (items.length === 0) {
     return (
       <EmptyState
@@ -37,9 +33,9 @@ export function RecentList({ items }: { items: ActivityRecent[] }) {
         title="아직 활동이 없어요"
         description="첫 한 표를 던져보세요"
         action={
-          <Button variant="dark" size="sm" onClick={() => router.push(ROUTES.home)}>
+          <Link href={ROUTES.home} className={buttonClassName({ variant: "dark", size: "sm" })}>
             홈에서 시작하기
-          </Button>
+          </Link>
         }
       />
     );

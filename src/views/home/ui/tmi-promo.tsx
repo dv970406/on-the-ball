@@ -15,14 +15,14 @@ export function TmiPromo() {
         <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-accent-yellow text-[22px]">
           🔥
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[15px] font-semibold text-ink">
+        <div className="min-w-0 flex-1">
+          <h2 className="block text-[15px] font-semibold text-ink">
             선수 TMI · 진실 or 거짓
-          </span>
+          </h2>
           <span className="mt-0.5 block text-[12px] text-ink-mute">
             오늘 12개 떡밥이 들어왔어요. 진위는 다른 팬들이 가립니다.
           </span>
-        </span>
+        </div>
         <Icon as={ChevronRight} size={18} className="shrink-0 text-ink-mute-2" />
       </Link>
     </section>

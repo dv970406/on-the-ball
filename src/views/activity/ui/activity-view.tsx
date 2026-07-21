@@ -40,11 +40,11 @@ function formatJoined(iso: string): string {
 /** 나의 축구 성향 다크 카드 */
 function TraitCard({ trait }: { trait: ActivityTrait }) {
   return (
-    <div className="px-5 py-6">
+    <article className="px-5 py-6">
       <div className="rounded-xl bg-canvas-night p-[18px] text-white">
-        <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.6px] text-primary">
+        <h2 className="mb-2 font-mono text-[10px] uppercase tracking-[0.6px] text-primary">
           ▸ 나의 축구 성향
-        </p>
+        </h2>
         <p className="mb-3 text-lg font-semibold leading-[1.35] tracking-[-0.3px]">
           “{trait.title} — {trait.text}”
         </p>
@@ -52,7 +52,7 @@ function TraitCard({ trait }: { trait: ActivityTrait }) {
           최근 60일 데이터 기반 · 월 1회 갱신
         </p>
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -126,7 +126,7 @@ export function ActivityView() {
     <div>
       <div className="px-5 pb-5 pt-14">
         {/* 프로필 헤더 */}
-        <div className="mb-[18px] flex items-center gap-3.5">
+        <header className="mb-[18px] flex items-center gap-3.5">
           <Avatar
             size={62}
             label={profile.nickname}
@@ -134,7 +134,7 @@ export function ActivityView() {
             style={{ background: avatarGradient(profile.fanTeam) }}
           />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-lg font-semibold text-ink">{profile.nickname}</p>
+            <h1 className="truncate text-lg font-semibold text-ink">{profile.nickname}</h1>
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
               {profile.fanTeam ? (
                 <Pill variant="soft">{profile.fanTeam}</Pill>
@@ -144,7 +144,9 @@ export function ActivityView() {
                 </Pill>
               )}
               <Pill variant="outline" className="font-mono tnum">
-                {formatJoined(profile.joinedAt)} 가입
+                <span>
+                  <time dateTime={profile.joinedAt}>{formatJoined(profile.joinedAt)}</time> 가입
+                </span>
               </Pill>
             </div>
           </div>
@@ -155,22 +157,24 @@ export function ActivityView() {
           >
             <Icon as={Settings} size={16} />
           </button>
-        </div>
+        </header>
 
         {/* 4열 스탯 */}
-        <div className="grid grid-cols-4 divide-x divide-hairline-cool rounded-[14px] border border-hairline py-3.5">
+        <ul className="grid grid-cols-4 divide-x divide-hairline-cool rounded-[14px] border border-hairline py-3.5">
           {statCells.map(([label, value]) => (
-            <div key={label} className="text-center">
+            <li key={label} className="text-center">
               <p className="font-mono text-lg font-semibold text-ink tnum">{value}</p>
               <p className="mt-0.5 text-[11px] text-ink-mute">{label}</p>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
 
       {/* 최근 한 표 */}
-      <SectionHead title="최근 한 표" />
-      <RecentList items={recent} />
+      <section>
+        <SectionHead title="최근 한 표" />
+        <RecentList items={recent} />
+      </section>
 
       {/* 나의 축구 성향 */}
       <TraitCard trait={trait} />

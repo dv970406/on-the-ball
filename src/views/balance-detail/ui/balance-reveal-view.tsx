@@ -48,27 +48,35 @@ export function BalanceRevealView({ poll, a, b, mySide }: BalanceRevealViewProps
   const statRowCount = Math.max(aMeta.stats.length, bMeta.stats.length);
 
   return (
-    <div className="animate-fade-up px-5 pb-6 pt-3">
-      {/* 메타 pill 줄 */}
-      <div className="mb-2.5 flex flex-wrap items-center gap-2">
-        <LiveStatusPill>결과 공개</LiveStatusPill>
-        <span className="whitespace-nowrap text-[12px] text-ink-mute">
-          <span className="tnum font-mono text-ink">{formatCount(poll.totalVotes)}</span>명 투표
-        </span>
-        {poll.closesAt ? (
-          <>
-            <span className="text-[12px] text-ink-mute-2">·</span>
-            <span className="whitespace-nowrap text-[12px] text-ink-mute">
-              {/* 마감된 폴이면 formatDday가 "마감"을 반환 → "마감 마감" 방지 */}
-              {isClosed(poll.closesAt) ? "마감" : `마감 ${formatDday(poll.closesAt)}`}
-            </span>
-          </>
-        ) : null}
-      </div>
+    <article className="animate-fade-up px-5 pb-6 pt-3">
+      {/* 헤드라인 헤더 — 메타 pill 줄 + 헤드라인 */}
+      <header>
+        <div className="mb-2.5 flex flex-wrap items-center gap-2">
+          <LiveStatusPill>결과 공개</LiveStatusPill>
+          <span className="whitespace-nowrap text-[12px] text-ink-mute">
+            <span className="tnum font-mono text-ink">{formatCount(poll.totalVotes)}</span>명 투표
+          </span>
+          {poll.closesAt ? (
+            <>
+              <span className="text-[12px] text-ink-mute-2">·</span>
+              <span className="whitespace-nowrap text-[12px] text-ink-mute">
+                {/* 마감된 폴이면 formatDday가 "마감"을 반환 → "마감 마감" 방지 */}
+                {isClosed(poll.closesAt) ? (
+                  "마감"
+                ) : (
+                  <>
+                    마감 <time dateTime={poll.closesAt}>{formatDday(poll.closesAt)}</time>
+                  </>
+                )}
+              </span>
+            </>
+          ) : null}
+        </div>
 
-      <h1 className="mb-3.5 text-[24px] font-bold leading-[1.2] tracking-[-0.5px] text-ink">
-        {poll.title}
-      </h1>
+        <h1 className="mb-3.5 text-[24px] font-bold leading-[1.2] tracking-[-0.5px] text-ink">
+          {poll.title}
+        </h1>
+      </header>
 
       {/* 내 선택 칩 */}
       {myChoice ? (
@@ -101,11 +109,11 @@ export function BalanceRevealView({ poll, a, b, mySide }: BalanceRevealViewProps
 
       {/* 응답자 분석 — 연령대별 스택바 */}
       {ageRows.length > 0 ? (
-        <div className="mt-6">
+        <section className="mt-6">
           <h2 className="mb-2.5 text-[13px] font-semibold text-ink">응답자 분석</h2>
-          <div className="flex flex-col gap-2">
+          <ul className="flex flex-col gap-2">
             {ageRows.map((row) => (
-              <div key={row.bucket}>
+              <li key={row.bucket}>
                 <div className="mb-1 flex items-center">
                   <span className="text-[11px] text-ink-mute">{row.bucket}</span>
                   <span className="tnum ml-auto font-mono text-[11px] text-ink">
@@ -120,15 +128,15 @@ export function BalanceRevealView({ poll, a, b, mySide }: BalanceRevealViewProps
                   height={8}
                   trackColor="var(--color-canvas-soft)"
                 />
-              </div>
+              </li>
             ))}
-          </div>
-        </div>
+          </ul>
+        </section>
       ) : null}
 
       {/* 한 줄 거들기 */}
       <CommentSection pollId={poll.id} commentCount={poll.commentCount} />
-    </div>
+    </article>
   );
 }
 

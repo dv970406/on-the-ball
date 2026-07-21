@@ -42,7 +42,7 @@ function OngoingPollCard({ poll }: { poll: PollListItem }) {
         )}
       </span>
 
-      <span className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1">
         {/* 상태 pill 줄 — 내가 투표한 폴이면 '참여함' */}
         <span className="mb-2 flex flex-wrap gap-1.5">
           <LiveStatusPill>진행 중</LiveStatusPill>
@@ -51,21 +51,26 @@ function OngoingPollCard({ poll }: { poll: PollListItem }) {
         </span>
 
         {/* 제목 — 홈 카드 전용 문구(meta.card.title) 우선 */}
-        <span className="mb-1.5 block text-[16px] font-semibold leading-[1.3] tracking-[-0.3px] text-ink">
+        <h3 className="mb-1.5 block text-[16px] font-semibold leading-[1.3] tracking-[-0.3px] text-ink">
           {card.title ?? poll.title}
-        </span>
+        </h3>
 
         <span className="block text-[12px] text-ink-mute">
           <span className="tnum font-mono text-ink">{formatCount(poll.totalVotes)}</span>명
           투표
           {/* 마감이 지나면 "마감 마감"이 되지 않도록 단독 표기 */}
-          {poll.closesAt
-            ? isClosed(poll.closesAt)
-              ? " · 마감"
-              : ` · 마감 ${formatDday(poll.closesAt)}`
-            : null}
+          {poll.closesAt ? (
+            isClosed(poll.closesAt) ? (
+              " · 마감"
+            ) : (
+              <>
+                {" · 마감 "}
+                <time dateTime={poll.closesAt}>{formatDday(poll.closesAt)}</time>
+              </>
+            )
+          ) : null}
         </span>
-      </span>
+      </div>
     </Link>
   );
 }
@@ -77,11 +82,13 @@ export function OngoingPolls({ polls }: { polls: PollListItem[] }) {
   return (
     <section>
       <SectionHead title="진행 중인 투표" />
-      <div className="flex flex-col gap-3 px-5">
+      <ul className="flex flex-col gap-3 px-5">
         {polls.map((poll) => (
-          <OngoingPollCard key={poll.id} poll={poll} />
+          <li key={poll.id}>
+            <OngoingPollCard poll={poll} />
+          </li>
         ))}
-      </div>
+      </ul>
     </section>
   );
 }

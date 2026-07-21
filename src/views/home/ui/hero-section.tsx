@@ -56,7 +56,9 @@ export function HeroSection({ poll }: { poll: PollListItem }) {
         {dday && !closed ? (
           <>
             <span className="text-[12px] text-ink-mute-2">·</span>
-            <span className="whitespace-nowrap text-[12px] text-ink-mute">마감 {dday}</span>
+            <span className="whitespace-nowrap text-[12px] text-ink-mute">
+              마감 <time dateTime={poll.closesAt ?? undefined}>{dday}</time>
+            </span>
           </>
         ) : null}
       </div>

@@ -85,45 +85,49 @@ export function QuizDetailView({ id }: { id: string }) {
     <div className="min-h-full bg-canvas-soft">
       <SubHeader title="오늘의 퀴즈" fallbackHref={ROUTES.quizList} />
 
-      <div className="px-5 pb-10 pt-3">
-        {/* 메타 — 상태 pill + 정답률/도전자 수 */}
-        <div className="mb-2.5 flex items-center gap-2">
-          {done ? (
-            <Pill variant="soft">도전 완료</Pill>
-          ) : (
-            <LiveStatusPill>진행 중</LiveStatusPill>
-          )}
-          <span className="tnum text-xs text-ink-mute">
-            정답률{" "}
-            <strong className="font-mono font-semibold text-ink">
-              {data.accuracyPct}%
-            </strong>{" "}
-            · <span className="font-mono">{formatCount(data.attempts)}</span>명 도전
-          </span>
-        </div>
+      <article className="px-5 pb-10 pt-3">
+        {/* 헤드라인 헤더 — 메타(상태 pill + 정답률/도전자) + 질문 */}
+        <header>
+          <div className="mb-2.5 flex items-center gap-2">
+            {done ? (
+              <Pill variant="soft">도전 완료</Pill>
+            ) : (
+              <LiveStatusPill>진행 중</LiveStatusPill>
+            )}
+            <span className="tnum text-xs text-ink-mute">
+              정답률{" "}
+              <strong className="font-mono font-semibold text-ink">
+                {data.accuracyPct}%
+              </strong>{" "}
+              · <span className="font-mono">{formatCount(data.attempts)}</span>명 도전
+            </span>
+          </div>
 
-        {/* 질문 헤드라인 */}
-        <h1 className="mb-1.5 text-[22px] font-bold leading-[1.2] tracking-[-0.4px] text-ink">
-          {data.title}
-        </h1>
-        {data.subtitle ? (
-          <p className="mb-4 text-[13px] leading-normal text-ink-mute">
-            {data.subtitle}
-          </p>
-        ) : (
-          <div className="mb-4" />
-        )}
+          <h1
+            className={cn(
+              "text-[22px] font-bold leading-[1.2] tracking-[-0.4px] text-ink",
+              data.subtitle ? "mb-1.5" : "mb-4",
+            )}
+          >
+            {data.title}
+          </h1>
+          {data.subtitle ? (
+            <p className="mb-4 text-[13px] leading-normal text-ink-mute">
+              {data.subtitle}
+            </p>
+          ) : null}
+        </header>
 
         {/* 피치 뷰 + 캡션 */}
         {data.lineup ? (
-          <>
+          <figure>
             <QuizPitch lineup={data.lineup} reveal={done} />
             {data.lineup.caption ? (
-              <div className="mt-2.5 text-center font-mono text-[11px] text-ink-mute-2">
+              <figcaption className="mt-2.5 text-center font-mono text-[11px] text-ink-mute-2">
                 {data.lineup.caption}
-              </div>
+              </figcaption>
             ) : null}
-          </>
+          </figure>
         ) : null}
 
         {/* 힌트 토글 — 도전 전에만 */}
@@ -148,51 +152,52 @@ export function QuizDetailView({ id }: { id: string }) {
         ) : null}
 
         {/* 4지선다 */}
-        <div className="mt-[18px] flex flex-col gap-2">
+        <ul className="mt-[18px] flex flex-col gap-2">
           {displayChoices.map((choice) => {
             const isCorrectChoice = done && choice.id === correctChoiceId;
             const isMyWrong = done && choice.id === myChoiceId && !isCorrectChoice;
             const isDim = done && !isCorrectChoice && !isMyWrong;
 
             return (
-              <button
-                key={choice.id}
-                type="button"
-                onClick={() => handlePick(choice.id)}
-                aria-disabled={done}
-                aria-label={`${choice.team}${choice.season ? ` ${choice.season}` : ""} 선택`}
-                className={cn(
-                  "flex w-full items-center justify-between rounded-[10px] border bg-canvas px-4 py-3.5 text-left text-[15px] font-medium text-ink transition-colors duration-150 ease-otb",
-                  !done && "border-hairline active:border-ink",
-                  !done && myChoiceId === choice.id && "border-ink",
-                  isCorrectChoice && "border-primary bg-primary/[0.12]",
-                  isMyWrong && "border-crimson bg-crimson/[0.06] text-crimson",
-                  isDim && "border-hairline opacity-[0.55]",
-                )}
-              >
-                <span className="min-w-0">
-                  <span className="block">{choice.team}</span>
-                  {done ? (
-                    <span className="tnum mt-1 block text-[11px] font-normal text-ink-mute">
-                      <span className="font-mono">{formatPct(choice.pickRatio)}</span>가
-                      이걸 골랐어요
+              <li key={choice.id}>
+                <button
+                  type="button"
+                  onClick={() => handlePick(choice.id)}
+                  aria-disabled={done}
+                  aria-label={`${choice.team}${choice.season ? ` ${choice.season}` : ""} 선택`}
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-[10px] border bg-canvas px-4 py-3.5 text-left text-[15px] font-medium text-ink transition-colors duration-150 ease-otb",
+                    !done && "border-hairline active:border-ink",
+                    !done && myChoiceId === choice.id && "border-ink",
+                    isCorrectChoice && "border-primary bg-primary/[0.12]",
+                    isMyWrong && "border-crimson bg-crimson/[0.06] text-crimson",
+                    isDim && "border-hairline opacity-[0.55]",
+                  )}
+                >
+                  <span className="min-w-0">
+                    <span className="block">{choice.team}</span>
+                    {done ? (
+                      <span className="tnum mt-1 block text-[11px] font-normal text-ink-mute">
+                        <span className="font-mono">{formatPct(choice.pickRatio)}</span>가
+                        이걸 골랐어요
+                      </span>
+                    ) : null}
+                  </span>
+                  {choice.season ? (
+                    <span
+                      className={cn(
+                        "shrink-0 font-mono text-xs font-normal",
+                        isCorrectChoice ? "text-primary-deep" : "text-ink-mute",
+                      )}
+                    >
+                      {choice.season}
                     </span>
                   ) : null}
-                </span>
-                {choice.season ? (
-                  <span
-                    className={cn(
-                      "shrink-0 font-mono text-xs font-normal",
-                      isCorrectChoice ? "text-primary-deep" : "text-ink-mute",
-                    )}
-                  >
-                    {choice.season}
-                  </span>
-                ) : null}
-              </button>
+                </button>
+              </li>
             );
           })}
-        </div>
+        </ul>
 
         {submitError ? (
           <p className="mt-2 text-xs text-crimson">{submitError}</p>
@@ -262,7 +267,7 @@ export function QuizDetailView({ id }: { id: string }) {
             ) : null}
           </div>
         ) : null}
-      </div>
+      </article>
     </div>
   );
 }

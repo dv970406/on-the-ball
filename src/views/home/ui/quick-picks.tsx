@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { SectionHead } from "@/shared/ui";
 import { formatCount } from "@/shared/lib";
 import { ROUTES } from "@/shared/config";
@@ -24,7 +23,7 @@ function MiniBalanceCard({ poll }: { poll: PollListItem }) {
     <Link
       href={ROUTES.balanceDetail(poll.id)}
       aria-label={`${poll.title} — ${sides.a.label} 대 ${sides.b.label} 밸런스 게임`}
-      className="w-60 shrink-0 overflow-hidden rounded-[14px] border border-hairline bg-canvas"
+      className="block overflow-hidden rounded-[14px] border border-hairline bg-canvas"
     >
       {/* 상단 2분할 — 홈 전용 라벨(meta.card) 우선 */}
       <span className="relative grid h-[110px] grid-cols-2">
@@ -60,21 +59,18 @@ function MiniBalanceCard({ poll }: { poll: PollListItem }) {
 
 /** 가벼운 양자택일 캐러셀 — 240px 미니 카드 가로 스크롤 */
 export function QuickPicks({ polls }: { polls: PollListItem[] }) {
-  const router = useRouter();
   if (polls.length === 0) return null;
 
   return (
     <section>
-      <SectionHead
-        title="더 가벼운 양자택일"
-        more="전체"
-        onMore={() => router.push(ROUTES.balanceList)}
-      />
-      <div className="no-scrollbar flex gap-3 overflow-x-auto px-5 pb-1">
+      <SectionHead title="더 가벼운 양자택일" more="전체" moreHref={ROUTES.balanceList} />
+      <ul className="no-scrollbar flex gap-3 overflow-x-auto px-5 pb-1">
         {polls.map((poll) => (
-          <MiniBalanceCard key={poll.id} poll={poll} />
+          <li key={poll.id} className="w-60 shrink-0">
+            <MiniBalanceCard poll={poll} />
+          </li>
         ))}
-      </div>
+      </ul>
     </section>
   );
 }

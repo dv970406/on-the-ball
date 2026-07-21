@@ -40,7 +40,7 @@ type AppBarProps = {
 /** 상단 앱바 (sticky) — 기본: 워드마크 + 스트릭 칩 + 검색/알림 */
 export function AppBar({ left, right }: AppBarProps) {
   return (
-    <div className="sticky top-0 z-[5] flex items-center border-b border-hairline-cool bg-canvas px-5 pb-3 pt-[max(20px,env(safe-area-inset-top))]">
+    <header className="sticky top-0 z-[5] flex items-center border-b border-hairline-cool bg-canvas px-5 pb-3 pt-[max(20px,env(safe-area-inset-top))]">
       {left ?? <Wordmark />}
       <div className="ml-auto flex items-center gap-2.5">
         {right ?? (
@@ -55,6 +55,6 @@ export function AppBar({ left, right }: AppBarProps) {
           </>
         )}
       </div>
-    </div>
+    </header>
   );
 }

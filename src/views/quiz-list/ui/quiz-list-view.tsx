@@ -54,7 +54,7 @@ function TodayQuizCard({ quiz }: { quiz: QuizSummary }) {
       <span className="flex size-12 shrink-0 items-center justify-center rounded-[10px] border border-hairline-cool bg-canvas-soft text-ink">
         <Icon as={MapIcon} size={22} />
       </span>
-      <span className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1">
         <span className="mb-1 flex gap-1.5">
           {quiz.myResult === "correct" ? (
             <Pill variant="green">정답</Pill>
@@ -65,12 +65,12 @@ function TodayQuizCard({ quiz }: { quiz: QuizSummary }) {
           )}
           <Pill variant="soft">{quiz.kind}</Pill>
         </span>
-        <span className="block text-sm font-semibold text-ink">{quiz.title}</span>
+        <h3 className="block text-sm font-semibold text-ink">{quiz.title}</h3>
         <span className="tnum mt-1 block text-[11px] text-ink-mute">
           정답률 <strong className="font-mono font-semibold text-ink">{quiz.accuracyPct}%</strong>{" "}
           · <span className="font-mono">{formatCount(quiz.attempts)}</span>명 도전
         </span>
-      </span>
+      </div>
       <Icon as={ChevronRight} size={18} className="shrink-0 text-ink-mute-2" />
     </Link>
   );
@@ -81,16 +81,19 @@ function UpcomingQuizRow({ quiz }: { quiz: QuizSummary }) {
   return (
     // 잠금 상태 — 인터랙션 없는 행
     <li className="flex items-center gap-2.5 rounded-lg border border-dashed border-hairline-strong p-3">
-      <span className="flex size-[38px] shrink-0 items-center justify-center rounded-[9px] bg-canvas-soft font-mono text-[10px] text-ink-mute">
+      <time
+        dateTime={quiz.opensOn}
+        className="flex size-[38px] shrink-0 items-center justify-center rounded-[9px] bg-canvas-soft font-mono text-[10px] text-ink-mute"
+      >
         {formatDday(quiz.opensOn)}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[13px] font-medium text-ink">{quiz.title}</span>
+      </time>
+      <div className="min-w-0 flex-1">
+        <h3 className="block text-[13px] font-medium text-ink">{quiz.title}</h3>
         <span className="mt-0.5 block text-[11px] text-ink-mute-2">
           {quiz.kind}
           {quiz.subtitle ? ` · ${quiz.subtitle}` : ""}
         </span>
-      </span>
+      </div>
       <Icon as={Lock} size={14} className="shrink-0 text-ink-mute-2" aria-label="잠김" />
     </li>
   );
@@ -121,13 +124,13 @@ function PastQuizRow({ quiz }: { quiz: QuizSummary }) {
             <span className="size-1.5 rounded-full bg-ink-faint" />
           </span>
         )}
-        <span className="min-w-0 flex-1">
-          <span className="block text-[13px] text-ink">{quiz.title}</span>
+        <div className="min-w-0 flex-1">
+          <h3 className="block text-[13px] text-ink">{quiz.title}</h3>
           <span className="tnum mt-0.5 block text-[10px] text-ink-mute-2">
             <span className="font-mono">{quiz.accuracyPct}%</span> ·{" "}
             <span className="font-mono">{formatCount(quiz.attempts)}</span>명 · {quiz.kind}
           </span>
-        </span>
+        </div>
         <Icon as={ChevronRight} size={14} className="shrink-0 text-ink-mute-2" />
       </Link>
     </li>
@@ -159,12 +162,12 @@ export function QuizListView() {
   return (
     <div>
       {/* 타이틀 */}
-      <div className="px-5 pb-3 pt-14">
+      <header className="px-5 pb-3 pt-14">
         <h1 className="text-[28px] font-bold tracking-[-0.6px] text-ink">축구 퀴즈</h1>
         <p className="mt-1.5 text-[13px] text-ink-mute">
           매일 오전 8시, 새 문제가 한 개씩 열려요.
         </p>
-      </div>
+      </header>
 
       {/* Streak 카드 */}
       <div className="px-5 pb-5">
@@ -182,43 +185,47 @@ export function QuizListView() {
       ) : (
         <>
           {/* 오늘의 문제 */}
-          <SectionHead title="오늘의 문제" />
-          <div className="mb-6 px-5">
-            {data.today ? (
-              <TodayQuizCard quiz={data.today} />
-            ) : (
-              <EmptyState
-                icon={MapIcon}
-                title="오늘의 문제가 아직 열리지 않았어요"
-                description="매일 오전 8시에 새 문제가 열려요."
-                className="rounded-[14px] border border-hairline bg-canvas py-10"
-              />
-            )}
-          </div>
+          <section>
+            <SectionHead title="오늘의 문제" />
+            <div className="mb-6 px-5">
+              {data.today ? (
+                <TodayQuizCard quiz={data.today} />
+              ) : (
+                <EmptyState
+                  icon={MapIcon}
+                  title="오늘의 문제가 아직 열리지 않았어요"
+                  description="매일 오전 8시에 새 문제가 열려요."
+                  className="rounded-[14px] border border-hairline bg-canvas py-10"
+                />
+              )}
+            </div>
+          </section>
 
           {/* 예정된 문제 */}
           {data.upcoming.length > 0 ? (
-            <>
+            <section>
               <SectionHead title="예정된 문제" />
               <ul className="flex flex-col gap-2.5 px-5 pb-6">
                 {data.upcoming.map((quiz) => (
                   <UpcomingQuizRow key={quiz.id} quiz={quiz} />
                 ))}
               </ul>
-            </>
+            </section>
           ) : null}
 
           {/* 지난 문제 보관함 */}
-          <SectionHead title="지난 문제 (보관함)" />
-          {data.past.length > 0 ? (
-            <ul className="flex flex-col px-5 pb-6">
-              {data.past.map((quiz) => (
-                <PastQuizRow key={quiz.id} quiz={quiz} />
-              ))}
-            </ul>
-          ) : (
-            <EmptyState title="지난 문제가 아직 없어요" className="py-8" />
-          )}
+          <section>
+            <SectionHead title="지난 문제 (보관함)" />
+            {data.past.length > 0 ? (
+              <ul className="flex flex-col px-5 pb-6">
+                {data.past.map((quiz) => (
+                  <PastQuizRow key={quiz.id} quiz={quiz} />
+                ))}
+              </ul>
+            ) : (
+              <EmptyState title="지난 문제가 아직 없어요" className="py-8" />
+            )}
+          </section>
         </>
       )}
     </div>

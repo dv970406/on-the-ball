@@ -9,15 +9,15 @@ import { useScrollRestore } from "@/shared/lib";
  * - 디테일 라우트 왕복 시 스크롤 위치 복원
  */
 export function TabScrollArea({ children }: { children: ReactNode }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLElement>(null);
   useScrollRestore(scrollRef);
 
   return (
-    <div
+    <main
       ref={scrollRef}
       className="no-scrollbar h-full overflow-y-auto overflow-x-hidden pb-[122px]"
     >
       {children}
-    </div>
+    </main>
   );
 }

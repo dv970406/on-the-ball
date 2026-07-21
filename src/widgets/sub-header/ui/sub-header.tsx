@@ -35,7 +35,7 @@ export function SubHeader({ title, dark = false, fallbackHref = ROUTES.home }: S
   };
 
   return (
-    <div
+    <header
       className={cn(
         "sticky top-0 z-[15] flex items-center gap-1 border-b px-2 pb-2.5 pt-[max(16px,env(safe-area-inset-top))] backdrop-blur-[14px]",
         dark
@@ -70,6 +70,6 @@ export function SubHeader({ title, dark = false, fallbackHref = ROUTES.home }: S
       >
         <Icon as={Share2} size={18} />
       </button>
-    </div>
+    </header>
   );
 }

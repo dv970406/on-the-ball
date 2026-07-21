@@ -27,9 +27,9 @@ export function QuizBanner({ quiz }: { quiz: HomeTodayQuiz }) {
         </span>
 
         {/* 제목 */}
-        <span className="mb-3.5 block text-[21px] font-semibold leading-[1.25] tracking-[-0.4px] text-white">
+        <h2 className="mb-3.5 block text-[21px] font-semibold leading-[1.25] tracking-[-0.4px] text-white">
           {quiz.title}
-        </span>
+        </h2>
 
         {/* 국기 프리뷰 — 라인업 없는 문제(비라인업 퀴즈)면 생략 */}
         {quiz.lineupRows.length > 0 ? (

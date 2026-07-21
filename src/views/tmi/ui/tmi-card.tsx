@@ -47,13 +47,13 @@ export function TmiCard({ poll, order, total, peek = false, resultSide = null, e
   const myWins = resultSide !== null && isMajoritySide(poll, resultSide);
 
   return (
-    <div
+    <article
       aria-hidden={peek}
       className="absolute inset-0 flex flex-col rounded-[18px] border border-hairline bg-canvas p-[28px_24px_24px] transition-[transform,opacity] duration-[350ms] ease-otb [box-shadow:0_8px_24px_rgba(0,0,0,0.08)]"
       style={cardStyle(peek, exitSide)}
     >
       {/* 선수 아바타 + 국기 + 클럽 */}
-      <div className="mb-4 flex items-center gap-2.5">
+      <header className="mb-4 flex items-center gap-2.5">
         <Avatar label={meta.player} size={44} className="text-base font-semibold" />
         <div className="flex-1">
           <div className="flex items-center gap-1.5">
@@ -65,16 +65,16 @@ export function TmiCard({ poll, order, total, peek = false, resultSide = null, e
         <span className="font-mono text-[11px] text-ink-mute-2 tnum">
           {order + 1}/{total}
         </span>
-      </div>
+      </header>
 
       <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.6px] text-ink-mute-2">
         TMI · 떡밥
       </div>
 
       {/* 주장 */}
-      <p className="mb-3.5 text-[22px] font-bold leading-[1.3] tracking-[-0.4px] text-ink">
+      <h2 className="mb-3.5 text-[22px] font-bold leading-[1.3] tracking-[-0.4px] text-ink">
         {poll.title}
-      </p>
+      </h2>
 
       {/* 출처 미상 디테일 박스 */}
       <div className="mb-auto rounded-[10px] border border-hairline-cool bg-canvas-soft p-3 text-xs leading-normal text-ink-mute">
@@ -99,7 +99,7 @@ export function TmiCard({ poll, order, total, peek = false, resultSide = null, e
               {falsePct}% 거짓
             </div>
           </div>
-          <div className="mt-2 flex items-baseline justify-between text-[11px] text-ink-mute">
+          <footer className="mt-2 flex items-baseline justify-between text-[11px] text-ink-mute">
             <span>
               <span className="font-mono tnum">{formatCount(poll.totalVotes)}</span>
               명이 가렸어요
@@ -108,11 +108,11 @@ export function TmiCard({ poll, order, total, peek = false, resultSide = null, e
               내 선택: {resultSide === "true" ? "진실" : "거짓"} (
               {myWins ? "다수 의견" : "소수 의견"})
             </span>
-          </div>
+          </footer>
         </div>
       ) : (
         <div className="mt-4 text-center text-[11px] text-ink-mute-2">← 거짓 · 진실 →</div>
       )}
-    </div>
+    </article>
   );
 }

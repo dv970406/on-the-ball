@@ -1,6 +1,6 @@
 export { Icon } from "./icon";
 export { Pill } from "./pill";
-export { Button } from "./button";
+export { Button, buttonClassName } from "./button";
 export { Flag, type FlagCode } from "./flag";
 export { PlayerSilhouette } from "./player-silhouette";
 export { Shirt, type ShirtStripe } from "./shirt";
