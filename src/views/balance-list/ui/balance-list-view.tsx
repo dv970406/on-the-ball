@@ -100,7 +100,7 @@ function BalanceListSkeleton() {
       </div>
       <div className="flex flex-col gap-3.5 px-5">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="overflow-hidden rounded-[14px] border border-hairline bg-canvas">
+          <div key={i} className="card overflow-hidden">
             <Skeleton className="h-[70px] rounded-none" />
             <div className="p-3.5">
               <div className="mb-2 flex gap-1.5">

@@ -24,7 +24,7 @@ export function BalanceListCard({ poll, a, b }: BalanceListCardProps) {
     <Link
       href={ROUTES.balanceDetail(poll.id)}
       aria-label={`${poll.title} — ${a.label} 대 ${b.label} 밸런스 게임`}
-      className="block overflow-hidden rounded-[14px] border border-hairline bg-canvas"
+      className="card block overflow-hidden"
     >
       {/* 상단 2분할 스트립 — A면 좌 / B면 우, 중앙 VS */}
       <div className="relative flex h-[70px]">

@@ -23,7 +23,7 @@ function MiniBalanceCard({ poll }: { poll: PollListItem }) {
     <Link
       href={ROUTES.balanceDetail(poll.id)}
       aria-label={`${poll.title} — ${sides.a.label} 대 ${sides.b.label} 밸런스 게임`}
-      className="block overflow-hidden rounded-[14px] border border-hairline bg-canvas"
+      className="card block overflow-hidden"
     >
       {/* 상단 2분할 — 홈 전용 라벨(meta.card) 우선 */}
       <span className="relative grid h-[110px] grid-cols-2">

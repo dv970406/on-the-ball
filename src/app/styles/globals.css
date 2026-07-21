@@ -141,6 +141,14 @@ button {
   font-feature-settings: "tnum";
 }
 
+/* 표준 콘텐츠 카드 표면 — 14px 라운드 + 1px 헤어라인 + 캔버스 배경
+   (rounded-[14px] border border-hairline bg-canvas 조합의 단일 소스) */
+@utility card {
+  border-radius: 14px;
+  border: 1px solid var(--color-hairline);
+  background-color: var(--color-canvas);
+}
+
 /* 스크롤바 숨김 (모바일 스크롤 영역·가로 캐러셀) */
 @utility no-scrollbar {
   scrollbar-width: none;

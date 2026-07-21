@@ -77,7 +77,7 @@ function HomeSkeleton() {
           {[0, 1, 2].map((i) => (
             <div
               key={i}
-              className="w-60 shrink-0 overflow-hidden rounded-[14px] border border-hairline bg-canvas"
+              className="card w-60 shrink-0 overflow-hidden"
             >
               <Skeleton className="h-[110px] rounded-none" />
               <div className="p-3">

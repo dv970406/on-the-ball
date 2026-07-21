@@ -48,7 +48,7 @@ function TodayQuizCard({ quiz }: { quiz: QuizSummary }) {
   return (
     <Link
       href={ROUTES.quizDetail(quiz.id)}
-      className="flex items-center gap-3 rounded-[14px] border border-hairline bg-canvas p-4"
+      className="card flex items-center gap-3 p-4"
       aria-label={`오늘의 문제: ${quiz.title}`}
     >
       <span className="flex size-12 shrink-0 items-center justify-center rounded-[10px] border border-hairline-cool bg-canvas-soft text-ink">
@@ -190,7 +190,7 @@ export function QuizListView() {
                   icon={MapIcon}
                   title="오늘의 문제가 아직 열리지 않았어요"
                   description="매일 오전 8시에 새 문제가 열려요."
-                  className="rounded-[14px] border border-hairline bg-canvas py-10"
+                  className="card py-10"
                 />
               )}
             </div>
