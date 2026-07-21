@@ -1,5 +1,5 @@
 /** 내 프로필 (profiles 테이블) — 익명 로그인 시 트리거로 자동 생성 */
-export type Profile = {
+export interface Profile {
   id: string;
   nickname: string;
   /** 팬 태그 (예: "아스널 팬") — 미설정 시 null */
@@ -12,4 +12,4 @@ export type Profile = {
   currentStreak: number;
   bestStreak: number;
   joinedAt: string;
-};
+}

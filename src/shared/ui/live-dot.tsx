@@ -2,9 +2,9 @@ import { COLOR } from "@/shared/config";
 
 type LiveDotTone = "primary" | "ink";
 
-type LiveDotProps = {
+interface LiveDotProps {
   tone?: LiveDotTone;
-};
+}
 
 /** tone별 배경·글로우 링 색 — primary는 에메랄드, ink는 중립 그레이 */
 const DOT_TONE: Record<LiveDotTone, { background: string; glow: string }> = {

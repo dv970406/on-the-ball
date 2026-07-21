@@ -8,11 +8,11 @@ import { usePollCommentsQuery, type PollComment } from "@/entities/poll";
 import { useWriteComment } from "@/features/write-comment";
 import { useToggleCommentLike } from "@/features/like-comment";
 
-type CommentSectionProps = {
+interface CommentSectionProps {
   pollId: string;
   /** 목록 로드 전 노출할 서버 집계 댓글 수 */
   commentCount: number;
-};
+}
 
 /** "한 줄 거들기" — 댓글 입력 + 댓글 리스트 (결과 공개 후에만 마운트) */
 export function CommentSection({ pollId, commentCount }: CommentSectionProps) {
@@ -92,12 +92,12 @@ export function CommentSection({ pollId, commentCount }: CommentSectionProps) {
   );
 }
 
-type CommentRowProps = {
+interface CommentRowProps {
   comment: PollComment;
   /** 아바타 파스텔 배경 회전용 인덱스 */
   index: number;
   onToggleLike: () => void;
-};
+}
 
 function CommentRow({ comment, index, onToggleLike }: CommentRowProps) {
   return (

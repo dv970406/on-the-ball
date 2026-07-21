@@ -2,13 +2,13 @@ import { useId } from "react";
 
 export type ShirtStripe = "sash" | "h" | "v" | null;
 
-type ShirtProps = {
+interface ShirtProps {
   /** 유니폼 메인 컬러 (클럽 컬러 — 콘텐츠 컬러로 허용) */
   tone: string;
   stripe?: ShirtStripe;
   /** 밝은 유니폼용 대비 플래그 (토트넘 화이트 등) */
   dark?: boolean;
-};
+}
 
 /** 유니폼 SVG placeholder — 실제 킷 이미지로 교체 예정 */
 export function Shirt({ tone, stripe = null, dark = false }: ShirtProps) {

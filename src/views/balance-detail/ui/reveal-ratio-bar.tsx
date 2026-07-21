@@ -8,7 +8,7 @@ import type { BalanceSideMeta, PollOption } from "@/entities/poll";
 
 type Side = "a" | "b";
 
-type RevealRatioBarProps = {
+interface RevealRatioBarProps {
   a: PollOption;
   b: PollOption;
   aMeta: BalanceSideMeta;
@@ -17,7 +17,7 @@ type RevealRatioBarProps = {
   winner: Side | null;
   /** 내가 투표한 면 — 없으면 마커 미노출 (마감 후 미투표 열람) */
   mySide: Side | null;
-};
+}
 
 /**
  * 결과 리빌의 센터피스 — 56px 비율 바.

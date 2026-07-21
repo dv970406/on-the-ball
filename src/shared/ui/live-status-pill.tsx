@@ -2,9 +2,9 @@ import type { ReactNode } from "react";
 import { COLOR } from "@/shared/config";
 import { Pill } from "./pill";
 
-type LiveStatusPillProps = {
+interface LiveStatusPillProps {
   children: ReactNode;
-};
+}
 
 /**
  * 라이브 상태 pill — 에메랄드 배경 + 잉크 상태 닷.

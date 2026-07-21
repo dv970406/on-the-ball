@@ -5,12 +5,12 @@ import { Icon } from "@/shared/ui";
 import { cn, formatCount } from "@/shared/lib";
 import { useTogglePollLike } from "../model/use-toggle-poll-like";
 
-type LikePollButtonProps = {
+interface LikePollButtonProps {
   /** polls.slug (URL 식별자) */
   slug: string;
   likes: number;
   likedByMe: boolean;
-};
+}
 
 /**
  * poll 좋아요 토글 버튼 — 하트 + 카운트.

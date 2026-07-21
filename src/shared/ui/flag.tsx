@@ -21,12 +21,12 @@ export type FlagCode =
   | "EG"
   | "PL";
 
-type FlagProps = {
+interface FlagProps {
   code: FlagCode | string;
   width?: number;
   height?: number;
   className?: string;
-};
+}
 
 function flagShapes(code: string) {
   switch (code) {

@@ -4,7 +4,7 @@ import { cn } from "@/shared/lib";
 import { Icon } from "./icon";
 import { Button } from "./button";
 
-type EmptyStateProps = {
+interface EmptyStateProps {
   icon?: LucideIcon;
   title: string;
   description?: string;
@@ -17,7 +17,7 @@ type EmptyStateProps = {
   /** 재시도 버튼 톤 (기본 "dark") */
   retryVariant?: "dark" | "secondary";
   className?: string;
-};
+}
 
 /** 빈 상태·오류·설정 안내 공용 컴포넌트 */
 export function EmptyState({

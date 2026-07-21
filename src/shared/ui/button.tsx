@@ -11,14 +11,14 @@ const BUTTON_VARIANT = {
   secondary: "border-hairline-strong bg-canvas text-ink",
 } as const;
 
-type ButtonStyle = {
+interface ButtonStyle {
   variant?: keyof typeof BUTTON_VARIANT;
   size?: "md" | "sm";
   /** 가로 꽉 채움 */
   block?: boolean;
   disabled?: boolean;
   className?: string;
-};
+}
 
 /**
  * 버튼 시각 스타일 — 색·형태의 단일 소스.

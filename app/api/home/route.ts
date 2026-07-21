@@ -25,13 +25,13 @@ import type { HomeFeed, HomeTrendingItem } from "@/views/home/model/types";
 import { todayUtc } from "@/shared/lib/format";
 
 /** trending_items 테이블 행 — 연결 poll의 slug를 임베드해 공개 식별자로 사용 */
-type TrendingRow = {
+interface TrendingRow {
   position: number;
   title: string;
   vote_count: number;
   delta: "up" | "down" | "new";
   polls: { slug: string } | { slug: string }[] | null;
-};
+}
 
 /** PostgREST to-one 임베드가 객체/배열 어느 쪽으로 와도 첫 행만 취한다 */
 function oneSlug(rel: { slug: string } | { slug: string }[] | null): string | null {

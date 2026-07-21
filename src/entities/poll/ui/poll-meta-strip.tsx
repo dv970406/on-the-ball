@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { cn, formatCount, formatDday, isClosed } from "@/shared/lib";
 
-type PollMetaStripProps = {
+interface PollMetaStripProps {
   /** 좌측 상태 pill — 뷰별 변주(green+LiveDot / LiveStatusPill / outline)를 그대로 전달 */
   pill: ReactNode;
   totalVotes: number;
@@ -10,7 +10,7 @@ type PollMetaStripProps = {
   countSuffix?: ReactNode;
   /** 외부 여백 등 (예: "mb-2.5") */
   className?: string;
-};
+}
 
 /**
  * 폴 메타 줄 — 상태 pill + 득표수 + 마감 D-day.

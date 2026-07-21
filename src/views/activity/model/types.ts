@@ -2,21 +2,21 @@
 // ⚠ 서버(Route Handler)에서도 import하므로 "use client" 지시어 금지.
 import type { PollType } from "@/entities/poll/model/types";
 
-export type ActivityProfile = {
+export interface ActivityProfile {
   nickname: string;
   fanTeam: string | null;
   joinedAt: string;
-};
+}
 
-export type ActivityStats = {
+export interface ActivityStats {
   votes: number;
   quizzes: number;
   streak: number;
   /** 퀴즈 정답률 (반올림 %, 0건이면 0) */
   accuracyPct: number;
-};
+}
 
-export type ActivityRecent = {
+export interface ActivityRecent {
   kind: PollType | "quiz";
   title: string;
   /** 내가 고른 라벨 (옵션 label 또는 선택한 team) */
@@ -27,13 +27,13 @@ export type ActivityRecent = {
   agreeRatio: number | null;
   /** 퀴즈면 정오답, 폴이면 null */
   isCorrect: boolean | null;
-};
+}
 
-export type ActivityTrait = { title: string; text: string };
+export interface ActivityTrait { title: string; text: string }
 
-export type MyActivity = {
+export interface MyActivity {
   profile: ActivityProfile;
   stats: ActivityStats;
   recent: ActivityRecent[];
   trait: ActivityTrait;
-};
+}

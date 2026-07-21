@@ -26,12 +26,12 @@ const RPC_ERROR_MAP: [needle: string, status: number, message: string][] = [
 ];
 
 /** RPC(submit_quiz_attempt) 반환 jsonb 형태 */
-type RpcResult = {
+interface RpcResult {
   is_correct: boolean;
   correct_choice_id: number | null;
   answer_text: string | null;
   streak: number;
-};
+}
 
 /**
  * POST /api/quizzes/[id]/attempts — 정답 제출 (body: { choiceId })

@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/shared/lib";
 
-type AvatarProps = {
+interface AvatarProps {
   /** 표시할 라벨 — 첫 글자만 사용 */
   label?: string;
   size?: number;
@@ -9,7 +9,7 @@ type AvatarProps = {
   /** 그라데이션 등 커스텀 배경용 */
   style?: CSSProperties;
   children?: ReactNode;
-};
+}
 
 /** 원형 이니셜 아바타 (댓글·프로필) */
 export function Avatar({ label, size = 28, className, style, children }: AvatarProps) {

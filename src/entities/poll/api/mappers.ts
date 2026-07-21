@@ -35,7 +35,7 @@ export const COMMENT_SELECT =
 // ---------------------------------------------------------------------------
 
 /** polls 테이블 행 — id는 정수 대리키, slug는 공개 식별자 */
-export type PollRow = {
+export interface PollRow {
   id: number;
   slug: string;
   type: PollType;
@@ -46,48 +46,48 @@ export type PollRow = {
   featured: boolean;
   position: number;
   meta: Record<string, unknown> | null;
-};
+}
 
 /** poll_options 테이블 행 */
-export type PollOptionRow = {
+export interface PollOptionRow {
   id: number;
   poll_id: number;
   position: number;
   label: string;
   sublabel: string | null;
   meta: Record<string, unknown> | null;
-};
+}
 
 /** poll_results 뷰 행 — votes = 시드 + 실투표 합 */
-export type PollResultRow = {
+export interface PollResultRow {
   poll_id: number;
   option_id: number;
   votes: number;
-};
+}
 
 /** poll_like_stats 뷰 행 — poll별 좋아요 수 */
-export type PollLikeStatsRow = {
+export interface PollLikeStatsRow {
   poll_id: number;
   likes: number;
-};
+}
 
 /** votes 테이블 행 (내 투표 조회용) */
-export type VoteRow = {
+export interface VoteRow {
   poll_id: number;
   option_id: number;
-};
+}
 
 /** poll_demographics 테이블 행 */
-export type PollDemographicRow = {
+export interface PollDemographicRow {
   dimension: "age" | "region";
   bucket: string;
   option_id: number | null;
   ratio: number;
   position: number;
-};
+}
 
 /** comments 조인 행 (COMMENT_SELECT 결과) */
-export type CommentRow = {
+export interface CommentRow {
   id: number;
   user_id: string | null;
   display_name: string | null;
@@ -99,7 +99,7 @@ export type CommentRow = {
   profiles: { nickname: string; fan_team: string | null } | null;
   /** 동감 누른 사용자 목록 (카운트 + likedByMe 판별용) */
   comment_likes: { user_id: string }[];
-};
+}
 
 // ---------------------------------------------------------------------------
 // 매핑 함수

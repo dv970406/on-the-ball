@@ -4,12 +4,12 @@ import { formatCount, formatDday } from "@/shared/lib";
 import { readSideMeta, VsBadge, type PollListItem, type PollOption } from "@/entities/poll";
 import { COLOR, ROUTES } from "@/shared/config";
 
-type BalanceListCardProps = {
+interface BalanceListCardProps {
   poll: PollListItem;
   /** meta.side 기준으로 정렬된 A/B 옵션 */
   a: PollOption;
   b: PollOption;
-};
+}
 
 /**
  * 밸런스 리스트 카드 — 프로토타입 BalanceListItem 재현.

@@ -23,9 +23,9 @@ import { ApiError } from "@/shared/api";
 import { cn, formatCount, formatPct, isClosed } from "@/shared/lib";
 import { COLOR } from "@/shared/config";
 
-type KitVoteViewProps = {
+interface KitVoteViewProps {
   pollId: string;
-};
+}
 
 /** 유니폼 투표 디테일 화면 루트 — 로딩 / 본문 / 에러 분기 */
 export function KitVoteView({ pollId }: KitVoteViewProps) {
@@ -125,14 +125,14 @@ function KitVoteBody({ poll }: { poll: PollDetail }) {
   );
 }
 
-type KitCardProps = {
+interface KitCardProps {
   option: PollOption;
   isMine: boolean;
   /** 결과(비율 바·퍼센트) 공개 여부 */
   revealed: boolean;
   disabled: boolean;
   onVote: () => void;
-};
+}
 
 /** 유니폼 카드 — 1:1 소프트 배경 + Shirt + 클럽명 (+ 결과 공개 시 비율 바) */
 function KitCard({ option, isMine, revealed, disabled, onVote }: KitCardProps) {

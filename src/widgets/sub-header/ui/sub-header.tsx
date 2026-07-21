@@ -6,13 +6,13 @@ import { cn } from "@/shared/lib";
 import { ROUTES } from "@/shared/config";
 import { Icon } from "@/shared/ui";
 
-type SubHeaderProps = {
+interface SubHeaderProps {
   title: string;
   /** 다크 배경 화면용 (랭킹 히어로 등) */
   dark?: boolean;
   /** 딥링크 진입 등 history가 없을 때 돌아갈 경로 */
   fallbackHref?: string;
-};
+}
 
 /** 디테일 화면 상단 헤더 — 뒤로가기 + 타이틀 + 공유 */
 export function SubHeader({ title, dark = false, fallbackHref = ROUTES.home }: SubHeaderProps) {

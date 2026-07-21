@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 
-type SectionHeadProps = {
+interface SectionHeadProps {
   title: string;
   /** 우측 보조 액션 라벨 (예: "전체 보기") */
   more?: string;
   /** 경로 이동인 경우 — Link로 렌더(prefetch·새 탭 지원). onMore보다 우선. */
   moreHref?: string;
   onMore?: () => void;
-};
+}
 
 const moreClassName = "ml-auto text-xs text-ink-mute";
 

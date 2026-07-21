@@ -34,7 +34,7 @@ export const QUIZ_REVEAL_SELECT = "quiz_id, choice_id, is_correct, answer_text";
 // ---------------------------------------------------------------------------
 
 /** quizzes 테이블 행 (공개 컬럼만) — id는 정수, slug는 공개 식별자 */
-export type QuizRow = {
+export interface QuizRow {
   id: number;
   slug: string;
   kind: string;
@@ -44,53 +44,53 @@ export type QuizRow = {
   lineup_id: number | null;
   opens_on: string;
   created_at: string;
-};
+}
 
 /** quiz_choices 테이블 행 (공개 컬럼만) */
-export type QuizChoiceRow = {
+export interface QuizChoiceRow {
   id: number;
   quiz_id: number;
   position: number;
   team: string;
   season: string | null;
-};
+}
 
 /** lineups 테이블 행 — rows: GK줄부터 4줄 11셀 jsonb (lineup_id로만 조회, slug 미사용) */
-export type LineupRow = {
+export interface LineupRow {
   id: number;
   formation: string;
   caption: string | null;
   rows: LineupCell[][];
-};
+}
 
 /** quiz_stats 뷰 행 — 도전자 수·정답률 집계 */
-export type QuizStatsRow = {
+export interface QuizStatsRow {
   quiz_id: number;
   attempts: number;
   accuracy_pct: number;
-};
+}
 
 /** quiz_choice_stats 뷰 행 — 보기별 픽 수 (시드 + 실픽 합) */
-export type QuizChoiceStatsRow = {
+export interface QuizChoiceStatsRow {
   quiz_id: number;
   choice_id: number;
   picks: number;
-};
+}
 
 /** quiz_attempts 테이블 행 (RLS로 본인 행만 조회됨) */
-export type QuizAttemptRow = {
+export interface QuizAttemptRow {
   quiz_id: number;
   choice_id: number;
   is_correct: boolean;
-};
+}
 
 /** quiz_reveal 뷰 행 — 해당 퀴즈를 시도한 유저에게만 행이 보임 */
-export type QuizRevealRow = {
+export interface QuizRevealRow {
   quiz_id: number;
   choice_id: number;
   is_correct: boolean;
   answer_text: string | null;
-};
+}
 
 // ---------------------------------------------------------------------------
 // 매핑 함수

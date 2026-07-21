@@ -3,11 +3,11 @@
 import { Flag } from "@/shared/ui";
 import type { QuizLineup } from "@/entities/quiz";
 
-type QuizPitchProps = {
+interface QuizPitchProps {
   lineup: QuizLineup;
   /** 정답 공개 시 칩 살짝 확대 */
   reveal: boolean;
-};
+}
 
 /**
  * 피치 뷰 — 그린 그라데이션 + 잔디 스트라이프 + 라인 프레임 위에

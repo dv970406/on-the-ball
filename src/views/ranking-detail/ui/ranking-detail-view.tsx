@@ -15,9 +15,9 @@ import { ApiError } from "@/shared/api";
 import { cn, formatCount, formatDday, formatPct, isClosed } from "@/shared/lib";
 import { COLOR } from "@/shared/config";
 
-type RankingDetailViewProps = {
+interface RankingDetailViewProps {
   pollId: string;
-};
+}
 
 /** 랭킹 투표 디테일 화면 루트 — 로딩 / 본문 / 에러 분기 */
 export function RankingDetailView({ pollId }: RankingDetailViewProps) {
@@ -189,12 +189,12 @@ function RankingDetailBody({ poll }: { poll: PollDetail }) {
   );
 }
 
-type CandidatePickRowProps = {
+interface CandidatePickRowProps {
   option: PollOption;
   order: number;
   isPicked: boolean;
   onPick: () => void;
-};
+}
 
 /** 투표 전 후보 행 — 순번 + 아바타 + 이름·클럽 + radio */
 function CandidatePickRow({ option, order, isPicked, onPick }: CandidatePickRowProps) {
@@ -234,11 +234,11 @@ function CandidatePickRow({ option, order, isPicked, onPick }: CandidatePickRowP
   );
 }
 
-type CandidateResultRowProps = {
+interface CandidateResultRowProps {
   option: PollOption;
   rank: number;
   isMine: boolean;
-};
+}
 
 /** 투표 후 후보 행 — 득표순 순번 + 비율 바 + 퍼센트·득표수 + 내 표 칩 */
 function CandidateResultRow({ option, rank, isMine }: CandidateResultRowProps) {

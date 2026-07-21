@@ -1,18 +1,18 @@
 import { cn } from "@/shared/lib";
 
-export type RatioSegment = {
+export interface RatioSegment {
   /** 0~1 비율 */
   ratio: number;
   color: string;
-};
+}
 
-type RatioBarProps = {
+interface RatioBarProps {
   segments: RatioSegment[];
   /** px 높이 — 리스트 4 / 랭킹 5 / 응답 분석 8 */
   height?: number;
   trackColor?: string;
   className?: string;
-};
+}
 
 /** 얇은 비율 바 — width 변화 시 0.5s otb 이징으로 애니메이션 */
 export function RatioBar({

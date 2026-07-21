@@ -5,12 +5,12 @@ import type { PollListItem } from "@/entities/poll";
 import { Button } from "@/shared/ui";
 import { isMajoritySide, type TmiSide } from "../model/deck";
 
-type TmiSummaryProps = {
+interface TmiSummaryProps {
   deck: PollListItem[];
   /** poll.id → 이번 세션에서 판정한 면 (서버 myVote 반영 전 보정용) */
   sideOf: (poll: PollListItem) => TmiSide | null;
   onReview: () => void;
-};
+}
 
 /** 덱 완료 요약 — 다수 의견 일치 수 + 결과 다시 보기 */
 export function TmiSummary({ deck, sideOf, onReview }: TmiSummaryProps) {

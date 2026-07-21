@@ -8,7 +8,7 @@ export const POLL_TYPES = ["balance", "ranking", "kit", "tmi"] as const;
 export type PollType = (typeof POLL_TYPES)[number];
 
 /** poll_options.meta (balance side) — sublabel 컬럼 = 라틴 표기 */
-export type BalanceSideMeta = {
+export interface BalanceSideMeta {
   side: "a" | "b";
   /** 이름 아래 메타 카피 (예: "통산 850골 · 발롱도르 8회") */
   metaLine: string;
@@ -22,22 +22,22 @@ export type BalanceSideMeta = {
   stats: [string, string][];
   /** 결과 화면 한 줄 코멘트 */
   blurb: string;
-};
+}
 
 /** poll_options.meta (ranking 후보) — label=이름, sublabel=클럽 */
-export type RankingCandidateMeta = { flag: string; hue: number };
+export interface RankingCandidateMeta { flag: string; hue: number }
 
 /** poll_options.meta (kit 유니폼) */
-export type KitMeta = { tone: string; stripe: "sash" | "h" | "v" | null; dark: boolean };
+export interface KitMeta { tone: string; stripe: "sash" | "h" | "v" | null; dark: boolean }
 
 /** poll_options.meta (tmi 선택지) — label=진실/거짓 */
-export type TmiOptionMeta = { verdict: "true" | "false" };
+export interface TmiOptionMeta { verdict: "true" | "false" }
 
 /** polls.meta (tmi) — TMI 카드 본문 */
-export type TmiPollMeta = { player: string; club: string; flag: string; detail: string };
+export interface TmiPollMeta { player: string; club: string; flag: string; detail: string }
 
 /** 투표 선택지 — votes = poll_results 뷰(시드 + 실투표 합) */
-export type PollOption = {
+export interface PollOption {
   /** poll_options.id (정수 대리키) */
   id: number;
   position: number;
@@ -47,10 +47,10 @@ export type PollOption = {
   /** votes / totalVotes (totalVotes 0이면 0) */
   ratio: number;
   meta: Record<string, unknown>;
-};
+}
 
 /** 리스트/덱 카드용 투표 아이템 */
-export type PollListItem = {
+export interface PollListItem {
   /** 공개 식별자 = polls.slug (URL·쿼리키에 사용) */
   id: string;
   type: PollType;
@@ -70,25 +70,25 @@ export type PollListItem = {
   likes: number;
   /** 내가 좋아요를 눌렀는지 (비로그인 시 false) */
   likedByMe: boolean;
-};
+}
 
 /** 응답자 분석 한 줄 (poll_demographics — v1 시드 값) */
-export type PollDemographic = {
+export interface PollDemographic {
   dimension: "age" | "region";
   bucket: string;
   optionId: number | null;
   ratio: number;
   position: number;
-};
+}
 
 /** 디테일 화면용 — 리스트 아이템 + 응답자 분석 + 댓글 수 */
-export type PollDetail = PollListItem & {
+export interface PollDetail extends PollListItem {
   demographics: PollDemographic[];
   commentCount: number;
-};
+}
 
 /** "한 줄 거들기" 댓글 */
-export type PollComment = {
+export interface PollComment {
   id: number;
   author: { name: string; tag: string | null };
   body: string;
@@ -97,10 +97,10 @@ export type PollComment = {
   likedByMe: boolean;
   isMine: boolean;
   createdAt: string;
-};
+}
 
 /** cast_vote RPC 결과 — cancelled는 유니폼(kit) 재탭 취소 */
-export type CastVoteResult = {
+export interface CastVoteResult {
   status: "voted" | "cancelled" | "unchanged";
   optionId: number | null;
-};
+}

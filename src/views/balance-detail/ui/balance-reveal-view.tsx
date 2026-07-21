@@ -11,13 +11,13 @@ import { CommentSection } from "./comment-section";
 
 type Side = "a" | "b";
 
-type BalanceRevealViewProps = {
+interface BalanceRevealViewProps {
   poll: PollDetail;
   a: PollOption;
   b: PollOption;
   /** 내가 투표한 면 — 마감 후 미투표 열람이면 null */
   mySide: Side | null;
-};
+}
 
 /** 투표 후(또는 마감 후) 결과 화면 — 비율 바 + 스탯 비교 + blurb + 응답자 분석 + 댓글 */
 export function BalanceRevealView({ poll, a, b, mySide }: BalanceRevealViewProps) {
@@ -140,10 +140,10 @@ export function BalanceRevealView({ poll, a, b, mySide }: BalanceRevealViewProps
   );
 }
 
-type StatRowProps = {
+interface StatRowProps {
   aStat?: [string, string];
   bStat?: [string, string];
-};
+}
 
 /** 스탯 비교 한 행 — 좌 A / 중앙 헤어라인 / 우 B */
 function StatRow({ aStat, bStat }: StatRowProps) {
@@ -169,11 +169,11 @@ function StatCell({ stat, side }: { stat?: [string, string]; side: Side }) {
   );
 }
 
-type BlurbCardProps = {
+interface BlurbCardProps {
   option: PollOption;
   meta: BalanceSideMeta;
   won: boolean;
-};
+}
 
 /** 면별 blurb 카드 — 면 tone/text 배경, 승자는 에메랄드 2px 보더 */
 function BlurbCard({ option, meta, won }: BlurbCardProps) {

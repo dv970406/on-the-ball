@@ -12,7 +12,7 @@ import {
 
 type Side = "a" | "b";
 
-type BalanceVoteViewProps = {
+interface BalanceVoteViewProps {
   poll: PollDetail;
   a: PollOption;
   b: PollOption;
@@ -21,7 +21,7 @@ type BalanceVoteViewProps = {
   onPick: (side: Side) => void;
   /** 투표 실패 시 인라인 노출할 메시지 (ApiError.message) */
   voteError: string | null;
-};
+}
 
 /** 투표 전 화면 — 메타 pill 줄 + 헤드라인 + 대각선 스플릿 + 안내/인포 스트립 */
 export function BalanceVoteView({ poll, a, b, picked, onPick, voteError }: BalanceVoteViewProps) {

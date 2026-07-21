@@ -2,14 +2,14 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { cn } from "@/shared/lib";
 
-type NightCardProps = {
+interface NightCardProps {
   /** 있으면 카드 전체가 링크(next/link) — 없으면 div */
   href?: string;
   /** 패딩·레이아웃 변주 (예: "p-[18px]", "p-5 flex items-center gap-3.5") */
   className?: string;
   "aria-label"?: string;
   children: ReactNode;
-};
+}
 
 /**
  * 다크 카드 쉘 — canvas-night 배경 + 흰 텍스트 + rounded-xl.

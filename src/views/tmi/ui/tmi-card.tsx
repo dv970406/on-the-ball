@@ -6,7 +6,7 @@ import { Avatar, Flag } from "@/shared/ui";
 import { cn, formatCount } from "@/shared/lib";
 import { isMajoritySide, truePctOf, type TmiSide } from "../model/deck";
 
-type TmiCardProps = {
+interface TmiCardProps {
   poll: PollListItem;
   /** 덱 내 순번 (0-base) */
   order: number;
@@ -17,7 +17,7 @@ type TmiCardProps = {
   resultSide?: TmiSide | null;
   /** 카드 이탈 방향 — 진실=우측, 거짓=좌측 */
   exitSide?: TmiSide | null;
-};
+}
 
 /** 이탈 애니메이션 transform — translateX(±120%) rotate(±14deg) */
 function cardStyle(peek: boolean, exitSide: TmiSide | null): CSSProperties {

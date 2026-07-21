@@ -5,7 +5,7 @@ export type QuizKind = string;
 export type QuizMyResult = "correct" | "wrong" | null;
 
 /** 퀴즈 리스트 항목 (오늘/예정/지난 공용) */
-export type QuizSummary = {
+export interface QuizSummary {
   id: string;
   kind: QuizKind;
   title: string;
@@ -17,30 +17,30 @@ export type QuizSummary = {
   /** 정답률 % (0~100 정수) */
   accuracyPct: number;
   myResult: QuizMyResult;
-};
+}
 
 /** GET /api/quizzes 응답 — 오늘의 문제 / 예정(잠금) / 지난 보관함 */
-export type QuizListData = {
+export interface QuizListData {
   today: QuizSummary | null;
   upcoming: QuizSummary[];
   past: QuizSummary[];
-};
+}
 
 /** 라인업 피치의 셀 하나 — 포지션 라벨 + 국기 코드 */
-export type LineupCell = {
+export interface LineupCell {
   pos: string;
   flag: string;
-};
+}
 
 /** 라인업 — rows는 GK줄부터 4줄 11셀 */
-export type QuizLineup = {
+export interface QuizLineup {
   formation: string;
   caption: string | null;
   rows: LineupCell[][];
-};
+}
 
 /** 4지선다 보기 — 정답 여부는 포함하지 않음 (치팅 방지) */
-export type QuizChoice = {
+export interface QuizChoice {
   /** quiz_choices.id (정수 대리키) */
   id: number;
   position: number;
@@ -50,18 +50,18 @@ export type QuizChoice = {
   picks: number;
   /** 전체 픽 대비 비율 (0~1) */
   pickRatio: number;
-};
+}
 
 /** 내 도전 기록 — 정답 정보는 시도한 유저에게만 quiz_reveal로 공개 */
-export type QuizMyAttempt = {
+export interface QuizMyAttempt {
   choiceId: number;
   isCorrect: boolean;
   correctChoiceId: number | null;
   answerText: string | null;
-};
+}
 
 /** GET /api/quizzes/[id] 응답 */
-export type QuizDetailData = {
+export interface QuizDetailData {
   id: string;
   kind: QuizKind;
   title: string;
@@ -75,10 +75,10 @@ export type QuizDetailData = {
   choices: QuizChoice[];
   /** 미도전이면 null — 있으면 바로 done 상태로 렌더 */
   myAttempt: QuizMyAttempt | null;
-};
+}
 
 /** POST /api/quizzes/[id]/attempts 응답 — RPC 판정 + 최신 선택률 */
-export type QuizAttemptResult = {
+export interface QuizAttemptResult {
   isCorrect: boolean;
   correctChoiceId: number | null;
   answerText: string | null;
@@ -86,4 +86,4 @@ export type QuizAttemptResult = {
   streak: number;
   /** 내 픽이 반영된 최신 선택률 (조회 실패 시 빈 배열) */
   choices: QuizChoice[];
-};
+}

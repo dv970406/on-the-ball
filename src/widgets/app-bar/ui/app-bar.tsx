@@ -32,10 +32,10 @@ function IconButton({ label, children }: { label: string; children: ReactNode })
   );
 }
 
-type AppBarProps = {
+interface AppBarProps {
   left?: ReactNode;
   right?: ReactNode;
-};
+}
 
 /** 상단 앱바 (sticky) — 기본: 워드마크 + 스트릭 칩 + 검색/알림 */
 export function AppBar({ left, right }: AppBarProps) {

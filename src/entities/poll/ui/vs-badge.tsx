@@ -1,12 +1,12 @@
 import { cn } from "@/shared/lib";
 
-type VsBadgeProps = {
+interface VsBadgeProps {
   /** 지름(px) — 기본 64 (홈 캐러셀 등 축소 배지는 사이즈만 줄이면 글자도 비례 축소) */
   size?: number;
   /** true면 등장 시 pop 애니메이션 (vs-pop 키프레임 — translate/rotate 포함) */
   animate?: boolean;
   className?: string;
-};
+}
 
 /**
  * 대각선 스플릿 중앙의 기울어진 VS 배지.

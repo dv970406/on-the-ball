@@ -79,11 +79,11 @@ function TrendRow({ item, href }: { item: HomeTrendingItem; href: string | null 
   );
 }
 
-type TrendingListProps = {
+interface TrendingListProps {
   items: HomeTrendingItem[];
   /** 홈 피드에 실린 폴들의 id → type 맵 (트렌딩 행 링크 라우팅용) */
   pollTypeById: ReadonlyMap<string, PollType>;
-};
+}
 
 /** 지금 뜨거운 떡밥 — 트렌딩 랭킹 리스트 */
 export function TrendingList({ items, pollTypeById }: TrendingListProps) {

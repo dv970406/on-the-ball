@@ -9,7 +9,7 @@ import { VsBadge } from "./vs-badge";
 
 type Side = "a" | "b";
 
-type SplitCardProps = {
+interface SplitCardProps {
   /** A면 옵션 (poll_options.meta.side === 'a') */
   a: PollOption;
   /** B면 옵션 */
@@ -26,7 +26,7 @@ type SplitCardProps = {
   animateVs?: boolean;
   /** 거대 이름 폰트 크기(px) — 디테일 56(기본), 홈 46 */
   nameSize?: number;
-};
+}
 
 /**
  * 대각선 스플릿 카드 — 밸런스 게임의 시그니처 (홈 히어로 + 밸런스 디테일 공용).
@@ -80,14 +80,14 @@ const CLIP: Record<Side, string> = {
   b: "polygon(0 42%, 100% 58%, 100% 100%, 0 100%)",
 };
 
-type SideHalfProps = {
+interface SideHalfProps {
   side: Side;
   option: PollOption;
   picked: Side | null;
   onPick?: (side: Side) => void;
   showLatin: boolean;
   nameSize: number;
-};
+}
 
 function SideHalf({ side, option, picked, onPick, showLatin, nameSize }: SideHalfProps) {
   const isA = side === "a";

@@ -10,14 +10,14 @@ const PILL_VARIANT = {
   crimson: "border border-crimson/25 bg-crimson/[0.08] text-crimson",
 } as const;
 
-type PillProps = {
+interface PillProps {
   variant?: keyof typeof PILL_VARIANT;
   /** 앞에 붙는 5px 상태 닷 색상 */
   dot?: string;
   className?: string;
   style?: CSSProperties;
   children: ReactNode;
-};
+}
 
 /** 소형 태그/상태 pill (radius full — 버튼에는 사용 금지) */
 export function Pill({ variant = "soft", dot, className, style, children }: PillProps) {

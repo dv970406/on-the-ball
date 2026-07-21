@@ -16,31 +16,31 @@ export const RECENT_LIMIT = 10;
 // DB 행 타입
 // ---------------------------------------------------------------------------
 
-export type ProfileRow = {
+export interface ProfileRow {
   nickname: string;
   fan_team: string | null;
   current_streak: number;
   trait_title: string | null;
   trait_text: string | null;
   created_at: string;
-};
+}
 
-export type VoteRow = {
+export interface VoteRow {
   poll_id: number;
   option_id: number;
   created_at: string;
   polls: { type: PollType; title: string } | { type: PollType; title: string }[] | null;
   poll_options: { label: string } | { label: string }[] | null;
-};
+}
 
-export type AttemptRow = {
+export interface AttemptRow {
   is_correct: boolean;
   created_at: string;
   quizzes: { title: string } | { title: string }[] | null;
   quiz_choices: { team: string } | { team: string }[] | null;
-};
+}
 
-export type PollResultRow = { poll_id: number; option_id: number; votes: number };
+export interface PollResultRow { poll_id: number; option_id: number; votes: number }
 
 /** PostgREST to-one 임베드가 객체/배열 어느 쪽으로 와도 첫 행만 취한다 */
 function one<T>(rel: T | T[] | null): T | null {

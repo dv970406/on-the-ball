@@ -26,11 +26,11 @@ function supabaseNotConfigured() {
   );
 }
 
-type HandlerContext = {
+interface HandlerContext {
   supabase: SupabaseClient;
   /** 익명 로그인 세션의 유저 (없으면 null) */
   user: User | null;
-};
+}
 
 /**
  * Route Handler 공통 진입 헬퍼.

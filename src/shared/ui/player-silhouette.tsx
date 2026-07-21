@@ -1,8 +1,8 @@
-type PlayerSilhouetteProps = {
+interface PlayerSilhouetteProps {
   /** 실루엣 색 (기본: 밝은 톤) */
   tone?: string;
   className?: string;
-};
+}
 
 /** 선수 실루엣 placeholder — 실제 선수 컷아웃 사진으로 교체 예정 */
 export function PlayerSilhouette({
