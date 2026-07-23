@@ -6,19 +6,18 @@ import { cn } from "@/shared/lib";
 import {
   PollMetaStrip,
   SplitCard,
+  type BalanceSide,
   type PollDetail,
   type PollOption,
 } from "@/entities/poll";
-
-type Side = "a" | "b";
 
 interface BalanceVoteViewProps {
   poll: PollDetail;
   a: PollOption;
   b: PollOption;
   /** 탭한 면 — 380ms 강조 구간 동안 선택 면이 떠오른다 */
-  picked: Side | null;
-  onPick: (side: Side) => void;
+  picked: BalanceSide | null;
+  onPick: (side: BalanceSide) => void;
   /** 투표 실패 시 인라인 노출할 메시지 (ApiError.message) */
   voteError: string | null;
 }

@@ -4,9 +4,7 @@ import { useEffect, useState } from "react";
 import { ArrowUp } from "lucide-react";
 import { Icon, Pill } from "@/shared/ui";
 import { formatCount } from "@/shared/lib";
-import type { BalanceSideMeta, PollOption } from "@/entities/poll";
-
-type Side = "a" | "b";
+import type { BalanceSide, BalanceSideMeta, PollOption } from "@/entities/poll";
 
 interface RevealRatioBarProps {
   a: PollOption;
@@ -14,9 +12,9 @@ interface RevealRatioBarProps {
   aMeta: BalanceSideMeta;
   bMeta: BalanceSideMeta;
   /** 득표 우세 면 — 동률이면 null (WIN pill 미표시) */
-  winner: Side | null;
+  winner: BalanceSide | null;
   /** 내가 투표한 면 — 없으면 마커 미노출 (마감 후 미투표 열람) */
-  mySide: Side | null;
+  mySide: BalanceSide | null;
 }
 
 /**

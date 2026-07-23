@@ -4,6 +4,7 @@
 //   - "@/entities/poll/api/mappers" (snake_case → camelCase 매퍼)
 export type {
   PollType,
+  BalanceSide,
   BalanceSideMeta,
   RankingCandidateMeta,
   KitMeta,

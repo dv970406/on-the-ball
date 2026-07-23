@@ -1,5 +1,5 @@
 import { COLOR } from "@/shared/config";
-import type { BalanceSideMeta, PollOption } from "../model/types";
+import type { BalanceSide, BalanceSideMeta, PollOption } from "../model/types";
 
 /**
  * 밸런스 옵션 meta(BalanceSideMeta 계약)의 단일 해석 지점.
@@ -26,7 +26,7 @@ export function pickSides(
   options: PollOption[],
 ): { a: PollOption; b: PollOption } | null {
   if (options.length < 2) return null;
-  const bySide = (side: "a" | "b") =>
+  const bySide = (side: BalanceSide) =>
     options.find((o) => (o.meta as Partial<BalanceSideMeta>).side === side);
   return {
     a: bySide("a") ?? options[0],

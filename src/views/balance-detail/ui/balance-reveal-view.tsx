@@ -5,18 +5,16 @@ import { CheckCircle2 } from "lucide-react";
 import { Icon, LiveStatusPill, RatioBar } from "@/shared/ui";
 import { cn, formatCount, formatDday, formatPct, isClosed } from "@/shared/lib";
 import { COLOR } from "@/shared/config";
-import { readSideMeta, type BalanceSideMeta, type PollDetail, type PollOption } from "@/entities/poll";
+import { readSideMeta, type BalanceSide, type BalanceSideMeta, type PollDetail, type PollOption } from "@/entities/poll";
 import { RevealRatioBar } from "./reveal-ratio-bar";
 import { CommentSection } from "./comment-section";
-
-type Side = "a" | "b";
 
 interface BalanceRevealViewProps {
   poll: PollDetail;
   a: PollOption;
   b: PollOption;
   /** 내가 투표한 면 — 마감 후 미투표 열람이면 null */
-  mySide: Side | null;
+  mySide: BalanceSide | null;
 }
 
 /** 투표 후(또는 마감 후) 결과 화면 — 비율 바 + 스탯 비교 + blurb + 응답자 분석 + 댓글 */
@@ -24,7 +22,7 @@ export function BalanceRevealView({ poll, a, b, mySide }: BalanceRevealViewProps
   const aMeta = readSideMeta(a);
   const bMeta = readSideMeta(b);
   // 동률(0표 포함)이면 승자 없음 — WIN pill·에메랄드 보더 미표시
-  const winner: Side | null = a.votes > b.votes ? "a" : b.votes > a.votes ? "b" : null;
+  const winner: BalanceSide | null = a.votes > b.votes ? "a" : b.votes > a.votes ? "b" : null;
   const myChoice = mySide === "a" ? a : mySide === "b" ? b : null;
 
   // 연령대 버킷별 A/B 비율 — position 순 유지
@@ -156,7 +154,7 @@ function StatRow({ aStat, bStat }: StatRowProps) {
   );
 }
 
-function StatCell({ stat, side }: { stat?: [string, string]; side: Side }) {
+function StatCell({ stat, side }: { stat?: [string, string]; side: BalanceSide }) {
   return (
     <div className={cn("py-2.5", side === "a" ? "pr-3 text-left" : "pl-3 text-right")}>
       {stat && (

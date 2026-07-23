@@ -7,9 +7,12 @@
 export const POLL_TYPES = ["balance", "ranking", "kit", "tmi"] as const;
 export type PollType = (typeof POLL_TYPES)[number];
 
+/** 밸런스 폴의 A/B 면 — poll 도메인의 단일 소스(뷰·SplitCard가 공유) */
+export type BalanceSide = "a" | "b";
+
 /** poll_options.meta (balance side) — sublabel 컬럼 = 라틴 표기 */
 export interface BalanceSideMeta {
-  side: "a" | "b";
+  side: BalanceSide;
   /** 이름 아래 메타 카피 (예: "통산 850골 · 발롱도르 8회") */
   metaLine: string;
   /** 면 배경색 */

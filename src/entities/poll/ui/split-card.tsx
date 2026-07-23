@@ -3,11 +3,9 @@
 import type { KeyboardEvent } from "react";
 import { cn } from "@/shared/lib";
 import { PlayerSilhouette } from "@/shared/ui";
-import type { PollOption } from "../model/types";
+import type { BalanceSide, PollOption } from "../model/types";
 import { readSideMeta } from "../lib/balance-side";
 import { VsBadge } from "./vs-badge";
-
-type Side = "a" | "b";
 
 interface SplitCardProps {
   /** A면 옵션 (poll_options.meta.side === 'a') */
@@ -17,9 +15,9 @@ interface SplitCardProps {
   /** 4/5 = 홈 히어로, 3/4 = 밸런스 디테일 */
   aspect?: "4/5" | "3/4";
   /** 선택된 면 — 선택 면은 살짝 떠오르고 반대 면은 흐려진다 */
-  picked?: Side | null;
+  picked?: BalanceSide | null;
   /** 면 탭 핸들러 — 없으면 표시 전용(카드 전체 탭은 부모가 담당) */
-  onPick?: (side: Side) => void;
+  onPick?: (side: BalanceSide) => void;
   /** 라틴 서브라벨(sublabel) 노출 — 디테일에서 true */
   showLatin?: boolean;
   /** VS 배지 등장 pop 애니메이션 */
@@ -73,7 +71,7 @@ export function SplitCard({
 }
 
 /** 면별 clip-path — 두 대각선이 지그재그 시임을 형성 */
-const CLIP: Record<Side, string> = {
+const CLIP: Record<BalanceSide, string> = {
   // A면: 헤어라인(좌 42% → 우 58%) 위쪽을 차지
   a: "polygon(0 0, 100% 0, 100% 58%, 0 42%)",
   // B면: 헤어라인 아래쪽을 차지
@@ -81,10 +79,10 @@ const CLIP: Record<Side, string> = {
 };
 
 interface SideHalfProps {
-  side: Side;
+  side: BalanceSide;
   option: PollOption;
-  picked: Side | null;
-  onPick?: (side: Side) => void;
+  picked: BalanceSide | null;
+  onPick?: (side: BalanceSide) => void;
   showLatin: boolean;
   nameSize: number;
 }

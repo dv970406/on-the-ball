@@ -5,14 +5,12 @@ import { Scale } from "lucide-react";
 import { EmptyState, Skeleton } from "@/shared/ui";
 import { isClosed, useDelayedReveal } from "@/shared/lib";
 import { ROUTES } from "@/shared/config";
-import { pickSides, usePollDetailQuery } from "@/entities/poll";
+import { pickSides, usePollDetailQuery, type BalanceSide } from "@/entities/poll";
 import { useCastVote } from "@/features/cast-vote";
 import { LikePollButton } from "@/features/like-poll";
 import { SubHeader } from "@/widgets/sub-header";
 import { BalanceVoteView } from "./balance-vote-view";
 import { BalanceRevealView } from "./balance-reveal-view";
-
-type Side = "a" | "b";
 
 /**
  * 밸런스 디테일 루트 — 투표 전(BalanceVoteView) ↔ 결과(BalanceRevealView) 전환.
@@ -24,7 +22,7 @@ export function BalanceDetailView({ id }: { id: string }) {
   const { revealed, trigger, reset } = useDelayedReveal(380);
 
   // 이번 세션에서 탭한 면 (380ms 강조 + 리빌 마커에 사용)
-  const [picked, setPicked] = useState<Side | null>(null);
+  const [picked, setPicked] = useState<BalanceSide | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
 
   const sides = poll ? pickSides(poll.options) : null;
@@ -50,7 +48,7 @@ export function BalanceDetailView({ id }: { id: string }) {
   const closed = isClosed(poll.closesAt);
 
   // 서버에 기록된 내 표 → 면 환산
-  const serverSide: Side | null =
+  const serverSide: BalanceSide | null =
     poll.myVote === a.id ? "a" : poll.myVote === b.id ? "b" : null;
 
   // 이번 세션 투표는 "380ms 경과 + 서버 기록 성공"을 모두 만족해야 리빌
@@ -60,7 +58,7 @@ export function BalanceDetailView({ id }: { id: string }) {
     ? revealed && castVote.isSuccess
     : serverSide !== null || closed;
 
-  const handlePick = (side: Side) => {
+  const handlePick = (side: BalanceSide) => {
     if (votedLocally || showReveal || closed) return;
     setPicked(side);
     setVoteError(null);
