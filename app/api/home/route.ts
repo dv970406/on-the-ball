@@ -21,6 +21,7 @@ import {
   type QuizRow,
   type QuizStatsRow,
 } from "@/entities/quiz/api/mappers";
+import { readLineupRows } from "@/entities/quiz/lib/lineup-meta";
 import type { HomeFeed, HomeTrendingItem } from "@/views/home/model/types";
 import { todayUtc } from "@/shared/lib/format";
 
@@ -171,7 +172,7 @@ export async function GET() {
           title: quiz.title,
           attempts: stats?.attempts ?? 0,
           accuracyPct: stats?.accuracy_pct ?? 0,
-          lineupRows: lineup?.rows ?? [],
+          lineupRows: readLineupRows(lineup?.rows),
         }
       : null;
 

@@ -3,12 +3,8 @@
  * ⚠ Route Handler에서 import하는 파일 — "use client" 금지.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type {
-  LineupCell,
-  QuizChoice,
-  QuizLineup,
-  QuizSummary,
-} from "../model/types";
+import type { QuizChoice, QuizLineup, QuizSummary } from "../model/types";
+import { readLineupRows } from "../lib/lineup-meta";
 
 // ---------------------------------------------------------------------------
 // select 컬럼 상수 (라우트들이 재사용)
@@ -55,12 +51,12 @@ export interface QuizChoiceRow {
   season: string | null;
 }
 
-/** lineups 테이블 행 — rows: GK줄부터 4줄 11셀 jsonb (lineup_id로만 조회, slug 미사용) */
+/** lineups 테이블 행 — rows: GK줄부터 4줄 11셀 jsonb(raw). readLineupRows로 파싱해 소비 */
 export interface LineupRow {
   id: number;
   formation: string;
   caption: string | null;
-  rows: LineupCell[][];
+  rows: unknown;
 }
 
 /** quiz_stats 뷰 행 — 도전자 수·정답률 집계 */
@@ -167,6 +163,6 @@ export function mapLineup(row: LineupRow): QuizLineup {
   return {
     formation: row.formation,
     caption: row.caption,
-    rows: row.rows,
+    rows: readLineupRows(row.rows),
   };
 }
