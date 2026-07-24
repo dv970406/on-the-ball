@@ -3,6 +3,8 @@
  * DB(polls/poll_options/votes)의 snake_case를 camelCase로 매핑한 형태.
  */
 
+import type { ShirtStripe } from "@/shared/ui";
+
 /** 투표 4종 — polls.type (런타임 검증·순회의 단일 소스) */
 export const POLL_TYPES = ["balance", "ranking", "kit", "tmi"] as const;
 export type PollType = (typeof POLL_TYPES)[number];
@@ -30,8 +32,8 @@ export interface BalanceSideMeta {
 /** poll_options.meta (ranking 후보) — label=이름, sublabel=클럽 */
 export interface RankingCandidateMeta { flag: string; hue: number }
 
-/** poll_options.meta (kit 유니폼) */
-export interface KitMeta { tone: string; stripe: "sash" | "h" | "v" | null; dark: boolean }
+/** poll_options.meta (kit 유니폼) — stripe 종류는 Shirt의 단일 소스(ShirtStripe) 참조 */
+export interface KitMeta { tone: string; stripe: ShirtStripe; dark: boolean }
 
 /** poll_options.meta (tmi 선택지) — label=진실/거짓 */
 export interface TmiOptionMeta { verdict: "true" | "false" }
