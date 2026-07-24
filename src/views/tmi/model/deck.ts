@@ -1,7 +1,7 @@
-import { readTmiOptionMeta, type PollListItem, type PollOption } from "@/entities/poll";
+import { readTmiOptionMeta, type PollListItem, type PollOption, type TmiOptionMeta } from "@/entities/poll";
 
-/** TMI 판정 면 — 옵션 meta.verdict 값과 동일 */
-export type TmiSide = "true" | "false";
+/** TMI 판정 면 — 옵션 meta.verdict의 단일 소스에서 파생 */
+export type TmiSide = TmiOptionMeta["verdict"];
 
 /** side에 해당하는 옵션 (meta.verdict 기준) */
 export function tmiSideOption(poll: PollListItem, side: TmiSide): PollOption | null {
