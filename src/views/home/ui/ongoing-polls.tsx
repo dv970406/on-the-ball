@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { Trophy } from "lucide-react";
 import { Icon, LiveStatusPill, Pill, SectionHead, Shirt } from "@/shared/ui";
-import { cn, formatCount, formatDday, isClosed } from "@/shared/lib";
+import { cn, formatCount, isClosed } from "@/shared/lib";
 import { ROUTES } from "@/shared/config";
-import type { PollListItem } from "@/entities/poll";
+import { Dday, type PollListItem } from "@/entities/poll";
 import { readHomeCardMeta } from "../model/poll-meta";
 
 /** 타입별 디테일 경로 — 홈 ongoing 섹션은 ranking/kit만 담는다 */
@@ -64,8 +64,8 @@ function OngoingPollCard({ poll }: { poll: PollListItem }) {
               " · 마감"
             ) : (
               <>
-                {" · 마감 "}
-                <time dateTime={poll.closesAt}>{formatDday(poll.closesAt)}</time>
+                {" · "}
+                <Dday closesAt={poll.closesAt} />
               </>
             ))}
         </span>

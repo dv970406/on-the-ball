@@ -26,6 +26,7 @@ export {
 export { SplitCard } from "./ui/split-card";
 export { VsBadge } from "./ui/vs-badge";
 export { PollMetaStrip } from "./ui/poll-meta-strip";
+export { Dday } from "./ui/dday";
 export { readSideMeta, pickSides } from "./lib/balance-side";
 export {
   readKitMeta,

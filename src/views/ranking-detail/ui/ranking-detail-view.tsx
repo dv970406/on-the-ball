@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, SearchX, Trophy } from "lucide-react";
 import {
+  Dday,
   readRankingMeta,
   usePollDetailQuery,
   type PollDetail,
@@ -12,7 +13,7 @@ import { useCastVote } from "@/features/cast-vote";
 import { SubHeader } from "@/widgets/sub-header";
 import { Button, EmptyState, Flag, Icon, LiveStatusPill, Pill, RatioBar, Skeleton } from "@/shared/ui";
 import { ApiError } from "@/shared/api";
-import { cn, formatCount, formatDday, formatPct, isClosed } from "@/shared/lib";
+import { cn, formatCount, formatPct, isClosed } from "@/shared/lib";
 import { COLOR } from "@/shared/config";
 
 interface RankingDetailViewProps {
@@ -80,7 +81,7 @@ function RankingDetailBody({ poll }: { poll: PollDetail }) {
           )}
           {poll.closesAt && !closed && (
             <span className="text-[11px] text-ink-mute-2">
-              마감 <time dateTime={poll.closesAt}>{formatDday(poll.closesAt)}</time>
+              <Dday closesAt={poll.closesAt} />
             </span>
           )}
         </div>

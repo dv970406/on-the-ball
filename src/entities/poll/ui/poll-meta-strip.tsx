@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { cn, formatCount, formatDday, isClosed } from "@/shared/lib";
+import { cn, formatCount, isClosed } from "@/shared/lib";
+import { Dday } from "./dday";
 
 interface PollMetaStripProps {
   /** 좌측 상태 pill — 뷰별 변주(green+LiveDot / LiveStatusPill / outline)를 그대로 전달 */
@@ -24,8 +25,6 @@ export function PollMetaStrip({
   countSuffix = "명 투표",
   className,
 }: PollMetaStripProps) {
-  const showDday = closesAt !== null && !isClosed(closesAt);
-
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
       {pill}
@@ -33,11 +32,11 @@ export function PollMetaStrip({
         <span className="tnum font-mono text-ink">{formatCount(totalVotes)}</span>
         {countSuffix}
       </span>
-      {showDday && (
+      {closesAt !== null && !isClosed(closesAt) && (
         <>
           <span className="text-[12px] text-ink-mute-2">·</span>
           <span className="whitespace-nowrap text-[12px] text-ink-mute">
-            마감 <time dateTime={closesAt ?? undefined}>{formatDday(closesAt)}</time>
+            <Dday closesAt={closesAt} />
           </span>
         </>
       )}

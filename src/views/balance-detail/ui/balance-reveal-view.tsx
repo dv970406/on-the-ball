@@ -3,9 +3,9 @@
 import { useMemo } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { Icon, LiveStatusPill, RatioBar } from "@/shared/ui";
-import { cn, formatCount, formatDday, formatPct, isClosed } from "@/shared/lib";
+import { cn, formatCount, formatPct, isClosed } from "@/shared/lib";
 import { COLOR } from "@/shared/config";
-import { readSideMeta, type BalanceSide, type BalanceSideMeta, type PollDetail, type PollOption } from "@/entities/poll";
+import { Dday, readSideMeta, type BalanceSide, type BalanceSideMeta, type PollDetail, type PollOption } from "@/entities/poll";
 import { RevealRatioBar } from "./reveal-ratio-bar";
 import { CommentSection } from "./comment-section";
 
@@ -62,9 +62,7 @@ export function BalanceRevealView({ poll, a, b, mySide }: BalanceRevealViewProps
                 {isClosed(poll.closesAt) ? (
                   "마감"
                 ) : (
-                  <>
-                    마감 <time dateTime={poll.closesAt}>{formatDday(poll.closesAt)}</time>
-                  </>
+                  <Dday closesAt={poll.closesAt} />
                 )}
               </span>
             </>
