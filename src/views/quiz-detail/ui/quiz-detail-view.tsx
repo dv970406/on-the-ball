@@ -6,6 +6,7 @@ import { SubHeader } from "@/widgets/sub-header";
 import { Button, EmptyState, Icon, LiveStatusPill, Pill, Skeleton } from "@/shared/ui";
 import { cn, formatCount, formatPct } from "@/shared/lib";
 import { ROUTES } from "@/shared/config";
+import type { QuizChoice } from "@/entities/quiz";
 import { QuizPitch } from "./quiz-pitch";
 import { useQuizAttempt } from "../model/use-quiz-attempt";
 
@@ -153,50 +154,16 @@ export function QuizDetailView({ id }: { id: string }) {
 
         {/* 4지선다 */}
         <ul className="mt-[18px] flex flex-col gap-2">
-          {displayChoices.map((choice) => {
-            const isCorrectChoice = done && choice.id === correctChoiceId;
-            const isMyWrong = done && choice.id === myChoiceId && !isCorrectChoice;
-            const isDim = done && !isCorrectChoice && !isMyWrong;
-
-            return (
-              <li key={choice.id}>
-                <button
-                  type="button"
-                  onClick={() => handlePick(choice.id)}
-                  aria-disabled={done}
-                  aria-label={`${choice.team}${choice.season ? ` ${choice.season}` : ""} 선택`}
-                  className={cn(
-                    "flex w-full items-center justify-between rounded-[10px] border bg-canvas px-4 py-3.5 text-left text-[15px] font-medium text-ink transition-colors duration-150 ease-otb",
-                    !done && "border-hairline active:border-ink",
-                    !done && myChoiceId === choice.id && "border-ink",
-                    isCorrectChoice && "border-primary bg-primary/[0.12]",
-                    isMyWrong && "border-crimson bg-crimson/[0.06] text-crimson",
-                    isDim && "border-hairline opacity-[0.55]",
-                  )}
-                >
-                  <span className="min-w-0">
-                    <span className="block">{choice.team}</span>
-                    {done && (
-                      <span className="tnum mt-1 block text-[11px] font-normal text-ink-mute">
-                        <span className="font-mono">{formatPct(choice.pickRatio)}</span>가
-                        이걸 골랐어요
-                      </span>
-                    )}
-                  </span>
-                  {choice.season && (
-                    <span
-                      className={cn(
-                        "shrink-0 font-mono text-xs font-normal",
-                        isCorrectChoice ? "text-primary-deep" : "text-ink-mute",
-                      )}
-                    >
-                      {choice.season}
-                    </span>
-                  )}
-                </button>
-              </li>
-            );
-          })}
+          {displayChoices.map((choice) => (
+            <ChoiceOption
+              key={choice.id}
+              choice={choice}
+              done={done}
+              correctChoiceId={correctChoiceId}
+              myChoiceId={myChoiceId}
+              onPick={handlePick}
+            />
+          ))}
         </ul>
 
         {submitError && (
@@ -206,68 +173,148 @@ export function QuizDetailView({ id }: { id: string }) {
         {/* 리빌 카드 + 스트릭 업데이트 */}
         {done && (
           <div className="animate-fade-up mt-6">
-            <div
-              className={cn(
-                "rounded-xl border p-[18px] text-center",
-                isCorrect
-                  ? "border-canvas-night bg-canvas-night text-white"
-                  : "border-hairline bg-canvas text-ink",
-              )}
-            >
-              <div className="text-[22px] font-bold tracking-[-0.4px]">
-                {isCorrect ? "정답이에요 ⚽" : "아쉽다."}
-              </div>
-              <div
-                className={cn(
-                  "mt-1 text-[13px] leading-normal",
-                  isCorrect ? "text-ink-mute-2" : "text-ink-mute",
-                )}
-              >
-                정답은{" "}
-                <span
-                  className={cn(
-                    "font-medium",
-                    isCorrect ? "text-primary" : "text-ink",
-                  )}
-                >
-                  {answerText}
-                </span>
-              </div>
-              {/* 실데이터라 재도전 불가 — 결과 공유만 제공 */}
-              <div className="mt-4 flex justify-center">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon={Share2}
-                  onClick={handleShare}
-                  aria-label="결과 공유"
-                >
-                  결과 공유
-                </Button>
-              </div>
-            </div>
-
-            {/* 스트릭 업데이트 — RPC 반환 streak 사용 (제출 직후에만) */}
+            <QuizResultCard
+              isCorrect={isCorrect}
+              answerText={answerText}
+              onShare={handleShare}
+            />
             {fresh && result && (
-              <div className="mt-4 flex items-center gap-3 rounded-lg border border-hairline bg-canvas p-3.5">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary font-mono text-base font-bold text-on-primary">
-                  {result.streak}
-                </div>
-                <div className="flex-1">
-                  <div className="text-[13px] font-medium text-ink">
-                    {isCorrect
-                      ? `연속 정답 ${result.streak}일째`
-                      : "연속 정답이 0으로 리셋됐어요"}
-                  </div>
-                  <div className="mt-0.5 text-[11px] text-ink-mute">
-                    {isCorrect ? `${result.streak + 1}일째도 가즈아.` : "내일 다시 도전해요."}
-                  </div>
-                </div>
-              </div>
+              <StreakUpdateRow streak={result.streak} isCorrect={isCorrect} />
             )}
           </div>
         )}
       </article>
+    </div>
+  );
+}
+
+interface ChoiceOptionProps {
+  choice: QuizChoice;
+  done: boolean;
+  correctChoiceId: number | null;
+  myChoiceId: number | null;
+  onPick: (choiceId: number) => void;
+}
+
+/** 4지선다 한 선택지 — 완료 시 정답/내오답/흐림 상태로 표시 */
+function ChoiceOption({
+  choice,
+  done,
+  correctChoiceId,
+  myChoiceId,
+  onPick,
+}: ChoiceOptionProps) {
+  const isCorrectChoice = done && choice.id === correctChoiceId;
+  const isMyWrong = done && choice.id === myChoiceId && !isCorrectChoice;
+  const isDim = done && !isCorrectChoice && !isMyWrong;
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => onPick(choice.id)}
+        aria-disabled={done}
+        aria-label={`${choice.team}${choice.season ? ` ${choice.season}` : ""} 선택`}
+        className={cn(
+          "flex w-full items-center justify-between rounded-[10px] border bg-canvas px-4 py-3.5 text-left text-[15px] font-medium text-ink transition-colors duration-150 ease-otb",
+          !done && "border-hairline active:border-ink",
+          !done && myChoiceId === choice.id && "border-ink",
+          isCorrectChoice && "border-primary bg-primary/[0.12]",
+          isMyWrong && "border-crimson bg-crimson/[0.06] text-crimson",
+          isDim && "border-hairline opacity-[0.55]",
+        )}
+      >
+        <span className="min-w-0">
+          <span className="block">{choice.team}</span>
+          {done && (
+            <span className="tnum mt-1 block text-[11px] font-normal text-ink-mute">
+              <span className="font-mono">{formatPct(choice.pickRatio)}</span>가
+              이걸 골랐어요
+            </span>
+          )}
+        </span>
+        {choice.season && (
+          <span
+            className={cn(
+              "shrink-0 font-mono text-xs font-normal",
+              isCorrectChoice ? "text-primary-deep" : "text-ink-mute",
+            )}
+          >
+            {choice.season}
+          </span>
+        )}
+      </button>
+    </li>
+  );
+}
+
+interface QuizResultCardProps {
+  isCorrect: boolean;
+  answerText: string;
+  onShare: () => void;
+}
+
+/** 도전 완료 리빌 카드 — 정답 여부 + 정답 명기 + 결과 공유 */
+function QuizResultCard({ isCorrect, answerText, onShare }: QuizResultCardProps) {
+  return (
+    <div
+      className={cn(
+        "rounded-xl border p-[18px] text-center",
+        isCorrect
+          ? "border-canvas-night bg-canvas-night text-white"
+          : "border-hairline bg-canvas text-ink",
+      )}
+    >
+      <div className="text-[22px] font-bold tracking-[-0.4px]">
+        {isCorrect ? "정답이에요 ⚽" : "아쉽다."}
+      </div>
+      <div
+        className={cn(
+          "mt-1 text-[13px] leading-normal",
+          isCorrect ? "text-ink-mute-2" : "text-ink-mute",
+        )}
+      >
+        정답은{" "}
+        <span className={cn("font-medium", isCorrect ? "text-primary" : "text-ink")}>
+          {answerText}
+        </span>
+      </div>
+      {/* 실데이터라 재도전 불가 — 결과 공유만 제공 */}
+      <div className="mt-4 flex justify-center">
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={Share2}
+          onClick={onShare}
+          aria-label="결과 공유"
+        >
+          결과 공유
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+interface StreakUpdateRowProps {
+  streak: number;
+  isCorrect: boolean;
+}
+
+/** 스트릭 업데이트 행 — RPC 반환 streak 사용 (제출 직후에만) */
+function StreakUpdateRow({ streak, isCorrect }: StreakUpdateRowProps) {
+  return (
+    <div className="mt-4 flex items-center gap-3 rounded-lg border border-hairline bg-canvas p-3.5">
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary font-mono text-base font-bold text-on-primary">
+        {streak}
+      </div>
+      <div className="flex-1">
+        <div className="text-[13px] font-medium text-ink">
+          {isCorrect ? `연속 정답 ${streak}일째` : "연속 정답이 0으로 리셋됐어요"}
+        </div>
+        <div className="mt-0.5 text-[11px] text-ink-mute">
+          {isCorrect ? `${streak + 1}일째도 가즈아.` : "내일 다시 도전해요."}
+        </div>
+      </div>
     </div>
   );
 }
