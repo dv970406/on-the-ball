@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BarChart3, Hand } from "lucide-react";
-import { Icon, LiveDot, Pill } from "@/shared/ui";
+import { Icon, LiveDot, Pill, buttonClassName } from "@/shared/ui";
 import { isClosed } from "@/shared/lib";
 import { ROUTES } from "@/shared/config";
 import {
@@ -74,17 +74,17 @@ export function HeroSection({ poll }: { poll: PollListItem }) {
         />
       </Link>
 
-      {/* 버튼 줄 — 둘 다 디테일로 이동 (버튼 스타일의 Link) */}
+      {/* 버튼 줄 — 둘 다 디테일로 이동 (버튼 스타일의 Link, 외형은 buttonClassName 단일 소스) */}
       <div className="mt-3.5 flex gap-2">
         <Link
           href={detailHref}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-sm bg-ink px-[18px] py-3.5 text-[15px] font-medium leading-none text-white transition-colors duration-150 ease-otb active:bg-[#2a2a2a]"
+          className={buttonClassName({ variant: "dark", className: "flex-1" })}
         >
           <Icon as={Hand} size={16} />한 표 던지기
         </Link>
         <Link
           href={detailHref}
-          className="flex items-center justify-center gap-1.5 rounded-sm border border-hairline-strong bg-canvas px-3 text-[13px] font-medium leading-none text-ink"
+          className={buttonClassName({ variant: "secondary", size: "sm" })}
         >
           <Icon as={BarChart3} size={14} />
           결과
