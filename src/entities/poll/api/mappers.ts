@@ -233,6 +233,61 @@ export function buildPollListItem(
   };
 }
 
+/**
+ * polls 목록 → PollListItem[] 조립 오케스트레이션 (home/list/detail 라우트 공용).
+ * 선택지·득표·좋아요 병렬조회 → 내 투표·좋아요 → poll_id 기준 조합.
+ * 조회 에러는 null 반환(라우트별 fail 메시지가 달라 호출부가 결정).
+ * fetchMy* 실패는 throw → withSupabase가 500 처리(기존 동작 유지).
+ */
+export async function assemblePollListItems(
+  supabase: SupabaseClient,
+  polls: PollRow[],
+  userId: string | null,
+): Promise<PollListItem[] | null> {
+  if (polls.length === 0) return [];
+  const pollIds = polls.map((p) => p.id);
+
+  const [optionsRes, resultsRes, likesRes] = await Promise.all([
+    supabase
+      .from("poll_options")
+      .select(POLL_OPTION_SELECT)
+      .in("poll_id", pollIds)
+      .order("position", { ascending: true }),
+    supabase
+      .from("poll_results")
+      .select("poll_id, option_id, votes")
+      .in("poll_id", pollIds),
+    supabase.from("poll_like_stats").select("poll_id, likes").in("poll_id", pollIds),
+  ]);
+  if (optionsRes.error || resultsRes.error || likesRes.error) return null;
+
+  const [myVoteByPoll, myLikedPolls] = await Promise.all([
+    fetchMyVotesByPoll(supabase, userId, pollIds),
+    fetchMyLikesByPoll(supabase, userId, pollIds),
+  ]);
+
+  const optionsByPoll = groupOptionsByPoll(
+    (optionsRes.data ?? []) as PollOptionRow[],
+  );
+  const votesByOption = buildVotesByOption(
+    (resultsRes.data ?? []) as PollResultRow[],
+  );
+  const likesByPoll = buildLikesByPoll(
+    (likesRes.data ?? []) as PollLikeStatsRow[],
+  );
+
+  return polls.map((poll) =>
+    buildPollListItem(
+      poll,
+      optionsByPoll.get(poll.id) ?? [],
+      votesByOption,
+      myVoteByPoll.get(poll.id) ?? null,
+      likesByPoll.get(poll.id) ?? 0,
+      myLikedPolls.has(poll.id),
+    ),
+  );
+}
+
 /** poll_demographics 행 → PollDemographic */
 export function mapDemographic(row: PollDemographicRow): PollDemographic {
   return {
