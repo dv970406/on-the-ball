@@ -148,7 +148,7 @@ function KitCard({ option, isMine, revealed, disabled, onVote }: KitCardProps) {
       className={cn(
         "flex h-full w-full flex-col gap-2 rounded-lg border bg-canvas p-3 text-left transition-[border-color,box-shadow] duration-150 ease-otb",
         isMine
-          ? "border-primary shadow-[inset_0_0_0_1px_#3ecf8e]"
+          ? "border-primary shadow-[inset_0_0_0_1px_var(--color-primary)]"
           : "border-hairline",
       )}
     >

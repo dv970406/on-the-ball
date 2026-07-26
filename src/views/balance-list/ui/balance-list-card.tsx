@@ -63,7 +63,6 @@ export function BalanceListCard({ poll, a, b }: BalanceListCardProps) {
         <RatioBar
           segments={[{ ratio: a.ratio, color: COLOR.ink }]}
           height={4}
-          trackColor="#f1f1f1"
         />
 
         {/* 양측 투표수 */}
