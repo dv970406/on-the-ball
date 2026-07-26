@@ -1,8 +1,9 @@
 "use client";
 
-import type { KeyboardEvent } from "react";
+import type { CSSProperties } from "react";
 import { cn } from "@/shared/lib";
 import { PlayerSilhouette } from "@/shared/ui";
+import { COLOR } from "@/shared/config";
 import type { BalanceSide, PollOption } from "../model/types";
 import { readSideMeta } from "../lib/balance-side";
 import { VsBadge } from "./vs-badge";
@@ -94,39 +95,23 @@ function SideHalf({ side, option, picked, onPick, showLatin, nameSize }: SideHal
   const { tone, text, metaLine } = readSideMeta(option);
   const isLightText = text === "#fff";
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      onPick?.(side);
-    }
+  const style: CSSProperties = {
+    background: tone,
+    color: text,
+    clipPath: CLIP[side],
+    WebkitClipPath: CLIP[side],
+    zIndex: isPicked ? 3 : 1,
+    opacity: isDimmed ? 0.42 : 1,
+    // 탭한 면은 시임 반대 방향으로 살짝 떠오른다
+    transform: isPicked
+      ? `translateY(${isA ? -2 : 2}px) scale(1.01)`
+      : "translateY(0)",
+    transition: "transform 0.35s var(--ease-otb), opacity 0.25s ease",
   };
 
-  return (
-    <div
-      role={onPick ? "button" : undefined}
-      tabIndex={onPick ? 0 : undefined}
-      aria-pressed={onPick ? isPicked : undefined}
-      aria-label={onPick ? `${option.label} 선택` : undefined}
-      onClick={onPick ? () => onPick(side) : undefined}
-      onKeyDown={onPick ? handleKeyDown : undefined}
-      className={cn(
-        "absolute inset-0 overflow-hidden",
-        onPick ? "cursor-pointer" : undefined,
-      )}
-      style={{
-        background: tone,
-        color: text,
-        clipPath: CLIP[side],
-        WebkitClipPath: CLIP[side],
-        zIndex: isPicked ? 3 : 1,
-        opacity: isDimmed ? 0.42 : 1,
-        // 탭한 면은 시임 반대 방향으로 살짝 떠오른다
-        transform: isPicked
-          ? `translateY(${isA ? -2 : 2}px) scale(1.01)`
-          : "translateY(0)",
-        transition: "transform 0.35s var(--ease-otb), opacity 0.25s ease",
-      }}
-    >
+  // 두 모드 공통 자식 — 실루엣 + 콘텐츠(뱃지·이름·메타)
+  const content = (
+    <>
       {/* 텍스트 반대 코너의 선수 실루엣 — A면 오른쪽 위, B면 왼쪽 아래(좌우 반전) */}
       <span
         aria-hidden
@@ -139,7 +124,7 @@ function SideHalf({ side, option, picked, onPick, showLatin, nameSize }: SideHal
           transform: isA ? undefined : "scaleX(-1)",
         }}
       >
-        <PlayerSilhouette tone={isLightText ? "#fff" : "#171717"} />
+        <PlayerSilhouette tone={isLightText ? "#fff" : COLOR.ink} />
       </span>
 
       {/* 콘텐츠 — A는 왼쪽 위, B는 오른쪽 아래에 앵커 */}
@@ -184,6 +169,29 @@ function SideHalf({ side, option, picked, onPick, showLatin, nameSize }: SideHal
           <span className="mt-2 block text-[12px] opacity-70">{metaLine}</span>
         )}
       </span>
-    </div>
+    </>
+  );
+
+  // 표시 전용(홈 히어로 — 카드 전체가 Link) — 비인터랙티브 div
+  if (!onPick) {
+    return (
+      <div className="absolute inset-0 overflow-hidden" style={style}>
+        {content}
+      </div>
+    );
+  }
+
+  // 투표 모드 — 네이티브 button (Enter/Space·포커스 링·커서를 브라우저가 제공)
+  return (
+    <button
+      type="button"
+      aria-pressed={isPicked}
+      aria-label={`${option.label} 선택`}
+      onClick={() => onPick(side)}
+      className="absolute inset-0 cursor-pointer overflow-hidden"
+      style={style}
+    >
+      {content}
+    </button>
   );
 }
