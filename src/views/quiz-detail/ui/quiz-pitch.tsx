@@ -33,29 +33,31 @@ export function QuizPitch({ lineup, reveal }: QuizPitchProps) {
         <div className="absolute left-1/2 top-1/2 size-16 -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white/40" />
       </div>
 
-      {/* 포메이션 — column-reverse로 GK줄(rows[0])이 하단 */}
-      <div className="relative z-[1] flex h-full flex-col-reverse justify-around gap-2">
+      {/* 포메이션 — 라인의 목록 × 라인별 선수 목록. column-reverse로 GK줄(rows[0])이 하단 */}
+      <ul className="relative z-[1] flex h-full flex-col-reverse justify-around gap-2">
         {lineup.rows.map((row, rowIndex) => (
-          <div key={rowIndex} className="flex justify-around">
-            {row.map((cell, cellIndex) => (
-              <div
-                key={cellIndex}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-black/55 py-1 pl-1 pr-2 backdrop-blur-[6px]",
-                  "transition-[transform] duration-[250ms] ease-otb",
-                  // ⚠ scale-* 표준 유틸 금지 — 개별 scale 프로퍼티로 출력되어 위 transition-[transform]이 잡지 못한다
-                  reveal ? "[transform:scale(1.04)]" : "[transform:scale(1)]",
-                )}
-              >
-                <Flag code={cell.flag} width={20} height={14} />
-                <span className="font-mono text-[9px] tracking-[0.4px] text-white/85">
-                  {cell.pos}
-                </span>
-              </div>
-            ))}
-          </div>
+          <li key={rowIndex}>
+            <ul className="flex justify-around">
+              {row.map((cell, cellIndex) => (
+                <li
+                  key={cellIndex}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-black/55 py-1 pl-1 pr-2 backdrop-blur-[6px]",
+                    "transition-[transform] duration-[250ms] ease-otb",
+                    // ⚠ scale-* 표준 유틸 금지 — 개별 scale 프로퍼티로 출력되어 위 transition-[transform]이 잡지 못한다
+                    reveal ? "[transform:scale(1.04)]" : "[transform:scale(1)]",
+                  )}
+                >
+                  <Flag code={cell.flag} width={20} height={14} />
+                  <span className="font-mono text-[9px] tracking-[0.4px] text-white/85">
+                    {cell.pos}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   );
 }

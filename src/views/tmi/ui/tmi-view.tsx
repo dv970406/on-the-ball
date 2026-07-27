@@ -136,26 +136,31 @@ export function TmiView() {
               </Button>
             </div>
           ) : (
-            <div className="flex gap-3 px-5 pb-3 pt-4">
-              <button
-                type="button"
-                aria-label="거짓으로 판정"
-                disabled={animating || currentSide !== null}
-                onClick={() => judge("false")}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-sm border border-crimson bg-canvas py-3.5 text-[15px] font-semibold leading-none text-crimson transition-opacity duration-150 ease-otb disabled:pointer-events-none disabled:opacity-40"
-              >
-                <Icon as={X} size={16} /> 거짓
-              </button>
-              <button
-                type="button"
-                aria-label="진실로 판정"
-                disabled={animating || currentSide !== null}
-                onClick={() => judge("true")}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-sm border border-primary-deep bg-primary py-3.5 text-[15px] font-semibold leading-none text-on-primary transition-opacity duration-150 ease-otb disabled:pointer-events-none disabled:opacity-40"
-              >
-                <Icon as={Check} size={16} /> 진실
-              </button>
-            </div>
+            /* 판정 2지선다 — 균등 분배(flex-1)는 li가, 채우기는 button이 w-full로 */
+            <ul className="flex gap-3 px-5 pb-3 pt-4">
+              <li className="flex flex-1">
+                <button
+                  type="button"
+                  aria-label="거짓으로 판정"
+                  disabled={animating || currentSide !== null}
+                  onClick={() => judge("false")}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-sm border border-crimson bg-canvas py-3.5 text-[15px] font-semibold leading-none text-crimson transition-opacity duration-150 ease-otb disabled:pointer-events-none disabled:opacity-40"
+                >
+                  <Icon as={X} size={16} /> 거짓
+                </button>
+              </li>
+              <li className="flex flex-1">
+                <button
+                  type="button"
+                  aria-label="진실로 판정"
+                  disabled={animating || currentSide !== null}
+                  onClick={() => judge("true")}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-sm border border-primary-deep bg-primary py-3.5 text-[15px] font-semibold leading-none text-on-primary transition-opacity duration-150 ease-otb disabled:pointer-events-none disabled:opacity-40"
+                >
+                  <Icon as={Check} size={16} /> 진실
+                </button>
+              </li>
+            </ul>
           )}
 
           {inlineError && (

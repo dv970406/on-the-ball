@@ -24,28 +24,32 @@ export function BottomNav() {
 
   return (
     <nav
-      className="absolute inset-x-3 bottom-[max(18px,env(safe-area-inset-bottom))] z-[70] flex items-center justify-between rounded-[28px] bg-[rgba(23,23,23,0.92)] p-2 shadow-[0_12px_32px_rgba(0,0,0,0.18),inset_0_0_0_1px_rgba(255,255,255,0.06)] backdrop-blur-[20px] backdrop-saturate-[1.6]"
+      className="absolute inset-x-3 bottom-[max(18px,env(safe-area-inset-bottom))] z-[70] rounded-[28px] bg-[rgba(23,23,23,0.92)] p-2 shadow-[0_12px_32px_rgba(0,0,0,0.18),inset_0_0_0_1px_rgba(255,255,255,0.06)] backdrop-blur-[20px] backdrop-saturate-[1.6]"
       aria-label="주요 메뉴"
     >
-      {NAV_ITEMS.map(({ href, label, icon }) => {
-        const active = pathname === href;
-        return (
-          <Link
-            key={href}
-            href={href}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "flex h-14 flex-1 flex-col items-center justify-center gap-[3px] rounded-[22px] text-[10px] font-medium transition-colors duration-150 ease-otb",
-              active ? "bg-white/[0.08] text-white" : "text-white/55",
-            )}
-          >
-            <span className={cn("flex items-center justify-center", active && "text-primary")}>
-              <Icon as={icon} size={20} />
-            </span>
-            <span>{label}</span>
-          </Link>
-        );
-      })}
+      {/* flex 배치는 ul이, 균등 분배(flex-1)는 li가 담당 — Link는 li를 w-full로 채운다 */}
+      <ul className="flex items-center justify-between">
+        {NAV_ITEMS.map(({ href, label, icon }) => {
+          const active = pathname === href;
+          return (
+            <li key={href} className="flex-1">
+              <Link
+                href={href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex h-14 w-full flex-col items-center justify-center gap-[3px] rounded-[22px] text-[10px] font-medium transition-colors duration-150 ease-otb",
+                  active ? "bg-white/[0.08] text-white" : "text-white/55",
+                )}
+              >
+                <span className={cn("flex items-center justify-center", active && "text-primary")}>
+                  <Icon as={icon} size={20} />
+                </span>
+                <span>{label}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     </nav>
   );
 }

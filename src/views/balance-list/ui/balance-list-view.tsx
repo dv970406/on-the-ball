@@ -44,25 +44,27 @@ export function BalanceListView() {
       ) : (
         <>
           {/* 필터 pill 가로 스크롤 */}
-          <div className="no-scrollbar flex gap-1.5 overflow-x-auto px-5 pb-4">
+          <ul className="no-scrollbar flex gap-1.5 overflow-x-auto px-5 pb-4">
             {filters.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => setFilter(tag)}
-                aria-pressed={filter === tag}
-                aria-label={`${tag} 필터`}
-                className={cn(
-                  "shrink-0 whitespace-nowrap rounded-full px-[9px] py-[5px] text-[11px] leading-none transition-colors duration-150 ease-otb",
-                  filter === tag
-                    ? "bg-ink font-medium text-white"
-                    : "border border-hairline bg-transparent text-ink-mute",
-                )}
-              >
-                {tag}
-              </button>
+              // li에 flex — button이 블록 자식이 되면 inline-block baseline 여백이 생긴다
+              <li key={tag} className="flex shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setFilter(tag)}
+                  aria-pressed={filter === tag}
+                  aria-label={`${tag} 필터`}
+                  className={cn(
+                    "shrink-0 whitespace-nowrap rounded-full px-[9px] py-[5px] text-[11px] leading-none transition-colors duration-150 ease-otb",
+                    filter === tag
+                      ? "bg-ink font-medium text-white"
+                      : "border border-hairline bg-transparent text-ink-mute",
+                  )}
+                >
+                  {tag}
+                </button>
+              </li>
             ))}
-          </div>
+          </ul>
 
           {filtered.length === 0 ? (
             <EmptyState

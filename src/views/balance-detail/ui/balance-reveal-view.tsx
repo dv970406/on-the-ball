@@ -88,13 +88,15 @@ export function BalanceRevealView({ poll, a, b, mySide }: BalanceRevealViewProps
       {/* 56px 비율 바 — 센터피스 */}
       <RevealRatioBar a={a} b={b} aMeta={aMeta} bMeta={bMeta} winner={winner} mySide={mySide} />
 
-      {/* 스탯 비교 그리드 — 중앙 세로 헤어라인 */}
+      {/* 스탯 비교 표 — 중앙 세로 헤어라인. tr이 행을 묶어 A/B 세로 정렬을 보장한다 */}
       {statRowCount > 0 && (
-        <div className="mt-6 grid grid-cols-[1fr_auto_1fr] items-stretch">
-          {Array.from({ length: statRowCount }, (_, i) => (
-            <StatRow key={i} aStat={aMeta.stats[i]} bStat={bMeta.stats[i]} />
-          ))}
-        </div>
+        <table className="mt-6 w-full table-fixed">
+          <tbody>
+            {Array.from({ length: statRowCount }, (_, i) => (
+              <StatRow key={i} aStat={aMeta.stats[i]} bStat={bMeta.stats[i]} />
+            ))}
+          </tbody>
+        </table>
       )}
 
       {/* 양측 blurb 카드 — 승자는 2px 에메랄드 보더 */}
@@ -144,24 +146,31 @@ interface StatRowProps {
 /** 스탯 비교 한 행 — 좌 A / 중앙 헤어라인 / 우 B */
 function StatRow({ aStat, bStat }: StatRowProps) {
   return (
-    <>
+    <tr>
       <StatCell stat={aStat} side="a" />
-      <div className="w-px bg-hairline-cool" />
+      {/* 헤어라인은 배경만 있는 1px 열 — 폭 합이 정확히 100%가 되도록 양쪽이 0.5px씩 양보.
+          aria-hidden을 주면 행이 셀 2개만 소유하게 되어 열 수가 어긋난다 → 빈 td로 둔다 */}
+      <td className="w-px bg-hairline-cool p-0" />
       <StatCell stat={bStat} side="b" />
-    </>
+    </tr>
   );
 }
 
 function StatCell({ stat, side }: { stat?: [string, string]; side: BalanceSide }) {
   return (
-    <div className={cn("py-2.5", side === "a" ? "pr-3 text-left" : "pl-3 text-right")}>
+    <td
+      className={cn(
+        "w-[calc(50%-0.5px)] py-2.5 align-top",
+        side === "a" ? "pr-3 text-left" : "pl-3 text-right",
+      )}
+    >
       {stat && (
         <>
           <div className="text-[11px] text-ink-mute-2">{stat[0]}</div>
           <div className="tnum mt-0.5 font-mono text-[18px] font-semibold text-ink">{stat[1]}</div>
         </>
       )}
-    </div>
+    </td>
   );
 }
 
