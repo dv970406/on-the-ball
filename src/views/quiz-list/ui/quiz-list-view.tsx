@@ -78,9 +78,9 @@ function TodayQuizCard({ quiz }: { quiz: QuizSummary }) {
 
 /** 예정된 문제 행 — dashed 보더 + 잠금 아이콘, 클릭 불가 */
 function UpcomingQuizRow({ quiz }: { quiz: QuizSummary }) {
+  // 행 레이아웃(dashed 보더 + flex)은 호출부 li가 담당
   return (
-    // 잠금 상태 — 인터랙션 없는 행
-    <li className="flex items-center gap-2.5 rounded-lg border border-dashed border-hairline-strong p-3">
+    <>
       <time
         dateTime={quiz.opensOn}
         className="flex size-[38px] shrink-0 items-center justify-center rounded-[9px] bg-canvas-soft font-mono text-[10px] text-ink-mute"
@@ -95,45 +95,44 @@ function UpcomingQuizRow({ quiz }: { quiz: QuizSummary }) {
         </span>
       </div>
       <Icon as={Lock} size={14} className="shrink-0 text-ink-mute-2" aria-label="잠김" />
-    </li>
+    </>
   );
 }
 
 /** 지난 문제 행 — 내 정답/오답 아이콘 (미시도는 중립 dot) */
 function PastQuizRow({ quiz }: { quiz: QuizSummary }) {
+  // 행 구분선(border-b)은 호출부 li가 담당
   return (
-    <li className="border-b border-hairline-cool">
-      <Link
-        href={ROUTES.quizDetail(quiz.id)}
-        className="flex items-center gap-3 py-2.5"
-        aria-label={`지난 문제: ${quiz.title}`}
-      >
-        {quiz.myResult === "correct" ? (
-          <span className="flex size-[26px] shrink-0 items-center justify-center rounded-sm bg-primary/[0.14] text-primary-deep">
-            <Icon as={Check} size={14} aria-label="정답" />
-          </span>
-        ) : quiz.myResult === "wrong" ? (
-          <span className="flex size-[26px] shrink-0 items-center justify-center rounded-sm bg-crimson/[0.08] text-crimson">
-            <Icon as={X} size={14} aria-label="오답" />
-          </span>
-        ) : (
-          <span
-            className="flex size-[26px] shrink-0 items-center justify-center rounded-sm bg-canvas-soft"
-            aria-label="미도전"
-          >
-            <span className="size-1.5 rounded-full bg-ink-faint" />
-          </span>
-        )}
-        <div className="min-w-0 flex-1">
-          <h3 className="block text-[13px] text-ink">{quiz.title}</h3>
-          <span className="tnum mt-0.5 block text-[10px] text-ink-mute-2">
-            <span className="font-mono">{quiz.accuracyPct}%</span> ·{" "}
-            <span className="font-mono">{formatCount(quiz.attempts)}</span>명 · {quiz.kind}
-          </span>
-        </div>
-        <Icon as={ChevronRight} size={14} className="shrink-0 text-ink-mute-2" />
-      </Link>
-    </li>
+    <Link
+      href={ROUTES.quizDetail(quiz.id)}
+      className="flex items-center gap-3 py-2.5"
+      aria-label={`지난 문제: ${quiz.title}`}
+    >
+      {quiz.myResult === "correct" ? (
+        <span className="flex size-[26px] shrink-0 items-center justify-center rounded-sm bg-primary/[0.14] text-primary-deep">
+          <Icon as={Check} size={14} aria-label="정답" />
+        </span>
+      ) : quiz.myResult === "wrong" ? (
+        <span className="flex size-[26px] shrink-0 items-center justify-center rounded-sm bg-crimson/[0.08] text-crimson">
+          <Icon as={X} size={14} aria-label="오답" />
+        </span>
+      ) : (
+        <span
+          className="flex size-[26px] shrink-0 items-center justify-center rounded-sm bg-canvas-soft"
+          aria-label="미도전"
+        >
+          <span className="size-1.5 rounded-full bg-ink-faint" />
+        </span>
+      )}
+      <div className="min-w-0 flex-1">
+        <h3 className="block text-[13px] text-ink">{quiz.title}</h3>
+        <span className="tnum mt-0.5 block text-[10px] text-ink-mute-2">
+          <span className="font-mono">{quiz.accuracyPct}%</span> ·{" "}
+          <span className="font-mono">{formatCount(quiz.attempts)}</span>명 · {quiz.kind}
+        </span>
+      </div>
+      <Icon as={ChevronRight} size={14} className="shrink-0 text-ink-mute-2" />
+    </Link>
   );
 }
 
@@ -202,7 +201,13 @@ export function QuizListView() {
               <SectionHead title="예정된 문제" />
               <ul className="flex flex-col gap-2.5 px-5 pb-6">
                 {data.upcoming.map((quiz) => (
-                  <UpcomingQuizRow key={quiz.id} quiz={quiz} />
+                  // 잠금 상태 — 인터랙션 없는 행
+                  <li
+                    key={quiz.id}
+                    className="flex items-center gap-2.5 rounded-lg border border-dashed border-hairline-strong p-3"
+                  >
+                    <UpcomingQuizRow quiz={quiz} />
+                  </li>
                 ))}
               </ul>
             </section>
@@ -214,7 +219,9 @@ export function QuizListView() {
             {data.past.length > 0 ? (
               <ul className="flex flex-col px-5 pb-6">
                 {data.past.map((quiz) => (
-                  <PastQuizRow key={quiz.id} quiz={quiz} />
+                  <li key={quiz.id} className="border-b border-hairline-cool">
+                    <PastQuizRow quiz={quiz} />
+                  </li>
                 ))}
               </ul>
             ) : (

@@ -79,12 +79,13 @@ export function CommentSection({ pollId, commentCount }: CommentSectionProps) {
       ) : (
         <ul className="list-none">
           {comments.map((comment, i) => (
-            <CommentRow
-              key={comment.id}
-              comment={comment}
-              index={i}
-              onToggleLike={() => toggleLike.mutate(comment.id)}
-            />
+            <li key={comment.id} className="border-b border-hairline-cool last:border-b-0">
+              <CommentRow
+                comment={comment}
+                index={i}
+                onToggleLike={() => toggleLike.mutate(comment.id)}
+              />
+            </li>
           ))}
         </ul>
       )}
@@ -100,45 +101,44 @@ interface CommentRowProps {
 }
 
 function CommentRow({ comment, index, onToggleLike }: CommentRowProps) {
+  // 행 구분선(border-b)은 호출부 li가 담당
   return (
-    <li className="border-b border-hairline-cool last:border-b-0">
-      <article className="flex gap-2.5 py-3.5">
-        <Avatar
-          label={comment.author.name}
-          size={28}
-          style={{ background: `hsl(${(index * 60) % 360},35%,92%)` }}
-        />
-        <div className="min-w-0 flex-1">
-          <header className="mb-0.5 flex items-baseline gap-1.5">
-            <span className="text-[13px] font-medium text-ink">{comment.author.name}</span>
-            {comment.author.tag && (
-              <span className="whitespace-nowrap rounded-full border border-hairline-cool bg-canvas-soft px-1.5 py-px text-[10px] text-ink-mute">
-                {comment.author.tag}
-              </span>
-            )}
-            <span className="whitespace-nowrap text-[11px] text-ink-mute-2">
-              · <time dateTime={comment.createdAt}>{formatRelativeTime(comment.createdAt)}</time>
+    <article className="flex gap-2.5 py-3.5">
+      <Avatar
+        label={comment.author.name}
+        size={28}
+        style={{ background: `hsl(${(index * 60) % 360},35%,92%)` }}
+      />
+      <div className="min-w-0 flex-1">
+        <header className="mb-0.5 flex items-baseline gap-1.5">
+          <span className="text-[13px] font-medium text-ink">{comment.author.name}</span>
+          {comment.author.tag && (
+            <span className="whitespace-nowrap rounded-full border border-hairline-cool bg-canvas-soft px-1.5 py-px text-[10px] text-ink-mute">
+              {comment.author.tag}
             </span>
-          </header>
-          <p className="text-[13px] leading-normal text-ink">{comment.body}</p>
-          <footer className="mt-1.5">
-            <button
-              type="button"
-              onClick={onToggleLike}
-              aria-pressed={comment.likedByMe}
-              aria-label={`동감 ${formatCount(comment.likes)}개${comment.likedByMe ? " — 동감 취소" : ""}`}
-              className={cn(
-                "inline-flex items-center gap-[3px] text-[11px]",
-                comment.likedByMe ? "font-medium text-primary-deep" : "text-ink-mute",
-              )}
-            >
-              <Icon as={ArrowUp} size={11} />
-              동감 <span className="tnum font-mono">{formatCount(comment.likes)}</span>
-            </button>
-          </footer>
-        </div>
-      </article>
-    </li>
+          )}
+          <span className="whitespace-nowrap text-[11px] text-ink-mute-2">
+            · <time dateTime={comment.createdAt}>{formatRelativeTime(comment.createdAt)}</time>
+          </span>
+        </header>
+        <p className="text-[13px] leading-normal text-ink">{comment.body}</p>
+        <footer className="mt-1.5">
+          <button
+            type="button"
+            onClick={onToggleLike}
+            aria-pressed={comment.likedByMe}
+            aria-label={`동감 ${formatCount(comment.likes)}개${comment.likedByMe ? " — 동감 취소" : ""}`}
+            className={cn(
+              "inline-flex items-center gap-[3px] text-[11px]",
+              comment.likedByMe ? "font-medium text-primary-deep" : "text-ink-mute",
+            )}
+          >
+            <Icon as={ArrowUp} size={11} />
+            동감 <span className="tnum font-mono">{formatCount(comment.likes)}</span>
+          </button>
+        </footer>
+      </div>
+    </article>
   );
 }
 

@@ -155,14 +155,15 @@ export function QuizDetailView({ id }: { id: string }) {
         {/* 4지선다 */}
         <ul className="mt-[18px] flex flex-col gap-2">
           {displayChoices.map((choice) => (
-            <ChoiceOption
-              key={choice.id}
-              choice={choice}
-              done={done}
-              correctChoiceId={correctChoiceId}
-              myChoiceId={myChoiceId}
-              onPick={handlePick}
-            />
+            <li key={choice.id}>
+              <ChoiceOption
+                choice={choice}
+                done={done}
+                correctChoiceId={correctChoiceId}
+                myChoiceId={myChoiceId}
+                onPick={handlePick}
+              />
+            </li>
           ))}
         </ul>
 
@@ -209,42 +210,40 @@ function ChoiceOption({
   const isDim = done && !isCorrectChoice && !isMyWrong;
 
   return (
-    <li>
-      <button
-        type="button"
-        onClick={() => onPick(choice.id)}
-        aria-disabled={done}
-        aria-label={`${choice.team}${choice.season ? ` ${choice.season}` : ""} 선택`}
-        className={cn(
-          "flex w-full items-center justify-between rounded-[10px] border bg-canvas px-4 py-3.5 text-left text-[15px] font-medium text-ink transition-colors duration-150 ease-otb",
-          !done && "border-hairline active:border-ink",
-          !done && myChoiceId === choice.id && "border-ink",
-          isCorrectChoice && "border-primary bg-primary/[0.12]",
-          isMyWrong && "border-crimson bg-crimson/[0.06] text-crimson",
-          isDim && "border-hairline opacity-[0.55]",
-        )}
-      >
-        <span className="min-w-0">
-          <span className="block">{choice.team}</span>
-          {done && (
-            <span className="tnum mt-1 block text-[11px] font-normal text-ink-mute">
-              <span className="font-mono">{formatPct(choice.pickRatio)}</span>가
-              이걸 골랐어요
-            </span>
-          )}
-        </span>
-        {choice.season && (
-          <span
-            className={cn(
-              "shrink-0 font-mono text-xs font-normal",
-              isCorrectChoice ? "text-primary-deep" : "text-ink-mute",
-            )}
-          >
-            {choice.season}
+    <button
+      type="button"
+      onClick={() => onPick(choice.id)}
+      aria-disabled={done}
+      aria-label={`${choice.team}${choice.season ? ` ${choice.season}` : ""} 선택`}
+      className={cn(
+        "flex w-full items-center justify-between rounded-[10px] border bg-canvas px-4 py-3.5 text-left text-[15px] font-medium text-ink transition-colors duration-150 ease-otb",
+        !done && "border-hairline active:border-ink",
+        !done && myChoiceId === choice.id && "border-ink",
+        isCorrectChoice && "border-primary bg-primary/[0.12]",
+        isMyWrong && "border-crimson bg-crimson/[0.06] text-crimson",
+        isDim && "border-hairline opacity-[0.55]",
+      )}
+    >
+      <span className="min-w-0">
+        <span className="block">{choice.team}</span>
+        {done && (
+          <span className="tnum mt-1 block text-[11px] font-normal text-ink-mute">
+            <span className="font-mono">{formatPct(choice.pickRatio)}</span>가 이걸
+            골랐어요
           </span>
         )}
-      </button>
-    </li>
+      </span>
+      {choice.season && (
+        <span
+          className={cn(
+            "shrink-0 font-mono text-xs font-normal",
+            isCorrectChoice ? "text-primary-deep" : "text-ink-mute",
+          )}
+        >
+          {choice.season}
+        </span>
+      )}
+    </button>
   );
 }
 

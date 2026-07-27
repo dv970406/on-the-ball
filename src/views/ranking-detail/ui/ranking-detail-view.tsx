@@ -107,30 +107,28 @@ function RankingDetailBody({ poll }: { poll: PollDetail }) {
         {revealed ? (
           <ol className="rounded-[14px] border border-hairline p-1.5" aria-label="후보별 득표 결과">
             {candidates.map((candidate, i) => (
-              <CandidateResultRow
-                key={candidate.id}
-                option={candidate}
-                rank={i + 1}
-                isMine={poll.myVote === candidate.id}
-              />
+              <li key={candidate.id} className="flex items-center gap-3 p-3">
+                <CandidateResultRow
+                  option={candidate}
+                  rank={i + 1}
+                  isMine={poll.myVote === candidate.id}
+                />
+              </li>
             ))}
           </ol>
         ) : (
-          <div
-            role="radiogroup"
-            aria-label="후보 선택"
-            className="rounded-[14px] border border-hairline p-1.5"
-          >
+          <ol aria-label="후보 선택" className="rounded-[14px] border border-hairline p-1.5">
             {candidates.map((candidate, i) => (
-              <CandidatePickRow
-                key={candidate.id}
-                option={candidate}
-                order={i + 1}
-                isPicked={picked === candidate.id}
-                onPick={() => setPicked(candidate.id)}
-              />
+              <li key={candidate.id}>
+                <CandidatePickRow
+                  option={candidate}
+                  order={i + 1}
+                  isPicked={picked === candidate.id}
+                  onPick={() => setPicked(candidate.id)}
+                />
+              </li>
             ))}
-          </div>
+          </ol>
         )}
 
         {!revealed && poll.subtitle && (
@@ -202,8 +200,7 @@ function CandidatePickRow({ option, order, isPicked, onPick }: CandidatePickRowP
   return (
     <button
       type="button"
-      role="radio"
-      aria-checked={isPicked}
+      aria-pressed={isPicked}
       onClick={onPick}
       aria-label={`${option.label} 선택`}
       className={cn(
@@ -246,8 +243,9 @@ function CandidateResultRow({ option, rank, isMine }: CandidateResultRowProps) {
   // 결과 바 컬러 — 1위 에메랄드 / 내 선택 잉크 / 나머지 그레이
   const barColor = rank === 1 ? COLOR.primary : isMine ? COLOR.ink : COLOR.hairline;
 
+  // 행 레이아웃(flex items-center gap-3 p-3)은 호출부 li가 담당
   return (
-    <li className="flex items-center gap-3 p-3">
+    <>
       <span className="min-w-3 font-mono text-[11px] text-ink-mute-2">
         {String(rank).padStart(2, "0")}
       </span>
@@ -278,7 +276,7 @@ function CandidateResultRow({ option, rank, isMine }: CandidateResultRowProps) {
           )}
         </div>
       </div>
-    </li>
+    </>
   );
 }
 
