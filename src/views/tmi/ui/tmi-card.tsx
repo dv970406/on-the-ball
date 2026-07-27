@@ -1,6 +1,5 @@
 "use client";
 
-import type { CSSProperties } from "react";
 import { readTmiPollMeta, type PollListItem } from "@/entities/poll";
 import { Avatar, Flag } from "@/shared/ui";
 import { cn, formatCount } from "@/shared/lib";
@@ -19,22 +18,22 @@ interface TmiCardProps {
   exitSide?: TmiSide | null;
 }
 
-/** 이탈 애니메이션 transform — translateX(±120%) rotate(±14deg) */
-function cardStyle(peek: boolean, exitSide: TmiSide | null): CSSProperties {
+/**
+ * 카드 상태별 transform·opacity·z 클래스 — 이탈은 translateX(±120%) rotate(±14deg).
+ * ⚠ translate / scale / rotate 표준 유틸 금지 — Tailwind v4는 이를 transform이 아닌 개별
+ *    프로퍼티로 출력하는데, 카드의 transition-[transform,opacity]가 그걸 포함하지 않아
+ *    이탈 모션이 트랜지션 없이 순간이동한다.
+ */
+function cardClassName(peek: boolean, exitSide: TmiSide | null) {
   if (peek) {
-    return { transform: "translateY(12px) scale(0.96)", opacity: 0.6, zIndex: 1 };
+    return "z-[1] opacity-60 [transform:translateY(12px)_scale(0.96)]";
   }
   if (exitSide) {
-    return {
-      transform:
-        exitSide === "true"
-          ? "translateX(120%) rotate(14deg)"
-          : "translateX(-120%) rotate(-14deg)",
-      opacity: 0,
-      zIndex: 2,
-    };
+    return exitSide === "true"
+      ? "z-[2] opacity-0 [transform:translateX(120%)_rotate(14deg)]"
+      : "z-[2] opacity-0 [transform:translateX(-120%)_rotate(-14deg)]";
   }
-  return { transform: "translateY(0) scale(1)", opacity: 1, zIndex: 2 };
+  return "z-[2] opacity-100 [transform:translateY(0)_scale(1)]";
 }
 
 /** TMI 판정 카드 한 장 — 주장 + 출처 박스 + (판정 후) 진실/거짓 비율 결과 */
@@ -49,8 +48,10 @@ export function TmiCard({ poll, order, total, peek = false, resultSide = null, e
   return (
     <article
       aria-hidden={peek}
-      className="absolute inset-0 flex flex-col rounded-[18px] border border-hairline bg-canvas p-[28px_24px_24px] transition-[transform,opacity] duration-[350ms] ease-otb [box-shadow:0_8px_24px_rgba(0,0,0,0.08)]"
-      style={cardStyle(peek, exitSide)}
+      className={cn(
+        "absolute inset-0 flex flex-col rounded-[18px] border border-hairline bg-canvas p-[28px_24px_24px] transition-[transform,opacity] duration-[350ms] ease-otb [box-shadow:0_8px_24px_rgba(0,0,0,0.08)]",
+        cardClassName(peek, exitSide),
+      )}
     >
       {/* 선수 아바타 + 국기 + 클럽 */}
       <header className="mb-4 flex items-center gap-2.5">

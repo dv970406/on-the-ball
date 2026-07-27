@@ -1,3 +1,5 @@
+import { cn } from "@/shared/lib";
+
 interface PlayerSilhouetteProps {
   /** 실루엣 색 (기본: 밝은 톤) */
   tone?: string;
@@ -10,7 +12,7 @@ export function PlayerSilhouette({
   className,
 }: PlayerSilhouetteProps) {
   return (
-    <svg viewBox="0 0 120 160" className={className} style={{ width: "100%", display: "block" }} aria-hidden>
+    <svg viewBox="0 0 120 160" className={cn("block w-full", className)} aria-hidden>
       {/* 머리 */}
       <circle cx="60" cy="34" r="20" fill={tone} />
       {/* 어깨 + 몸통 */}

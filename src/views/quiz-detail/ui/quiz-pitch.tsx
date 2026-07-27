@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "@/shared/lib";
 import { Flag } from "@/shared/ui";
 import type { QuizLineup } from "@/entities/quiz";
 
@@ -15,36 +16,21 @@ interface QuizPitchProps {
  */
 export function QuizPitch({ lineup, reveal }: QuizPitchProps) {
   return (
-    <div
-      className="relative overflow-hidden rounded-[14px] px-4 py-5"
-      style={{
-        aspectRatio: "3 / 4",
-        background: "linear-gradient(to bottom, #2d7a4f 0%, #245d3d 100%)",
-      }}
-    >
+    /* 그라데이션은 arbitrary로 — bg-linear-* 유틸은 in oklab 보간이라 원본 sRGB와 중간색이 다르다 */
+    <div className="relative aspect-[3/4] overflow-hidden rounded-[14px] bg-[linear-gradient(to_bottom,#2d7a4f_0%,#245d3d_100%)] px-4 py-5">
       {/* 잔디 세로 스트라이프 (24px 간격) */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(to right, transparent 0, transparent 24px, rgba(255,255,255,0.04) 24px, rgba(255,255,255,0.04) 48px)",
-        }}
+        className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(to_right,transparent_0,transparent_24px,rgba(255,255,255,0.04)_24px,rgba(255,255,255,0.04)_48px)]"
       />
       {/* 라인 프레임 + 센터라인 + 센터서클 */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-2 rounded-[10px]"
-        style={{ border: "1.5px solid rgba(255,255,255,0.45)" }}
+        className="pointer-events-none absolute inset-2 rounded-[10px] border-[1.5px] border-white/45"
       >
-        <div
-          className="absolute inset-x-0 top-1/2"
-          style={{ height: 1.5, background: "rgba(255,255,255,0.4)" }}
-        />
-        <div
-          className="absolute left-1/2 top-1/2 size-16 -translate-x-1/2 -translate-y-1/2 rounded-full"
-          style={{ border: "1.5px solid rgba(255,255,255,0.4)" }}
-        />
+        <div className="absolute inset-x-0 top-1/2 h-[1.5px] bg-white/40" />
+        {/* 이 요소는 애니메이션·트랜지션이 없어 표준 translate 유틸을 그대로 쓴다 */}
+        <div className="absolute left-1/2 top-1/2 size-16 -translate-x-1/2 -translate-y-1/2 rounded-full border-[1.5px] border-white/40" />
       </div>
 
       {/* 포메이션 — column-reverse로 GK줄(rows[0])이 하단 */}
@@ -54,14 +40,12 @@ export function QuizPitch({ lineup, reveal }: QuizPitchProps) {
             {row.map((cell, cellIndex) => (
               <div
                 key={cellIndex}
-                className="inline-flex items-center gap-1.5 rounded-full backdrop-blur-[6px]"
-                style={{
-                  background: "rgba(0,0,0,0.55)",
-                  border: "1px solid rgba(255,255,255,0.25)",
-                  padding: "4px 8px 4px 4px",
-                  transform: reveal ? "scale(1.04)" : "scale(1)",
-                  transition: "transform 250ms cubic-bezier(0.2,0,0,1)",
-                }}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-black/55 py-1 pl-1 pr-2 backdrop-blur-[6px]",
+                  "transition-[transform] duration-[250ms] ease-otb",
+                  // ⚠ scale-* 표준 유틸 금지 — 개별 scale 프로퍼티로 출력되어 위 transition-[transform]이 잡지 못한다
+                  reveal ? "[transform:scale(1.04)]" : "[transform:scale(1)]",
+                )}
               >
                 <Flag code={cell.flag} width={20} height={14} />
                 <span className="font-mono text-[9px] tracking-[0.4px] text-white/85">

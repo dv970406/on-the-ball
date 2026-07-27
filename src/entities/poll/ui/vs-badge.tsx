@@ -17,7 +17,11 @@ export function VsBadge({ size = 64, animate = false, className }: VsBadgeProps)
     <span
       aria-hidden
       className={cn(
-        "absolute left-1/2 top-1/2 z-[2] flex items-center justify-center rounded-full border-4 border-white bg-primary font-bold text-on-primary shadow-[0_8px_20px_rgba(0,0,0,0.18)]",
+        "absolute left-1/2 top-1/2 z-[2] flex items-center justify-center rounded-full border-4 border-white bg-primary font-bold tracking-[-0.6px] text-on-primary shadow-[0_8px_20px_rgba(0,0,0,0.18)]",
+        // ⚠ -translate-x-1/2 등 표준 유틸 금지 — Tailwind v4는 이를 transform이 아닌 개별
+        //    translate 프로퍼티로 출력하는데, vs-pop 키프레임이 transform으로 translate(-50%,-50%)를
+        //    직접 애니메이트하므로 둘이 합성되어 -50%가 이중 적용된다(배지 위치 붕괴).
+        "[transform:translate(-50%,-50%)_rotate(-12deg)]",
         animate && "animate-vs-pop",
         className,
       )}
@@ -26,8 +30,6 @@ export function VsBadge({ size = 64, animate = false, className }: VsBadgeProps)
         height: size,
         // 기준 64px일 때 22px — 사이즈에 비례
         fontSize: Math.round((size * 22) / 64),
-        letterSpacing: "-0.6px",
-        transform: "translate(-50%, -50%) rotate(-12deg)",
       }}
     >
       VS

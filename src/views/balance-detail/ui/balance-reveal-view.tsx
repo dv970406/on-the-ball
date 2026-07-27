@@ -175,12 +175,12 @@ interface BlurbCardProps {
 function BlurbCard({ option, meta, won }: BlurbCardProps) {
   return (
     <div
-      className="rounded-lg p-3.5"
-      style={{
-        background: meta.tone,
-        color: meta.text,
-        border: won ? "2px solid var(--color-primary)" : "1px solid var(--color-hairline-cool)",
-      }}
+      className={cn(
+        "rounded-lg p-3.5",
+        won ? "border-2 border-primary" : "border border-hairline-cool",
+      )}
+      // 면 색은 DB meta 런타임 값 — style 유지
+      style={{ background: meta.tone, color: meta.text }}
     >
       <div className="mb-1 text-[17px] font-bold tracking-[-0.4px]">{option.label}</div>
       <div className="mb-2 text-[11px] opacity-70">{meta.metaLine}</div>
