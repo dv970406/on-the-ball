@@ -39,8 +39,8 @@ export function SubHeader({ title, dark = false, fallbackHref = ROUTES.home }: S
       className={cn(
         "sticky top-0 z-[15] flex items-center gap-1 border-b px-2 pb-2.5 pt-[max(16px,env(safe-area-inset-top))] backdrop-blur-[14px]",
         dark
-          ? "border-white/[0.08] bg-[rgba(23,23,23,0.85)]"
-          : "border-hairline-cool bg-[rgba(255,255,255,0.92)]",
+          ? "border-white/[0.08] bg-ink/85"
+          : "border-hairline-cool bg-canvas/92",
       )}
     >
       <button

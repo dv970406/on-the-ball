@@ -24,7 +24,7 @@ export function BottomNav() {
 
   return (
     <nav
-      className="absolute inset-x-3 bottom-[max(18px,env(safe-area-inset-bottom))] z-[70] rounded-[28px] bg-[rgba(23,23,23,0.92)] p-2 shadow-[0_12px_32px_rgba(0,0,0,0.18),inset_0_0_0_1px_rgba(255,255,255,0.06)] backdrop-blur-[20px] backdrop-saturate-[1.6]"
+      className="absolute inset-x-3 bottom-[max(18px,env(safe-area-inset-bottom))] z-[70] rounded-[28px] bg-ink/92 p-2 shadow-[0_12px_32px_rgba(0,0,0,0.18),inset_0_0_0_1px_rgba(255,255,255,0.06)] backdrop-blur-[20px] backdrop-saturate-[1.6]"
       aria-label="주요 메뉴"
     >
       {/* flex 배치는 ul이, 균등 분배(flex-1)는 li가 담당 — Link는 li를 w-full로 채운다 */}
