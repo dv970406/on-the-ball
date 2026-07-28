@@ -4,7 +4,7 @@ import {
   mapProfile,
   type MyProfileRow,
 } from "@/entities/user/api/mappers";
-import type { Profile } from "@/entities/user";
+import type { Profile } from "@/entities/user/model/types";
 
 /** GET /api/me/profile — 내 프로필 (세션 없으면 null) */
 export async function GET() {

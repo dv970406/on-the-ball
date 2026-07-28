@@ -40,6 +40,16 @@ shared ← entities ← features ← widgets ← views
 - `@/shared/api` — 클라이언트 안전 모듈만 노출. 서버 전용(`handler`, `supabase-server` = `next/headers` 의존)은 **직접 경로**로 import: `@/shared/api/handler`.
 - `@/shared/lib` — `"use client"` 훅(`useDelayedReveal` 등) 포함. **Route Handler는 순수 함수를 `@/shared/lib/format`에서 직접 import**.
 - `@/entities/poll` — `"use client"` UI 포함. **Route Handler는 `@/entities/poll/model/types`·`@/entities/poll/api/mappers`를 직접 import**.
+- `@/entities/user` — 배럴이 `"use client"` 쿼리 훅(`useMyProfileQuery`)을 재export. **Route Handler는 `@/entities/user/model/types`·`@/entities/user/api/mappers`를 직접 import**.
+
+### 응답 계약(response contract) seam — 화면 전용 타입은 view에 두되 서버 안전하게
+
+집계 응답처럼 **owning 엔티티가 없고 특정 화면에만 쓰이는 타입**(예: `HomeFeed`, `MyActivity`)은 그 화면의 `views/*/model/types.ts`에 co-locate한다. 이 파일은 **뷰와 그 화면의 Route Handler가 함께 소비**하므로, 다음 규칙으로 서버 안전성을 유지한다:
+
+- **Route Handler → view 계약 타입**: `@/views/home/model/types` 등 **`import type`로만** 직접 참조한다(런타임 값은 금지 — 타입은 완전 소거되어 단방향 의존을 깨지 않는다).
+- **view 계약 타입 파일 → 하위 엔티티 타입**: `@/entities/poll/model/types`처럼 **서버 안전 deep 경로**를 쓴다. 이 파일이 Route Handler에 물리므로, `"use client"` UI를 포함한 슬라이스 배럴(`@/entities/poll`)을 경유하면 클라 코드가 라우트로 샌다.
+
+즉 계약 타입 파일은 위 "Route Handler" 규칙과 동일한 서버 안전 제약을 따른다.
 
 ## 파일·네이밍
 
