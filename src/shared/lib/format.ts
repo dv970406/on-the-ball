@@ -32,6 +32,15 @@ export function todayUtc(): string {
 }
 
 /**
+ * ISO 시각을 "2024.03"(연.월) 형태로 표기 (가입일 등).
+ * UTC 기준으로 뽑아 SSR·CSR 타임존 차이로 월이 어긋나지 않게 한다(todayUtc와 동일 전제).
+ */
+export function formatYearMonth(iso: string): string {
+  const date = new Date(iso);
+  return `${date.getUTCFullYear()}.${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/**
  * ISO 시각을 "8분 전" 형태로 표기 (댓글 등). 7일 이후는 "N월 N일".
  * 클라이언트 쿼리 이후에만 렌더되는 곳에서 사용(hydration mismatch 없음).
  */

@@ -7,6 +7,7 @@ export {
   formatDday,
   isClosed,
   todayUtc,
+  formatYearMonth,
   formatRelativeTime,
 } from "./format";
 // ⚠ 이 배럴은 "use client" 훅을 포함하므로 Route Handler는 여기서 import 금지.

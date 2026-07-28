@@ -2,7 +2,8 @@
 
 import { Settings, UserRound } from "lucide-react";
 import { Avatar, EmptyState, Icon, NightCard, Pill, SectionHead, Skeleton } from "@/shared/ui";
-import { formatCount } from "@/shared/lib";
+import { formatCount, formatYearMonth } from "@/shared/lib";
+import { COLOR } from "@/shared/config";
 import { useMyActivityQuery, type ActivityTrait } from "../model/use-my-activity";
 import { RecentList } from "./recent-list";
 
@@ -19,18 +20,13 @@ const CLUB_TONES: [needle: string, gradient: string][] = [
   ["리버풀", "linear-gradient(135deg, #7a0c1e 0%, #c8102e 100%)"],
 ];
 
-const NEUTRAL_TONE = "linear-gradient(135deg, #4a4a4a 0%, #171717 100%)";
+// #4a4a4a는 톤 시작점 one-off, 끝점은 ink 토큰(COLOR.ink 단일 소스)
+const NEUTRAL_TONE = `linear-gradient(135deg, #4a4a4a 0%, ${COLOR.ink} 100%)`;
 
 function avatarGradient(fanTeam: string | null): string {
   if (!fanTeam) return NEUTRAL_TONE;
   const matched = CLUB_TONES.find(([needle]) => fanTeam.includes(needle));
   return matched ? matched[1] : NEUTRAL_TONE;
-}
-
-/** 가입일 "2024.03" 표기 (ISO 문자열 → 로컬 연/월) */
-function formatJoined(iso: string): string {
-  const date = new Date(iso);
-  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -137,7 +133,7 @@ export function ActivityView() {
               )}
               <Pill variant="outline" className="font-mono tnum">
                 <span>
-                  <time dateTime={profile.joinedAt}>{formatJoined(profile.joinedAt)}</time> 가입
+                  <time dateTime={profile.joinedAt}>{formatYearMonth(profile.joinedAt)}</time> 가입
                 </span>
               </Pill>
             </div>
