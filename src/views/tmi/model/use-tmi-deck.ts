@@ -85,7 +85,7 @@ export function useTmiDeck() {
         });
       },
       onError: (e) => {
-        // 마감/변경 제한 등 — 카드는 이탈시키지 않고 인라인으로 안내
+        // 마감/표 확정 등 — 카드는 이탈시키지 않고 인라인으로 안내
         setFlow("idle");
         setInlineError(e instanceof Error ? e.message : "판정을 저장하지 못했어요.");
       },

@@ -14,13 +14,12 @@ const RPC_ERROR_MAP: [needle: string, status: number, message: string][] = [
   ["POLL_NOT_FOUND", 404, "투표를 찾을 수 없어요."],
   ["INVALID_OPTION", 400, "올바르지 않은 선택지예요."],
   ["POLL_CLOSED", 409, "마감된 투표예요."],
-  ["CHANGE_LIMIT", 409, "투표 변경은 한 번만 가능해요."],
-  ["CHANGE_WINDOW_OVER", 409, "투표 후 24시간이 지나 변경할 수 없어요."],
+  ["VOTE_LOCKED", 409, "이미 던진 표는 바꿀 수 없어요."],
 ];
 
 /**
  * POST /api/polls/[id]/votes — 투표하기 (body: { optionId })
- * 쓰기 정책(중복 방지·마감·kit 재탭 취소·24h 내 1회 변경)은 cast_vote RPC가 원자 처리.
+ * 쓰기 정책(중복 방지·마감·표 확정)은 cast_vote RPC가 원자 처리.
  */
 export async function POST(
   request: NextRequest,

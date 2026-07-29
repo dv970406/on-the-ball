@@ -104,8 +104,8 @@ export interface PollComment {
   createdAt: string;
 }
 
-/** cast_vote RPC 결과 — cancelled는 유니폼(kit) 재탭 취소 */
+/** cast_vote RPC 결과 — unchanged는 같은 선택지 재요청(멱등 처리) */
 export interface CastVoteResult {
-  status: "voted" | "cancelled" | "unchanged";
+  status: "voted" | "unchanged";
   optionId: number | null;
 }

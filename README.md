@@ -148,7 +148,7 @@ pnpm lint:fix     # ESLint 자동 수정
 
 **무결성 장치**
 
-- 쓰기는 `cast_vote` / `submit_quiz_attempt` **RPC(SECURITY DEFINER)** 로만 — 중복 방지(동시 요청 직렬화), 마감 검증, "24시간 안에 1회 변경" 정책, 스트릭 증감(**하루 1회만 반영**), 뱃지 지급을 원자 처리. 런타임에 service role 불필요
+- 쓰기는 `cast_vote` / `submit_quiz_attempt` **RPC(SECURITY DEFINER)** 로만 — 중복 방지(동시 요청 직렬화), 마감 검증, "한 번 던진 표는 변경 불가" 정책, 스트릭 증감(**하루 1회만 반영**), 뱃지 지급을 원자 처리. 런타임에 service role 불필요
 - 퀴즈 정답·해설·보기별 픽 수는 컬럼 권한·뷰 게이트로 차단, **시도한 사용자에게만** 공개 (공개 정답률과 픽 분포를 조합한 정답 역산까지 차단)
 - `profiles`는 공개 컬럼(닉네임·팬 태그)과 사용자 편집 컬럼만 열려 있고, 스트릭·성향은 RPC 전용 — 본인 전체 행은 `my_profile` 뷰로 조회
 - 모든 API 응답에 `Cache-Control: private, no-store` (개인화 응답의 공유 캐시 유출 방지)
@@ -163,7 +163,7 @@ pnpm lint:fix     # ESLint 자동 수정
 |---|---|
 | `GET /api/home` | 홈 피드 집계 (히어로·캐러셀·오늘의 퀴즈·진행 중 투표·트렌딩) |
 | `GET /api/polls?type=` · `GET /api/polls/[id]` | 투표 리스트/디테일 (+내 투표, 인구통계, 댓글 수) |
-| `POST /api/polls/[id]/votes` | 투표 (kit은 재탭 취소, 24h 1회 변경) |
+| `POST /api/polls/[id]/votes` | 투표 (첫 표만 기록, 이후 변경·취소 불가) |
 | `GET·POST /api/polls/[id]/comments` · `POST /api/comments/[id]/likes` | 댓글·동감 |
 | `GET /api/quizzes` · `GET /api/quizzes/[id]` · `POST /api/quizzes/[id]/attempts` | 퀴즈 목록/디테일/시도 |
 | `GET /api/me/profile` · `GET /api/me/activity` | 내 프로필(스트릭) / 활동 집계 |

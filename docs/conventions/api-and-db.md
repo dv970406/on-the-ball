@@ -9,7 +9,7 @@
 
 ## DB 정책 (Supabase)
 
-- 쓰기(투표·퀴즈 시도 등)는 **SECURITY DEFINER RPC**로만(`cast_vote`·`submit_quiz_attempt`). 중복 방지·마감 검증·24h 변경 정책·스트릭·뱃지를 원자 처리 → 런타임 service role 불필요.
+- 쓰기(투표·퀴즈 시도 등)는 **SECURITY DEFINER RPC**로만(`cast_vote`·`submit_quiz_attempt`). 중복 방지·마감 검증·표 확정(한 번 투표하면 변경·취소 불가)·스트릭·뱃지를 원자 처리 → 런타임 service role 불필요.
 - 민감 컬럼은 **컬럼 권한**으로 보호:
   - 퀴즈 정답/해설(`is_correct`·`answer_text`·`seed_picks`)은 시도자에게만(뷰 게이트). `quizzes`/`quiz_choices`는 **`select *` 금지**(컬럼 명시).
   - `profiles`는 공개 컬럼(닉네임·팬 태그)만 읽기 / 편집 허용 컬럼만 update. 스트릭 등은 RPC 전용. 본인 전체 행은 **`my_profile` 뷰**로 조회(`select *` 금지).

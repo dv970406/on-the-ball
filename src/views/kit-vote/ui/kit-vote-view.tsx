@@ -56,13 +56,13 @@ function KitVoteBody({ poll }: { poll: PollDetail }) {
 
   // 마감이면 투표 불가 — 결과만 공개
   const closed = isClosed(poll.closesAt);
+  // 투표 여부의 단일 소스 — 결과 게이팅과 카드 비활성 판정이 갈리지 않게 한 번만 계산
+  const voted = poll.myVote !== null;
   // 결과 게이팅 — 투표(또는 마감) 후에만 수치 공개
-  const revealed = poll.myVote !== null || closed;
+  const revealed = voted || closed;
 
   const kits = [...poll.options].sort((a, b) => a.position - b.position);
-  const myKit = poll.myVote
-    ? (poll.options.find((option) => option.id === poll.myVote) ?? null)
-    : null;
+  const myKit = poll.options.find((option) => option.id === poll.myVote) ?? null;
 
   return (
     <div>
@@ -92,10 +92,12 @@ function KitVoteBody({ poll }: { poll: PollDetail }) {
         </header>
 
         {castVote.isError && (
-          <p className="mt-2 text-[11px] text-crimson">{castVote.error.message}</p>
+          <p role="alert" className="mt-2 text-[11px] text-crimson">
+            {castVote.error.message}
+          </p>
         )}
 
-        {/* 2열 유니폼 카드 그리드 — 탭 = 투표, 재탭 = 취소(서버가 cancelled 처리) */}
+        {/* 2열 유니폼 카드 그리드 — 탭 = 투표. 한 번 던지면 확정이라 이후 전부 비활성 */}
         <ul className="mt-[18px] grid grid-cols-2 gap-3">
           {kits.map((kit) => (
             <li key={kit.id}>
@@ -103,20 +105,20 @@ function KitVoteBody({ poll }: { poll: PollDetail }) {
                 option={kit}
                 isMine={poll.myVote === kit.id}
                 revealed={revealed}
-                disabled={closed || castVote.isPending}
+                disabled={closed || voted || castVote.isPending}
                 onVote={() => castVote.mutate(kit.id)}
               />
             </li>
           ))}
         </ul>
 
-        {/* 투표 확인 스트립 — 재탭 취소 안내 */}
-        {myKit && !closed && (
+        {/* 투표 확인 스트립 — 마감 후에도 내 표는 계속 보여준다(랭킹·밸런스와 동일) */}
+        {myKit && (
           <div className="mt-5 flex animate-fade-up items-center gap-2.5 rounded-lg border border-hairline-cool bg-canvas-soft p-3.5">
             <Icon as={CheckCircle2} size={16} className="shrink-0 text-primary-deep" aria-hidden />
             <p className="flex-1 text-xs text-ink">
               {myKit.label}에 한 표 던졌어요.{" "}
-              <span className="text-ink-mute">마음 바뀌면 다시 탭해서 취소.</span>
+              {!closed && <span className="text-ink-mute">던진 표는 바꿀 수 없어요.</span>}
             </p>
           </div>
         )}
@@ -144,7 +146,7 @@ function KitCard({ option, isMine, revealed, disabled, onVote }: KitCardProps) {
       disabled={disabled}
       onClick={onVote}
       aria-pressed={isMine}
-      aria-label={isMine ? `${option.label} 투표 취소` : `${option.label}에 투표`}
+      aria-label={isMine ? `${option.label} — 내가 던진 표` : `${option.label}에 투표`}
       className={cn(
         "flex h-full w-full flex-col gap-2 rounded-lg border bg-canvas p-3 text-left transition-[border-color,box-shadow] duration-150 ease-otb",
         isMine

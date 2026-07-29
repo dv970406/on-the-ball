@@ -92,7 +92,7 @@ export function HeroSection({ poll }: { poll: PollListItem }) {
       </div>
 
       <p className="mt-2 text-center text-[11px] text-ink-mute-2">
-        한 번 투표하면 24시간 안에 한 번만 바꿀 수 있어요.
+        한 번 던진 표는 바꿀 수 없어요. 신중하게!
       </p>
     </section>
   );
