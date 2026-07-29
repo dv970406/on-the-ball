@@ -57,7 +57,7 @@ export function BalanceVoteView({ poll, a, b, picked, onPick, voteError }: Balan
       <SplitCard a={a} b={b} aspect="3/4" showLatin animateVs picked={picked} onPick={onPick} />
 
       <p className="mt-3 text-center text-[12px] text-ink-mute-2">
-        한쪽 카드를 탭하면 즉시 한 표 반영돼요.
+        한쪽 카드를 탭하면 즉시 한 표 반영돼요. 던진 표는 바꿀 수 없어요.
       </p>
 
       {/* 투표 실패 인라인 메시지 */}

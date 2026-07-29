@@ -169,7 +169,9 @@ function RankingDetailBody({ poll }: { poll: PollDetail }) {
       {!revealed && (
         <div className="absolute inset-x-3 bottom-[max(18px,env(safe-area-inset-bottom))] z-50 rounded-xl border border-hairline bg-canvas p-2.5 shadow-[0_8px_20px_rgba(0,0,0,0.06)]">
           {castVote.isError && (
-            <p className="mb-1.5 px-1 text-[11px] text-crimson">{castVote.error.message}</p>
+            <p role="alert" className="mb-1.5 px-1 text-[11px] text-crimson">
+              {castVote.error.message}
+            </p>
           )}
           <Button
             variant="dark"
@@ -182,6 +184,9 @@ function RankingDetailBody({ poll }: { poll: PollDetail }) {
           >
             {pickedOption ? `${pickedOption.label}에 한 표` : "한 명을 골라주세요"}
           </Button>
+          <p className="mt-1.5 text-center text-[11px] text-ink-mute-2">
+            던진 표는 바꿀 수 없어요.
+          </p>
         </div>
       )}
     </div>
