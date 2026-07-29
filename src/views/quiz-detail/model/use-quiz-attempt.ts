@@ -67,7 +67,7 @@ export function useQuizAttempt(id: string) {
         setSubmitError(e instanceof Error ? e.message : "정답 제출에 실패했어요.");
         // 이미 도전한 문제(다른 탭 제출 등)면 재조회로 done 상태 동기화
         if (e instanceof ApiError && e.status === 409) {
-          void queryClient.invalidateQueries({ queryKey: quizQueryKeys.detail(id) });
+          queryClient.invalidateQueries({ queryKey: quizQueryKeys.detail(id) });
         }
       },
     });

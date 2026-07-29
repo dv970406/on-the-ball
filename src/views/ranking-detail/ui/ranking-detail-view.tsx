@@ -38,7 +38,7 @@ export function RankingDetailView({ pollId }: RankingDetailViewProps) {
           error instanceof ApiError ? error.message : "랭킹 투표를 찾을 수 없어요."
         }
         retryVariant="secondary"
-        onRetry={error ? () => void refetch() : undefined}
+        onRetry={error ? () => refetch() : undefined}
       />
     </div>
   );

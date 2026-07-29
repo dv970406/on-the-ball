@@ -44,7 +44,7 @@ export function useToggleCommentLike(pollId: string) {
     },
     onSettled: () => {
       // 서버 기준 값으로 동기화
-      void queryClient.invalidateQueries({ queryKey: commentsKey });
+      queryClient.invalidateQueries({ queryKey: commentsKey });
     },
   });
 }

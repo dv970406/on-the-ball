@@ -43,8 +43,8 @@ export function useTogglePollLike(slug: string) {
     },
     onSettled: () => {
       // 서버 기준 값으로 동기화 — 디테일 + 리스트(카드 좋아요 수)
-      void queryClient.invalidateQueries({ queryKey: detailKey });
-      void queryClient.invalidateQueries({ queryKey: pollQueryKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: detailKey });
+      queryClient.invalidateQueries({ queryKey: pollQueryKeys.lists() });
     },
   });
 }

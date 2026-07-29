@@ -45,7 +45,7 @@ export function KitVoteView({ pollId }: KitVoteViewProps) {
           error instanceof ApiError ? error.message : "유니폼 투표를 찾을 수 없어요."
         }
         retryVariant="secondary"
-        onRetry={error ? () => void refetch() : undefined}
+        onRetry={error ? () => refetch() : undefined}
       />
     </div>
   );

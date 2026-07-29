@@ -21,8 +21,8 @@ export function useWriteComment(pollId: string) {
     },
     onSuccess: () => {
       // 댓글 목록 + 디테일(commentCount) 갱신
-      void queryClient.invalidateQueries({ queryKey: pollQueryKeys.comments(pollId) });
-      void queryClient.invalidateQueries({ queryKey: pollQueryKeys.detail(pollId) });
+      queryClient.invalidateQueries({ queryKey: pollQueryKeys.comments(pollId) });
+      queryClient.invalidateQueries({ queryKey: pollQueryKeys.detail(pollId) });
     },
   });
 }
