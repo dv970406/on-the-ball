@@ -9,7 +9,7 @@
 - `app` — FSD app 레이어: `providers`(QueryClient·익명 세션), `fonts`, `styles/globals.css`
 - `views` — 화면 조립. ⚠ **`pages` 금지** (Next Pages Router로 오감지됨 → 반드시 `views`)
 - `widgets` — app-bar / bottom-nav / sub-header / tab-scroll-area
-- `features` — cast-vote / submit-quiz-attempt / write-comment / like-comment
+- `features` — cast-vote / submit-quiz-attempt / write-comment / like-comment / like-poll
 - `entities` — poll / quiz / user (도메인 타입·쿼리 훅·도메인 UI)
 - `shared` — ui / api / lib / config
 

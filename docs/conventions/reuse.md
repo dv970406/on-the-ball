@@ -8,6 +8,8 @@
 - `formatDday` — 마감일 → `"D-8"`/`"마감"` (순수 표시용)
 - `isClosed` — 마감 여부 boolean 판정 (표시 문자열 비교 금지, 이 함수로 판정)
 - `todayUtc` — 오늘 날짜 `"YYYY-MM-DD"`(UTC, Postgres `current_date`와 정합)
+- `formatYearMonth` — ISO 날짜 → `"2026.07"`(UTC 기준)
+- `formatRelativeTime` — 과거 시각 → `"방금 전"`/`"3분 전"`/`"2시간 전"`/`"5일 전"`, 7일↑은 `"7월 30일"`. ⚠ 내부에서 `Date.now()`·`new Date()`를 쓰므로 **서버 렌더에 넣지 말 것**(hydration 불일치). 클라 마운트 이후에만 렌더한다.
 
 ## `@/shared/lib` (배럴 — 클라이언트 훅 포함)
 - `cn` — Tailwind 클래스 병합
@@ -19,12 +21,13 @@
 - `groupOptionsByPoll` — poll_options를 poll_id로 그룹핑
 - `buildPollListItem` / `buildVotesByOption` — 리스트 아이템·득표 맵 조립
 
-## `@/entities/poll/lib` (meta 안전 파서)
+## meta 안전 파서 — `@/entities/poll` 배럴에서 import
 - `readSideMeta` / `pickSides`(밸런스), `readKitMeta`, `readRankingMeta`, `readTmiOptionMeta`, `readTmiPollMeta`
+- 소스는 `src/entities/poll/lib/`(`balance-side.ts`·`option-meta.ts`)에 있지만 **`lib` 배럴은 없다**. 슬라이스 루트 `@/entities/poll`로만 소비한다(`@/entities/poll/lib` 경로 import 금지). 위 `mappers`(서버 전용 deep 경로)와 달리 이 파서들은 클라 UI에서 쓰이므로 배럴 경유가 맞다.
 
 ## `@/shared/config`
 - `ROUTES` — 경로 헬퍼. **경로 문자열 하드코딩 금지**(`"/balance"` ❌ → `ROUTES.balanceList`).
 - `COLOR` — JS 인라인 style용 색 상수. **토큰 hex 하드코딩 금지**.
 
 ## `@/shared/ui`
-- 공용 컴포넌트: `Button`·`Pill`·`Icon`·`Flag`·`Shirt`·`Avatar`·`RatioBar`·`Skeleton`·`EmptyState`·`SectionHead`·`LiveDot`·`Wordmark`·`PlayerSilhouette` — 새로 만들기 전 여기 확인.
+- 공용 컴포넌트: `Button`·`Pill`·`Icon`·`Flag`·`Shirt`·`Avatar`·`RatioBar`·`Skeleton`·`EmptyState`·`SectionHead`·`TabHeader`·`LiveDot`·`LiveStatusPill`·`NightCard`·`Wordmark`·`PlayerSilhouette` — 새로 만들기 전 여기 확인.
