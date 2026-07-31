@@ -31,7 +31,7 @@ shared ← entities ← features ← widgets ← views
 - 소비는 **슬라이스 루트**에서: `import { ROUTES } from "@/shared/config"`.
 - **deep import 금지**: `@/shared/config/palette` ❌ → `@/shared/config` ✅.
 - 이점: 캡슐화 / 파일 이동에 강함(배럴만 수정) / 단방향 의존 감시 용이.
-- Vercel `react-best-practices`의 `bundle-barrel-imports`는 **서드파티 라이브러리 배럴**(lucide-react·@mui 등, 최대 수천 개 재export) 대상이다. 내부 슬라이스 배럴은 위 deep-import 금지 규칙을 유지하고, 서드파티는 next.config `optimizePackageImports`로 최적화한다.
+- Vercel `react-best-practices`의 `bundle-barrel-imports`는 **서드파티 라이브러리 배럴**(lucide-react·@mui 등, 최대 수천 개 재export) 대상이다. 내부 슬라이스 배럴은 위 deep-import 금지 규칙을 유지한다. 서드파티는 Next의 `optimizePackageImports` **기본 목록이 이미 커버**한다(`lucide-react` 포함 — `next/dist/server/config.js`의 기본값). next.config에 따로 적지 않는다.
 
 ## 서버/클라이언트 경계 (배럴이 담당)
 
@@ -51,9 +51,24 @@ shared ← entities ← features ← widgets ← views
 
 즉 계약 타입 파일은 위 "Route Handler" 규칙과 동일한 서버 안전 제약을 따른다.
 
+### 서버 조립 모듈 seam — Route Handler와 서버 컴포넌트가 같은 조립 로직을 공유할 때
+
+화면을 서버에서 프리페치하면 **같은 응답을 만드는 코드가 Route Handler와 page.tsx 두 곳에서 필요**해진다. 이때 로직을 복붙하지 않고 `views/*/api/*.ts`에 서버 안전 모듈로 두고 양쪽이 deep 경로로 소비한다.
+
+- 선례: `@/views/home/api/build-home-feed` — `app/api/home/route.ts`와 `app/(tabs)/page.tsx`가 함께 쓴다.
+- 이 파일은 **`"use client"` 금지**이며, 위 Route Handler 규칙대로 하위 레이어를 서버 안전 경로로만 참조한다.
+- **슬라이스 배럴(`@/views/home`)에 싣지 않는다** — 배럴은 클라 UI를 포함하므로 라우트로 클라 코드가 샌다.
+- 계약 타입(`import type`)만 허용하는 위 규칙의 예외다. 판단 기준은 "런타임 값이냐"가 아니라 **"서버 안전하냐"** 이다.
+
+### `"use client"` 모듈의 값은 서버에서 호출할 수 없다
+
+`"use client"` 파일의 export는 서버에서 값이 아니라 **클라이언트 참조**가 된다. 컴포넌트로 렌더하는 건 되지만 **함수로 호출하면 런타임 에러**다(`Attempted to call X() from the server`). 서버 컴포넌트(`not-found.tsx` 등)에서도 필요한 순수 함수는 별도 파일로 뺀다.
+
+- 선례: `shared/ui/button-class.ts`(순수 `buttonClassName`) ↔ `shared/ui/button.tsx`(`"use client"` `Button`). 배럴은 각각의 소스에서 재export하므로 소비 경로(`@/shared/ui`)는 그대로다.
+
 ## 파일·네이밍
 
 - 파일명은 **kebab-case** (`split-card.tsx`, `use-cast-vote.ts`, `option-meta.ts`).
-- 컴포넌트·함수는 **named export** (page/layout의 default export는 Next 요구사항이라 예외).
+- 컴포넌트·함수는 **named export** (`page`·`layout`·`template`·`error`·`global-error`·`not-found`의 default export는 Next 요구사항이라 예외).
 - 주석·문서는 **한국어**, 변수·함수명은 영어.
 - 슬라이스 내부 구조: `ui/`(프레젠테이션) · `model/`(상태·타입·훅) · `api/`(쿼리·매퍼) · `lib/`(순수 유틸) + `index.ts`.
