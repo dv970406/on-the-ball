@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { unstable_rethrow } from "next/navigation";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "./supabase-server";
 
@@ -39,16 +40,21 @@ interface HandlerContext {
 export async function withSupabase(
   run: (ctx: HandlerContext) => Promise<NextResponse>,
 ): Promise<NextResponse> {
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) return supabaseNotConfigured();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  // 클라이언트 생성·세션 조회까지 try 안에 둔다 — Supabase auth 장애로 여기서 throw하면
+  // { error } 규격 대신 Next 기본 500 HTML이 나가 apiFetch가 메시지를 잃는다.
   try {
+    const supabase = await createSupabaseServerClient();
+    if (!supabase) return supabaseNotConfigured();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     return await run({ supabase, user });
   } catch (e) {
+    // cookies()의 동적 렌더 전환·notFound()·redirect()는 Next가 제어 흐름으로 쓰는 내부 에러다.
+    // 삼키면 라우트가 정적으로 굳거나 리다이렉트가 500으로 바뀌므로 그대로 되던진다.
+    unstable_rethrow(e);
     console.error("[api] 처리 중 오류:", e);
     return fail(500, "서버 처리 중 오류가 발생했어요.");
   }
