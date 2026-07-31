@@ -1,126 +1,16 @@
 import { fail, ok, withSupabase } from "@/shared/api/handler";
-import {
-  POLL_SELECT,
-  assemblePollListItems,
-  type PollRow,
-} from "@/entities/poll/api/mappers";
-import {
-  LINEUP_SELECT,
-  QUIZ_SELECT,
-  QUIZ_STATS_SELECT,
-  type LineupRow,
-  type QuizRow,
-  type QuizStatsRow,
-} from "@/entities/quiz/api/mappers";
-import { readLineupRows } from "@/entities/quiz/lib/lineup-meta";
-import type { HomeFeed, HomeTrendingItem } from "@/views/home/model/types";
-import { todayUtc } from "@/shared/lib/format";
-
-/** trending_items 테이블 행 — 연결 poll의 slug를 임베드해 공개 식별자로 사용 */
-interface TrendingRow {
-  position: number;
-  title: string;
-  vote_count: number;
-  delta: "up" | "down" | "new";
-  polls: { slug: string } | { slug: string }[] | null;
-}
-
-/** PostgREST to-one 임베드가 객체/배열 어느 쪽으로 와도 첫 행만 취한다 */
-function oneSlug(rel: { slug: string } | { slug: string }[] | null): string | null {
-  if (rel == null) return null;
-  const row = Array.isArray(rel) ? (rel[0] ?? null) : rel;
-  return row?.slug ?? null;
-}
-
-const HOME_FETCH_ERROR = "홈 피드를 불러오지 못했어요.";
+import { buildHomeFeed } from "@/views/home/api/build-home-feed";
+import type { HomeFeed } from "@/views/home/model/types";
 
 /**
  * GET /api/home — 홈 피드 조합
- *  - hero: featured=true 밸런스 폴 / quickPicks: 나머지 밸런스 폴 (position asc)
- *  - todayQuiz: opens_on = 오늘인 퀴즈 + 라인업 국기 프리뷰 + 집계
- *  - ongoing: ranking → kit 순 진행 중 투표
- *  - trending: trending_items 시드 (position asc)
+ * 조립 로직은 buildHomeFeed가 담당한다(홈 페이지의 서버 프리페치와 공유하는 서버 안전 모듈).
  */
 export async function GET() {
   return withSupabase(async ({ supabase, user }) => {
-    // 1) 컨테이너 병렬 조회 — 홈에 오르는 폴 3종 + 오늘의 퀴즈 + 트렌딩
-    const [pollsRes, quizRes, trendingRes] = await Promise.all([
-      supabase
-        .from("polls")
-        .select(POLL_SELECT)
-        .in("type", ["balance", "ranking", "kit"])
-        .order("position", { ascending: true }),
-      // quizzes는 answer_text 컬럼 권한이 없어 select 컬럼 명시 필수
-      supabase
-        .from("quizzes")
-        .select(QUIZ_SELECT)
-        .eq("opens_on", todayUtc())
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("trending_items")
-        .select("position, title, vote_count, delta, polls(slug)")
-        .order("position", { ascending: true }),
-    ]);
-    if (pollsRes.error || quizRes.error || trendingRes.error) {
-      return fail(500, HOME_FETCH_ERROR);
-    }
+    const feed = await buildHomeFeed(supabase, user?.id ?? null);
+    if (!feed) return fail(500, "홈 피드를 불러오지 못했어요.");
 
-    const polls = (pollsRes.data ?? []) as PollRow[];
-    const quiz = (quizRes.data ?? null) as QuizRow | null;
-    const trendingRows = (trendingRes.data ?? []) as TrendingRow[];
-    // 2) 리스트아이템 조립(공용 헬퍼) + 퀴즈 통계·라인업 병렬 조회 (동시성 유지)
-    const [items, statsRes, lineupRes] = await Promise.all([
-      assemblePollListItems(supabase, polls, user?.id ?? null),
-      quiz
-        ? supabase
-            .from("quiz_stats")
-            .select(QUIZ_STATS_SELECT)
-            .eq("quiz_id", quiz.id)
-            .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-      quiz?.lineup_id
-        ? supabase
-            .from("lineups")
-            .select(LINEUP_SELECT)
-            .eq("id", quiz.lineup_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-    ]);
-    if (!items || statsRes.error || lineupRes.error) {
-      return fail(500, HOME_FETCH_ERROR);
-    }
-
-    // 3) 섹션 분배 — hero는 featured 밸런스 1건, ongoing은 ranking → kit 순
-    const balances = items.filter((item) => item.type === "balance");
-    const hero = balances.find((item) => item.featured) ?? null;
-    const quickPicks = balances.filter((item) => item !== hero);
-    const ongoing = [
-      ...items.filter((item) => item.type === "ranking"),
-      ...items.filter((item) => item.type === "kit"),
-    ];
-
-    const stats = (statsRes.data ?? null) as QuizStatsRow | null;
-    const lineup = (lineupRes.data ?? null) as LineupRow | null;
-    const todayQuiz: HomeFeed["todayQuiz"] = quiz
-      ? {
-          id: quiz.slug,
-          title: quiz.title,
-          attempts: stats?.attempts ?? 0,
-          accuracyPct: stats?.accuracy_pct ?? 0,
-          lineupRows: readLineupRows(lineup?.rows),
-        }
-      : null;
-
-    const trending: HomeTrendingItem[] = trendingRows.map((row) => ({
-      position: row.position,
-      title: row.title,
-      voteCount: row.vote_count,
-      delta: row.delta,
-      pollId: oneSlug(row.polls),
-    }));
-
-    return ok<HomeFeed>({ hero, quickPicks, todayQuiz, ongoing, trending });
+    return ok<HomeFeed>(feed);
   });
 }

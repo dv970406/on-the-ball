@@ -11,13 +11,19 @@ import type { HomeFeed } from "./types";
  */
 export const homeFeedQueryKey = [...pollQueryKeys.lists(), "home"] as const;
 
-/** 홈 피드 조회 — myVote가 첫 로드에도 반영되도록 익명 세션을 먼저 보장한다 */
-export function useHomeQuery() {
+/**
+ * 홈 피드 조회 — myVote가 첫 로드에도 반영되도록 익명 세션을 먼저 보장한다.
+ *
+ * initialData: 홈 페이지가 서버에서 미리 조립해 넘긴 피드(스켈레톤 없이 첫 화면을 그린다).
+ * 프리페치가 실패하면 undefined가 들어와 기존과 똑같이 클라이언트 조회로 동작한다.
+ */
+export function useHomeQuery(initialData?: HomeFeed) {
   return useQuery({
     queryKey: homeFeedQueryKey,
     queryFn: async () => {
       await ensureAnonymousSession();
       return apiFetch<HomeFeed>("/api/home");
     },
+    initialData,
   });
 }

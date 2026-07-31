@@ -22,9 +22,12 @@ function buildPollTypeMap(feed: HomeFeed): Map<string, PollType> {
   return map;
 }
 
-/** 홈 화면 — 히어로/캐러셀/퀴즈 배너/진행 중 투표/트렌딩/TMI 프로모 조립 피드 */
-export function HomeView() {
-  const { data, isPending, isError, error } = useHomeQuery();
+/**
+ * 홈 화면 — 히어로/캐러셀/퀴즈 배너/진행 중 투표/트렌딩/TMI 프로모 조립 피드.
+ * initialFeed는 서버 프리페치 결과(없으면 클라이언트 조회로 스켈레톤부터 시작).
+ */
+export function HomeView({ initialFeed }: { initialFeed?: HomeFeed }) {
+  const { data, isPending, isError, error } = useHomeQuery(initialFeed);
 
   return (
     <>
