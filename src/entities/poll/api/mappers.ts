@@ -235,9 +235,12 @@ export function buildPollListItem(
 
 /**
  * polls 목록 → PollListItem[] 조립 오케스트레이션 (home/list/detail 라우트 공용).
- * 선택지·득표·좋아요 병렬조회 → 내 투표·좋아요 → poll_id 기준 조합.
+ * 선택지·득표·좋아요·내 투표·내 좋아요를 **한 번에** 병렬 조회 → poll_id 기준 조합.
+ * (다섯 조회 모두 pollIds만 있으면 되므로 서로를 기다릴 이유가 없다 — 왕복 1회 절약)
  * 조회 에러는 null 반환(라우트별 fail 메시지가 달라 호출부가 결정).
- * fetchMy* 실패는 throw → withSupabase가 500 처리(기존 동작 유지).
+ * ⚠ 병합의 대가: fetchMy*가 reject하면 Promise.all이 먼저 터져 에러 체크 줄에 닿지 못하고
+ *   throw → withSupabase의 일괄 500이 된다. 앞의 3개 조회도 함께 실패한 경우에 한해
+ *   메시지가 라우트별 문구에서 "서버 처리 중 오류가 발생했어요."로 바뀐다(상태 코드는 동일 500).
  */
 export async function assemblePollListItems(
   supabase: SupabaseClient,
@@ -247,24 +250,22 @@ export async function assemblePollListItems(
   if (polls.length === 0) return [];
   const pollIds = polls.map((p) => p.id);
 
-  const [optionsRes, resultsRes, likesRes] = await Promise.all([
-    supabase
-      .from("poll_options")
-      .select(POLL_OPTION_SELECT)
-      .in("poll_id", pollIds)
-      .order("position", { ascending: true }),
-    supabase
-      .from("poll_results")
-      .select("poll_id, option_id, votes")
-      .in("poll_id", pollIds),
-    supabase.from("poll_like_stats").select("poll_id, likes").in("poll_id", pollIds),
-  ]);
+  const [optionsRes, resultsRes, likesRes, myVoteByPoll, myLikedPolls] =
+    await Promise.all([
+      supabase
+        .from("poll_options")
+        .select(POLL_OPTION_SELECT)
+        .in("poll_id", pollIds)
+        .order("position", { ascending: true }),
+      supabase
+        .from("poll_results")
+        .select("poll_id, option_id, votes")
+        .in("poll_id", pollIds),
+      supabase.from("poll_like_stats").select("poll_id, likes").in("poll_id", pollIds),
+      fetchMyVotesByPoll(supabase, userId, pollIds),
+      fetchMyLikesByPoll(supabase, userId, pollIds),
+    ]);
   if (optionsRes.error || resultsRes.error || likesRes.error) return null;
-
-  const [myVoteByPoll, myLikedPolls] = await Promise.all([
-    fetchMyVotesByPoll(supabase, userId, pollIds),
-    fetchMyLikesByPoll(supabase, userId, pollIds),
-  ]);
 
   const optionsByPoll = groupOptionsByPoll(
     (optionsRes.data ?? []) as PollOptionRow[],
