@@ -135,6 +135,9 @@ unique (poll_id, user_id)         -- 1인 1표
 
 #### `cast_vote(p_poll_id, p_option_id) → jsonb`
 **최종 정책(0003) = "한 번 던진 표는 바꿀 수 없다"**
+
+> ⚠ 이 최종 정책은 **로컬에만 적용돼 있었다.** 원격에는 0001·0002만 push되어, 원격 `cast_vote`는 끝까지 아래 "폐기된 0001 정책"(24h 내 1회 변경 + kit 재탭 취소) 버전으로 남아 있었다.
+
 ```
 표 없음      → insert 후 { status: 'voted' }
 같은 선택지  → { status: 'unchanged' }  (더블탭·네트워크 재시도 멱등)
@@ -275,6 +278,7 @@ src/
 
 - 로컬 Supabase 스택은 포트 충돌 회피로 **643xx** 포트 사용 (`supabase/config.toml`).
 - `.env.local`에 로컬 스택 값이 채워져 있음. env가 비어도 빌드는 성공하고 API가 503 안내를 반환.
-- **마이그레이션 0001·0002·0003은 원격에도 적용 완료** — 원격 청산 시 별도 드롭 마이그레이션이 필요하다.
+- **원격 청산 완료 (2026-08-01)** — 프로젝트 `umcsedjsuwthuxaqwtpz`의 public 테이블·뷰·함수, `auth.users`의 `on_auth_user_created` 트리거, `supabase_migrations.schema_migrations` 이력을 모두 제거했다. 청산 시점 원격의 실사용 데이터는 0건이었다(auth.users·profiles·votes·quiz_attempts 모두 0 — 남아 있던 건 시드뿐).
+- 청산 중 확인된 사실: **원격에는 0001·0002만 적용돼 있었고 0003은 push된 적이 없다.** 로컬과 원격의 투표 정책이 서로 달랐던 것 — 앞으로는 스키마 변경 후 `db push` 여부를 이력으로 확인할 것.
 - 원격 연결 절차: 대시보드에서 **Allow anonymous sign-ins ON** → `supabase link --project-ref` → `supabase db push`.
 - 스택: Next 16.2 / React 19.2 / TS 5 strict / Tailwind v4 / TanStack Query v5 / Supabase(@supabase/ssr) / zod 4 / lucide-react.
