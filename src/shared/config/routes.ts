@@ -1,12 +1,7 @@
-/** 앱 라우트 경로 헬퍼 — 문자열 하드코딩 대신 이 객체를 사용 */
+/**
+ * 앱 라우트 경로 헬퍼 — 문자열 하드코딩 대신 이 객체를 사용.
+ * v1 화면(밸런스·퀴즈·랭킹·유니폼·TMI·내활동)은 청산됨 — 새 화면이 정해지면 여기에 추가한다.
+ */
 export const ROUTES = {
   home: "/",
-  balanceList: "/balance",
-  balanceDetail: (id: string) => `/balance/${id}`,
-  quizList: "/quiz",
-  quizDetail: (id: string) => `/quiz/${id}`,
-  rankingDetail: (id: string) => `/ranking/${id}`,
-  kitDetail: (id: string) => `/kit/${id}`,
-  tmi: "/tmi",
-  me: "/me",
 } as const;
