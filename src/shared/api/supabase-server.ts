@@ -2,18 +2,21 @@ import { createServerClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { env, isSupabaseConfigured } from "@/shared/config";
+import type { Database } from "@/types/database.types";
 
 /**
- * Route Handler용 Supabase 서버 클라이언트.
- * 요청 쿠키의 익명 세션으로 동작하므로 RLS가 그대로 적용된다 (service role 불필요).
- * env 미설정이면 null을 반환한다 — 호출부(handler 헬퍼)에서 503 처리.
+ * 서버(generateMetadata·서버 컴포넌트)용 Supabase 클라이언트.
+ * 요청 쿠키의 세션으로 동작하므로 RLS가 그대로 적용된다 (service role 불필요).
+ * env 미설정이면 null을 반환한다 — 호출부에서 가드.
+ *
+ * ⚠ next/headers 의존이라 @/shared/api 배럴에 싣지 않는다. 직접 경로로 import한다.
  */
-export async function createSupabaseServerClient(): Promise<SupabaseClient | null> {
+export async function createSupabaseServerClient(): Promise<SupabaseClient<Database> | null> {
   if (!isSupabaseConfigured()) return null;
 
   const cookieStore = await cookies();
 
-  return createServerClient(env.supabaseUrl, env.supabaseAnonKey, {
+  return createServerClient<Database>(env.supabaseUrl, env.supabaseAnonKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
