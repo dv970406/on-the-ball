@@ -1,6 +1,6 @@
 # ⚽ 온더볼 (On the Ball)
 
-> 해외축구를 다루는 **모바일 전용** 커뮤니티 앱 — **재설계 진행 중**
+> 글을 쓰고 이야기를 나누는 **모바일 전용** 커뮤니티 게시판
 
 ![Next.js](https://img.shields.io/badge/Next.js-16.2-black?logo=next.js)
 ![React](https://img.shields.io/badge/React-19-149eca?logo=react)
@@ -11,27 +11,30 @@
 
 ---
 
-## 🚧 현재 상태 (2026-08-01)
-
-v1은 밸런스·랭킹·유니폼·TMI·퀴즈 5종 콘텐츠를 한 번에 담았지만, **집중할 축이 불분명해 DB 테이블·정책부터 새로 설계하기로 하고 전면 청산**했습니다.
-
-- **기능 코드 삭제**: `app/(tabs)`·`app/(detail)`·`app/api`, `src/views`·`features`·`entities`, `widgets/app-bar`·`bottom-nav`
-- **DB 청산**: 마이그레이션 3개 삭제 + **로컬·원격 모두** 비움 → 테이블·뷰·함수·마이그레이션 이력 0
-- **v1 전체 기록**: [`docs/legacy/v1-inventory.md`](docs/legacy/v1-inventory.md) — 화면 9개 · 테이블 13개 · 집계 뷰 6개 · RPC 2개 · API 11개, 설계 판단과 폐기 사유, 남은 부채까지
-- **코드 실물**: 커밋 `5d02657` 이전 이력에 남아 있어 언제든 참조·복구 가능
-
-> 원격 청산 시점의 실사용 데이터는 0건이었습니다(익명 가입·투표·퀴즈 도전 모두 없음 — 남아 있던 건 시드뿐).
-
-### 남아 있는 기반
+## ✨ 기능
 
 | 영역 | 내용 |
 |---|---|
-| 디자인 시스템 | `src/app/styles/globals.css`의 Tailwind v4 `@theme` 토큰, Pretendard 서브셋 92개 + JetBrains Mono |
-| 공용 UI | `src/shared/ui` 18종 (Button·Pill·Icon·Flag·Shirt·Avatar·RatioBar·Skeleton·EmptyState 등) |
-| 공용 로직 | `src/shared/lib`(포맷터·`cn`·`useDelayedReveal`·`useScrollRestore`), `src/shared/api`(Supabase 클라이언트·`withSupabase` 핸들러·익명 세션) |
-| 셸 | `src/widgets/sub-header`·`tab-scroll-area`, `app/layout.tsx`(430px 모바일 프레임), 에러 파일 3종, `proxy.ts` |
-| 문서 | `docs/conventions/` 7종 (일부는 삭제된 v1 코드를 선례로 인용 — 새 구조 확정 시 갱신 예정) |
-| 원본 디자인 | `design_handoff_ontheball/` 하이파이 프로토타입 |
+| 게시글 | 목록 · 상세 · 작성 · 수정 · 삭제(소프트). 본문은 **마크다운**(GFM) |
+| 댓글 | 작성 · 삭제. 글의 `comment_count`는 DB 트리거가 관리 |
+| 좋아요 | 토글(낙관적 업데이트). 동시성은 `SECURITY DEFINER` RPC의 행 잠금으로 직렬화 |
+| 인증 | 이메일 회원가입 · 로그인 · 로그아웃 · 비밀번호 재설정. 에러는 한국어로 매핑 |
+| 권한 | **3중 방어** — `proxy.ts` 서버 가드 → 클라이언트 가드 → **RLS + 컬럼 권한(최종)** |
+
+> 데이터 접근에 Route Handler를 두지 않고 **브라우저가 Supabase를 직접 호출**합니다.
+> 그래서 **RLS와 컬럼 권한이 유일한 방어선**이며, 마이그레이션이 곧 보안 설계입니다 —
+> 자세한 규칙은 [`docs/conventions/api-and-db.md`](docs/conventions/api-and-db.md).
+
+<details>
+<summary>v1(밸런스·랭킹·유니폼·TMI·퀴즈) 청산 기록</summary>
+
+집중할 축이 불분명해 DB 테이블·정책부터 새로 설계하기로 하고 전면 청산했습니다(2026-08-01).
+청산 시점의 실사용 데이터는 0건이었습니다. 화면 9개 · 테이블 13개 · RPC 2개 등 전체 스냅샷은
+[`docs/legacy/v1-inventory.md`](docs/legacy/v1-inventory.md)에, 코드 실물은 커밋 `5d02657` 이전 이력에 있습니다.
+
+`src/shared/ui`의 일부 컴포넌트와 `shared/lib`의 포맷터 몇 개는 그때의 자산으로 **의도적으로 보존**돼 있습니다
+(현재 미사용, 트리셰이킹되어 번들 비용 0). 현역/보존 구분은 [`docs/conventions/reuse.md`](docs/conventions/reuse.md).
+</details>
 
 ---
 
@@ -44,7 +47,9 @@ v1은 밸런스·랭킹·유니폼·TMI·퀴즈 5종 콘텐츠를 한 번에 담
 | UI | React 19 |
 | Styling | Tailwind CSS v4 (`@theme` 디자인 토큰) |
 | Data Fetching | TanStack Query v5 |
-| Backend / DB | Supabase (PostgreSQL, RLS, 익명 인증) |
+| Global State | zustand (세션) |
+| Backend / DB | Supabase (PostgreSQL, RLS, 이메일 인증) |
+| Markdown | react-markdown + remark-gfm |
 | Validation | Zod 4 |
 | Icons | lucide-react |
 | Architecture | FSD (Feature-Sliced Design) |
@@ -60,14 +65,18 @@ v1은 밸런스·랭킹·유니폼·TMI·퀴즈 5종 콘텐츠를 한 번에 담
 
 ```bash
 pnpm install
-supabase start      # 로컬 스택 기동
-supabase db reset   # 현재 마이그레이션 없음 → 빈 DB
+supabase start                          # 로컬 스택 기동 (643xx 포트)
+supabase db reset                       # 마이그레이션 6개 적용
+bash supabase/tests/seed-users.sh       # 테스트 계정 alice/bob (비번 test1234)
 pnpm dev
 ```
 
 [http://localhost:3000](http://localhost:3000) 에서 확인합니다.
 
-> **참고:** 로컬 Supabase 스택은 포트 충돌을 피하기 위해 표준(543xx)이 아닌 **643xx** 포트를 사용합니다 (`supabase/config.toml`).
+> 로컬 Supabase 스택은 포트 충돌을 피하려고 표준(543xx)이 아닌 **643xx**를 씁니다 (`supabase/config.toml`).
+> API 64321 / DB 64322 / Studio 64323 / **Mailpit 64324**(비밀번호 재설정 메일 확인).
+
+> ⚠ `supabase/config.toml`의 `[auth]` 값을 바꾸면 `db reset`이 아니라 **`supabase stop && supabase start`** 가 필요합니다.
 
 ---
 
@@ -84,26 +93,39 @@ pnpm dev
 | `SUPABASE_DB_PASSWORD` | `supabase db push`용 DB 비밀번호 | 배포 시 |
 | `SUPABASE_ACCESS_TOKEN` | CLI/MCP 인증 토큰 | 배포 시 |
 
-> env가 비어 있어도 빌드는 성공하며, API가 503 안내를 반환합니다.
+> env가 비어 있어도 빌드는 성공합니다. 런타임에 쿼리 훅이 한국어 안내 에러를 던집니다.
+
+> ⚠ **CLI가 원격 프로젝트에 링크돼 있습니다.** `supabase db push`(플래그 없음)는 **원격**에 적용하고
+> `db reset --linked`는 원격을 초기화합니다. 로컬 작업에는 `supabase db reset`만 쓰세요.
 
 ---
 
 ## 📁 프로젝트 구조
 
-라우팅은 얇게(`app/`), 구현은 FSD 레이어(`src/`)로 분리합니다. 의존 방향은 `shared ← entities ← features ← widgets ← views` 단방향이며, 각 슬라이스의 `index.ts`가 public API입니다. 상세 규칙은 [`docs/conventions/`](docs/conventions/).
+라우팅은 얇게(`app/`), 구현은 FSD 레이어(`src/`)로 분리합니다. 의존 방향은
+`shared ← entities ← features ← widgets ← views` 단방향이며, 각 슬라이스의 `index.ts`가 public API입니다.
+상세 규칙은 [`docs/conventions/`](docs/conventions/).
 
 ```
-app/                    # Next.js 라우팅 전용 (현재: page 플레이스홀더 + 에러 파일)
-proxy.ts                # Supabase 세션 쿠키 리프레시 (Next 16의 middleware)
+app/                     # Next.js 라우팅 전용 (view만 마운트)
+├── (auth)/              #   sign-in · sign-up · forget-password (GuestOnly 셸)
+├── posts/               #   목록 · new · [id] · [id]/edit
+└── reset-password/      #   (auth) 밖 — 재설정 링크는 세션이 선 채로 도착한다
+proxy.ts                 # 세션 쿠키 리프레시 + 낙관적 라우트 가드 (Next 16의 middleware)
 src/
-├── app/                # FSD app 레이어: providers, fonts, globals.css
-├── widgets/            # sub-header / tab-scroll-area
-└── shared/             # ui / api / lib / config
+├── app/                 # providers(QueryClient + AuthProvider), fonts, globals.css
+├── views/               # 화면 조립 8종 (⚠ pages 금지)
+├── widgets/             # sub-header · tab-scroll-area · auth-shell · auth-status
+├── features/            # 사용자 액션 1개 = 슬라이스 1개 (10종)
+├── entities/            # session · post · comment
+├── shared/              # ui / api / lib / config
+└── types/               # database.types.ts (supabase 생성 — 손으로 고치지 않는다)
 supabase/
-└── migrations/         # (비어 있음 — 새 스키마 설계 예정)
+├── migrations/          # 6개 (스키마 = 보안 설계)
+└── tests/               # rls.sql · concurrency.sh · seed-users.sh
 docs/
-├── conventions/        # 코딩 컨벤션 7종
-└── legacy/             # v1 인벤토리 (청산 전 스냅샷)
+├── conventions/         # 코딩 컨벤션 7종
+└── legacy/              # v1 인벤토리 (청산 전 스냅샷)
 ```
 
 ---
@@ -116,12 +138,20 @@ pnpm build        # 프로덕션 빌드
 pnpm start        # 프로덕션 서버 실행
 pnpm lint         # ESLint 실행
 pnpm lint:fix     # ESLint 자동 수정
+pnpm db:types     # 로컬 스키마 → src/types/database.types.ts 재생성 (마이그레이션 추가 후 필수)
 ```
 
 ---
 
-## 🗺 다음 단계
+## ✅ 검증
 
-1. **테이블 설계** — 어떤 콘텐츠 축에 집중할지 정하고 스키마·RLS·RPC를 새로 구성
-2. **기능 정의** — 화면과 API 계약을 스키마 위에 얹기
-3. **컨벤션 갱신** — 새 구조에 맞춰 `docs/conventions/` 정리 (특히 `api-and-db.md`·`reuse.md`)
+자동 테스트 프레임워크는 없습니다. 대신 **DB 계층에 실행 가능한 검증 스크립트**를 둡니다 —
+RLS가 유일한 방어선이라 정책을 고칠 때마다 돌려야 합니다.
+
+```bash
+# RLS · 컬럼 권한 · RPC · 회귀 검사 (전체 rollback이라 DB에 흔적을 남기지 않는다)
+psql "postgresql://postgres:postgres@127.0.0.1:64322/postgres" -f supabase/tests/rls.sql
+
+# 좋아요 동시성 — N명 동시 클릭 후 like_count == count(post_like)
+bash supabase/tests/concurrency.sh
+```

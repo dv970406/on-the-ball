@@ -28,14 +28,14 @@
 - prop으로 받은 px: `style={{ width: size, height: size }}`
 
 **값이 유한한 열거형(tone·side·상태)은 동적이 아니다** — `Record<K, string>` 클래스 맵으로 만든다.
-(예: `shared/ui/live-dot.tsx`의 `DOT_TONE`, `entities/poll/ui/split-card.tsx`의 `CLIP`)
+(예: `shared/ui/live-dot.tsx`의 `DOT_TONE`, `shared/ui/button-class.ts`의 `BUTTON_VARIANT`, `shared/ui/markdown-editor.tsx`의 `TAB_LABEL`)
 
 CSS 변수를 `style`로 주입해 클래스에서 읽는 패턴(`style={{ "--w": ... }}` + `w-[var(--w)]`)은 쓰지 않는다 — 간접 계층만 늘어난다.
 
 ### `CSSProperties`를 반환하는 헬퍼 함수 금지
 
 상태별 스타일은 **className 문자열을 반환하는 함수**나 `cn()` 분기로 표현한다.
-선례: `shared/ui/button.tsx`의 `buttonClassName`, `views/tmi/ui/tmi-card.tsx`의 `cardClassName`.
+선례: `shared/ui/button-class.ts`의 `buttonClassName`, `shared/ui/markdown-editor.tsx`의 `tabClassName`.
 
 ```tsx
 // ❌ 금지
@@ -63,8 +63,8 @@ function cardClassName(peek: boolean) {
 <span className="animate-vs-pop [transform:translate(-50%,-50%)_rotate(-12deg)]" />
 ```
 
-**유일한 예외**: 같은 요소에 animation도, transform을 건드리는 transition도 **없는** 순수 정적 배치는 `-translate-x-1/2 -translate-y-1/2` 센터링을 그대로 써도 된다(예: `quiz-pitch.tsx`의 센터서클).
-단 `VsBadge`는 똑같은 센터링이지만 `animate-vs-pop` 때문에 **예외가 아니다** — 애니메이션·트랜지션 유무로 판단하고, "센터링이니까 표준 유틸"로 판단하지 않는다.
+**유일한 예외**: 같은 요소에 animation도, transform을 건드리는 transition도 **없는** 순수 정적 배치는 `-translate-x-1/2 -translate-y-1/2` 센터링을 그대로 써도 된다.
+같은 센터링이라도 그 요소에 애니메이션이 붙어 있으면 예외가 아니다 — **애니메이션·트랜지션 유무로 판단**하고, "센터링이니까 표준 유틸"로 판단하지 않는다.
 
 한 요소에 `[transition:...]` arbitrary와 표준 `transition-*` 유틸을 섞지 않는다 — twMerge가 서로 다른 그룹으로 보아 둘 다 남는다.
 
@@ -75,6 +75,13 @@ function cardClassName(peek: boolean) {
 1. **`@theme` 토큰 추가 — 하지 않는다**(동결). 여러 슬라이스가 공유하는 디자인 결정이 새로 생겼을 때만 별도 논의.
 2. **슬라이스 내부 `Record<K, string>` 클래스 맵** — 판별자(tone·side·상태)가 **이미 있고** 값들이 반드시 함께 바뀔 때만. 새 추상화를 만드는 게 아니라 기존 맵의 값 타입을 바꾸는 수준이어야 한다.
 3. 그 외는 전부 **인라인 arbitrary**. 길어도 1회 사용이면 이름을 붙이지 않는다 — 바로 위 한국어 주석이 이미 의미를 설명한다.
+
+### 마크다운 렌더
+
+- **Tailwind Typography(`prose`)를 도입하지 않는다.** 새 의존성인 데다 자체 색·간격 스케일이 Tifo 토큰과 충돌한다. 대신 `shared/ui/markdown.tsx`의 `components` 맵에 태그별 클래스를 명시한다(판별자가 태그명이라 `styling.md`의 "슬라이스 내부 클래스 맵" 기준을 충족).
+- **본문 링크를 에메랄드로 칠하지 않는다.** 본문에 링크가 많으면 "뷰포트당 컬러 이벤트 1개"가 깨진다 — 밑줄만으로 충분히 구분된다. GFM 체크박스도 `accent-ink`.
+- 넘칠 수 있는 블록(`pre`·`table`)은 **자기 안에서만 가로 스크롤**시킨다(`overflow-x-auto` 래퍼). 페이지 본문이 가로로 밀리면 안 된다.
+- react-markdown은 기본적으로 raw HTML을 렌더하지 않는다(rehype-raw 미사용). 본문이 사용자 입력이므로 **이 기본값을 절대 풀지 않는다**.
 
 ## 디자인 규칙 (Tifo)
 
