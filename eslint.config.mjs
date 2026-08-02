@@ -20,6 +20,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // 디자인 핸드오프 레퍼런스 (구현 대상 아님 — 린트 제외)
     "design_handoff_ontheball/**",
+    // supabase CLI가 생성하는 파일 — 손으로 고쳐도 `pnpm db:types`에 덮인다
+    "src/types/database.types.ts",
   ]),
 ]);
 
