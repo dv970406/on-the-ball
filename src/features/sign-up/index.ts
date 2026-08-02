@@ -1,1 +1,1 @@
-export { useSignUp, type SignUpInput } from "./model/use-sign-up";
+export { useSignUp, type SignUpInput, type SignUpResult } from "./model/use-sign-up";

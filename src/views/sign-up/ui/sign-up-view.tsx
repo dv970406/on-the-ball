@@ -30,10 +30,32 @@ export function SignUpView() {
     }
     setConfirmError(undefined);
 
-    // enable_confirmations = false라 가입 즉시 세션이 생긴다.
-    // ⚠ 로그인과 같은 이유로 여기서 이동시키지 않는다 — GuestOnly가 목적지를 정한다.
+    // ⚠ 로그인과 같은 이유로 여기서 이동시키지 않는다 — 세션이 생기면 GuestOnly가 목적지를 정한다.
     signUp.mutate({ email, password });
   };
+
+  // 이메일 확인이 켜진 프로젝트에서는 세션이 없어 GuestOnly가 움직이지 않는다.
+  // 이 화면이 없으면 가입 버튼을 눌러도 폼 그대로라 실패한 것처럼 보인다.
+  if (signUp.data?.needsEmailConfirm) {
+    return (
+      <AuthShell
+        title="메일을 보냈어요"
+        description={`${email}로 인증 링크를 보냈습니다. 메일함을 확인해 주세요.`}
+        footer={
+          <Link
+            href={withNext(ROUTES.signIn, next)}
+            className="font-medium text-ink underline underline-offset-2"
+          >
+            로그인으로 돌아가기
+          </Link>
+        }
+      >
+        <p className="rounded-sm border border-hairline bg-canvas-soft px-4 py-3 text-[13px] leading-[1.6] text-ink-mute">
+          링크를 눌러 인증을 마치면 로그인할 수 있어요.
+        </p>
+      </AuthShell>
+    );
+  }
 
   return (
     <AuthShell
