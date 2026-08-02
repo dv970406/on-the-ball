@@ -1,0 +1,61 @@
+"use client";
+
+import Link from "next/link";
+import { ROUTES } from "@/shared/config";
+import { Skeleton, buttonClassName } from "@/shared/ui";
+import { useSessionStore } from "@/entities/session";
+import { useProfileQuery } from "@/entities/profile";
+import { useSignOut } from "@/features/sign-out";
+
+/**
+ * 목록 화면 상단의 세션 표시 — 로그인 링크 / 닉네임 + 로그아웃.
+ * status가 확정되기 전에는 아무것도 그리지 않는다(비로그인 UI가 잠깐 보이는 깜빡임 방지).
+ *
+ * ⚠ 이메일이 아니라 **닉네임**을 보여준다 — 같은 화면의 글쓴이 표기가 전부 닉네임인데
+ *   내 정보만 이메일이면 표기 체계가 두 갈래가 되고, 이메일은 목록 상단에 상시 노출될 값이 아니다.
+ */
+export function AuthStatus() {
+  const status = useSessionStore((s) => s.status);
+  const user = useSessionStore((s) => s.user);
+  const signOut = useSignOut();
+  // 세션을 아는 이 레이어가 userId를 넘긴다 (entities끼리는 서로 import할 수 없다)
+  const { data: profile, isPending: profilePending } = useProfileQuery(user?.id);
+
+  if (status === "loading") return null;
+
+  if (status === "guest") {
+    return (
+      <Link
+        href={ROUTES.signIn}
+        className={buttonClassName({ variant: "secondary", size: "sm" })}
+      >
+        로그인
+      </Link>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      {/*
+        ⚠ 빈 문자열을 두면 폭이 0이라 자리를 못 잡고, 닉네임이 도착하는 순간
+        로그아웃 버튼이 밀린다(이메일은 세션에 이미 있어 왕복이 없었지만 닉네임은 조회가 필요하다).
+        스켈레톤으로 자리를 확보한다.
+      */}
+      {profilePending ? (
+        <Skeleton className="h-4 w-16" />
+      ) : (
+        <span className="max-w-[140px] truncate text-[13px] text-ink-mute">
+          {profile?.nickname ?? ""}
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={() => signOut.mutate()}
+        disabled={signOut.isPending}
+        className="text-[13px] text-ink-mute underline underline-offset-2 disabled:opacity-40"
+      >
+        로그아웃
+      </button>
+    </div>
+  );
+}

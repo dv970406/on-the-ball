@@ -5,7 +5,7 @@ import "@/app/styles/globals.css";
 
 export const metadata: Metadata = {
   title: "온더볼",
-  description: "해외축구 가십·밸런스 대결·퀴즈를 다루는 커뮤니티 투표 앱",
+  description: "글을 쓰고 이야기를 나누는 커뮤니티 게시판",
 };
 
 export const viewport: Viewport = {
