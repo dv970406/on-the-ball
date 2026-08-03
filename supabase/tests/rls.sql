@@ -405,6 +405,120 @@ select p.id, p.like_count, coalesce(l.cnt,0) as actual_likes,
   left join (select post_id, count(*) cnt from public.comment   group by 1) c on c.post_id = p.id
  where p.like_count <> coalesce(l.cnt,0) or p.comment_count <> coalesce(c.cnt,0);
 
+-- ---------------------------------------------------------------------
+\echo ''
+\echo '=== 17. 신규 객체 전수 가드 — 0행이어야 정상 ==='
+\echo '  (테이블명을 하드코딩한 검사들과 달리, 앞으로 만들 테이블·함수까지 자동으로 걸린다.'
+\echo '   public 스키마의 기본 권한이 anon/authenticated에 ALL이라, 새 마이그레이션이'
+\echo '   revoke를 한 번만 잊어도 즉시 구멍이 된다 — 손으로 반복하는 규칙은 언젠가 빠진다)'
+reset role;
+
+\echo '-- 17a. RLS가 꺼졌거나 anon/authenticated에 쓰기 권한이 남은 테이블'
+select c.relname,
+       c.relrowsecurity                                   as rls_on,
+       has_table_privilege('anon', c.oid, 'INSERT')       as anon_insert,
+       has_table_privilege('anon', c.oid, 'UPDATE')       as anon_update,
+       has_table_privilege('anon', c.oid, 'DELETE')       as anon_delete,
+       has_table_privilege('anon', c.oid, 'TRUNCATE')     as anon_truncate,
+       has_table_privilege('authenticated', c.oid, 'TRUNCATE') as auth_truncate
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname = 'public' and c.relkind = 'r'
+   and (not c.relrowsecurity
+        or has_table_privilege('anon', c.oid, 'INSERT')
+        or has_table_privilege('anon', c.oid, 'UPDATE')
+        or has_table_privilege('anon', c.oid, 'DELETE')
+        or has_table_privilege('anon', c.oid, 'TRUNCATE')
+        or has_table_privilege('authenticated', c.oid, 'TRUNCATE'));
+
+\echo '-- 17b. RLS는 켜졌는데 정책이 하나도 없는 테이블 (전면 차단이 의도인지 확인 필요)'
+select c.relname
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity
+   and not exists (select 1 from pg_policy p where p.polrelid = c.oid);
+
+\echo '-- 17c. security definer인데 search_path가 고정되지 않은 함수'
+select p.proname
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public' and p.prosecdef
+   and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) cfg
+                    where cfg like 'search\_path=%');
+
+\echo '-- 17d. anon이 EXECUTE 가능한 함수 중 화이트리스트 밖'
+\echo '   허용: post_is_alive(글 생존 판정) / has_visible_char(CHECK 평가에 필요)'
+select p.proname
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public'
+   and has_function_privilege('anon', p.oid, 'EXECUTE')
+   and p.proname not in ('post_is_alive', 'has_visible_char');
+
+-- ---------------------------------------------------------------------
+\echo ''
+\echo '=== 18. INSERT 시점 위조 — 컬럼 INSERT 권한이 막아야 한다 ==='
+\echo '  (섹션 1은 UPDATE만 검사했다. grant insert 목록이 넓어지는 회귀는 여기서 잡는다)'
+savepoint s; :login_alice
+\echo '[거부 기대] like_count를 실어 태어날 때부터 부풀린 글'
+insert into public.post (author_id, title, content, like_count) values (:'alice', 'x', 'y', 9999);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[거부 기대] deleted_at을 실어 태어날 때부터 숨은 글'
+insert into public.post (author_id, title, content, deleted_at) values (:'alice', 'x', 'y', now());
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[거부 기대] created_at을 미래로 실어 목록 상단 고정'
+insert into public.post (author_id, title, content, created_at)
+values (:'alice', 'x', 'y', now() + interval '10 years');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[거부 기대] id 직접 지정 (identity GENERATED ALWAYS)'
+insert into public.post (id, author_id, title, content) values (999999, :'alice', 'x', 'y');
+rollback to s;
+
+-- ---------------------------------------------------------------------
+\echo ''
+\echo '=== 19. 보이지 않는 글 차단 (has_visible_char) ==='
+savepoint s; :login_alice
+\echo '[거부 기대] 제목이 BOM(U+FEFF) 한 글자'
+insert into public.post (author_id, title, content) values (:'alice', U&'\FEFF', '본문');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[거부 기대] 본문이 제로폭 공백(U+200B)뿐'
+insert into public.post (author_id, title, content) values (:'alice', '제목', U&'\200B\200B');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[거부 기대] 제목이 NBSP(U+00A0) 한 글자'
+\echo '   ⚠ 이 검사가 핵심이다 — [:space:]는 collation에 따라 NBSP를 공백으로 보지 않아,'
+\echo '     그걸 쓰면 libc 로캘 DB에서만 조용히 통과한다(로컬에서는 재현되지 않는다)'
+insert into public.post (author_id, title, content) values (:'alice', U&'\00A0', '본문');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[거부 기대] 제목이 전각 공백(U+3000)뿐'
+insert into public.post (author_id, title, content) values (:'alice', U&'\3000\3000', '본문');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[거부 기대] 제목이 NEL(U+0085)뿐'
+insert into public.post (author_id, title, content) values (:'alice', U&'\0085', '본문');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[성공] 제로폭 문자가 섞여도 보이는 글자가 있으면 통과'
+insert into public.post (author_id, title, content) values (:'alice', U&'\200B' || '제목', '본문');
+rollback to s;
+
+\echo '-- 19b. collation 비의존 확인 — 세 열이 전부 f여야 정상'
+reset role;
+select public.has_visible_char(U&'\00A0')                       as nbsp_default,
+       public.has_visible_char(U&'\00A0' collate "C")           as nbsp_c,
+       public.has_visible_char(U&'\00A0' collate "en_US.utf8")  as nbsp_libc;
+
 rollback;
 \echo ''
 \echo '=== 끝 (전체 rollback — DB에 흔적을 남기지 않는다) ==='

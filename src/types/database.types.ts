@@ -148,6 +148,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      has_visible_char: { Args: { p_text: string }; Returns: boolean }
       post_is_alive: { Args: { p_id: number }; Returns: boolean }
       soft_delete_post: { Args: { p_post_id: number }; Returns: undefined }
       toggle_post_like: { Args: { p_post_id: number }; Returns: boolean }

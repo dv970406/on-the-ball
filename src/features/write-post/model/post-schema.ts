@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { codePointLength, hasVisibleChar } from "@/shared/lib/text";
 
 /**
  * 게시글 입력 검증 — 작성·수정 공용.
@@ -10,17 +11,27 @@ import { z } from "zod";
 export const TITLE_MAX = 120;
 export const CONTENT_MAX = 20000;
 
+/**
+ * 길이는 코드포인트로, "빈 값"은 보이는 글자 유무로 판정한다.
+ * 둘 다 DB 제약과 **같은 기준**이라 shared/lib/text에 단일 소스로 둔다.
+ */
 export const postSchema = z.object({
   title: z
     .string()
     .trim()
-    .min(1, "제목을 입력해 주세요.")
-    .max(TITLE_MAX, `제목은 ${TITLE_MAX}자까지 쓸 수 있어요.`),
+    .refine(hasVisibleChar, "제목을 입력해 주세요.")
+    .refine(
+      (value) => codePointLength(value) <= TITLE_MAX,
+      `제목은 ${TITLE_MAX}자까지 쓸 수 있어요.`,
+    ),
   content: z
     .string()
     .trim()
-    .min(1, "내용을 입력해 주세요.")
-    .max(CONTENT_MAX, `내용은 ${CONTENT_MAX}자까지 쓸 수 있어요.`),
+    .refine(hasVisibleChar, "내용을 입력해 주세요.")
+    .refine(
+      (value) => codePointLength(value) <= CONTENT_MAX,
+      `내용은 ${CONTENT_MAX}자까지 쓸 수 있어요.`,
+    ),
 });
 
 export type PostInput = z.infer<typeof postSchema>;

@@ -2,13 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button, MarkdownEditor, TextField } from "@/shared/ui";
-import {
-  CONTENT_MAX,
-  TITLE_MAX,
-  validatePost,
-  type PostFieldErrors,
-  type PostInput,
-} from "../model/post-schema";
+import { validatePost, type PostFieldErrors, type PostInput } from "../model/post-schema";
 
 interface PostFormProps {
   initial?: PostInput;
@@ -70,10 +64,15 @@ export function PostForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5 px-5 py-5">
+      {/*
+        ⚠ maxLength를 걸지 않는다. 브라우저의 maxLength는 UTF-16 코드유닛을 세므로
+          이모지 제목이 한도의 절반(60개)에서 **아무 안내 없이 잘렸다.**
+          한도 검사는 DB와 같은 단위(코드포인트)를 쓰는 validatePost가 맡고,
+          넘치면 메시지로 알려준다.
+      */}
       <TextField
         label="제목"
         name="title"
-        maxLength={TITLE_MAX}
         placeholder="제목을 입력하세요"
         value={title}
         error={fieldErrors.title}
@@ -86,7 +85,6 @@ export function PostForm({
       <MarkdownEditor
         label="내용 (마크다운)"
         value={content}
-        maxLength={CONTENT_MAX}
         placeholder={"# 제목\n\n**굵게**, *기울임*, `코드`\n\n- 목록\n- 항목"}
         error={fieldErrors.content}
         onChange={(next) => {
