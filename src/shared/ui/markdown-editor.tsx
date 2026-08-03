@@ -40,14 +40,34 @@ export function MarkdownEditor({
   maxLength,
 }: MarkdownEditorProps) {
   const id = useId();
+  const describedById = `${id}-desc`;
   const [tab, setTab] = useState<Tab>("write");
+
+  /**
+   * 검증 에러가 떠 있는 동안에는 **작성 탭을 보여준다.**
+   * ⚠ 미리보기 상태에서 제출하면 textarea가 언마운트된 채 에러만 떠서
+   *   "내용을 입력해 주세요"가 가리키는 입력창이 화면에 없었다.
+   *
+   * state를 건드리지 않고 **파생**시킨다. 전에는 "에러가 새로 생겼을 때 setTab"으로 했는데,
+   * 같은 메시지로 다시 제출하면 값이 같아 전이가 감지되지 않아 그 버그가 그대로 재현됐다
+   * (빈 내용 제출 → 미리보기로 전환 → 다시 제출 → 탭이 안 돌아옴).
+   * 파생이면 그런 구멍이 없다. 에러는 사용자가 내용을 고치는 순간 부모가 지운다.
+   */
+  const activeTab: Tab = error ? "write" : tab;
+
+  // 미리보기에는 label이 가리킬 폼 컨트롤이 없다 —
+  // htmlFor가 존재하지 않는 id를 가리키면 스크린리더에서 라벨 연결이 끊긴다.
+  const LabelTag = activeTab === "write" ? "label" : "span";
 
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between">
-        <label htmlFor={id} className="text-[13px] font-medium text-ink-mute">
+        <LabelTag
+          htmlFor={activeTab === "write" ? id : undefined}
+          className="text-[13px] font-medium text-ink-mute"
+        >
           {label}
-        </label>
+        </LabelTag>
         {/*
           role="tablist"를 쓰지 않는다. tab 롤을 선언하면 스크린리더가 대응하는 tabpanel과
           화살표키 이동을 기대하는데, 실체는 그냥 "작성/미리보기" 토글 두 개다.
@@ -58,9 +78,12 @@ export function MarkdownEditor({
             <button
               key={key}
               type="button"
-              aria-pressed={tab === key}
+              aria-pressed={activeTab === key}
+              // 에러가 떠 있는 동안 미리보기는 잠근다 — 에러가 가리키는 입력창이 화면에서
+              // 사라지면 안 된다. 첫 타이핑에 에러가 지워지므로 잠기는 구간은 아주 짧다.
+              disabled={key === "preview" && Boolean(error)}
               onClick={() => setTab(key)}
-              className={tabClassName(tab === key)}
+              className={cn(tabClassName(activeTab === key), "disabled:opacity-40")}
             >
               {TAB_LABEL[key]}
             </button>
@@ -68,7 +91,7 @@ export function MarkdownEditor({
         </div>
       </div>
 
-      {tab === "write" ? (
+      {activeTab === "write" ? (
         <textarea
           id={id}
           value={value}
@@ -77,10 +100,14 @@ export function MarkdownEditor({
           required={required}
           maxLength={maxLength}
           aria-invalid={error ? true : undefined}
+          aria-describedby={error ? describedById : undefined}
           className={cn(
             "min-h-[280px] w-full resize-y rounded-sm border bg-canvas px-3 py-3 font-mono text-[14px] leading-[1.7] text-ink transition-colors duration-150 ease-otb",
             "placeholder:text-ink-faint focus:outline-none",
-            error ? "border-crimson" : "border-hairline-strong focus:border-ink",
+            // TextField와 같은 이유로 에러 상태에도 포커스 표시를 남긴다
+            error
+              ? "border-crimson focus:ring-2 focus:ring-crimson/[0.35]"
+              : "border-hairline-strong focus:border-ink",
           )}
         />
       ) : (
@@ -96,7 +123,7 @@ export function MarkdownEditor({
       )}
 
       {error && (
-        <p className="text-[12px] leading-[1.5] text-crimson" role="alert">
+        <p id={describedById} className="text-[12px] leading-[1.5] text-crimson" role="alert">
           {error}
         </p>
       )}

@@ -20,18 +20,43 @@ export function useScrollRestore(ref: RefObject<HTMLElement | null>) {
     if (!el) return;
 
     const key = `otb-scroll:${pathname}`;
-    const saved = Number(sessionStorage.getItem(key) ?? 0);
+    /**
+     * ⚠ sessionStorage 접근은 실패할 수 있다 — 사파리의 쿠키·사이트 데이터 차단이나
+     *   일부 임베드 환경에서 접근 자체가 throw한다. effect에서 터지면 목록 화면이
+     *   통째로 app/error.tsx로 떨어지므로, 스크롤 복원 실패는 조용히 넘긴다
+     *   (기능이 아니라 편의다).
+     */
+    const readSaved = () => {
+      try {
+        return Number(sessionStorage.getItem(key) ?? 0);
+      } catch {
+        return 0;
+      }
+    };
+    const writeSaved = (value: number) => {
+      try {
+        sessionStorage.setItem(key, String(value));
+      } catch {
+        // 저장 불가 환경 — 복원을 포기할 뿐 화면은 정상 동작한다
+      }
+    };
+
+    const saved = readSaved();
 
     let disposed = false;
     let raf = 0;
+    let saveRaf = 0;
     let ticking = false;
     const startedAt = performance.now();
 
     const onScroll = () => {
       if (ticking) return;
       ticking = true;
-      requestAnimationFrame(() => {
-        sessionStorage.setItem(key, String(el.scrollTop));
+      // ⚠ 이 핸들을 따로 들고 있어야 cleanup에서 취소된다. 전에는 복원용 raf 변수만
+      //   취소해서, 스크롤 직후 한 프레임 안에 화면을 떠나면 **detached 엘리먼트의
+      //   scrollTop(0)이 저장되어** 뒤로가기 시 맨 위로 튀었다.
+      saveRaf = requestAnimationFrame(() => {
+        writeSaved(el.scrollTop);
         ticking = false;
       });
     };
@@ -62,6 +87,7 @@ export function useScrollRestore(ref: RefObject<HTMLElement | null>) {
     return () => {
       disposed = true;
       cancelAnimationFrame(raf);
+      cancelAnimationFrame(saveRaf);
       el.removeEventListener("scroll", onScroll);
     };
   }, [pathname, ref]);
