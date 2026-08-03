@@ -17,10 +17,15 @@ export default function GlobalError({
   return (
     <html lang="ko">
       <body>
-        <div className="flex h-dvh flex-col items-center justify-center gap-2 bg-canvas px-8 text-center">
-          <p className="text-[15px] font-medium text-ink">
+        {/*
+          ⚠ 여기서는 metadata/generateMetadata가 동작하지 않는다(루트 layout이 대체된 상태다).
+            React의 <title>을 직접 써야 탭 제목이 빈 채로 남지 않는다 — Next 16 error 문서 명시.
+        */}
+        <title>앱을 불러오지 못했어요 · 온더볼</title>
+        <main className="flex h-dvh flex-col items-center justify-center gap-2 bg-canvas px-8 text-center">
+          <h1 className="text-[15px] font-medium text-ink">
             앱을 불러오지 못했어요
-          </p>
+          </h1>
           <p className="text-[13px] leading-relaxed text-ink-mute">
             잠시 후 다시 시도해 주세요.
             {/* 프로덕션에서는 message가 가려지므로 서버 로그 대조용 digest를 노출한다 */}
@@ -38,7 +43,7 @@ export default function GlobalError({
           >
             다시 시도
           </button>
-        </div>
+        </main>
       </body>
     </html>
   );

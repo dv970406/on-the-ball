@@ -4,7 +4,9 @@ import { AppProviders } from "@/app/providers";
 import "@/app/styles/globals.css";
 
 export const metadata: Metadata = {
-  title: "온더볼",
+  // 접미사 단일 소스 — 각 page는 자기 제목만 적는다("· 온더볼"을 손으로 반복하지 않는다).
+  // default는 템플릿이 적용되지 않는 자리(루트·not-found)에 쓰인다.
+  title: { template: "%s · 온더볼", default: "온더볼" },
   description: "글을 쓰고 이야기를 나누는 커뮤니티 게시판",
 };
 

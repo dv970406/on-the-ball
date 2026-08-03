@@ -9,6 +9,13 @@ const eslintConfig = defineConfig([
   {
     rules: {
       "@typescript-eslint/consistent-type-definitions": ["error", "interface"],
+      // `const { node, ...props } = props`처럼 **일부러 걷어내려고** 구조분해한 이름은
+      // 미사용이 정상이다(shared/ui/markdown.tsx가 react-markdown의 hast node를 이렇게 버린다).
+      // 그 외의 미사용 변수는 그대로 잡는다.
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { ignoreRestSiblings: true, argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
     },
   },
   // Override default ignores of eslint-config-next.

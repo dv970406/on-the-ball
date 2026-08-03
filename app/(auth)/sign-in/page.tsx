@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { SignInView } from "@/views/sign-in";
 
-export const metadata: Metadata = { title: "로그인 · 온더볼" };
+export const metadata: Metadata = { title: "로그인" };
 
 /**
  * 로그인 후 목적지(?next=)는 SignInView가 아니라 (auth)/layout의 GuestOnly가 정한다.
