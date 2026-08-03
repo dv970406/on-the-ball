@@ -52,6 +52,32 @@ const { data, error } = await supabase.from("post")
 if (!error && data.length === 0) throw new Error("수정 권한이 없거나 삭제된 글이에요.");
 ```
 
+## ⚠ CHECK 제약 안의 함수는 **호출자 EXECUTE 권한**으로 평가된다
+
+`has_visible_char`를 만들고 다른 함수들처럼 `revoke execute from public, anon, authenticated`를
+걸었더니 **모든 글쓰기가 `42501 permission denied for function has_visible_char`로 막혔다**(실측).
+
+RPC(`security definer`, 호출자가 직접 부른다)와 성질이 다르다 — 제약 평가 함수는 **쓰기 권한이
+있는 역할이 EXECUTE도 가져야 한다.** 노출이 걱정되면 함수가 입력 외의 정보를 돌려주지 않게
+설계하고 열어라(`post_is_alive`·`has_visible_char` 둘 다 그렇다).
+
+## 문자 검증은 클라이언트와 DB가 **같은 문자 집합**을 써야 한다
+
+`char_length` 길이 제한과 `~ '[^[:space:]]'` 공백 검사만으로는 부족했다:
+
+| 값 | 클라이언트 | DB(수정 전) |
+|---|---|---|
+| `U+FEFF`(BOM) 한 글자 | `.trim()`이 깎아 거부 | **통과** — `[:space:]`에 없다 |
+| `U+200B`(제로폭 공백) | 통과 | 통과 |
+| 이모지 121개 | **거부** — `.length`가 UTF-16 코드유닛 | 통과 — `char_length`는 코드포인트 |
+
+결과: 제목이 **완전히 비어 보이는 글**이 실제로 만들어졌고(`<title>﻿ · 온더볼</title>`),
+이모지 제목은 한도의 절반에서 막혔다. 방향이 양쪽으로 다 어긋난 셈이다.
+
+→ 단일 소스를 둔다. `src/shared/lib/text.ts`의 `hasVisibleChar`·`codePointLength`와
+   `public.has_visible_char`(마이그레이션 20260802000001)가 **같은 문자 집합**을 쓴다.
+   한쪽만 고치면 다시 갈린다. `<input maxLength>`는 UTF-16을 세므로 길이 제한에 쓰지 않는다.
+
 ## SECURITY DEFINER RPC
 
 쓰기가 RLS를 넘어야 할 때만 RPC로 내린다. 현재 `toggle_post_like`·`soft_delete_post` + 트리거 3종.
@@ -154,6 +180,8 @@ RLS 술어가 security-barrier 서브쿼리 안으로 들어가 바깥의 `fk = 
 | 파일 | 용도 |
 |---|---|
 | `supabase/tests/rls.sql` | RLS·컬럼 권한·RPC 전량 검사 (전체 rollback이라 DB에 흔적 없음) |
+| — 섹션 17은 **테이블명을 하드코딩하지 않는다** | public 스키마 기본 권한이 anon/authenticated에 ALL이라, 새 마이그레이션이 `revoke`를 한 번만 잊어도 즉시 구멍이 된다. 고정 목록만 검사하면 **새 테이블은 검사 대상에 들어오지도 않는다** → RLS 미적용·anon 쓰기 권한·search_path 미고정·anon EXECUTE를 전수로 훑는다 |
+| — 섹션 18은 **INSERT 시점 위조**를 검사 | 섹션 1이 UPDATE만 보고 있어서, `grant insert` 목록이 넓어지는 회귀(카운터·타임스탬프 동봉)를 못 잡았다 |
 | — 시드 INSERT는 반드시 `begin;` **아래**에 | 위에 두면 오토커밋으로 새어나가 실행할 때마다 행이 쌓인다(실제로 그랬다) |
 | — 시각 비교 검사는 시드를 과거로 밀 것 | `now()`는 **트랜잭션 시작 시각**이라 한 트랜잭션 안에서 insert의 default와 트리거의 값이 같아진다 → "수정하면 updated_at이 바뀐다"를 증명할 수 없다 |
 | `supabase/tests/concurrency.sh` | 좋아요 동시성 — N명 동시 클릭 후 `like_count == count(post_like)` |

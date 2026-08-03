@@ -17,6 +17,53 @@
 - ⚠ `onAuthStateChange` 콜백을 **async로 만들지 않는다**. `@supabase/auth-js` 2.110에서 async 오버로드는 `@deprecated`이며 `TOKEN_REFRESHED` 처리 중 중첩 리프레시가 나면 데드락된다. 콜백 안에서 `supabase.auth.*`를 다시 호출하는 것도 금지.
 - 캐시 무효화는 `SIGNED_IN`·`SIGNED_OUT`·`USER_UPDATED`에서만 한다. `TOKEN_REFRESHED`까지 포함하면 토큰 갱신마다 화면 전체가 리페치된다.
 
+### ⚠ 서버가 세션을 부정하는데 클라이언트만 유효하다고 믿는 구간
+
+`proxy`는 `getUser()`로 GoTrue에 **서버 검증**을 하지만, 클라이언트는 쿠키의 `expires_at`만
+**로컬 검사**한다. 다른 기기의 global 로그아웃·계정 삭제·JWT 시크릿 회전이 일어나면
+토큰은 만료 전인데 서버는 403을 준다. 그러면 판정이 갈려 **무한 리다이렉트**가 된다:
+
+```
+proxy: /posts/new → 307 /sign-in?next=/posts/new   (서버는 비로그인으로 본다)
+GuestOnly: status === "authenticated" → replace("/posts/new")
+→ 끝나지 않는다. 탈출 수단이 없다.
+```
+
+→ `AuthProvider`가 로그인 상태가 될 때 **1회 `getUser()`로 서버에 확인**한다.
+  `session_not_found`면 auth-js가 스스로 세션을 지우고 `SIGNED_OUT`을 낸다(2.110 `_getUser`).
+  그 밖의 서버 거부는 `signOut({ scope: "local" })`로 직접 정리한다.
+  ⚠ 네트워크 장애(`isAuthRetryableFetchError`)는 세션 부정이 아니다 — 여기서 로그아웃시키면
+  잠깐 끊긴 사용자가 튕겨나간다.
+
+### ⚠ `signOut()`의 기본 scope는 `global`이다
+
+auth-js 2.110의 시그니처가 `signOut(options = { scope: 'global' })`이라, 그냥 부르면
+**폰에서 로그아웃하면 데스크톱 세션까지 서버에서 revoke된다.** 사용자가 기대하지 않는 동작이고,
+남은 기기가 위 "판정이 갈리는 구간"에 빠지는 가장 현실적인 경로다 → `scope: "local"`을 명시한다.
+
+### ⚠ `invalidateQueries()`는 비활성 캐시를 지우지 않는다
+
+기본 `refetchType`이 `"active"`라 **언마운트된 쿼리는 stale 표시만 되고 데이터가 그대로 남는다.**
+그래서 로그아웃 후 다른 계정으로 로그인하면 이전 사용자의 `isLiked`가 한 프레임 노출됐다.
+유저가 바뀌는 이벤트에서는 `removeQueries({ type: "inactive" })`를 **함께** 부른다.
+
+### ⚠ `mutate(..., { onSuccess })`는 훅의 `onSuccess`가 끝난 뒤에 실행된다
+
+query-core는 훅 레벨 `onSuccess`(무효화 Promise)를 **await한 뒤** success를 dispatch하고,
+그때서야 호출부 콜백을 부른다. 그래서 "성공하면 입력창 비우기"를 호출부 콜백에 두면
+**리페치가 끝나는 순간** 비워진다 — 느린 회선에서 그 사이 타이핑한 내용이 통째로 날아갔다.
+
+입력창 초기화처럼 즉시성이 필요한 것은 **제출 직후에 하고 실패 시 되돌린다**(선례 `CommentForm`).
+
+### 에러 화면으로 갈아치우는 건 **보여줄 데이터가 없을 때뿐이다**
+
+TanStack Query는 성공 후 리페치가 실패해도 `data`를 유지한다(`status: "error"` + `data`).
+`if (error) return <EmptyState/>`를 데이터 렌더보다 앞에 두면, 좋아요 한 번에 네트워크가
+잠깐 끊겨도 **읽고 있던 글이 통째로 사라진다.** 수정 화면에서는 작성 중이던 입력까지 잃는다.
+
+→ `error && !data`일 때만 전체 대체, 데이터가 있으면 **배너로만** 알린다.
+  목록·상세·수정·댓글 네 화면이 같은 규약을 쓴다.
+
 ## 하이드레이션
 
 - 렌더 중 `Date.now()` / `new Date()` / `Math.random()` **직접 호출 금지**. 날짜 표시는 헬퍼로(`formatRelativeTime`·`formatYearMonth`·`todayUtc`).
