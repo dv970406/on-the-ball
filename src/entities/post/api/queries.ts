@@ -10,8 +10,13 @@ import {
   buildPostListItem,
 } from "./mappers";
 
-/** 목록 1페이지 크기 — 페이지네이션은 아직 없다 */
-const LIST_LIMIT = 30;
+/**
+ * 목록에 한 번에 가져올 글 수 — 페이지네이션은 아직 없다.
+ *
+ * ⚠ 화면이 **잘렸다는 사실을 사용자에게 알려야 한다**(댓글 목록이 이미 그렇게 하고 있다).
+ *   조용히 자르면 31번째 글부터는 URL을 아는 사람 말고는 도달할 방법이 없다.
+ */
+export const POST_LIST_LIMIT = 30;
 
 /**
  * 게시글 목록.
@@ -28,7 +33,10 @@ export function usePostListQuery() {
         .from("post")
         .select(POST_LIST_SELECT)
         .order("created_at", { ascending: false })
-        .limit(LIST_LIMIT);
+        // id를 2차 정렬키로 둔다 — 같은 created_at이 여러 건이면 순서가 불안정해지고,
+        // 페이지네이션을 붙이는 순간 경계에서 행 중복·누락으로 드러난다(댓글 목록과 같은 규약).
+        .order("id", { ascending: false })
+        .limit(POST_LIST_LIMIT);
 
       if (error) {
         console.error("[post] 목록 조회 실패:", error);

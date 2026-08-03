@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { ROUTES } from "@/shared/config";
@@ -12,6 +12,25 @@ export function DeletePostButton({ postId }: { postId: number }) {
   const router = useRouter();
   const deletePost = useDeletePost(postId);
   const [confirming, setConfirming] = useState(false);
+
+  /**
+   * 중복 제출 동기 가드 — PostForm·CommentForm과 같은 패턴.
+   * `disabled={isPending}`은 렌더 이후에야 적용되므로 같은 tick의 연타를 막지 못한다.
+   * 두 번째 요청은 이미 삭제된 글을 다시 지우려다 "존재하지 않는 게시글입니다"로 실패해,
+   * 이동 직전에 엉뚱한 에러가 깜빡인다.
+   */
+  const deletingRef = useRef(false);
+  useEffect(() => {
+    if (!deletePost.isPending) deletingRef.current = false;
+  }, [deletePost.isPending]);
+
+  const handleDelete = () => {
+    if (deletingRef.current) return;
+    deletingRef.current = true;
+    deletePost.mutate(undefined, {
+      onSuccess: () => router.replace(ROUTES.postList),
+    });
+  };
 
   if (!confirming) {
     return (
@@ -41,11 +60,7 @@ export function DeletePostButton({ postId }: { postId: number }) {
         size="sm"
         variant="dark"
         disabled={deletePost.isPending}
-        onClick={() =>
-          deletePost.mutate(undefined, {
-            onSuccess: () => router.replace(ROUTES.postList),
-          })
-        }
+        onClick={handleDelete}
       >
         {deletePost.isPending ? "삭제 중…" : "삭제"}
       </Button>

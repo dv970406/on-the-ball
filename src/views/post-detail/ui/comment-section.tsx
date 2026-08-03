@@ -41,12 +41,33 @@ export function CommentSection({ postId, commentCount }: CommentSectionProps) {
         </div>
       )}
 
-      {error && (
+      {/*
+        ⚠ 에러 화면은 보여줄 댓글이 없을 때만 띄운다.
+          TanStack Query는 성공 후 리페치가 실패해도 data를 유지하므로, 조건을 나누지 않으면
+          "불러오지 못했어요" 박스와 정상 댓글 목록이 한 화면에 공존한다.
+          (댓글 작성·삭제가 매번 무효화를 걸어서 이 경로가 실제로 자주 열린다)
+          목록·상세 화면도 같은 규약을 쓴다.
+      */}
+      {error && !comments && (
         <EmptyState
+          live
           title="댓글을 불러오지 못했어요"
           description={error.message}
           onRetry={() => void refetch()}
         />
+      )}
+
+      {error && comments && (
+        <p role="status" className="mt-3 text-center text-[12px] text-ink-mute-2">
+          최신 댓글을 불러오지 못했어요.{" "}
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="underline underline-offset-2"
+          >
+            다시 시도
+          </button>
+        </p>
       )}
 
       {comments && comments.length === 0 && (

@@ -31,6 +31,11 @@ export function useCreatePost() {
       // 클라이언트에 Database 타입이 붙어 있어 data는 { id: number }로 추론된다
       return data.id;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: postKeys.lists() }),
+    // ⚠ 무효화 Promise를 반환하지 않는다 — 성공하면 곧바로 상세로 이동하므로
+    //   리페치 완료를 기다릴 이유가 없다. 반환하면 그만큼 isPending이 길어져
+    //   버튼이 "등록 중…"인 채 이동이 지연된다(삭제 훅과 같은 규약).
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: postKeys.lists() });
+    },
   });
 }

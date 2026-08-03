@@ -17,5 +17,5 @@ export {
   buildPostDetail,
   isEdited,
 } from "./api/mappers";
-export { usePostListQuery, usePostQuery } from "./api/queries";
+export { usePostListQuery, usePostQuery, POST_LIST_LIMIT } from "./api/queries";
 export { PostCard } from "./ui/post-card";
