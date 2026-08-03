@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ROUTES } from "@/shared/config";
+import { usePathname } from "next/navigation";
+import { signInWithNext } from "@/shared/config";
 import { Skeleton, buttonClassName } from "@/shared/ui";
 import { useSessionStore } from "@/entities/session";
 import { useProfileQuery } from "@/entities/profile";
@@ -17,6 +18,7 @@ import { useSignOut } from "@/features/sign-out";
 export function AuthStatus() {
   const status = useSessionStore((s) => s.status);
   const user = useSessionStore((s) => s.user);
+  const pathname = usePathname();
   const signOut = useSignOut();
   // 세션을 아는 이 레이어가 userId를 넘긴다 (entities끼리는 서로 import할 수 없다)
   const { data: profile, isPending: profilePending } = useProfileQuery(user?.id);
@@ -25,8 +27,10 @@ export function AuthStatus() {
 
   if (status === "guest") {
     return (
+      // 로그인 후 보던 화면으로 돌아오도록 목적지를 싣는다 —
+      // 앱의 다른 로그인 진입점(좋아요·댓글·가드)이 전부 이 형태다.
       <Link
-        href={ROUTES.signIn}
+        href={signInWithNext(pathname)}
         className={buttonClassName({ variant: "secondary", size: "sm" })}
       >
         로그인

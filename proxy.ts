@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { ROUTES, safeNextPath } from "@/shared/config";
+import { ROUTES, env, isSupabaseConfigured, safeNextPath } from "@/shared/config";
 // 페이지와 같은 파서를 써야 판정이 어긋나지 않는다 — post-id.ts 주석 참고.
 // "use client" 훅을 포함한 @/shared/lib 배럴 대신 직접 경로로 가져온다.
 import { parsePostId } from "@/shared/lib/post-id";
@@ -17,8 +17,15 @@ import { parsePostId } from "@/shared/lib/post-id";
  * → entities/session의 AuthRequired·GuestOnly가 그 구멍을 메운다.
  */
 
-/** 로그인 상태로 접근하면 목록으로 보낼 경로 */
-const GUEST_ONLY: string[] = [ROUTES.signIn, ROUTES.signUp, ROUTES.forgetPassword];
+/**
+ * 로그인 상태로 접근하면 목록으로 보낼 경로.
+ *
+ * ⚠ /forget-password는 **일부러 빼 두었다.** 여기 있으면 로그인한 사용자가
+ *   재설정 링크를 요청할 수 없고, /reset-password는 복구 링크로만 열리므로
+ *   "로그인한 채로는 비밀번호를 바꿀 방법이 없는" 막다른 길이 된다.
+ *   app/(auth) 그룹에서 뺀 것과 같은 이유다(app/forget-password/page.tsx 주석 참고).
+ */
+const GUEST_ONLY: string[] = [ROUTES.signIn, ROUTES.signUp];
 
 /**
  * 경로 비교 전 정규화.
@@ -44,11 +51,10 @@ function isAuthRequired(pathname: string) {
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) return response; // env 미설정 — 통과
+  // 화면·훅과 같은 단일 소스를 쓴다(process.env를 여기서 또 읽지 않는다)
+  if (!isSupabaseConfigured()) return response; // env 미설정 — 통과
 
-  const supabase = createServerClient(url, anonKey, {
+  const supabase = createServerClient(env.supabaseUrl, env.supabaseAnonKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -70,19 +76,34 @@ export async function proxy(request: NextRequest) {
 
   const pathname = normalizePath(request.nextUrl.pathname);
 
+  /**
+   * 리다이렉트 응답으로 갈아타되 **갱신된 세션 쿠키를 옮겨 싣는다.**
+   *
+   * ⚠ getUser()가 만료 토큰을 리프레시하면 @supabase/ssr이 위 setAll을 호출해
+   *   `response`에 새 쿠키를 쌓는다. 그런데 `NextResponse.redirect(...)`는 완전히 새 응답이라
+   *   그냥 반환하면 그 Set-Cookie가 통째로 사라진다(리프레시 실패 시의 쿠키 **삭제**도 함께).
+   *   그러면 가드 리다이렉트마다 토큰 갱신 왕복이 한 번씩 버려진다.
+   *   Supabase 공식 가이드가 "반드시 쿠키를 복사하라"고 경고하는 지점이다.
+   */
+  const redirectTo = (url: URL) => {
+    const redirect = NextResponse.redirect(url);
+    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    return redirect;
+  };
+
   if (!user && isAuthRequired(pathname)) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = ROUTES.signIn;
     redirectUrl.search = "";
     redirectUrl.searchParams.set("next", pathname); // 로그인 후 원래 목적지로
-    return NextResponse.redirect(redirectUrl);
+    return redirectTo(redirectUrl);
   }
 
   if (user && GUEST_ONLY.includes(pathname)) {
     // 클라이언트 가드(GuestOnly)와 같은 규칙으로 목적지를 정한다 —
     // 서버만 next를 버리면 "로그인 화면에 하드 진입했을 때만 목적지가 사라지는" 불일치가 생긴다.
     const next = safeNextPath(request.nextUrl.searchParams.get("next"), request.nextUrl.origin);
-    return NextResponse.redirect(new URL(next ?? ROUTES.postList, request.nextUrl.origin));
+    return redirectTo(new URL(next ?? ROUTES.postList, request.nextUrl.origin));
   }
 
   return response;
@@ -94,7 +115,13 @@ export const config = {
   // 현재 app/api는 없다(데이터 접근은 브라우저가 supabase를 직접 호출).
   // 나중에 라우트를 만든다면 그 핸들러가 세션 검증을 직접 하는지 확인하고
   // 중복 왕복이 생기지 않게 이 제외 규칙을 재검토할 것.
+  // ⚠ `api`에만 세그먼트 경계를 둔다. 접두어 매칭이면 나중에 만들 `/api-docs` 같은
+  //   **일반 화면까지 가드가 조용히 비활성화**되기 때문이다.
+  // ⚠ 반대로 `_next/image`에는 경계를 두지 말 것. Next의 이미지 최적화 엔드포인트는
+  //   뒤에 슬래시가 없는 `/_next/image?url=...` 형태라, `_next/image/`로 적으면 제외가
+  //   무효가 되어 **이미지 요청마다 proxy + getUser() 왕복**이 붙는다(Next 공식 예제도
+  //   경계 없이 `_next/image`로 적는다).
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|ico|woff2?)$).*)",
+    "/((?!api/|api$|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|ico|woff2?)$).*)",
   ],
 };

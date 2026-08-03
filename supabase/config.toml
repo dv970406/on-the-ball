@@ -211,8 +211,14 @@ double_confirm_changes = true
 enable_confirmations = false
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 # 비밀번호 변경 시 최근 로그인(또는 재인증 nonce)을 요구한다.
-# 없으면 남의 로그인된 브라우저에 잠깐 접근한 사람이 /reset-password에서
-# 비밀번호만 바꿔 계정을 탈취할 수 있다.
+#
+# ⚠ 이 값이 "남의 로그인된 브라우저를 잠깐 만진 사람"을 막아주지는 **않는다.**
+#   GoTrue가 재인증을 요구하는 기준은 "세션 생성 후 24시간 경과"다 — 실측:
+#     갓 만든 세션으로 비밀번호 변경  → 200
+#     created_at을 2일 전으로 민 세션 → 400 reauthentication_needed
+#   즉 로그인한 지 하루가 안 된 브라우저에서는 기존 비밀번호 없이 변경이 통과한다.
+#   실제 방어는 앱이 한다 — /reset-password는 복구 링크로 확립된 세션
+#   (PASSWORD_RECOVERY 이벤트)에서만 폼을 연다(reset-password-view.tsx 주석 참고).
 secure_password_change = true
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
 max_frequency = "1s"
