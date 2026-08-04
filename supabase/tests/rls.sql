@@ -35,11 +35,11 @@ begin;
 --   now()는 **트랜잭션 시작 시각**이라 한 트랜잭션 안에서는 insert의 default now()와
 --   트리거의 now()가 같은 값이 된다. 기본값으로 시드하면 "본문을 고치면 updated_at이
 --   바뀐다"를 이 스크립트 안에서 증명할 수 없다(실제 앱은 요청마다 트랜잭션이 달라 정상).
-insert into public.post (author_id, title, content, created_at, updated_at)
-values (:'alice', 'alice의 글', '본문', now() - interval '1 hour', now() - interval '1 hour')
+insert into public.post (author_id, title, content, created_at, updated_at, category)
+values (:'alice', 'alice의 글', '본문', now() - interval '1 hour', now() - interval '1 hour', '잡담')
 returning id as pid \gset
-insert into public.post (author_id, title, content, created_at, updated_at)
-values (:'bob', 'bob의 글', '본문', now() - interval '1 hour', now() - interval '1 hour')
+insert into public.post (author_id, title, content, created_at, updated_at, category)
+values (:'bob', 'bob의 글', '본문', now() - interval '1 hour', now() - interval '1 hour', '잡담')
 returning id as bpid \gset
 
 -- ---------------------------------------------------------------------
@@ -47,12 +47,12 @@ returning id as bpid \gset
 \echo '=== 1. post 쓰기 권한 (alice) ==='
 savepoint s; :login_alice
 \echo '[성공] 본인 명의 insert'
-insert into public.post (author_id, title, content) values (:'alice', '새 글', '본문');
+insert into public.post (author_id, title, content, category) values (:'alice', '새 글', '본문', '잡담');
 rollback to s;
 
 savepoint s; :login_alice
 \echo '[❌차단] 남(bob) 명의 insert'
-insert into public.post (author_id, title, content) values (:'bob', '위조', 'x');
+insert into public.post (author_id, title, content, category) values (:'bob', '위조', 'x', '잡담');
 rollback to s;
 
 savepoint s; :login_alice
@@ -258,7 +258,7 @@ rollback to s;
 \echo '=== 9. 회귀: 공백만 있는 제목·본문·댓글은 거부된다 ==='
 savepoint s; :login_alice
 \echo '[❌차단] 제목이 공백뿐'
-insert into public.post (author_id, title, content) values (:'alice', '     ', '본문');
+insert into public.post (author_id, title, content, category) values (:'alice', '     ', '본문', '잡담');
 rollback to s;
 savepoint s; :login_alice
 \echo '[❌차단] 댓글이 공백뿐'
@@ -306,7 +306,7 @@ rollback to s;
 --   문자열로 출력만 된다(검사인 척하는 검사가 된다). 반드시 줄을 나눈다.
 savepoint s; :login_anon
 \echo '[❌차단] post insert'
-insert into public.post (author_id, title, content) values (:'alice','x','y');
+insert into public.post (author_id, title, content, category) values (:'alice','x','y', '잡담');
 rollback to s;
 savepoint s; :login_anon
 \echo '[❌차단] post update'
@@ -379,11 +379,11 @@ rollback to s;
 \echo '=== 15. 회귀: 공백만 있는 본문 (btrim이 아니라 비공백 문자 요구) ==='
 savepoint s; :login_alice
 \echo '[❌차단] 본문이 공백뿐'
-insert into public.post (author_id, title, content) values (:'alice', '제목', '   ');
+insert into public.post (author_id, title, content, category) values (:'alice', '제목', '   ', '잡담');
 rollback to s;
 savepoint s; :login_alice
 \echo '[❌차단] 제목이 줄바꿈뿐'
-insert into public.post (author_id, title, content) values (:'alice', E'\n\n', '본문');
+insert into public.post (author_id, title, content, category) values (:'alice', E'\n\n', '본문', '잡담');
 rollback to s;
 savepoint s; :login_alice
 \echo '[❌차단] 댓글이 전각공백뿐'
@@ -391,7 +391,7 @@ insert into public.comment (post_id, user_id, content) values (:bpid, :'alice', 
 rollback to s;
 savepoint s; :login_alice
 \echo '[성공] 앞뒤 공백이 있는 정상 제목은 통과해야 한다'
-insert into public.post (author_id, title, content) values (:'alice', '  정상 제목  ', '본문');
+insert into public.post (author_id, title, content, category) values (:'alice', '  정상 제목  ', '본문', '잡담');
 rollback to s;
 
 -- ---------------------------------------------------------------------
@@ -447,11 +447,14 @@ select p.proname
 
 \echo '-- 17d. anon이 EXECUTE 가능한 함수 중 화이트리스트 밖'
 \echo '   허용: post_is_alive(글 생존 판정) / has_visible_char(CHECK 평가에 필요)'
+\echo '        increment_post_view(조회수 — 이 시스템의 유일한 비로그인 쓰기 경로, 의도된 예외.'
+\echo '        조회는 비로그인이 대부분이라 authenticated 전용이면 숫자가 의미를 잃는다.'
+\echo '        대가로 부풀리기를 막을 수 없어 view_count는 "대략치"로 취급한다 — 컬럼 주석 참고)'
 select p.proname
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
  where n.nspname = 'public'
    and has_function_privilege('anon', p.oid, 'EXECUTE')
-   and p.proname not in ('post_is_alive', 'has_visible_char');
+   and p.proname not in ('post_is_alive', 'has_visible_char', 'increment_post_view');
 
 -- ---------------------------------------------------------------------
 \echo ''
@@ -459,23 +462,23 @@ select p.proname
 \echo '  (섹션 1은 UPDATE만 검사했다. grant insert 목록이 넓어지는 회귀는 여기서 잡는다)'
 savepoint s; :login_alice
 \echo '[거부 기대] like_count를 실어 태어날 때부터 부풀린 글'
-insert into public.post (author_id, title, content, like_count) values (:'alice', 'x', 'y', 9999);
+insert into public.post (author_id, title, content, like_count, category) values (:'alice', 'x', 'y', 9999, '잡담');
 rollback to s;
 
 savepoint s; :login_alice
 \echo '[거부 기대] deleted_at을 실어 태어날 때부터 숨은 글'
-insert into public.post (author_id, title, content, deleted_at) values (:'alice', 'x', 'y', now());
+insert into public.post (author_id, title, content, deleted_at, category) values (:'alice', 'x', 'y', now(), '잡담');
 rollback to s;
 
 savepoint s; :login_alice
 \echo '[거부 기대] created_at을 미래로 실어 목록 상단 고정'
-insert into public.post (author_id, title, content, created_at)
-values (:'alice', 'x', 'y', now() + interval '10 years');
+insert into public.post (author_id, title, content, created_at, category)
+values (:'alice', 'x', 'y', now() + interval '10 years', '잡담');
 rollback to s;
 
 savepoint s; :login_alice
 \echo '[거부 기대] id 직접 지정 (identity GENERATED ALWAYS)'
-insert into public.post (id, author_id, title, content) values (999999, :'alice', 'x', 'y');
+insert into public.post (id, author_id, title, content, category) values (999999, :'alice', 'x', 'y', '잡담');
 rollback to s;
 
 -- ---------------------------------------------------------------------
@@ -483,34 +486,34 @@ rollback to s;
 \echo '=== 19. 보이지 않는 글 차단 (has_visible_char) ==='
 savepoint s; :login_alice
 \echo '[거부 기대] 제목이 BOM(U+FEFF) 한 글자'
-insert into public.post (author_id, title, content) values (:'alice', U&'\FEFF', '본문');
+insert into public.post (author_id, title, content, category) values (:'alice', U&'\FEFF', '본문', '잡담');
 rollback to s;
 
 savepoint s; :login_alice
 \echo '[거부 기대] 본문이 제로폭 공백(U+200B)뿐'
-insert into public.post (author_id, title, content) values (:'alice', '제목', U&'\200B\200B');
+insert into public.post (author_id, title, content, category) values (:'alice', '제목', U&'\200B\200B', '잡담');
 rollback to s;
 
 savepoint s; :login_alice
 \echo '[거부 기대] 제목이 NBSP(U+00A0) 한 글자'
 \echo '   ⚠ 이 검사가 핵심이다 — [:space:]는 collation에 따라 NBSP를 공백으로 보지 않아,'
 \echo '     그걸 쓰면 libc 로캘 DB에서만 조용히 통과한다(로컬에서는 재현되지 않는다)'
-insert into public.post (author_id, title, content) values (:'alice', U&'\00A0', '본문');
+insert into public.post (author_id, title, content, category) values (:'alice', U&'\00A0', '본문', '잡담');
 rollback to s;
 
 savepoint s; :login_alice
 \echo '[거부 기대] 제목이 전각 공백(U+3000)뿐'
-insert into public.post (author_id, title, content) values (:'alice', U&'\3000\3000', '본문');
+insert into public.post (author_id, title, content, category) values (:'alice', U&'\3000\3000', '본문', '잡담');
 rollback to s;
 
 savepoint s; :login_alice
 \echo '[거부 기대] 제목이 NEL(U+0085)뿐'
-insert into public.post (author_id, title, content) values (:'alice', U&'\0085', '본문');
+insert into public.post (author_id, title, content, category) values (:'alice', U&'\0085', '본문', '잡담');
 rollback to s;
 
 savepoint s; :login_alice
 \echo '[성공] 제로폭 문자가 섞여도 보이는 글자가 있으면 통과'
-insert into public.post (author_id, title, content) values (:'alice', U&'\200B' || '제목', '본문');
+insert into public.post (author_id, title, content, category) values (:'alice', U&'\200B' || '제목', '본문', '잡담');
 rollback to s;
 
 \echo '-- 19b. collation 비의존 확인 — 세 열이 전부 f여야 정상'
@@ -518,6 +521,127 @@ reset role;
 select public.has_visible_char(U&'\00A0')                       as nbsp_default,
        public.has_visible_char(U&'\00A0' collate "C")           as nbsp_c,
        public.has_visible_char(U&'\00A0' collate "en_US.utf8")  as nbsp_libc;
+
+-- ---------------------------------------------------------------------
+\echo ''
+\echo '=== 20. 말머리(category) ==='
+savepoint s; :login_alice
+\echo '[성공] 본인 글 말머리 수정 (신규 update grant)'
+update public.post set category = '이적설' where id = :pid;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[거부 기대 22P02] 목록에 없는 말머리'
+insert into public.post (author_id, title, content, category) values (:'alice', 'x', 'y', '먹방');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[거부 기대 23502] 말머리 없이 insert — "말머리 필수"의 DB 대응물(default가 없어야 성립)'
+insert into public.post (author_id, title, content) values (:'alice', 'x', 'y');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[UPDATE 0 기대] 남의 글 말머리 변경 — post_update_own이 필터로 막는다'
+update public.post set category = '잡담' where id = :bpid;
+rollback to s;
+
+-- ---------------------------------------------------------------------
+\echo ''
+\echo '=== 21. 조회수 (view_count / increment_post_view) ==='
+savepoint s; :login_alice
+\echo '[거부 기대] view_count 직접 UPDATE (컬럼 권한 없음)'
+update public.post set view_count = 9999 where id = :pid;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[거부 기대] view_count를 실어 태어날 때부터 부풀린 글'
+insert into public.post (author_id, title, content, category, view_count) values (:'alice', 'x', 'y', '잡담', 9999);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[거부 기대] excerpt 직접 지정 (generated column)'
+insert into public.post (author_id, title, content, category, excerpt) values (:'alice', 'x', 'y', '잡담', '조작');
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[성공 기대] 비로그인이 increment_post_view 호출 — **의도된 예외**임을 여기서 고정한다'
+select public.increment_post_view(:pid);
+reset role;
+\echo '[1 기대] 실제로 증가했는가'
+select view_count from public.post where id = :pid;
+rollback to s;
+
+savepoint s;
+\echo '[0 기대] 소프트 삭제된 글은 에러 없이 조용히 무시된다'
+select public.soft_delete_post(:pid) from (select set_config('request.jwt.claims', json_build_object('sub', :'alice', 'role', 'authenticated')::text, true)) _;
+reset role;
+select public.increment_post_view(:pid);
+select view_count from public.post where id = :pid;
+rollback to s;
+
+savepoint s;
+\echo '[f 기대] 조회는 "수정됨"을 유발하지 않는다 (touch_updated_at의 WHEN 절 회귀)'
+select public.increment_post_view(:pid);
+select created_at <> updated_at as edited from public.post where id = :pid;
+rollback to s;
+
+-- ---------------------------------------------------------------------
+\echo ''
+\echo '=== 22. 답글 (comment.parent_id — 깊이 1) ==='
+savepoint s; :login_alice
+insert into public.comment (post_id, user_id, content) values (:pid, :'alice', '루트') returning id as rootid \gset
+\echo '[성공] 루트 댓글에 답글'
+insert into public.comment (post_id, user_id, content, parent_id) values (:pid, :'alice', '답글', :rootid) returning id as replyid \gset
+\echo '[거부 기대 P0001] 답글에 다시 답글'
+insert into public.comment (post_id, user_id, content, parent_id) values (:pid, :'alice', '답답글', :replyid);
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.comment (post_id, user_id, content) values (:bpid, :'alice', '남의 글 루트') returning id as otherid \gset
+\echo '[거부 기대 P0001] 다른 글의 댓글을 부모로'
+insert into public.comment (post_id, user_id, content, parent_id) values (:pid, :'alice', '답글', :otherid);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[거부 기대 P0001] 존재하지 않는 부모 (BEFORE 트리거가 FK보다 먼저 — 결정적)'
+insert into public.comment (post_id, user_id, content, parent_id) values (:pid, :'alice', '답글', 999999);
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.comment (post_id, user_id, content) values (:pid, :'alice', '루트') returning id as rootid \gset
+insert into public.comment (post_id, user_id, content, parent_id) values (:pid, :'alice', '답글1', :rootid);
+insert into public.comment (post_id, user_id, content, parent_id) values (:pid, :'alice', '답글2', :rootid);
+reset role;
+\echo '[3 기대] comment_count는 답글을 포함한 총합이다'
+select comment_count from public.post where id = :pid;
+:login_alice
+delete from public.comment where id = :rootid;
+reset role;
+\echo '[0 기대] 루트 삭제 시 cascade가 행마다 트리거를 발화시켜 정확히 감소한다'
+select comment_count from public.post where id = :pid;
+rollback to s;
+
+savepoint s; :login_bob
+insert into public.comment (post_id, user_id, content) values (:pid, :'bob', 'bob 루트') returning id as brootid \gset
+reset role; :login_alice
+insert into public.comment (post_id, user_id, content, parent_id) values (:pid, :'alice', 'alice 답글', :brootid);
+reset role; :login_bob
+\echo '[DELETE 1 / 남은 댓글 0 기대] ⚠ 수용된 결정: cascade는 RLS를 우회하므로'
+\echo '    루트 작성자(bob)가 자기 댓글을 지우면 남(alice)의 답글까지 사라진다.'
+\echo '    화면의 삭제 확인 문구가 이 사실을 알려야 한다.'
+delete from public.comment where id = :brootid;
+reset role;
+select count(*) from public.comment where post_id = :pid;
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.comment (post_id, user_id, content) values (:pid, :'alice', '루트') returning id as rootid \gset
+insert into public.comment (post_id, user_id, content, parent_id) values (:pid, :'alice', '답글', :rootid);
+select public.soft_delete_post(:pid);
+reset role; :login_anon
+\echo '[0 기대] 글이 소프트 삭제되면 답글도 함께 감춰진다 (comment_select_alive_post)'
+select count(*) from public.comment where post_id = :pid;
+rollback to s;
 
 rollback;
 \echo ''

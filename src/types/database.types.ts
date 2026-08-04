@@ -14,6 +14,7 @@ export type Database = {
           content: string
           created_at: string
           id: number
+          parent_id: number | null
           post_id: number
           user_id: string
         }
@@ -21,6 +22,7 @@ export type Database = {
           content: string
           created_at?: string
           id?: never
+          parent_id?: number | null
           post_id: number
           user_id: string
         }
@@ -28,10 +30,18 @@ export type Database = {
           content?: string
           created_at?: string
           id?: never
+          parent_id?: number | null
           post_id?: number
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "comment_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "comment"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "comment_post_id_fkey"
             columns: ["post_id"]
@@ -51,36 +61,45 @@ export type Database = {
       post: {
         Row: {
           author_id: string
+          category: Database["public"]["Enums"]["post_category"]
           comment_count: number
           content: string
           created_at: string
           deleted_at: string | null
+          excerpt: string
           id: number
           like_count: number
           title: string
           updated_at: string
+          view_count: number
         }
         Insert: {
           author_id: string
+          category: Database["public"]["Enums"]["post_category"]
           comment_count?: number
           content: string
           created_at?: string
           deleted_at?: string | null
+          excerpt?: string
           id?: never
           like_count?: number
           title: string
           updated_at?: string
+          view_count?: number
         }
         Update: {
           author_id?: string
+          category?: Database["public"]["Enums"]["post_category"]
           comment_count?: number
           content?: string
           created_at?: string
           deleted_at?: string | null
+          excerpt?: string
           id?: never
           like_count?: number
           title?: string
           updated_at?: string
+          view_count?: number
         }
         Relationships: [
           {
@@ -149,12 +168,13 @@ export type Database = {
     }
     Functions: {
       has_visible_char: { Args: { p_text: string }; Returns: boolean }
+      increment_post_view: { Args: { p_post_id: number }; Returns: undefined }
       post_is_alive: { Args: { p_id: number }; Returns: boolean }
       soft_delete_post: { Args: { p_post_id: number }; Returns: undefined }
       toggle_post_like: { Args: { p_post_id: number }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      post_category: "이적설" | "경기" | "선수" | "유니폼" | "잡담"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -281,7 +301,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      post_category: ["이적설", "경기", "선수", "유니폼", "잡담"],
+    },
   },
 } as const
 

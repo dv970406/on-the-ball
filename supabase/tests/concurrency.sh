@@ -50,8 +50,8 @@ echo "유저 ${#UIDS[@]}명 확보"
 # stdout에 섞어 변수가 오염된다
 POST_ID=$(psql "$DB" -tAc \
   "with i as (
-     insert into public.post (author_id, title, content)
-     values ('${UIDS[0]}', '동시성 테스트', '본문') returning id
+     insert into public.post (author_id, title, content, category)
+     values ('${UIDS[0]}', '동시성 테스트', '본문', '잡담') returning id
    ) select id from i")
 echo "게시글 id=$POST_ID"
 
