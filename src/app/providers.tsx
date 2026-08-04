@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/entities/session";
+import { ToastViewport } from "@/shared/ui";
 
 /** 전역 프로바이더 — TanStack Query + supabase 세션 동기화 */
 export function AppProviders({ children }: { children: ReactNode }) {
@@ -24,7 +25,14 @@ export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       {/* AuthProvider가 useQueryClient로 세션 변경 시 캐시를 무효화하므로 반드시 안쪽에 둔다 */}
-      <AuthProvider>{children}</AuthProvider>
+      <AuthProvider>
+        {children}
+        {/*
+          토스트는 라우트 전환을 넘어 살아남아야 한다 —
+          "글을 올렸어요"는 등록 후 **목록으로 이동한 뒤** 떠야 하므로 화면이 아니라 여기에 둔다.
+        */}
+        <ToastViewport />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
