@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Heart } from "lucide-react";
 import { signInWithNext } from "@/shared/config";
 import { cn, formatCount } from "@/shared/lib";
-import { Icon } from "@/shared/ui";
+import { ActionChip, Icon } from "@/shared/ui";
 import { useSessionStore } from "@/entities/session";
 import { useTogglePostLike } from "../model/use-toggle-post-like";
 
@@ -16,10 +16,10 @@ interface LikeButtonProps {
 }
 
 /**
- * 상세 화면의 좋아요 버튼.
+ * 상세 화면의 좋아요 칩 (프로토타입 `.cm-act`).
  *
- * 여기서는 좋아요가 이 뷰포트의 유일한 액션이라 활성 시 에메랄드를 쓴다
- * (목록 카드는 글쓰기 버튼이 컬러 이벤트를 가져가므로 잉크 래더로만 표현한다).
+ * 활성 시 배경이 에메랄드로 채워진다 — **이 화면의 유일한 컬러 이벤트**다
+ * (목록 카드는 잉크 래더로만 표현한다).
  *
  * disabled로 막지 않는다 — 낙관적 업데이트의 목적이 즉시 반응이고,
  * 최종 정답은 onSettled의 무효화가 확정한다.
@@ -29,19 +29,20 @@ export function LikeButton({ postId, likeCount, isLiked }: LikeButtonProps) {
   const pathname = usePathname();
   const toggleLike = useTogglePostLike(postId);
 
-  const className = cn(
-    "flex items-center gap-1.5 rounded-sm border px-3 py-1.5 text-[13px] transition-colors duration-150 ease-otb",
-    isLiked
-      ? "border-primary bg-primary/[0.12] text-primary-deep"
-      : "border-hairline-strong text-ink-mute",
-  );
-
-  // 비로그인은 아예 로그인으로 유도한다 — 훅의 RPC 호출은 어차피 DB가 거부한다
+  // 비로그인은 아예 로그인으로 유도한다 — 훅의 RPC 호출은 어차피 DB가 거부한다.
+  // Link 안에 button을 넣지 않으므로 ActionChip 대신 같은 클래스를 직접 재현한다.
   if (status !== "authenticated") {
     return (
-      <Link href={signInWithNext(pathname)} className={className}>
+      <Link
+        href={signInWithNext(pathname)}
+        className={cn(
+          "inline-flex h-9 items-center gap-1.5 rounded-full border border-hairline bg-canvas px-[13px]",
+          "font-mono text-xs tabular-nums text-ink-secondary no-underline",
+          "transition-colors duration-150 ease-otb",
+        )}
+      >
         <Icon as={Heart} size={15} />
-        <span className="tnum">{formatCount(likeCount)}</span>
+        {formatCount(likeCount)}
         <span className="sr-only">좋아요 (로그인 필요)</span>
       </Link>
     );
@@ -49,16 +50,15 @@ export function LikeButton({ postId, likeCount, isLiked }: LikeButtonProps) {
 
   return (
     <>
-      <button
-        type="button"
+      <ActionChip
+        icon={Heart}
+        active={isLiked}
         onClick={() => toggleLike.mutate()}
-        aria-pressed={isLiked}
-        className={className}
+        className={isLiked ? "[&_svg]:fill-current" : undefined}
       >
-        <Icon as={Heart} size={15} className={isLiked ? "fill-current" : undefined} />
-        <span className="tnum">{formatCount(likeCount)}</span>
+        {formatCount(likeCount)}
         <span className="sr-only">좋아요</span>
-      </button>
+      </ActionChip>
       {toggleLike.error && (
         <span role="alert" className="text-[12px] text-crimson">
           {toggleLike.error.message}

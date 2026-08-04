@@ -1,16 +1,27 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Button, MarkdownEditor, TextField } from "@/shared/ui";
-import { validatePost, type PostFieldErrors, type PostInput } from "../model/post-schema";
+import { BarChart2, Hash, Image as ImageIcon, Link2 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { cn, codePointLength } from "@/shared/lib";
+import { Chip, Dialog, Icon, buttonClassName } from "@/shared/ui";
+import { POST_CATEGORIES, type PostCategory } from "@/entities/post";
+import {
+  CONTENT_MAX,
+  validatePost,
+  type PostFieldErrors,
+  type PostInput,
+} from "../model/post-schema";
 
 interface PostFormProps {
+  /** 수정 모드면 헤더 문구와 이탈 방어 동작이 달라진다 */
+  mode: "create" | "edit";
   initial?: PostInput;
-  submitLabel: string;
-  pendingLabel: string;
   isPending: boolean;
   /** 훅이 한국어로 바꿔 던진 서버 에러 */
   error?: Error | null;
+  /** 취소 — 생성 모드에서 입력이 있으면 이탈 확인을 거친 뒤 호출된다 */
+  onCancel: () => void;
   /**
    * ⚠ **반드시 `isPending`을 토글하는 뮤테이션을 시작해야 한다.**
    *   중복 제출 가드가 자기가 잠근 자물쇠를 `isPending`이 false로 돌아올 때 푼다.
@@ -19,18 +30,56 @@ interface PostFormProps {
   onSubmit: (input: PostInput) => void;
 }
 
-/** 작성·수정 공용 폼 — 두 화면이 같은 필드·같은 검증을 쓰므로 한 곳에 둔다 */
+/** 하단 툴바의 첨부 아이콘 — 핸드오프 7장이 "아직 구현하지 않은 것"으로 못박은 기능들 */
+const TOOLS: { icon: LucideIcon; label: string }[] = [
+  { icon: ImageIcon, label: "사진 첨부" },
+  { icon: BarChart2, label: "투표 첨부" },
+  { icon: Link2, label: "링크 첨부" },
+  { icon: Hash, label: "해시태그" },
+];
+
+/**
+ * 작성·수정 공용 에디터 화면 (프로토타입 `screen-community-editor`).
+ * 두 화면이 같은 필드·같은 검증·같은 헤더를 쓰므로 한 곳에 둔다.
+ *
+ * 본문은 **마크다운 원문**을 그대로 담는다(상세에서 Markdown 컴포넌트가 렌더한다).
+ * 프로토타입에 미리보기 탭이 없으므로 MarkdownEditor(작성/미리보기 토글)는 쓰지 않는다.
+ */
 export function PostForm({
+  mode,
   initial,
-  submitLabel,
-  pendingLabel,
   isPending,
   error,
+  onCancel,
   onSubmit,
 }: PostFormProps) {
+  const editing = mode === "edit";
+  const [category, setCategory] = useState<PostCategory | "">(initial?.category ?? "");
   const [title, setTitle] = useState(initial?.title ?? "");
   const [content, setContent] = useState(initial?.content ?? "");
   const [fieldErrors, setFieldErrors] = useState<PostFieldErrors>({});
+  const [savedAt, setSavedAt] = useState("");
+  const [askLeave, setAskLeave] = useState(false);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+
+  const dirty = title.trim().length > 0 || content.trim().length > 0 || category !== "";
+  // 등록 활성 조건 — 말머리 선택 + 스키마 통과. 실제 검증은 제출 시 validatePost가 한다.
+  const ready = validatePost({ category, title, content }).ok;
+
+  /** 본문 textarea 자동 높이 확장 — scrollHeight를 그대로 반영한다 */
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [content]);
+
+  /** 임시저장 캡션 — 입력이 멎고 900ms 뒤에 뜬다(실제 저장은 하지 않는다, 핸드오프 7장) */
+  useEffect(() => {
+    if (!dirty) return;
+    const timer = setTimeout(() => setSavedAt("임시저장됨 · 방금"), 900);
+    return () => clearTimeout(timer);
+  }, [dirty, category, title, content]);
 
   /**
    * 중복 제출 동기 가드.
@@ -52,7 +101,7 @@ export function PostForm({
     e.preventDefault();
     if (submittingRef.current) return;
 
-    const result = validatePost({ title, content });
+    const result = validatePost({ category, title, content });
     if (!result.ok) {
       setFieldErrors(result.errors);
       return;
@@ -62,46 +111,171 @@ export function PostForm({
     onSubmit(result.value);
   };
 
+  /** 이탈 방어는 **생성 모드에서만** — 수정은 원본이 남아 있으므로 바로 돌아간다 */
+  const handleCancel = () => {
+    if (!editing && dirty) setAskLeave(true);
+    else onCancel();
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5 px-5 py-5">
-      {/*
-        ⚠ maxLength를 걸지 않는다. 브라우저의 maxLength는 UTF-16 코드유닛을 세므로
-          이모지 제목이 한도의 절반(60개)에서 **아무 안내 없이 잘렸다.**
-          한도 검사는 DB와 같은 단위(코드포인트)를 쓰는 validatePost가 맡고,
-          넘치면 메시지로 알려준다.
-      */}
-      <TextField
-        label="제목"
-        name="title"
-        placeholder="제목을 입력하세요"
-        value={title}
-        error={fieldErrors.title}
-        onChange={(e) => {
-          setTitle(e.target.value);
-          setFieldErrors((prev) => ({ ...prev, title: undefined }));
-        }}
+    <>
+      <main className="h-full overflow-y-auto pb-[calc(140px+env(safe-area-inset-bottom))]">
+        <h1 className="sr-only">{editing ? "글 수정" : "글쓰기"}</h1>
+
+        <form onSubmit={handleSubmit}>
+          <header className="sticky top-0 z-20 flex items-center border-b border-hairline-cool bg-canvas px-2 pb-2.5 pt-[max(16px,env(safe-area-inset-top))]">
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="px-2.5 py-2 text-sm font-medium text-ink-mute"
+            >
+              취소
+            </button>
+            {/*
+              중앙 제목은 절대 위치 + pointer-events-none — 좌우 버튼의 히트 영역을 덮지 않는다.
+              시각 요소일 뿐이므로 스크린리더에는 위의 sr-only h1이 이미 같은 정보를 준다.
+            */}
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 text-center text-[15px] font-semibold tracking-[-0.3px] text-ink"
+            >
+              {editing ? "글 수정" : "글쓰기"}
+            </span>
+            <div className="z-1 ml-auto">
+              {/* 이 화면의 유일한 컬러 이벤트 */}
+              <button
+                type="submit"
+                disabled={!ready || isPending}
+                className={buttonClassName({ size: "sm", disabled: !ready || isPending })}
+              >
+                {editing ? "수정 완료" : "등록"}
+              </button>
+            </div>
+          </header>
+
+          <div className="px-5 pt-4">
+            {/* 말머리 — 필수. "전체"는 필터 전용이라 여기엔 없다 */}
+            <fieldset>
+              <legend className="sr-only">말머리</legend>
+              <div className="flex flex-wrap gap-1.5">
+                {POST_CATEGORIES.map((item) => (
+                  <Chip
+                    key={item}
+                    selected={category === item}
+                    onClick={() => {
+                      setCategory(item);
+                      setFieldErrors((prev) => ({ ...prev, category: undefined }));
+                    }}
+                  >
+                    {item}
+                  </Chip>
+                ))}
+              </div>
+            </fieldset>
+            {!category && (
+              <p className="mt-2.5 text-[11px] text-ink-faint">말머리를 하나 골라 주세요</p>
+            )}
+            {fieldErrors.category && category && (
+              <p role="alert" className="mt-2.5 text-[11px] text-crimson">
+                {fieldErrors.category}
+              </p>
+            )}
+
+            {/*
+              ⚠ maxLength를 걸지 않는다. 브라우저의 maxLength는 UTF-16 코드유닛을 세므로
+                이모지 제목이 한도의 절반에서 **아무 안내 없이 잘렸다.**
+                한도 검사는 DB와 같은 단위(코드포인트)를 쓰는 validatePost가 맡는다.
+            */}
+            <div className="mt-[22px]">
+              <label htmlFor="post-title" className="sr-only">
+                제목
+              </label>
+              <input
+                id="post-title"
+                name="title"
+                placeholder="제목을 입력하세요"
+                value={title}
+                aria-invalid={fieldErrors.title ? true : undefined}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  setFieldErrors((prev) => ({ ...prev, title: undefined }));
+                }}
+                className="w-full border-0 bg-transparent p-0 text-2xl font-medium leading-[1.3] tracking-[-0.7px] text-ink outline-none placeholder:text-ink-faint"
+              />
+            </div>
+            {fieldErrors.title && (
+              <p role="alert" className="mt-2 text-[12px] text-crimson">
+                {fieldErrors.title}
+              </p>
+            )}
+
+            <hr className="my-4 border-0 border-t border-hairline-cool" />
+
+            <label htmlFor="post-content" className="sr-only">
+              내용
+            </label>
+            <textarea
+              id="post-content"
+              ref={bodyRef}
+              name="content"
+              rows={1}
+              placeholder={"무슨 얘기를 나눌까요?\n소문이면 출처를 같이 적어주면 좋아요."}
+              value={content}
+              aria-invalid={fieldErrors.content ? true : undefined}
+              onChange={(e) => {
+                setContent(e.target.value);
+                setFieldErrors((prev) => ({ ...prev, content: undefined }));
+              }}
+              className="min-h-[180px] w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-[15px] leading-[1.65] text-ink-secondary outline-none placeholder:text-ink-faint"
+            />
+            {fieldErrors.content && (
+              <p role="alert" className="mt-2 text-[12px] text-crimson">
+                {fieldErrors.content}
+              </p>
+            )}
+
+            {error && (
+              <p role="alert" className="mt-4 text-[13px] leading-[1.5] text-crimson">
+                {error.message}
+              </p>
+            )}
+
+            <p className="mt-5 font-mono text-[10px] tracking-[0.3px] text-ink-faint">{savedAt}</p>
+          </div>
+        </form>
+      </main>
+
+      {/* 하단 고정 툴바 — 첨부 4종은 자리만, 우측은 글자 수 카운터 */}
+      <div className="absolute inset-x-0 bottom-0 z-[60] flex items-center gap-1 border-t border-hairline-cool bg-canvas px-3.5 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5">
+        {TOOLS.map((tool) => (
+          <button
+            key={tool.label}
+            type="button"
+            aria-label={tool.label}
+            aria-disabled
+            className={cn(
+              "pointer-events-none flex size-11 items-center justify-center rounded-sm text-ink-secondary opacity-40",
+            )}
+          >
+            <Icon as={tool.icon} size={20} />
+          </button>
+        ))}
+        {/* ⚠ 코드포인트로 센다 — .length(UTF-16)로 세면 이모지가 2로 잡혀 DB 한도와 어긋난다 */}
+        <span className="ml-auto font-mono text-[11px] tabular-nums text-ink-faint">
+          {codePointLength(content).toLocaleString("ko-KR")} /{" "}
+          {CONTENT_MAX.toLocaleString("ko-KR")}
+        </span>
+      </div>
+
+      <Dialog
+        open={askLeave}
+        onCancel={() => setAskLeave(false)}
+        onConfirm={onCancel}
+        title="작성을 그만둘까요?"
+        description="지금까지 쓴 내용은 임시저장함에 남겨둘게요."
+        cancelLabel="계속 쓰기"
+        confirmLabel="나가기"
       />
-
-      <MarkdownEditor
-        label="내용 (마크다운)"
-        value={content}
-        placeholder={"# 제목\n\n**굵게**, *기울임*, `코드`\n\n- 목록\n- 항목"}
-        error={fieldErrors.content}
-        onChange={(next) => {
-          setContent(next);
-          setFieldErrors((prev) => ({ ...prev, content: undefined }));
-        }}
-      />
-
-      {error && (
-        <p role="alert" className="text-[13px] leading-[1.5] text-crimson">
-          {error.message}
-        </p>
-      )}
-
-      <Button type="submit" block disabled={isPending}>
-        {isPending ? pendingLabel : submitLabel}
-      </Button>
-    </form>
+    </>
   );
 }

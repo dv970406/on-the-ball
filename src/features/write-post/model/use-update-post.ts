@@ -10,11 +10,11 @@ export function useUpdatePost(postId: number) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ title, content }: PostInput) => {
+    mutationFn: async ({ category, title, content }: PostInput) => {
       const supabase = requireBrowserSupabase();
       const { data, error } = await supabase
         .from("post")
-        .update({ title, content })
+        .update({ category, title, content })
         .eq("id", postId)
         .select("id");
 

@@ -1,7 +1,9 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
+import { startOfTodaySeoul } from "@/shared/lib/format";
+import type { PostListFilters, PostListPage } from "../model/types";
 import { postKeys } from "./keys";
 import {
   POST_DETAIL_SELECT,
@@ -19,22 +21,41 @@ import {
 export const POST_LIST_LIMIT = 30;
 
 /**
- * 게시글 목록.
+ * 게시글 목록 (말머리 필터 + 정렬).
  *
  * 삭제된 글은 RLS의 post_select_alive가 걸러주므로 .is("deleted_at", null)을 붙이지 않는다.
  * 필터를 쿼리마다 반복하면 한 곳만 빠뜨려도 삭제된 글이 새기 때문에, 정책에 박아 두었다.
+ *
+ * ⚠ count: "exact"로 **목록과 `N POSTS`를 한 왕복에** 얻는다. 카운트를 별도 쿼리로 빼면
+ *   필터를 바꿀 때마다 왕복이 2배가 된다.
+ * ⚠ placeholderData: 필터를 바꿀 때마다 새 캐시 키라 그냥 두면 isPending이 되어 스켈레톤이
+ *   튄다("로딩 중 레이아웃이 튀지 않게 한다" — data-and-state.md).
  */
-export function usePostListQuery() {
-  return useQuery({
-    queryKey: postKeys.list(),
+export function usePostListQuery(filters: PostListFilters) {
+  return useQuery<PostListPage, Error>({
+    queryKey: postKeys.list(filters),
+    placeholderData: keepPreviousData,
     queryFn: async () => {
       const supabase = requireBrowserSupabase();
-      const { data, error } = await supabase
-        .from("post")
-        .select(POST_LIST_SELECT)
-        .order("created_at", { ascending: false })
-        // id를 2차 정렬키로 둔다 — 같은 created_at이 여러 건이면 순서가 불안정해지고,
-        // 페이지네이션을 붙이는 순간 경계에서 행 중복·누락으로 드러난다(댓글 목록과 같은 규약).
+      let query = supabase.from("post").select(POST_LIST_SELECT, { count: "exact" });
+
+      if (filters.category !== null) query = query.eq("category", filters.category);
+
+      // 정렬 키가 무엇이든 **마지막은 항상 id**다 — 동점이면 순서가 불안정해지고,
+      // 페이지네이션을 붙이는 순간 경계에서 행 중복·누락으로 드러난다(댓글 목록과 같은 규약).
+      if (filters.sort === "popular") {
+        query = query
+          .order("like_count", { ascending: false })
+          .order("created_at", { ascending: false });
+      } else if (filters.sort === "comments") {
+        query = query
+          .order("comment_count", { ascending: false })
+          .order("created_at", { ascending: false });
+      } else {
+        query = query.order("created_at", { ascending: false });
+      }
+
+      const { data, error, count } = await query
         .order("id", { ascending: false })
         .limit(POST_LIST_LIMIT);
 
@@ -42,7 +63,34 @@ export function usePostListQuery() {
         console.error("[post] 목록 조회 실패:", error);
         throw new Error(toDbErrorMessage(error));
       }
-      return (data ?? []).map(buildPostListItem);
+      const items = (data ?? []).map(buildPostListItem);
+      // count가 null인 경우(헤드 요청 실패 등)는 화면 라벨이 0을 찍는 것보다 실제 개수가 낫다
+      return { items, total: count ?? items.length };
+    },
+  });
+}
+
+/**
+ * 오늘(한국 기준) 올라온 글 수 — 목록 헤드의 "오늘 N개의 글이 올라왔어요".
+ * head: true라 행을 받지 않고 카운트만 가져온다.
+ */
+export function useTodayPostCountQuery() {
+  return useQuery<number, Error>({
+    queryKey: postKeys.todayCount(),
+    queryFn: async () => {
+      const supabase = requireBrowserSupabase();
+      // ⚠ 시각은 queryFn 안에서만 읽는다 — queryKey에 넣으면 매 렌더 새 키가 되고,
+      //   렌더 중에 부르면 하이드레이션 규약(Date.now 금지)을 어긴다.
+      const { count, error } = await supabase
+        .from("post")
+        .select("id", { count: "exact", head: true })
+        .gte("created_at", startOfTodaySeoul());
+
+      if (error) {
+        console.error("[post] 오늘 글 수 조회 실패:", error);
+        throw new Error(toDbErrorMessage(error));
+      }
+      return count ?? 0;
     },
   });
 }

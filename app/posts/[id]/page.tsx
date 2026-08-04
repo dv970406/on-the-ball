@@ -4,6 +4,9 @@ import { notFound, unstable_rethrow } from "next/navigation";
 // proxy(서버 가드)·수정 페이지와 같은 파서를 공유한다 — post-id 주석 참고
 import { parsePostId } from "@/shared/lib/post-id";
 import { createSupabaseServerClient } from "@/shared/api/supabase-server";
+// ⚠ 배럴(@/entities/post)이 아니라 직접 경로 — 배럴은 "use client" 모듈을 포함한다.
+//   목록 카드의 발췌와 **같은 변환기**를 쓴다(둘이 갈리면 화면과 공유 프리뷰의 요약이 달라진다).
+import { clamp, toPlainSummary } from "@/entities/post/lib/plain-summary";
 import { PostDetailView } from "@/views/post-detail";
 
 const FALLBACK_METADATA: Metadata = { title: "게시글" };
@@ -19,31 +22,6 @@ type PostHead =
   | { state: "missing" }
   /** 조회 자체가 실패 — 일시 장애로 멀쩡한 글을 없다고 단정하면 안 되므로 구분한다 */
   | { state: "unknown" };
-
-/** 길면 말줄임 — 잘린 자리에 …를 남겨 원문이 더 있음을 알린다 */
-function clamp(text: string, max: number): string {
-  const chars = [...text.trim()];
-  return chars.length <= max ? chars.join("") : `${chars.slice(0, max - 1).join("")}…`;
-}
-
-/**
- * 마크다운 원문 → 공유 프리뷰용 한 줄 요약.
- * 렌더러를 돌리지 않고 기호만 걷어낸다(서버에서 react-markdown을 태울 이유가 없다).
- */
-function toPlainSummary(markdown: string): string {
-  const plain = markdown
-    .replace(/```[\s\S]*?```/g, " ") // 펜스 코드블록
-    .replace(/`([^`]*)`/g, "$1") // 인라인 코드
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ") // 이미지
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1") // 링크는 텍스트만
-    .replace(/^\s{0,3}>+\s?/gm, "") // 인용
-    .replace(/^\s{0,3}#{1,6}\s+/gm, "") // 헤딩
-    .replace(/^\s{0,3}([-*+]|\d+\.)\s+/gm, "") // 목록 마커
-    .replace(/^\s{0,3}([-*_])\s*(\1\s*){2,}$/gm, " ") // 수평선
-    .replace(/[*_~]/g, "") // 강조 기호
-    .replace(/\s+/g, " ");
-  return clamp(plain, META_DESCRIPTION_MAX);
-}
 
 /**
  * generateMetadata와 Page가 같은 요청에서 함께 쓴다.
@@ -96,7 +74,7 @@ export async function generateMetadata(props: PageProps<"/posts/[id]">): Promise
   if (head.state !== "found") return FALLBACK_METADATA;
 
   const title = clamp(head.title, META_TITLE_MAX);
-  const description = toPlainSummary(head.content);
+  const description = toPlainSummary(head.content, META_DESCRIPTION_MAX);
 
   return {
     title,

@@ -12,7 +12,7 @@ export function useCreatePost() {
   const user = useSessionStore((s) => s.user);
 
   return useMutation({
-    mutationFn: async ({ title, content }: PostInput) => {
+    mutationFn: async ({ category, title, content }: PostInput) => {
       const supabase = requireBrowserSupabase();
       if (!user) throw new Error("로그인이 필요해요.");
 
@@ -20,7 +20,7 @@ export function useCreatePost() {
         .from("post")
         // author_id를 클라이언트가 넣지만 RLS의 with check가 auth.uid()와 대조한다 →
         // 남의 명의로 쓰려 하면 정책 위반으로 거부된다
-        .insert({ author_id: user.id, title, content })
+        .insert({ author_id: user.id, category, title, content })
         .select("id")
         .single();
 
@@ -36,6 +36,9 @@ export function useCreatePost() {
     //   버튼이 "등록 중…"인 채 이동이 지연된다(삭제 훅과 같은 규약).
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: postKeys.lists() });
+      // ⚠ todayCount는 lists() prefix에 걸리지 않는다 — 따로 무효화하지 않으면
+      //   글을 올려도 목록 헤드의 "오늘 N개"가 그대로 남는다.
+      void queryClient.invalidateQueries({ queryKey: postKeys.todayCount() });
     },
   });
 }

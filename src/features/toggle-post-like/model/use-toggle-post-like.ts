@@ -2,11 +2,19 @@
 
 import { useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
-import { postKeys, type PostDetail, type PostListItem } from "@/entities/post";
+import {
+  postKeys,
+  type PostDetail,
+  type PostListItem,
+  type PostListPage,
+} from "@/entities/post";
 
-/** 롤백용 스냅샷 — 목록은 키가 여러 개일 수 있어 전부 담는다 */
+/**
+ * 롤백용 스냅샷 — 목록은 말머리·정렬 조합마다 키가 달라 **여러 개**다. 전부 담는다.
+ * (그래서 setQueryData가 아니라 setQueriesData를 쓴다)
+ */
 interface LikeSnapshot {
-  lists: [QueryKey, PostListItem[] | undefined][];
+  lists: [QueryKey, PostListPage | undefined][];
   detail: PostDetail | undefined;
 }
 
@@ -55,13 +63,14 @@ export function useTogglePostLike(postId: number) {
       ]);
 
       const snapshot: LikeSnapshot = {
-        lists: queryClient.getQueriesData<PostListItem[]>({ queryKey: postKeys.lists() }),
+        lists: queryClient.getQueriesData<PostListPage>({ queryKey: postKeys.lists() }),
         detail: queryClient.getQueryData<PostDetail>(postKeys.detail(postId)),
       };
 
-      // setQueryData가 아니라 setQueriesData(복수형) — 목록 캐시가 여러 키에 존재할 수 있다
-      queryClient.setQueriesData<PostListItem[]>({ queryKey: postKeys.lists() }, (old) =>
-        old?.map((post) => toggled(post, postId)),
+      // setQueryData가 아니라 setQueriesData(복수형) — 목록 캐시가 여러 키에 존재할 수 있다.
+      // total은 좋아요로 바뀌지 않으므로 items만 손댄다.
+      queryClient.setQueriesData<PostListPage>({ queryKey: postKeys.lists() }, (old) =>
+        old ? { ...old, items: old.items.map((post) => toggled(post, postId)) } : old,
       );
       queryClient.setQueryData<PostDetail>(postKeys.detail(postId), (old) =>
         old ? toggled(old, postId) : old,

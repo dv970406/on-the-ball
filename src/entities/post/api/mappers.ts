@@ -1,3 +1,4 @@
+import { toPlainSummary } from "../lib/plain-summary";
 import type {
   PostDetail,
   PostLikeRow,
@@ -11,9 +12,12 @@ import type {
  * 순수 함수라 서버에서도 import할 수 있다("use client" 없음).
  */
 
+/** 목록 카드 발췌의 최대 길이 — 13px 2행 클램프에 맞춘 값(CSS가 최종 컷을 한다) */
+const EXCERPT_MAX = 120;
+
 /** 목록·상세가 공유하는 select 컬럼 목록 — 스키마가 바뀌면 여기 한 곳만 고친다 */
 const BASE_COLUMNS =
-  "id, author_id, title, like_count, comment_count, created_at, updated_at";
+  "id, author_id, category, title, like_count, comment_count, view_count, created_at, updated_at";
 
 // ⚠ 그냥 `profiles(nickname)`이라고 쓰면 PGRST201로 실패한다 —
 //   post → profiles 경로가 둘(author_id 직접 FK / post_like 경유 many-to-many)이라 모호하다.
@@ -22,7 +26,10 @@ const AUTHOR_EMBED = "author:author_id(nickname)";
 // post_like는 SELECT 정책이 "내 행만"이라 결과 배열이 곧 "내가 눌렀는지"다
 const MY_LIKE_EMBED = "post_like(user_id)";
 
-export const POST_LIST_SELECT = `${BASE_COLUMNS}, ${AUTHOR_EMBED}, ${MY_LIKE_EMBED}`;
+// ⚠ 목록은 content가 아니라 **excerpt**(generated column = content의 앞 300자)를 받는다.
+//   content(최대 20000자)를 30건 실어 보내면 최악 600KB다.
+export const POST_LIST_SELECT = `${BASE_COLUMNS}, excerpt, ${AUTHOR_EMBED}, ${MY_LIKE_EMBED}`;
+// 상세는 본문 전체가 필요하다. excerpt는 content에서 파생하므로 여기서 다시 받지 않는다.
 export const POST_DETAIL_SELECT = `${BASE_COLUMNS}, content, ${AUTHOR_EMBED}, ${MY_LIKE_EMBED}`;
 
 /**
@@ -32,21 +39,35 @@ export const POST_DETAIL_SELECT = `${BASE_COLUMNS}, content, ${AUTHOR_EMBED}, ${
  */
 type PostSelectRow = Pick<
   PostRow,
-  "id" | "author_id" | "title" | "like_count" | "comment_count" | "created_at" | "updated_at"
+  | "id"
+  | "author_id"
+  | "category"
+  | "title"
+  | "like_count"
+  | "comment_count"
+  | "view_count"
+  | "created_at"
+  | "updated_at"
 > & {
+  /** 목록에만 온다 */
+  excerpt?: PostRow["excerpt"];
+  /** 상세에만 온다 */
   content?: PostRow["content"];
   author: Pick<ProfileRow, "nickname"> | null;
   post_like: Pick<PostLikeRow, "user_id">[] | null;
 };
 
-function mapBase(row: PostSelectRow): PostListItem {
+function mapBase(row: PostSelectRow, source: string): PostListItem {
   return {
     id: row.id,
     authorId: row.author_id,
     authorNickname: row.author?.nickname ?? "알 수 없음",
+    category: row.category,
     title: row.title,
+    excerpt: toPlainSummary(source, EXCERPT_MAX),
     likeCount: row.like_count,
     commentCount: row.comment_count,
+    viewCount: row.view_count,
     // post_like의 SELECT 정책이 "내 행만"이라 임베딩 결과에 남의 좋아요가 섞일 수 없다.
     // 별도 user_id 필터를 잊어 남의 좋아요가 새는 사고가 구조적으로 불가능하다.
     isLiked: (row.post_like?.length ?? 0) > 0,
@@ -56,11 +77,13 @@ function mapBase(row: PostSelectRow): PostListItem {
 }
 
 export function buildPostListItem(row: PostSelectRow): PostListItem {
-  return mapBase(row);
+  return mapBase(row, row.excerpt ?? "");
 }
 
 export function buildPostDetail(row: PostSelectRow): PostDetail {
-  return { ...mapBase(row), content: row.content ?? "" };
+  const content = row.content ?? "";
+  // 상세는 content 전체를 받으므로 발췌도 원문에서 만든다(excerpt 컬럼을 다시 받을 이유가 없다).
+  return { ...mapBase(row, content), content };
 }
 
 /** 수정된 글인지 — created_at과 updated_at이 다르면 수정됨 (트리거가 서버 시각으로 찍는다) */
