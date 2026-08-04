@@ -121,6 +121,36 @@ button {
   cursor: pointer;
 }
 
+/* =========================================================
+   오버레이 모션 (시트·다이얼로그·토스트)
+
+   ⚠ @theme 토큰이 아니라 **일반 @keyframes**다 — 토큰 블록은 동결이므로 열지 않았다.
+     소비는 arbitrary 유틸로 한다: animate-[cm-fade_0.2s_cubic-bezier(0.2,0,0,1)_both]
+     (styling.md "그 외는 전부 인라인 arbitrary" 기준).
+   ⚠ 스크림·다이얼로그는 **불투명도만** 움직인다. 기존 fade-up은 translateY가 섞여 있어
+     화면 가운데 고정된 다이얼로그에는 쓸 수 없다.
+   위 prefers-reduced-motion 블록이 duration을 0.01ms로 눌러 자동으로 존중된다.
+   ========================================================= */
+@keyframes cm-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cm-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* 모션 최소화 환경 존중 — 트랜지션/애니메이션 0ms */
 @media (prefers-reduced-motion: reduce) {
   *,

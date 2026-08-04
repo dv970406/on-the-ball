@@ -1,15 +1,17 @@
 export { cn } from "./cn";
 export { useDelayedReveal } from "./use-delayed-reveal";
-export { useScrollRestore } from "./use-scroll-restore";
+export { useScrollRestore, clearScrollRestore } from "./use-scroll-restore";
 export {
   formatCount,
   formatPct,
   formatDday,
   isClosed,
   todayUtc,
+  startOfTodaySeoul,
   formatYearMonth,
   formatRelativeTime,
 } from "./format";
+export { useNowMs } from "./use-now";
 export { parsePostId } from "./post-id";
 export { hasVisibleChar, codePointLength } from "./text";
 export { useNextParam } from "./use-next-param";
