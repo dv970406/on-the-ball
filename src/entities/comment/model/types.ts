@@ -16,5 +16,13 @@ export interface Comment {
   /** profiles 임베딩에서 온다 */
   authorNickname: ProfileRow["nickname"];
   content: CommentRow["content"];
+  /** null = 루트 댓글. 깊이는 DB 트리거(check_comment_depth)가 1로 제한한다 */
+  parentId: CommentRow["parent_id"];
   createdAt: CommentRow["created_at"];
+}
+
+/** 루트 댓글 + 그 답글들. 깊이 1까지만이라 replies 안에 또 스레드가 들어가지 않는다 */
+export interface CommentThread {
+  comment: Comment;
+  replies: Comment[];
 }

@@ -1,41 +1,94 @@
 "use client";
 
+import { Fragment, useState } from "react";
 import { formatCount } from "@/shared/lib";
-import { EmptyState, Skeleton } from "@/shared/ui";
-import { COMMENT_LIST_LIMIT, CommentItem, useCommentListQuery } from "@/entities/comment";
+import { Dialog, EmptyState, Skeleton, useToast } from "@/shared/ui";
+import {
+  COMMENT_LIST_LIMIT,
+  CommentItem,
+  buildCommentThreads,
+  useCommentListQuery,
+  type Comment,
+} from "@/entities/comment";
 import { useSessionStore } from "@/entities/session";
 import { useDeleteComment } from "@/features/delete-comment";
-import { CommentForm } from "./comment-form";
+import type { ReplyTarget } from "./comment-bar";
 
 interface CommentSectionProps {
   postId: number;
-  /** 글의 comment_count (DB 트리거가 관리하는 진실값) */
+  /** 글의 comment_count (DB 트리거가 관리하는 진실값 — 답글 포함 총합) */
   commentCount: number;
+  /** 글 작성자 — `작성자` 배지 판정용 */
+  postAuthorId: string;
+  onReply: (target: ReplyTarget) => void;
 }
 
-export function CommentSection({ postId, commentCount }: CommentSectionProps) {
+export function CommentSection({
+  postId,
+  commentCount,
+  postAuthorId,
+  onReply,
+}: CommentSectionProps) {
   const { data: comments, isPending, error, refetch } = useCommentListQuery(postId);
   const user = useSessionStore((s) => s.user);
   const deleteComment = useDeleteComment(postId);
+  const toast = useToast();
+  /** 답글이 달린 루트 댓글은 cascade로 남의 답글까지 지우므로 확인을 받는다 */
+  const [confirmTarget, setConfirmTarget] = useState<{ id: number; replyCount: number } | null>(
+    null,
+  );
 
   // 목록은 최근 COMMENT_LIST_LIMIT개만 가져오므로 헤딩 카운트는 글의 값(트리거가 관리)을 쓴다 —
-  // comments.length를 쓰면 상단 헤딩과 하단 footer 숫자가 어긋난다.
+  // comments.length를 쓰면 상단 헤딩과 액션 바 숫자가 어긋난다.
   //
   // ⚠ 잘림 판정은 **목록 길이만으로** 한다. `commentCount > comments.length`로 하면,
   //   댓글 작성 후 글 상세와 댓글 목록이 병렬로 무효화되는 사이 상세가 먼저 도착했을 때
   //   (카운트 6 / 목록 5) 댓글 6개짜리 글에 "최근 200개만 표시" 문구가 잘못 뜬다.
   const truncated = (comments?.length ?? 0) >= COMMENT_LIST_LIMIT;
+  const threads = comments ? buildCommentThreads(comments) : undefined;
+
+  const removeComment = (commentId: number) => {
+    deleteComment.mutate(commentId, {
+      onSuccess: () => toast("댓글을 삭제했어요"),
+    });
+  };
+
+  /** 삭제 버튼 — 답글이 달린 루트면 확인 다이얼로그를 거친다 */
+  const deleteAction = (comment: Comment, replyCount: number) => {
+    if (comment.userId !== user?.id) return undefined;
+    const busy = deleteComment.isPending && deleteComment.variables === comment.id;
+    return (
+      <button
+        type="button"
+        onClick={() =>
+          replyCount > 0
+            ? setConfirmTarget({ id: comment.id, replyCount })
+            : removeComment(comment.id)
+        }
+        // 훅은 하나지만 variables로 "지금 지우는 중인 댓글"을 특정한다 →
+        // 한 개를 지우는 동안 나머지 삭제 버튼까지 잠기지 않는다
+        disabled={busy}
+        // 시각 크기는 그대로 두고 히트 영역만 44px까지 넓힌다(ActionChip과 같은 방식)
+        className="relative py-1.5 text-[11px] text-ink-faint after:absolute after:-inset-x-3.5 after:-inset-y-2 after:content-[''] disabled:opacity-40"
+      >
+        {busy ? "삭제 중…" : "삭제"}
+      </button>
+    );
+  };
 
   return (
-    <section className="px-5 pb-10" aria-labelledby="comment-heading">
-      <h2 id="comment-heading" className="mb-3 text-[15px] font-semibold text-ink">
-        댓글 {formatCount(commentCount)}
-      </h2>
-
-      <CommentForm postId={postId} />
+    <section aria-labelledby="comment-heading">
+      <div className="flex items-baseline gap-1.5 px-5 pb-1 pt-[18px]">
+        <h2 id="comment-heading" className="text-[15px] font-semibold tracking-[-0.3px] text-ink">
+          댓글
+        </h2>
+        <span className="font-mono text-xs tabular-nums text-primary-deep">
+          {formatCount(commentCount)}
+        </span>
+      </div>
 
       {isPending && (
-        <div className="mt-4 flex flex-col gap-3">
+        <div className="flex flex-col gap-3 px-5 py-4">
           <Skeleton className="h-14 w-full" />
           <Skeleton className="h-14 w-full" />
         </div>
@@ -58,7 +111,7 @@ export function CommentSection({ postId, commentCount }: CommentSectionProps) {
       )}
 
       {error && comments && (
-        <p role="status" className="mt-3 text-center text-[12px] text-ink-mute-2">
+        <p role="status" className="px-5 py-3 text-center text-[12px] text-ink-mute-2">
           최신 댓글을 불러오지 못했어요.{" "}
           <button
             type="button"
@@ -70,50 +123,71 @@ export function CommentSection({ postId, commentCount }: CommentSectionProps) {
         </p>
       )}
 
-      {comments && comments.length === 0 && (
-        <p className="py-8 text-center text-[13px] text-ink-mute-2">
-          첫 댓글을 남겨보세요.
-        </p>
+      {threads && threads.length === 0 && (
+        <p className="py-8 text-center text-[13px] text-ink-mute-2">첫 댓글을 남겨보세요.</p>
       )}
 
-      {comments && comments.length > 0 && truncated && (
-        <p className="mt-3 text-center text-[12px] text-ink-mute-2">
+      {threads && threads.length > 0 && truncated && (
+        <p className="px-5 py-2 text-center text-[12px] text-ink-mute-2">
           최근 {formatCount(COMMENT_LIST_LIMIT)}개만 표시하고 있어요.
         </p>
       )}
 
-      {comments && comments.length > 0 && (
-        <ul className="mt-2">
-          {comments.map((comment) => (
-            <CommentItem
-              key={comment.id}
-              comment={comment}
-              action={
-                comment.userId === user?.id ? (
-                  <button
-                    type="button"
-                    onClick={() => deleteComment.mutate(comment.id)}
-                    // 훅은 하나지만 variables로 "지금 지우는 중인 댓글"을 특정한다 →
-                    // 한 개를 지우는 동안 나머지 삭제 버튼까지 잠기지 않는다
-                    disabled={deleteComment.isPending && deleteComment.variables === comment.id}
-                    className="text-[12px] text-ink-mute-2 underline underline-offset-2 disabled:opacity-40"
-                  >
-                    {deleteComment.isPending && deleteComment.variables === comment.id
-                      ? "삭제 중…"
-                      : "삭제"}
-                  </button>
-                ) : undefined
-              }
-            />
+      {threads && threads.length > 0 && (
+        <ul>
+          {threads.map(({ comment, replies }) => (
+            // ⚠ 루트와 답글은 **형제 <li>** 로 나열한다. CommentItem이 자기 <li>를 그리므로
+            //   여기서 <li>로 한 번 더 감싸면 li 안의 li가 되어 잘못된 HTML + 하이드레이션
+            //   에러가 난다(실측). 중첩 <ul>을 만들지 않는 이유는 답글의 좌측 패딩이
+            //   프로토타입(44px 고정)과 어긋나고, 깊이가 1뿐이라 계층을 표현할 이유가 적어서다.
+            <Fragment key={comment.id}>
+              <CommentItem
+                comment={comment}
+                isAuthor={comment.userId === postAuthorId}
+                isMine={comment.userId === user?.id}
+                onReply={() =>
+                  onReply({ commentId: comment.id, nickname: comment.authorNickname })
+                }
+                deleteAction={deleteAction(comment, replies.length)}
+              />
+              {replies.map((reply) => (
+                <CommentItem
+                  key={reply.id}
+                  comment={reply}
+                  reply
+                  isAuthor={reply.userId === postAuthorId}
+                  isMine={reply.userId === user?.id}
+                  deleteAction={deleteAction(reply, 0)}
+                />
+              ))}
+            </Fragment>
           ))}
         </ul>
       )}
 
       {deleteComment.error && (
-        <p role="alert" className="mt-2 text-[12px] text-crimson">
+        <p role="alert" className="px-5 py-2 text-[12px] text-crimson">
           {deleteComment.error.message}
         </p>
       )}
+
+      {/*
+        ⚠ 답글이 달린 루트 댓글의 삭제는 **cascade가 RLS를 우회해** 남이 단 답글까지 지운다.
+          포럼 관례로 수용한 동작이지만(마이그레이션 주석), 사용자에게는 반드시 알려야 한다.
+      */}
+      <Dialog
+        open={confirmTarget !== null}
+        onCancel={() => setConfirmTarget(null)}
+        onConfirm={() => {
+          if (confirmTarget) removeComment(confirmTarget.id);
+          setConfirmTarget(null);
+        }}
+        title="이 댓글을 삭제할까요?"
+        description={`답글 ${formatCount(confirmTarget?.replyCount ?? 0)}개도 함께 삭제돼요. 되돌릴 수 없습니다.`}
+        cancelLabel="취소"
+        confirmLabel="삭제"
+        destructive
+      />
     </section>
   );
 }

@@ -9,24 +9,31 @@ import { useSessionStore } from "@/entities/session";
 /** DB의 char_length check와 맞춘다 */
 export const COMMENT_MAX = 1000;
 
+export interface WriteCommentInput {
+  content: string;
+  /** null = 루트 댓글. 깊이 1 제한은 DB 트리거(check_comment_depth)가 P0001로 거부한다 */
+  parentId: number | null;
+}
+
 /**
  * 댓글 작성.
  *
  * post.comment_count는 클라이언트가 건드리지 않는다 — DB 트리거가 올린다.
  * 그래서 성공 후 댓글 목록과 함께 글 캐시도 무효화해야 카운트가 화면에 반영된다.
+ * (트리거가 답글도 세므로 comment_count는 답글 포함 총합이다)
  */
 export function useWriteComment(postId: number) {
   const queryClient = useQueryClient();
   const user = useSessionStore((s) => s.user);
 
   return useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: async ({ content, parentId }: WriteCommentInput) => {
       const supabase = requireBrowserSupabase();
       if (!user) throw new Error("로그인이 필요해요.");
 
       const { error } = await supabase
         .from("comment")
-        .insert({ post_id: postId, user_id: user.id, content });
+        .insert({ post_id: postId, user_id: user.id, content, parent_id: parentId });
 
       if (error) {
         console.error("[comment] 작성 실패:", error);
