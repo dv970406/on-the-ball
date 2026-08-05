@@ -14,7 +14,13 @@ import {
   UserX,
 } from "lucide-react";
 import { ROUTES } from "@/shared/config";
-import { clearScrollRestore, formatCount, formatRelativeTime, useNowMs } from "@/shared/lib";
+import {
+  clearScrollRestore,
+  formatCount,
+  formatRelativeTime,
+  useNowMs,
+  useToast,
+} from "@/shared/lib";
 import {
   ActionChip,
   Avatar,
@@ -28,7 +34,6 @@ import {
   SheetItem,
   Skeleton,
   buttonClassName,
-  useToast,
 } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
 import { isEdited, isHotPost, usePostQuery } from "@/entities/post";
@@ -175,17 +180,22 @@ export function PostDetailView({ postId }: { postId: number }) {
                   {isEdited(post) && " · 수정됨"} · 조회 {formatCount(post.viewCount)}
                 </div>
               </div>
-              {/* 팔로우는 핸드오프 7장의 미구현 목록 — 자리만 두고 동작을 발명하지 않는다 */}
-              <span
-                aria-disabled
+              {/*
+                팔로우는 핸드오프 7장의 미구현 목록 — 자리만 두고 동작을 발명하지 않는다.
+                ⚠ span + aria-disabled였는데, span의 암묵 role(generic)은 aria-* 상태를
+                  지원하지 않아 그냥 본문 중간의 단어로 읽혔다. 진짜 disabled 버튼으로 둔다.
+              */}
+              <button
+                type="button"
+                disabled
                 className={buttonClassName({
                   variant: "secondary",
                   size: "sm",
-                  className: "pointer-events-none ml-auto opacity-40",
+                  className: "ml-auto disabled:opacity-40",
                 })}
               >
                 팔로우
-              </span>
+              </button>
             </div>
           </header>
 
@@ -193,23 +203,28 @@ export function PostDetailView({ postId }: { postId: number }) {
           <div className="mt-5">
             <Markdown>{post.content}</Markdown>
           </div>
-        </article>
 
-        {/* 액션 바 — 위아래 헤어라인 */}
-        <div className="mt-[22px] flex items-center gap-2 border-y border-hairline-cool px-5 py-3.5">
-          <LikeButton postId={post.id} likeCount={post.likeCount} isLiked={post.isLiked} />
-          <ActionChip icon={MessageCircle} aria-label="댓글 수">
-            {formatCount(post.commentCount)}
-          </ActionChip>
-          {/* 저장(북마크)은 DB에 테이블이 없다 — 자리만 두고 토스트를 발명하지 않는다 */}
-          <ActionChip
-            icon={Bookmark}
-            iconSize={17}
-            aria-label="저장"
-            aria-disabled
-            className="ml-auto border-0 px-1.5"
-          />
-        </div>
+          {/*
+            액션 바 — 위아래 헤어라인.
+            ⚠ 반드시 <article> **안**이다. 좋아요·댓글 수는 이 글의 메타데이터라,
+              밖에 두면 보조기술이 글을 한 단위로 읽을 때 딸려오지 않는다.
+          */}
+          {/* -mx-5 px-5: article의 좌우 패딩 안에 있으면서 헤어라인만 화면 끝까지 긋는다 */}
+          <footer className="-mx-5 mt-[22px] flex items-center gap-2 border-y border-hairline-cool px-5 py-3.5">
+            <LikeButton postId={post.id} likeCount={post.likeCount} isLiked={post.isLiked} />
+            <ActionChip icon={MessageCircle} aria-label="댓글 수">
+              {formatCount(post.commentCount)}
+            </ActionChip>
+            {/* 저장(북마크)은 DB에 테이블이 없다 — 자리만 두고 토스트를 발명하지 않는다 */}
+            <ActionChip
+              icon={Bookmark}
+              iconSize={17}
+              aria-label="저장"
+              disabled
+              className="ml-auto border-0 px-1.5"
+            />
+          </footer>
+        </article>
 
         <CommentSection
           postId={post.id}
@@ -285,7 +300,8 @@ export function PostDetailView({ postId }: { postId: number }) {
       />
 
       {deletePost.error && (
-        <p role="alert" className="absolute inset-x-0 bottom-24 z-[90] px-5 text-center text-[12px] text-crimson">
+        // 하단 고정 댓글 입력(z-60) 위, 오버레이(80~95) 아래 — 시트가 열린 동안은 가려도 된다
+        <p role="alert" className="absolute inset-x-0 bottom-24 z-[66] px-5 text-center text-[12px] text-crimson">
           {deletePost.error.message}
         </p>
       )}

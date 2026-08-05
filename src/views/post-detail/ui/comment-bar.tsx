@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowUp, CornerDownRight, X } from "lucide-react";
@@ -51,10 +51,10 @@ export function CommentBar({ postId, replyTo, onCancelReply }: CommentBarProps) 
     if (replyTo) inputRef.current?.focus();
   }, [replyTo]);
 
-  const shell = (children: React.ReactNode) => (
-    <div className="absolute inset-x-0 bottom-0 z-[60] border-t border-hairline-cool bg-canvas px-3.5 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5">
+  const shell = (children: ReactNode) => (
+    <footer className="absolute inset-x-0 bottom-0 z-[60] border-t border-hairline-cool bg-canvas px-3.5 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5">
       {children}
-    </div>
+    </footer>
   );
 
   // 세션 판정 전에는 자리를 비워 둔다 — 로그인 안내가 깜빡였다가 폼으로 바뀌지 않게

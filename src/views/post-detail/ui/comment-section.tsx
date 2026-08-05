@@ -1,8 +1,9 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { formatCount } from "@/shared/lib";
-import { Dialog, EmptyState, Skeleton, useToast } from "@/shared/ui";
+import { useToast } from "@/shared/lib";
+import { Dialog, EmptyState, Skeleton } from "@/shared/ui";
 import {
   COMMENT_LIST_LIMIT,
   CommentItem,
@@ -47,7 +48,23 @@ export function CommentSection({
   const truncated = (comments?.length ?? 0) >= COMMENT_LIST_LIMIT;
   const threads = comments ? buildCommentThreads(comments) : undefined;
 
+  /**
+   * 삭제 중복 실행 동기 가드 — PostForm·CommentBar·글 삭제와 같은 패턴.
+   *
+   * ⚠ `disabled={busy}`만으로는 못 막는다. isPending은 **렌더 이후에야** DOM에 반영되는데
+   *   TanStack Query의 상태 변경은 마이크로태스크로 배치되므로 같은 tick의 두 번째 클릭이
+   *   아직 enabled인 버튼을 누른다. 두 번째 DELETE는 이미 지워진 행이라 0행이 되고,
+   *   use-delete-comment가 그걸 에러로 승격해 **권한이 있었는데도
+   *   "삭제 권한이 없어요" 배너가 뜬다**(실측).
+   */
+  const deletingRef = useRef(false);
+  useEffect(() => {
+    if (!deleteComment.isPending) deletingRef.current = false;
+  }, [deleteComment.isPending]);
+
   const removeComment = (commentId: number) => {
+    if (deletingRef.current) return;
+    deletingRef.current = true;
     deleteComment.mutate(commentId, {
       onSuccess: () => toast("댓글을 삭제했어요"),
     });

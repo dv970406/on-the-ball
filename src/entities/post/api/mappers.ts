@@ -57,14 +57,18 @@ type PostSelectRow = Pick<
   post_like: Pick<PostLikeRow, "user_id">[] | null;
 };
 
-function mapBase(row: PostSelectRow, source: string): PostListItem {
+/**
+ * 목록·상세가 공유하는 필드.
+ * ⚠ excerpt는 여기서 만들지 않는다 — 상세는 발췌를 쓰지 않는데 여기 두면
+ *   상세 조회마다 본문 전체에 정규식 파이프라인이 돌고 결과가 버려진다.
+ */
+function mapBase(row: PostSelectRow): Omit<PostListItem, "excerpt"> {
   return {
     id: row.id,
     authorId: row.author_id,
     authorNickname: row.author?.nickname ?? "알 수 없음",
     category: row.category,
     title: row.title,
-    excerpt: toPlainSummary(source, EXCERPT_MAX),
     likeCount: row.like_count,
     commentCount: row.comment_count,
     viewCount: row.view_count,
@@ -77,13 +81,12 @@ function mapBase(row: PostSelectRow, source: string): PostListItem {
 }
 
 export function buildPostListItem(row: PostSelectRow): PostListItem {
-  return mapBase(row, row.excerpt ?? "");
+  // 입력은 DB의 excerpt(= content 앞 300자)라 파이프라인이 짧은 문자열만 훑는다
+  return { ...mapBase(row), excerpt: toPlainSummary(row.excerpt ?? "", EXCERPT_MAX) };
 }
 
 export function buildPostDetail(row: PostSelectRow): PostDetail {
-  const content = row.content ?? "";
-  // 상세는 content 전체를 받으므로 발췌도 원문에서 만든다(excerpt 컬럼을 다시 받을 이유가 없다).
-  return { ...mapBase(row, content), content };
+  return { ...mapBase(row), content: row.content ?? "" };
 }
 
 /** 수정된 글인지 — created_at과 updated_at이 다르면 수정됨 (트리거가 서버 시각으로 찍는다) */

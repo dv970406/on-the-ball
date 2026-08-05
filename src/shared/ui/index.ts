@@ -20,9 +20,12 @@ export { TextField } from "./text-field";
 // 커뮤니티 화면 — 말머리 칩 / 카운터 액션 칩 / 오버레이 3종
 export { Chip } from "./chip";
 export { ActionChip } from "./action-chip";
+// 순수 함수라 Link 등 button이 아닌 요소에서도 같은 외형을 재사용할 수 있다 (buttonClassName과 같은 이유)
+export { actionChipClassName } from "./action-chip-class";
 export { Sheet, SheetItem, SheetCloseItem } from "./sheet";
 export { Dialog } from "./dialog";
-export { ToastViewport, useToast, useToastStore, useTabBarPresence } from "./toast";
+// 토스트의 상태(useToast·useToastStore)는 @/shared/lib에 있다 — ui는 뷰포트만 노출한다
+export { ToastViewport } from "./toast";
 // Markdown은 "use client"가 없다 — 서버 컴포넌트에서도 렌더 가능 (markdown.tsx 주석 참고)
 export { Markdown } from "./markdown";
 export { MarkdownEditor } from "./markdown-editor";

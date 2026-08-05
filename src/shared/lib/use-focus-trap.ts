@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -20,6 +20,19 @@ export function useFocusTrap(
   active: boolean,
   onClose: () => void,
 ) {
+  /**
+   * ⚠ onClose를 의존성에 두면 안 된다. 호출부가 전부 인라인 화살표라
+   * (`onClose={() => setSheetOpen(false)}`) 부모가 리렌더될 때마다 새 함수가 되고,
+   * effect가 재실행되면서 cleanup의 `trigger.focus()` → 재실행의 첫 항목 focus()가 연달아 돈다.
+   * 시트를 연 채 쿼리가 갱신되면 **탭으로 옮겨둔 포커스가 첫 항목으로 되감긴다.**
+   * ref에 담아 최신 콜백을 읽되 effect는 active만 보고 돌게 한다.
+   */
+  const onCloseRef = useRef(onClose);
+  // 렌더 중 ref를 쓰면 react-hooks/refs에 걸린다 — 커밋 이후에 갱신한다
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!active) return;
 
@@ -38,7 +51,7 @@ export function useFocusTrap(
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== "Tab") return;
@@ -67,5 +80,5 @@ export function useFocusTrap(
       // 트리거가 아직 문서에 있을 때만 되돌린다(글 삭제처럼 트리거째 사라지는 경우가 있다)
       if (trigger?.isConnected) trigger.focus();
     };
-  }, [containerRef, active, onClose]);
+  }, [containerRef, active]);
 }

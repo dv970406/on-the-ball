@@ -12,6 +12,8 @@ export {
   formatRelativeTime,
 } from "./format";
 export { useNowMs } from "./use-now";
+export { useFocusTrap } from "./use-focus-trap";
+export { useToast, useToastStore } from "./toast-store";
 export { parsePostId } from "./post-id";
 export { hasVisibleChar, codePointLength } from "./text";
 export { useNextParam } from "./use-next-param";

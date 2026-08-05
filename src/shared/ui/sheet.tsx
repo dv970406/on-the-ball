@@ -2,8 +2,7 @@
 
 import { useRef, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { cn } from "@/shared/lib";
-import { useFocusTrap } from "@/shared/lib/use-focus-trap";
+import { cn, useFocusTrap } from "@/shared/lib";
 import { Icon } from "./icon";
 
 interface SheetProps {
@@ -62,19 +61,27 @@ interface SheetItemProps {
   children: ReactNode;
 }
 
-/** 시트 항목 — 마지막 항목의 하단 헤어라인은 CSS가 지운다(last:border-b-0) */
+/**
+ * 시트 항목 — 마지막 항목의 하단 헤어라인은 CSS가 지운다(last:border-b-0)
+ *
+ * ⚠ 비활성은 `aria-disabled`가 아니라 **HTML `disabled`** 다.
+ *   `aria-disabled` + `pointer-events-none`은 **키보드 포커스를 막지 못해**
+ *   "포커스는 가는데 Enter를 눌러도 무반응"인 요소가 된다. 게다가 useFocusTrap의
+ *   FOCUSABLE 셀렉터가 `button:not([disabled])`라 aria-disabled는 걸러지지 않아,
+ *   **시트를 열면 초기 포커스가 비활성 항목에 놓였다**(실측). disabled면 둘 다 해소된다.
+ */
 export function SheetItem({ icon, danger, disabled, onClick, children }: SheetItemProps) {
   return (
     <button
       type="button"
-      aria-disabled={disabled || undefined}
-      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      onClick={onClick}
       className={cn(
         "flex w-full items-center gap-2.5 border-b border-hairline-cool px-[18px] py-4 text-left",
         "text-[15px] font-medium last:border-b-0",
         "transition-colors duration-150 ease-otb active:bg-canvas-soft",
         danger ? "text-crimson" : "text-ink",
-        disabled && "pointer-events-none opacity-40",
+        "disabled:opacity-40",
       )}
     >
       {icon && <Icon as={icon} size={17} />}

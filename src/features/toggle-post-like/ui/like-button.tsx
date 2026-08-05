@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Heart } from "lucide-react";
 import { signInWithNext } from "@/shared/config";
-import { cn, formatCount } from "@/shared/lib";
-import { ActionChip, Icon } from "@/shared/ui";
+import { formatCount } from "@/shared/lib";
+import { ActionChip, Icon, actionChipClassName } from "@/shared/ui";
 import { useSessionStore } from "@/entities/session";
 import { useTogglePostLike } from "../model/use-toggle-post-like";
 
@@ -30,16 +30,12 @@ export function LikeButton({ postId, likeCount, isLiked }: LikeButtonProps) {
   const toggleLike = useTogglePostLike(postId);
 
   // 비로그인은 아예 로그인으로 유도한다 — 훅의 RPC 호출은 어차피 DB가 거부한다.
-  // Link 안에 button을 넣지 않으므로 ActionChip 대신 같은 클래스를 직접 재현한다.
+  // Link 안에 button을 넣지 않으므로 클래스만 공유한다(buttonClassName과 같은 패턴).
   if (status !== "authenticated") {
     return (
       <Link
         href={signInWithNext(pathname)}
-        className={cn(
-          "inline-flex h-9 items-center gap-1.5 rounded-full border border-hairline bg-canvas px-[13px]",
-          "font-mono text-xs tabular-nums text-ink-secondary no-underline",
-          "transition-colors duration-150 ease-otb",
-        )}
+        className={actionChipClassName({ className: "no-underline" })}
       >
         <Icon as={Heart} size={15} />
         {formatCount(likeCount)}

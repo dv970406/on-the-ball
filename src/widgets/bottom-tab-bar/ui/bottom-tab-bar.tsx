@@ -40,6 +40,9 @@ export function BottomTabBar({ active = "커뮤니티" }: { active?: string }) {
       className={cn(
         "absolute inset-x-3 bottom-[max(18px,env(safe-area-inset-bottom))] z-70",
         "flex items-center justify-between rounded-[28px] bg-ink/92 p-2",
+        // backdrop-blur/saturate 유틸은 Tailwind가 -webkit-backdrop-filter를 함께 출력한다
+        // (빌드 CSS에서 확인) — styling.md의 "벤더 prefix 수동 병기"는 clip-path처럼
+        // 유틸이 없어 arbitrary로 쓰는 속성에 해당하고, 여기서는 병기가 중복이다.
         "backdrop-blur-[20px] backdrop-saturate-[160%]",
         "shadow-[0_12px_32px_rgba(0,0,0,0.18),inset_0_0_0_1px_rgba(255,255,255,0.06)]",
       )}
@@ -71,7 +74,10 @@ export function BottomTabBar({ active = "커뮤니티" }: { active?: string }) {
             {content}
           </Link>
         ) : (
-          <span key={tab.label} aria-disabled className={cn(className, "opacity-60")}>
+          // ⚠ aria-disabled를 붙이지 않는다 — span의 암묵 role은 generic이라 aria-* 상태를
+          //   지원하지 않아 접근성 트리에서 그대로 버려진다(효과 0의 죽은 속성).
+          //   대상 화면이 없는 자리표시라 라벨만 남기고 시각적으로만 흐린다.
+          <span key={tab.label} className={cn(className, "opacity-60")}>
             {content}
           </span>
         );

@@ -2,8 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { ROUTES } from "@/shared/config";
-import { clearScrollRestore } from "@/shared/lib";
-import { useToast } from "@/shared/ui";
+import { clearScrollRestore, useToast } from "@/shared/lib";
 import { PostForm, useCreatePost } from "@/features/write-post";
 
 /**

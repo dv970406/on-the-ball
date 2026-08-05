@@ -5,7 +5,7 @@ import Link from "next/link";
 import { PenLine } from "lucide-react";
 import { ROUTES } from "@/shared/config";
 import { cn, formatCount } from "@/shared/lib";
-import { Chip, EmptyState, Icon, useTabBarPresence } from "@/shared/ui";
+import { Chip, EmptyState, Icon } from "@/shared/ui";
 import { TabScrollArea } from "@/widgets/tab-scroll-area";
 import { AppBar } from "@/widgets/app-bar";
 import { AuthStatus } from "@/widgets/auth-status";
@@ -35,9 +35,6 @@ export function PostListView() {
   });
   const todayCount = useTodayPostCountQuery();
 
-  // 토스트가 탭바에 가리지 않도록 이 화면이 떠 있는 동안만 위치를 올린다
-  useTabBarPresence();
-
   const posts = data?.items;
 
   return (
@@ -46,7 +43,7 @@ export function PostListView() {
         {/* 세션 표시는 프로토타입에 없지만, 없으면 로그아웃 진입점이 앱에서 사라진다 — AppBar 주석 참고 */}
         <AppBar leading={<AuthStatus />} />
 
-        <div className="px-5 pb-0.5 pt-[18px]">
+        <header className="px-5 pb-0.5 pt-[18px]">
           <h1 className="text-[26px] font-medium tracking-[-0.9px] text-ink">커뮤니티</h1>
           <p className="mt-1.5 text-[13px] text-ink-mute">
             오늘{" "}
@@ -55,10 +52,21 @@ export function PostListView() {
             </span>
             개의 글이 올라왔어요
           </p>
-        </div>
+        </header>
 
-        {/* 말머리 레일 — 가로 스크롤, 스크롤바 숨김 */}
-        <div className="no-scrollbar flex gap-1.5 overflow-x-auto px-5 py-3">
+        {/*
+          말머리 레일 — 가로 스크롤, 스크롤바 숨김.
+          ⚠ 그룹 경계와 접근 가능한 이름이 필요하다. 없으면 스크린리더에 문맥 없는
+            토글 버튼 6개가 흩어져 들린다.
+          ⚠ role="radiogroup"이 의미상 더 정확하지만(단일 선택), 그러면 화살표 키 이동 +
+            roving tabindex까지 구현해야 규격에 맞는다. 그걸 갖추기 전까지는 키보드 모델을
+            거짓으로 알리지 않도록 group + aria-pressed를 유지한다.
+        */}
+        <div
+          role="group"
+          aria-label="말머리"
+          className="no-scrollbar flex gap-1.5 overflow-x-auto px-5 py-3"
+        >
           <Chip selected={category === null} onClick={() => setCategory(null)}>
             전체
           </Chip>
@@ -73,8 +81,12 @@ export function PostListView() {
           ))}
         </div>
 
-        {/* 정렬 행 + 현재 필터의 전체 건수 */}
-        <div className="flex items-center gap-3.5 border-b border-hairline-cool px-5 pb-2.5 pt-0.5">
+        {/* 정렬 행 + 현재 필터의 전체 건수 (그룹 경계·이름은 말머리 레일과 같은 이유) */}
+        <div
+          role="group"
+          aria-label="정렬"
+          className="flex items-center gap-3.5 border-b border-hairline-cool px-5 pb-2.5 pt-0.5"
+        >
           {POST_SORTS.map((item) => (
             <button
               key={item}

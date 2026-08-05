@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { BarChart2, Hash, Image as ImageIcon, Link2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { cn, codePointLength } from "@/shared/lib";
+import { codePointLength, hasVisibleChar } from "@/shared/lib";
 import { Chip, Dialog, Icon, buttonClassName } from "@/shared/ui";
 import { POST_CATEGORIES, type PostCategory } from "@/entities/post";
 import {
   CONTENT_MAX,
+  TITLE_MAX,
   validatePost,
   type PostFieldErrors,
   type PostInput,
@@ -17,6 +18,12 @@ interface PostFormProps {
   /** 수정 모드면 헤더 문구와 이탈 방어 동작이 달라진다 */
   mode: "create" | "edit";
   initial?: PostInput;
+  /**
+   * 헤더 바로 아래에 붙는 알림(수정 화면의 "최신 내용을 불러오지 못했어요" 배너).
+   * ⚠ 슬롯으로 받는 이유: 호출부가 absolute로 얹으면 sticky 헤더를 덮어
+   *   `취소`·`수정 완료`가 눌리지 않는다(실측). 폼 내부 일반 흐름에 둔다.
+   */
+  notice?: ReactNode;
   isPending: boolean;
   /** 훅이 한국어로 바꿔 던진 서버 에러 */
   error?: Error | null;
@@ -48,6 +55,7 @@ const TOOLS: { icon: LucideIcon; label: string }[] = [
 export function PostForm({
   mode,
   initial,
+  notice,
   isPending,
   error,
   onCancel,
@@ -62,9 +70,30 @@ export function PostForm({
   const [askLeave, setAskLeave] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
-  const dirty = title.trim().length > 0 || content.trim().length > 0 || category !== "";
-  // 등록 활성 조건 — 말머리 선택 + 스키마 통과. 실제 검증은 제출 시 validatePost가 한다.
-  const ready = validatePost({ category, title, content }).ok;
+  /**
+   * ⚠ 렌더마다 도는 계산은 **최소한으로** 둔다.
+   *   전에는 `dirty`의 .trim() ×2 + `ready`의 validatePost(내부 codePointLength = [...content]
+   *   스프레드 ×2) + 하단 카운터의 codePointLength ×1이 **키 입력 한 프레임마다** 돌았다.
+   *   본문 상한이 20,000자라 최대 2만 원소 배열을 프레임당 3번 할당하는 셈이고,
+   *   같은 프레임에 textarea 자동높이의 scrollHeight 강제 리플로가 겹친다.
+   *   → 길이는 여기서 **한 번만** 세고 아래 카운터와 공유한다.
+   */
+  const contentLength = codePointLength(content);
+
+  // 길이 0 판정에는 .trim()이 필요 없다(공백만 있는 입력도 "쓰다 만 것"이므로 dirty가 맞다)
+  const dirty = title.length > 0 || content.length > 0 || category !== "";
+
+  /**
+   * 등록 버튼 활성 조건 — **저렴한 검사만** 한다.
+   * 진짜 검증(zod)은 제출 시점의 validatePost가 하므로 여기서 또 돌릴 이유가 없다.
+   * 두 판정이 갈리지 않도록 기준은 postSchema와 같은 것을 쓴다(hasVisibleChar·코드포인트 길이).
+   */
+  const ready =
+    category !== "" &&
+    hasVisibleChar(title) &&
+    codePointLength(title) <= TITLE_MAX &&
+    hasVisibleChar(content) &&
+    contentLength <= CONTENT_MAX;
 
   /** 본문 textarea 자동 높이 확장 — scrollHeight를 그대로 반영한다 */
   useEffect(() => {
@@ -153,8 +182,13 @@ export function PostForm({
             </div>
           </header>
 
+          {/* 헤더 아래 일반 흐름 — absolute로 얹으면 sticky 헤더의 버튼을 덮는다 */}
+          {notice}
+
           <div className="px-5 pt-4">
             {/* 말머리 — 필수. "전체"는 필터 전용이라 여기엔 없다 */}
+            {/* fieldset+legend가 그룹 경계와 이름을 준다 — Chip은 aria-pressed 토글이므로
+                role="radiogroup"을 붙이지 않는다(자식 role과 어긋난다) */}
             <fieldset>
               <legend className="sr-only">말머리</legend>
               <div className="flex flex-wrap gap-1.5">
@@ -172,13 +206,13 @@ export function PostForm({
                 ))}
               </div>
             </fieldset>
+            {/*
+              말머리 미선택 안내. 별도의 zod 에러 표시는 두지 않는다 —
+              `ready`가 미선택 상태의 제출을 막으므로 fieldErrors.category가 채워질 경로가 없다
+              (전에 있던 분기는 도달 불가였다).
+            */}
             {!category && (
               <p className="mt-2.5 text-[11px] text-ink-faint">말머리를 하나 골라 주세요</p>
-            )}
-            {fieldErrors.category && category && (
-              <p role="alert" className="mt-2.5 text-[11px] text-crimson">
-                {fieldErrors.category}
-              </p>
             )}
 
             {/*
@@ -246,26 +280,30 @@ export function PostForm({
       </main>
 
       {/* 하단 고정 툴바 — 첨부 4종은 자리만, 우측은 글자 수 카운터 */}
-      <div className="absolute inset-x-0 bottom-0 z-[60] flex items-center gap-1 border-t border-hairline-cool bg-canvas px-3.5 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5">
+      <footer
+        role="toolbar"
+        aria-label="첨부"
+        className="absolute inset-x-0 bottom-0 z-[60] flex items-center gap-1 border-t border-hairline-cool bg-canvas px-3.5 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5"
+      >
         {TOOLS.map((tool) => (
+          // ⚠ aria-disabled + pointer-events-none이 아니라 disabled — 전자는 키보드 포커스를
+          //   막지 못해 툴바에서 무반응 요소를 연속 4번 지나게 된다(app-bar와 같은 판단)
           <button
             key={tool.label}
             type="button"
             aria-label={tool.label}
-            aria-disabled
-            className={cn(
-              "pointer-events-none flex size-11 items-center justify-center rounded-sm text-ink-secondary opacity-40",
-            )}
+            disabled
+            className="flex size-11 items-center justify-center rounded-sm text-ink-secondary disabled:opacity-40"
           >
             <Icon as={tool.icon} size={20} />
           </button>
         ))}
-        {/* ⚠ 코드포인트로 센다 — .length(UTF-16)로 세면 이모지가 2로 잡혀 DB 한도와 어긋난다 */}
+        {/* ⚠ 코드포인트로 센다 — .length(UTF-16)로 세면 이모지가 2로 잡혀 DB 한도와 어긋난다.
+            위에서 이미 센 값을 재사용한다(렌더당 1회). */}
         <span className="ml-auto font-mono text-[11px] tabular-nums text-ink-faint">
-          {codePointLength(content).toLocaleString("ko-KR")} /{" "}
-          {CONTENT_MAX.toLocaleString("ko-KR")}
+          {contentLength.toLocaleString("ko-KR")} / {CONTENT_MAX.toLocaleString("ko-KR")}
         </span>
-      </div>
+      </footer>
 
       <Dialog
         open={askLeave}

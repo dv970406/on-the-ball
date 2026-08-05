@@ -3,7 +3,8 @@
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ROUTES } from "@/shared/config";
-import { EmptyState, Skeleton, useToast } from "@/shared/ui";
+import { useToast } from "@/shared/lib";
+import { EmptyState, Skeleton } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
 import { usePostQuery } from "@/entities/post";
 import { useSessionStore } from "@/entities/session";
@@ -61,31 +62,38 @@ export function PostEditView({ postId }: { postId: number }) {
   }
 
   return (
-    <>
-      {error && (
-        <p
-          role="status"
-          className="absolute inset-x-0 top-0 z-30 border-b border-hairline bg-canvas-soft px-5 py-2.5 text-[12px] text-ink-mute"
-        >
-          최신 내용을 불러오지 못했어요. 그대로 저장하면 다른 곳에서 수정된 내용을 덮어쓸 수 있어요.
-        </p>
-      )}
-      <PostForm
-        mode="edit"
-        initial={{ category: post.category, title: post.title, content: post.content }}
-        isPending={updatePost.isPending}
-        error={updatePost.error}
-        // 수정 모드는 이탈 확인 없이 바로 상세로 복귀한다(원본이 남아 있다)
-        onCancel={() => router.replace(ROUTES.post(postId))}
-        onSubmit={(input) =>
-          updatePost.mutate(input, {
-            onSuccess: () => {
-              router.replace(ROUTES.post(postId));
-              toast("수정했어요");
-            },
-          })
-        }
-      />
-    </>
+    <PostForm
+      mode="edit"
+      initial={{ category: post.category, title: post.title, content: post.content }}
+      /*
+        ⚠ 이 배너를 absolute로 얹으면 안 된다. 전에 `absolute top-0 z-30`이었는데
+          PostForm 헤더가 `sticky top-0 z-20`이라 **배너가 헤더를 덮어 `취소`·`수정 완료`가
+          눌리지 않았다**(배너에 닫기 수단도 없어 작성 중인 글에서 나갈 수 없었다).
+          상세 화면의 같은 배너처럼 일반 흐름에 둔다.
+      */
+      notice={
+        error ? (
+          <p
+            role="status"
+            className="border-b border-hairline bg-canvas-soft px-5 py-2.5 text-[12px] text-ink-mute"
+          >
+            최신 내용을 불러오지 못했어요. 그대로 저장하면 다른 곳에서 수정된 내용을 덮어쓸 수
+            있어요.
+          </p>
+        ) : null
+      }
+      isPending={updatePost.isPending}
+      error={updatePost.error}
+      // 수정 모드는 이탈 확인 없이 바로 상세로 복귀한다(원본이 남아 있다)
+      onCancel={() => router.replace(ROUTES.post(postId))}
+      onSubmit={(input) =>
+        updatePost.mutate(input, {
+          onSuccess: () => {
+            router.replace(ROUTES.post(postId));
+            toast("수정했어요");
+          },
+        })
+      }
+    />
   );
 }

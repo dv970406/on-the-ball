@@ -92,7 +92,13 @@ export interface PostListPage {
   total: number;
 }
 
-/** 상세 화면 — 목록 항목에 본문(마크다운 원문)이 더해진다 */
-export interface PostDetail extends PostListItem {
+/**
+ * 상세 화면 — 목록 항목에서 발췌를 빼고 본문(마크다운 원문)이 더해진다.
+ *
+ * ⚠ `excerpt`를 **일부러 상속하지 않는다.** 상세 화면은 발췌를 렌더하지 않는데
+ *   타입이 필수로 요구하면 매퍼가 채울 수밖에 없고, 그러면 상세 조회마다 본문 전체
+ *   (최대 20,000자)에 정규식 파이프라인을 돌려 결과를 버리게 된다.
+ */
+export interface PostDetail extends Omit<PostListItem, "excerpt"> {
   content: PostRow["content"];
 }

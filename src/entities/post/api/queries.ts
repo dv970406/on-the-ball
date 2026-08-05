@@ -2,7 +2,8 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
-import { startOfTodaySeoul } from "@/shared/lib/format";
+// 이 파일은 "use client"라 배럴을 그대로 쓴다 — 직접 경로 예외는 **서버 모듈**을 위한 것이다
+import { startOfTodaySeoul } from "@/shared/lib";
 import type { PostListFilters, PostListPage } from "../model/types";
 import { postKeys } from "./keys";
 import {

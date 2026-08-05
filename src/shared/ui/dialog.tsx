@@ -1,8 +1,7 @@
 "use client";
 
 import { useId, useRef } from "react";
-import { cn } from "@/shared/lib";
-import { useFocusTrap } from "@/shared/lib/use-focus-trap";
+import { cn, useFocusTrap } from "@/shared/lib";
 
 interface DialogProps {
   open: boolean;
@@ -55,7 +54,11 @@ export function Dialog({
         aria-describedby={descId}
         tabIndex={-1}
         className={cn(
-          "absolute inset-x-6 top-1/2 z-[82] -translate-y-1/2 rounded-xl bg-canvas outline-none",
+          "absolute inset-x-6 top-1/2 z-[82] rounded-xl bg-canvas outline-none",
+          // ⚠ -translate-y-1/2 표준 유틸이 아니라 arbitrary property다 — 같은 요소에 animation이
+          //   있으면 `translate` 개별 프로퍼티가 `transform`과 합성되어 조용히 어긋난다(styling.md).
+          //   이 자리는 globals.css 주석이 이미 translateY 충돌을 경고한 곳이다.
+          "[transform:translateY(-50%)]",
           "px-[22px] pb-4 pt-6 shadow-[0_16px_48px_rgba(0,0,0,0.12)]",
           "motion-safe:animate-[cm-fade_0.2s_cubic-bezier(0.2,0,0,1)_both]",
         )}

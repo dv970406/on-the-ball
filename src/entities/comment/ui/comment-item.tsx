@@ -49,7 +49,7 @@ export function CommentItem({
             className={reply ? "text-[11px]" : "text-xs"}
           />
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
+            <header className="flex items-center gap-1.5">
               <span className="truncate text-[12px] font-medium text-ink">
                 {comment.authorNickname}
               </span>
@@ -69,7 +69,7 @@ export function CommentItem({
               >
                 {formatRelativeTime(comment.createdAt)}
               </time>
-            </div>
+            </header>
 
             {/* 댓글은 마크다운이 아니라 평문이다 — 줄바꿈만 보존한다 */}
             <p className="mt-[5px] whitespace-pre-wrap break-words text-pretty text-[14px] leading-[1.6] text-ink-secondary">
@@ -77,7 +77,7 @@ export function CommentItem({
             </p>
 
             {(onReply || deleteAction) && (
-              <div className="mt-2 flex items-center gap-3.5 text-[11px] text-ink-mute-2">
+              <footer className="mt-2 flex items-center gap-3.5 text-[11px] text-ink-mute-2">
                 {/* 답글에는 `답글` 버튼이 없다 — 깊이 1까지만(DB 트리거도 같은 제한) */}
                 {onReply && (
                   <button
@@ -91,7 +91,7 @@ export function CommentItem({
                   </button>
                 )}
                 {deleteAction && <span className="ml-auto">{deleteAction}</span>}
-              </div>
+              </footer>
             )}
           </div>
         </div>

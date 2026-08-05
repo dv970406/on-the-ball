@@ -7,14 +7,18 @@ import { Icon, Wordmark } from "@/shared/ui";
  * 검색·알림 자리표시 버튼.
  * 핸드오프 7장이 "아직 구현하지 않은 것"으로 못박은 기능이라 **동작을 발명하지 않는다.**
  * 36px 원형이지만 히트 영역은 44px을 확보한다(투명 패딩).
+ *
+ * ⚠ `aria-disabled` + `pointer-events-none`이 아니라 **`disabled`** 다.
+ *   전자는 키보드 포커스를 막지 못해 "포커스는 가는데 Enter를 눌러도 무반응"이 된다.
+ *   포커스를 남겨 이유를 설명할 것도 아니므로 tab order에서 빼는 편이 맞다.
  */
 function PlaceholderIconButton({ icon, label }: { icon: LucideIcon; label: string }) {
   return (
     <button
       type="button"
       aria-label={label}
-      aria-disabled
-      className="pointer-events-none -m-1 flex size-11 items-center justify-center p-1 opacity-40"
+      disabled
+      className="-m-1 flex size-11 items-center justify-center p-1 disabled:opacity-40"
     >
       <span className="flex size-9 items-center justify-center rounded-full border border-hairline-cool bg-canvas-soft text-ink">
         <Icon as={icon} size={16} />

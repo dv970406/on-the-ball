@@ -2,7 +2,7 @@
 
 import type { ButtonHTMLAttributes } from "react";
 import type { LucideIcon } from "lucide-react";
-import { cn } from "@/shared/lib";
+import { actionChipClassName } from "./action-chip-class";
 import { Icon } from "./icon";
 
 interface ActionChipProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type"> {
@@ -15,9 +15,11 @@ interface ActionChipProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
 /**
  * 카운터형 액션 칩 (프로토타입 `.cm-act`).
  *
- * "알약 버튼 금지" 규칙의 **명시적 예외 4곳** 중 하나다
- * (나머지: 아바타 · 댓글 입력창 · 플로팅 글쓰기 버튼).
+ * "알약 버튼 금지" 규칙의 **명시적 예외** 중 하나다
+ * (나머지: 아바타 · 댓글 입력창 · 플로팅 글쓰기 버튼 · 아이콘 원형 버튼).
  * 숫자를 싣는 칩이라 mono + tabular-nums다.
+ *
+ * ⚠ 비활성은 `disabled` 속성으로 넘긴다 — `aria-disabled`는 키보드 포커스를 막지 못한다.
  */
 export function ActionChip({
   icon,
@@ -31,21 +33,19 @@ export function ActionChip({
     <button
       type="button"
       aria-pressed={active}
-      className={cn(
-        "inline-flex h-9 items-center gap-1.5 rounded-full border px-[13px]",
-        "font-mono text-xs tabular-nums",
-        "transition-colors duration-150 ease-otb",
-        // ⚠ 시각 크기는 프로토타입의 36px을 지키고, **히트 영역만** 투명 의사요소로 44px까지 넓힌다
-        //   (핸드오프: 모든 탭 가능 요소의 실제 히트 영역 최소 44×44).
-        //   패딩으로 늘리면 배경이 함께 커져 칩이 뚱뚱해진다.
-        "relative after:absolute after:-inset-x-2 after:-inset-y-1 after:content-['']",
-        active
-          ? "border-primary bg-primary text-on-primary"
-          : "border-hairline bg-canvas text-ink-secondary",
-        // 비활성 자리표시(저장·신고 등 미구현 액션)는 눌리지 않는다 — 동작을 발명하지 않는다
-        "aria-disabled:pointer-events-none aria-disabled:opacity-40",
-        className,
-      )}
+      className={actionChipClassName({
+        active,
+        className: [
+          // ⚠ 시각 크기는 프로토타입의 36px을 지키고, **히트 영역만** 투명 의사요소로 44px까지
+          //   넓힌다(핸드오프: 탭 가능 요소의 실제 히트 영역 최소 44×44).
+          //   패딩으로 늘리면 배경이 함께 커져 칩이 뚱뚱해진다.
+          "relative after:absolute after:-inset-x-2 after:-inset-y-1 after:content-['']",
+          "disabled:opacity-40",
+          className,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      })}
       {...props}
     >
       <Icon as={icon} size={iconSize} />
