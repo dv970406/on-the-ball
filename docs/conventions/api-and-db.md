@@ -61,6 +61,15 @@ RPC(`security definer`, 호출자가 직접 부른다)와 성질이 다르다 �
 있는 역할이 EXECUTE도 가져야 한다.** 노출이 걱정되면 함수가 입력 외의 정보를 돌려주지 않게
 설계하고 열어라(`post_is_alive`·`has_visible_char` 둘 다 그렇다).
 
+### 그래서 검증 로직을 정책이 아니라 **트리거**에 두는 경우가 있다
+
+RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 권한으로 평가**된다. 즉
+"정책에 넣고 함수는 revoke"라는 조합은 성립하지 않는다 — revoke하는 순간 그 테이블의 쓰기가 전부 42501로 죽는다.
+
+- 선례: 답글 깊이 제한(`check_comment_depth`)은 `comment`의 insert 정책이 아니라 **before insert 트리거**다.
+- 부수 효과로 **에러 메시지가 좋아진다.** 정책 위반은 Postgres의 영어 42501뿐이라 "왜 거부됐는지"를 설명하지 못하는데, 트리거는 `P0001`로 한국어 사유를 그대로 노출한다(`toDbErrorMessage`가 P0001을 통과시킨다).
+- 판단 기준: **거부 사유를 사용자에게 설명해야 하면 트리거**, 단순 접근 차단이면 정책.
+
 ## 문자 검증은 클라이언트와 DB가 **같은 문자 집합**을 써야 한다
 
 `char_length` 길이 제한과 `~ '[^[:space:]]'` 공백 검사만으로는 부족했다:
@@ -80,11 +89,13 @@ RPC(`security definer`, 호출자가 직접 부른다)와 성질이 다르다 �
 
 ## SECURITY DEFINER RPC
 
-쓰기가 RLS를 넘어야 할 때만 RPC로 내린다. 현재 `toggle_post_like`·`soft_delete_post` + 트리거 3종.
+쓰기가 RLS를 넘어야 할 때만 RPC로 내린다. 현재 `toggle_post_like`·`soft_delete_post`·`increment_post_view` + 트리거 4종(`sync_post_like_count`·`sync_post_comment_count`·`touch_updated_at`·`check_comment_depth`).
 
 - **유저 id를 인자로 받지 않는다.** `security definer`는 RLS를 우회하므로 유저를 클라이언트가 넘기면 남의 명의로 조작할 수 있다. 함수 안에서 `auth.uid()`로 확정한다 — PostgREST가 access token을 검증해 `request.jwt.claims`에 심어둔 값이라 위조가 불가능하다. `security definer`가 바꾸는 것은 "무엇을 할 수 있는가"(권한)이지 "누가 호출했는가"(세션 컨텍스트)가 아니다.
 - **`set search_path = ''` + `public.` 접두사.** 호출자가 search_path를 조작해 다른 스키마의 동명 테이블을 붙잡게 만드는 권한 상승을 막는다.
 - **`revoke execute from public, anon`.** 함수는 기본적으로 PUBLIC에 EXECUTE가 부여된다 — 그대로 두면 비로그인도 호출한다.
+  - ⚠ **예외 1건: `increment_post_view`는 anon에도 열려 있다.** 이 시스템의 **유일한 비로그인 쓰기 경로**이고, "anon은 어디에도 쓸 수 없다"는 전제가 여기서만 깨진다(`rls.sql` 섹션 17d의 화이트리스트에 등재). 조회는 비로그인이 대부분이라 authenticated 전용으로 두면 숫자가 의미를 잃기 때문이다.
+  - 대가로 **`view_count`는 curl 루프로 부풀릴 수 있는 대략치**다 — 트리거가 단독 관리하는 `like_count`·`comment_count`와 **신뢰 수준이 다르다.** 이 차이는 컬럼 주석에도 적혀 있다. 정확도가 필요해지면 `(post_id, viewer_hash, viewed_on)` 로그 테이블이 필요하다.
 - **에러 코드 규약**: 우리가 의도적으로 띄우는 한국어 메시지는 **`P0001`** 로 던진다(`toDbErrorMessage`가 그대로 노출한다). `42501`은 Postgres 자신의 영어 권한 거부용으로 남겨둔다.
 
 ### 왜 좋아요는 RPC이고 댓글 수는 트리거인가
@@ -123,6 +134,20 @@ create policy "comment_select_alive_post" on public.comment
 
 같은 리소스에 대해 **좋아요와 댓글의 삭제 판정이 달라지면 안 된다** — RPC 쪽만 막고
 정책 쪽을 잊는 게 전형적인 실수다.
+
+## ⚠ `on delete cascade`는 RLS를 적용받지 않는다
+
+cascade 삭제는 RI(참조 무결성) **내부 트리거**가 수행하므로 정책이 개입하지 않는다.
+`comment.parent_id`가 `on delete cascade`라서 실제로 이런 일이 생긴다:
+
+> 루트 댓글 작성자가 자기 댓글을 지우면 **남이 단 답글까지 함께 사라진다.**
+> `comment_delete_own`("본인 것만")의 간접 우회로다.
+
+포럼 관례라 **수용한 트레이드오프**이지만, 그렇다면 **화면의 삭제 확인 문구가 이 사실을 고지해야 한다** —
+정책이 못 막는 것을 UI 계약으로 갚는 셈이다. `comment_count`는 자식 행마다 `after delete` 트리거가
+발화해 정확히 감소한다(확인함).
+
+새 FK에 cascade를 걸 때는 **"이 삭제가 누구의 행까지 지우는가"** 를 정책과 따로 따진다.
 
 ## 트리거는 필요한 변경에만 발화시킨다
 
@@ -179,7 +204,8 @@ RLS 술어가 security-barrier 서브쿼리 안으로 들어가 바깥의 `fk = 
 
 | 파일 | 용도 |
 |---|---|
-| `supabase/tests/rls.sql` | RLS·컬럼 권한·RPC 전량 검사 (전체 rollback이라 DB에 흔적 없음) |
+| `supabase/tests/rls.sql` | RLS·컬럼 권한·RPC 전량 검사, 섹션 22까지 (전체 rollback이라 DB에 흔적 없음) |
+| — 섹션 22는 **답글**을 검사 | 깊이 1 초과 거부·타 게시글 부모 거부·없는 부모 거부(전부 P0001), cascade가 남의 답글까지 지우는 동작, `comment_count`가 답글 포함 총합인지, 글이 소프트 삭제되면 답글도 함께 감춰지는지 |
 | — 섹션 17은 **테이블명을 하드코딩하지 않는다** | public 스키마 기본 권한이 anon/authenticated에 ALL이라, 새 마이그레이션이 `revoke`를 한 번만 잊어도 즉시 구멍이 된다. 고정 목록만 검사하면 **새 테이블은 검사 대상에 들어오지도 않는다** → RLS 미적용·anon 쓰기 권한·search_path 미고정·anon EXECUTE를 전수로 훑는다 |
 | — 섹션 18은 **INSERT 시점 위조**를 검사 | 섹션 1이 UPDATE만 보고 있어서, `grant insert` 목록이 넓어지는 회귀(카운터·타임스탬프 동봉)를 못 잡았다 |
 | — 시드 INSERT는 반드시 `begin;` **아래**에 | 위에 두면 오토커밋으로 새어나가 실행할 때마다 행이 쌓인다(실제로 그랬다) |

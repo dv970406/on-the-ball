@@ -8,9 +8,13 @@
 - `formatDday` — 마감일 → `"D-8"`/`"마감"` (순수 표시용)
 - `isClosed` — 마감 여부 boolean 판정 (표시 문자열 비교 금지, 이 함수로 판정)
 - `todayUtc` — 오늘 날짜 `"YYYY-MM-DD"`(UTC, Postgres `current_date`와 정합)
+- **`startOfTodaySeoul`** — 오늘(한국 기준) 00:00의 ISO 시각. "오늘 N개의 글" 같은 하루 경계에 쓴다.
+  ⚠ **`todayUtc`로 대신하지 말 것** — 그건 Postgres `current_date`와 맞추기 위한 값이라 한국 사용자에게는 **오전 0~9시 사이 "오늘"이 어제가 된다**. 내부에서 `Date.now()`를 부르므로 렌더 중이 아니라 queryFn 안에서만 호출한다.
 - `formatYearMonth` — ISO 날짜 → `"2026.07"`(UTC 기준)
-- `formatRelativeTime` — 과거 시각 → `"방금 전"`/`"3분 전"`/`"2시간 전"`/`"5일 전"`, 7일↑은 `"7월 30일"`, **해가 다르면 `"2025년 7월 30일"`**. ⚠ 내부에서 `Date.now()`·`new Date()`를 쓰므로 **서버 렌더에 넣지 말 것**(hydration 불일치). 클라 마운트 이후에만 렌더한다.
+- `formatRelativeTime` — 과거 시각 → `"방금 전"`/`"3분 전"`/`"2시간 전"`/`"5일 전"`, 7일↑은 `"7월 30일"`, **해가 다르면 `"2025년 7월 30일"`**.
   - 연도를 붙이는 이유: 전에는 무조건 `"7월 30일"`이라 **작년 글이 올해 글과 구분되지 않았다**(`<time dateTime>`은 정확한데 화면 텍스트만 거짓말).
+  - ⚠ **내부에서 `Date.now()`·`new Date()`를 쓴다.** 그런데 실제 호출부(`post-card.tsx`·`post-detail-view.tsx`·`comment-item.tsx`)는 이 함수를 **렌더 중에** 부른다 — 목록·상세가 전부 클라이언트 쿼리라 **SSR HTML이 항상 스켈레톤이어서** 지금은 안전할 뿐이다. 서버 프리페치를 붙이는 순간 깨진다(`data-and-state.md` 하이드레이션 절).
+  - ⚠ HOT 판정은 이미 `useNowMs`(마운트 후 값)로 옮겨졌는데 이 함수만 아직 직접 시계를 읽는 **비대칭 상태**다. 프리페치를 붙일 때는 `entities/post/lib/hot.ts` 주석대로 **두 곳을 함께** "서버 기준 시각 주입"으로 바꾼다. 한쪽만 고치면 같은 카드 안에서 기준 시각이 갈린다.
 
 ## `@/shared/lib` (배럴 — 클라이언트 훅 포함)
 - `cn` — Tailwind 클래스 병합
@@ -18,7 +22,11 @@
 - **`hasVisibleChar`** — 보이는 글자가 하나라도 있는지. **`.trim()` 대신 이걸 쓴다** — `.trim()`도 Postgres `[:space:]`도 제로폭 문자·BOM을 못 걸러서 "제목이 완전히 비어 보이는 글"이 실제로 만들어졌다. DB의 `public.has_visible_char`와 **문자 집합이 같아야 한다**(한쪽만 고치지 말 것).
 - **`codePointLength`** — DB `char_length`와 같은 단위의 길이. **`.length`나 `<input maxLength>`로 길이를 제한하지 말 것** — UTF-16 코드유닛이라 이모지가 2로 세어져 한도의 절반에서 막힌다.
 - **`useNextParam`** — 현재 URL의 `?next=`. `useSearchParams` 대신 쓴다(그걸 쓰면 화면 프리렌더가 CSR로 떨어진다).
-- `useScrollRestore` — 목록 스크롤 위치 저장/복원
+- **`useNowMs`** — 마운트 이후의 현재 시각(ms). 마운트 전에는 `null`.
+  렌더 중 `Date.now()`를 부르지 않기 위한 훅이다. **시간에 따라 달라지는 표시(HOT 배지 등)는 이걸로 판정한다** — `null`인 첫 렌더에서는 그 표시를 그리지 않으면 서버·클라 출력이 같아진다. 선례: `entities/post`의 `isHotPost(post, nowMs)`.
+- `useScrollRestore` / `clearScrollRestore` — 목록 스크롤 위치 저장/복원 (`clearScrollRestore`는 목록을 처음부터 보여야 할 때 저장분을 버린다)
+- `useFocusTrap` — 오버레이(`Dialog`·`Sheet`) 안에 포커스를 가둔다
+- `useToast` / `useToastStore` — 토스트 발행. **표시 영역(`ToastViewport`)은 `@/shared/ui`에 있고 루트에 하나만 둔다** — 상태와 UI가 레이어를 달리한다
 - `useDelayedReveal` — (v1 자산, 현재 미사용)
 
 ## `@/types/database.types` (생성 파일 — `pnpm db:types`)
@@ -42,13 +50,22 @@
 
 ## `@/entities/post` · `@/entities/comment`
 - `postKeys` / `commentKeys` — 쿼리 키. 낙관적 업데이트가 prefix 매칭에 의존하므로 계층을 지킨다.
-- `usePostListQuery` / `usePostQuery` / `useCommentListQuery`
+- `usePostListQuery` / `usePostQuery` / `useCommentListQuery` / `useTodayPostCountQuery`
 - `POST_LIST_LIMIT` / `COMMENT_LIST_LIMIT` — 목록 상한. **화면이 잘림을 안내해야 한다** — 조용히 자르면 그 뒤 항목은 URL을 아는 사람 말고는 도달할 방법이 없다.
 - `POST_LIST_SELECT` / `POST_DETAIL_SELECT` / `COMMENT_SELECT` — PostgREST select 문자열의 단일 소스.
 - `buildPostListItem` / `buildPostDetail` / `buildComment` — row(snake) → 도메인(camel).
 - `isEdited` — `created_at !== updated_at` 판정("수정됨" 표시).
+- **`POST_CATEGORIES` / `POST_SORTS` / `POST_SORT_LABEL`** — 말머리·정렬의 단일 소스. 말머리는 **DB의 `post_category` enum에서 생성된 타입**이라 목록을 손으로 다시 적지 않는다(`Record<PostCategory, ...>` 맵이 값 추가 시 누락을 컴파일 에러로 잡아준다).
+- **`isHotPost(post, nowMs)` / `HOT_LIKE_THRESHOLD` / `HOT_WINDOW_MS`** — HOT 배지 판정. **`nowMs`를 인자로 받는 이유**가 규약이다 — 매퍼에 넣으면 순수·서버 안전이 깨지고 같은 행이 호출 시점마다 달라진다. 호출부는 `useNowMs`를 넘긴다.
+- **`toPlainSummary` / `clamp`** — 마크다운 원문 → 기호를 걷어낸 요약. 목록 카드의 `excerpt`와 `og:description`이 **같은 변환기**를 쓴다.
+- **`buildCommentThreads`** — 평면 댓글 배열 → 깊이 1 스레드(`CommentThread`). 답글 정렬·부모 매칭을 화면에서 다시 짜지 않는다.
 - `PostCard` / `CommentItem` — 목록 아이템 UI.
-- 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/keys`를 직접 import.
+- 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/keys`·`lib/plain-summary`·`lib/hot`을 직접 import.
+
+## `@/entities/profile`
+- `useProfileQuery(userId)` / `profileKeys` — 닉네임 등 프로필 조회.
+- `MyProfile` / `ProfileRow` — 도메인 타입 / DB 행 타입.
+- ⚠ **`userId`를 인자로 받는다.** 세션을 직접 읽지 않는 이유는 `entities`끼리 서로 import할 수 없기 때문이다 — 세션을 아는 **상위 레이어**(`widgets/auth-status`가 선례)가 `user?.id`를 넘긴다.
 
 ## `@/shared/config`
 - `ROUTES` — 경로 헬퍼. **경로 문자열 하드코딩 금지**(`"/posts"` ❌ → `ROUTES.postList`).
@@ -58,17 +75,29 @@
 
 ## `@/shared/ui`
 **현역(게시판 v2가 실제로 쓰는 것)** — 새로 만들기 전 여기부터 확인:
-`Button`·`buttonClassName`·`Icon`·`TabHeader`·`Skeleton`·`EmptyState`·`TextField`·`Markdown`·`MarkdownEditor`
+`Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·`TextField`·`Markdown`·
+`Chip`·`ActionChip`·`actionChipClassName`·`Dialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`
 
 **v1 보존 자산(현재 미사용)** — `docs/legacy/v1-inventory.md`가 보존 대상으로 명시한 것들이다. 트리셰이킹되어 번들 비용은 0이니 지우지 않는다. 다만 **"검증된 현역"으로 오인하지 말 것**:
-`Pill`·`Flag`·`Shirt`·`Avatar`·`RatioBar`·`SectionHead`·`LiveDot`·`LiveStatusPill`·`NightCard`·`Wordmark`·`PlayerSilhouette`
+`TabHeader`·`MarkdownEditor`·`Flag`·`Shirt`·`RatioBar`·`SectionHead`·`LiveDot`·`LiveStatusPill`·`NightCard`·`PlayerSilhouette`
+
+> ⚠ 이 두 목록은 **실사용 여부로만 판정한다**(`grep -rE "<Name\b" src app --include='*.tsx'`).
+> 커뮤니티 이식 때 실제로 어긋났다 — `TabHeader`·`MarkdownEditor`는 현역으로 적혀 있었지만 호출부가 0이었고, 반대로 `Pill`·`Avatar`·`Wordmark`는 v1 미사용으로 적혀 있는 채 화면에서 쓰이고 있었다.
+> **이 문서의 존재 이유가 "새로 만들기 전 확인"이라 목록이 틀리면 문서가 없느니만 못하다.** UI를 추가·제거하면 여기부터 고친다.
+
 - `TextField` — 라벨 + 인풋 + 에러 한 덩어리. 인증 화면 4개와 글 작성에서 공유.
 - `Markdown` — 마크다운 렌더(GFM). `"use client"` **없음** — 서버 렌더 가능.
-- `MarkdownEditor` — textarea + 작성/미리보기 탭.
+- `Chip` — 말머리 칩. **`rounded-sm`(6px)** 이다 — 칩이라고 알약이 아니다(`styling.md` 예외 목록 참고).
+- `ActionChip` / `actionChipClassName` — 좋아요·댓글 카운터 칩. 클래스 함수가 분리된 이유는 `Button`↔`buttonClassName`과 같다 — 비로그인 좋아요는 `Link`로 렌더해야 하는데 `Link` 안에 `button`을 넣을 수 없어 **클래스만** 필요하다.
+- `Dialog` / `Sheet`(+`SheetItem`·`SheetCloseItem`) — 확인 대화상자 / 하단 시트. 포커스 가둠은 `@/shared/lib`의 `useFocusTrap`.
+- `ToastViewport` — 루트(`AppProviders`)에 **하나만** 둔다. 발행 API(`useToast`)는 `@/shared/lib`에 있다.
+- `MarkdownEditor` — textarea + 작성/미리보기 탭. **현재 미사용** — 프로토타입에 미리보기 탭이 없어 `PostForm`이 일반 textarea를 쓴다.
 - ⚠ `Link` 안에 `Button`을 넣지 않는다(`<a>` 안의 `<button>`). 버튼형 링크는 `buttonClassName({...})`을 `Link`의 className에 준다.
 
 ## `@/widgets`
+- `AppBar` — 목록 화면 상단(워드마크 + 액션).
+- `BottomTabBar` — 하단 탭바. **`backdrop-blur`가 허용된 유일한 요소**다(`styling.md`).
 - `SubHeader` — 상세·작성·수정 화면 상단(뒤로가기 + 공유).
 - `TabScrollArea` — 목록 스크롤 영역(`<main>` 제공 + 스크롤 복원).
 - `AuthShell` — 인증 화면 4개의 공통 껍데기.
-- `AuthStatus` — 세션 표시 + 로그인 링크 / 로그아웃.
+- `AuthStatus` — 세션 표시 + 로그인 링크 / 로그아웃. 세션을 아는 레이어라 `useProfileQuery(user?.id)`에 id를 넘기는 선례이기도 하다.

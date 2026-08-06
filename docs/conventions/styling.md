@@ -87,9 +87,37 @@ function cardClassName(peek: boolean) {
 
 - **한 뷰포트당 컬러 이벤트는 에메랄드 1개.** 나머지는 잉크 그레이 래더.
 - 에메랄드(`bg-primary`) 위 텍스트는 항상 `text-on-primary`(#171717) — **흰색 금지**.
-- 버튼은 **6px 라운드**(`rounded-sm`) — pill 버튼 금지.
-- 그림자 대신 **1px 헤어라인**이 카드 구조를 담당, resting 상태는 flat.
+- 버튼은 **6px 라운드**(`rounded-sm`) — pill 버튼 금지. **예외 4곳은 아래에 못박아 두었다.**
+- 그림자 대신 **1px 헤어라인**이 카드 구조를 담당, resting 상태는 flat. **예외는 "떠 있는 레이어"뿐이다(아래).**
 - 배경 그라데이션·블러·글래스모피즘 금지(하단 탭바만 예외적으로 blur).
 - 애니메이션 이징 `ease-otb`(cubic-bezier(0.2,0,0,1)), 150–350ms. 바운스·스프링 금지.
 - 강한 컬러(클럽 컬러·국기)는 **콘텐츠**로만 허용 — 크롬(버튼·네비)에는 금지.
 - `prefers-reduced-motion` 존중(전역 처리됨).
+
+### 알약(`rounded-full`) 예외 — 정확히 4곳
+
+프로토타입 치수를 그대로 옮긴 자리다. **이 목록에 없으면 `rounded-sm`이다.**
+
+| 자리 | 파일 |
+|---|---|
+| `ActionChip` (좋아요·댓글 카운터 칩) | `shared/ui/action-chip-class.ts` |
+| 댓글 입력창 | `views/post-detail/ui/comment-bar.tsx` |
+| 댓글 전송 버튼 | `views/post-detail/ui/comment-bar.tsx` |
+| 글쓰기 FAB | `views/post-list/ui/post-list-view.tsx` |
+
+경계가 헷갈리는 두 가지:
+
+- **`size-11 rounded-full` 아이콘 버튼은 이 예외가 아니다** (`sub-header`·`post-detail-view`·`app-bar`). 버튼 라운드가 아니라 **원형 히트 영역**이라 범주가 다르다. 도트·아바타·`Pill`·`RatioBar` 같은 순수 표시 요소도 마찬가지로 무관하다.
+- **대비 선례 — `Chip`(말머리)은 `rounded-sm`이다.** "칩이니까 알약"이 아니다. 실제로 같은 화면에서 `Chip`은 6px, `ActionChip`은 알약으로 공존한다.
+
+### 그림자 예외 — "떠 있는 레이어"만
+
+resting 상태의 카드·목록·헤더는 **여전히 flat + 1px 헤어라인**이다. 그림자는 표면 위로 **떠오른** 요소만 갖는다.
+
+| 자리 | 값 |
+|---|---|
+| `Dialog` · `Sheet` | `shadow-[0_16px_48px_rgba(0,0,0,0.12)]` |
+| 글쓰기 FAB | `shadow-[0_8px_24px_rgba(0,0,0,0.18)]` |
+| `BottomTabBar` | `shadow-[0_12px_32px_rgba(0,0,0,0.18),inset_...]` (blur도 여기만 허용) |
+
+새 그림자를 넣고 싶으면 **"이 요소가 정말 떠 있는가"** 를 먼저 답한다. 카드에 얹고 싶은 거라면 답은 헤어라인이다.
