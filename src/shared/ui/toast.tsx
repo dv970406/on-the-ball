@@ -2,8 +2,7 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { cn } from "@/shared/lib";
-import { useToastStore } from "@/shared/lib/toast-store";
+import { cn, useToastStore } from "@/shared/lib";
 import { ROUTES } from "@/shared/config";
 
 /** 자동 소멸까지 — 프로토타입과 동일 */

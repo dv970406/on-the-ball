@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { codePointLength, hasVisibleChar } from "@/shared/lib/text";
+import { codePointLength, hasVisibleChar } from "@/shared/lib";
 import { POST_CATEGORIES } from "@/entities/post";
 
 /**
