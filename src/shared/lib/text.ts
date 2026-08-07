@@ -35,7 +35,7 @@ const VISIBLE_CHAR = new RegExp(
  *
  * ⚠ `.trim()`이나 `char_length` 검사만으로는 부족하다 — 제로폭 공백(U+200B)·BOM(U+FEFF)을
  *   둘 다 걸러내지 못해서 **제목이 완전히 비어 보이는 글**이 실제로 만들어졌다
- *   (`<title>﻿ · 온더볼</title>`).
+ *   (`<title>﻿ | 온더볼</title>`).
  */
 export function hasVisibleChar(value: string): boolean {
   return VISIBLE_CHAR.test(value);

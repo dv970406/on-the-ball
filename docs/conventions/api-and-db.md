@@ -80,7 +80,7 @@ RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 
 | `U+200B`(제로폭 공백) | 통과 | 통과 |
 | 이모지 121개 | **거부** — `.length`가 UTF-16 코드유닛 | 통과 — `char_length`는 코드포인트 |
 
-결과: 제목이 **완전히 비어 보이는 글**이 실제로 만들어졌고(`<title>﻿ · 온더볼</title>`),
+결과: 제목이 **완전히 비어 보이는 글**이 실제로 만들어졌고(`<title>﻿ | 온더볼</title>`),
 이모지 제목은 한도의 절반에서 막혔다. 방향이 양쪽으로 다 어긋난 셈이다.
 
 → 단일 소스를 둔다. `src/shared/lib/text.ts`의 `hasVisibleChar`·`codePointLength`와

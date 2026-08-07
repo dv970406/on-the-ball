@@ -21,7 +21,8 @@ export default function GlobalError({
           ⚠ 여기서는 metadata/generateMetadata가 동작하지 않는다(루트 layout이 대체된 상태다).
             React의 <title>을 직접 써야 탭 제목이 빈 채로 남지 않는다 — Next 16 error 문서 명시.
         */}
-        <title>앱을 불러오지 못했어요 · 온더볼</title>
+        {/* ⚠ 접미사를 손으로 적는 유일한 자리 — layout의 title.template이 닿지 않는다 */}
+        <title>앱을 불러오지 못했어요 | 온더볼</title>
         <main className="flex h-dvh flex-col items-center justify-center gap-2 bg-canvas px-8 text-center">
           <h1 className="text-[15px] font-medium text-ink">
             앱을 불러오지 못했어요

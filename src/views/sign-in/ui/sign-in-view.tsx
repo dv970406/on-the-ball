@@ -25,38 +25,21 @@ export function SignInView() {
 
   return (
     <AuthShell
-      // 카피는 핸드오프 8장 그대로 — 줄바꿈 위치까지 명세다
-      title={
-        <>
-          축구 얘기는
-          <br />
-          여기서 끝까지.
-        </>
-      }
-      description={
-        <>
-          이적설부터 유니폼 취향까지,
-          <br />
-          거들 자리를 만들어 뒀어요.
-        </>
-      }
+      // 서비스 이름과 한 줄 소개만 — 인증 화면은 로그인이라는 목적 하나만 드러낸다
+      title="온더볼"
+      description="모든 축구팬들을 위한 커뮤니티."
+      // 게스트 진입 — 로그인 없이 목록을 둘러본다(읽기는 RLS가 공개로 허용한다).
+      // ⚠ 약관 동의 고지는 여기 두지 않는다 — 동의를 받는 시점은 가입이고,
+      //   링크할 /terms·/privacy도 아직 없다. 문서가 생기면 회원가입 화면에 링크와 함께 넣는다.
       belowForm={
-        <>
-          {/* 게스트 진입 — 로그인 없이 목록을 둘러본다(읽기는 RLS가 공개로 허용한다) */}
-          <div className="mt-4 text-center">
-            <Link
-              href={ROUTES.postList}
-              className="text-[13px] font-medium text-ink-mute underline decoration-hairline-strong underline-offset-[3px]"
-            >
-              먼저 둘러볼게요
-            </Link>
-          </div>
-          <p className="mt-5 text-center text-[11px] leading-[1.7] text-ink-faint">
-            계속하면 이용약관과 개인정보 처리방침에
-            <br />
-            동의하는 것으로 봅니다.
-          </p>
-        </>
+        <div className="mt-4 text-center">
+          <Link
+            href={ROUTES.postList}
+            className="text-[13px] font-medium text-ink-mute underline decoration-hairline-strong underline-offset-[3px]"
+          >
+            먼저 둘러볼게요
+          </Link>
+        </div>
       }
       footer={
         <>

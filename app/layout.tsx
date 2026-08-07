@@ -8,10 +8,12 @@ export const metadata: Metadata = {
   // og:image는 절대 URL이라야 한다 — 없으면 Next가 localhost로 추정하고 빌드 경고를 낸다.
   // 같은 폴더의 opengraph-image.png가 이 값을 기준으로 절대 URL이 된다.
   metadataBase: new URL(env.siteUrl),
-  // 접미사 단일 소스 — 각 page는 자기 제목만 적는다("· 온더볼"을 손으로 반복하지 않는다).
+  // 접미사 단일 소스 — 각 page는 자기 제목만 적는다("| 온더볼"을 손으로 반복하지 않는다).
   // default는 템플릿이 적용되지 않는 자리(루트·not-found)에 쓰인다.
-  title: { template: "%s · 온더볼", default: "온더볼" },
-  description: "글을 쓰고 이야기를 나누는 커뮤니티 게시판",
+  title: { template: "%s | 온더볼", default: "온더볼" },
+  // 서비스 소개 문구의 단일 소스 — 하위 페이지는 이 값을 상속한다.
+  // sign-in 화면과 opengraph-image.alt.txt도 같은 문구를 쓴다(세 곳이 갈리면 공유 프리뷰만 옛 톤으로 남는다).
+  description: "모든 축구팬들을 위한 커뮤니티",
 };
 
 export const viewport: Viewport = {

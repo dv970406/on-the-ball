@@ -6,7 +6,7 @@ interface AuthShellProps {
   children: ReactNode;
   /** 하단 보조 링크 영역 (다른 인증 화면으로 이동) */
   footer?: ReactNode;
-  /** 폼 아래 붙는 부가 영역 — 게스트 진입·법적 문구 등 (로그인 화면만 사용) */
+  /** 폼 아래 붙는 부가 영역 — 게스트 진입 링크 (로그인 화면만 사용) */
   belowForm?: ReactNode;
 }
 
@@ -15,8 +15,8 @@ interface AuthShellProps {
  * 각 뷰는 폼 본문에만 집중하고 제목·여백은 여기서 한 번에 정한다.
  *
  * 커뮤니티 프로토타입의 `.cm-login` 톤을 따른다 — 좌우 28px, 상단 여백을 크게 두고
- * 헤드라인 30px/500/-1px. title/description을 ReactNode로 받는 이유는
- * 프로토타입 카피가 `<br />`로 줄을 강제하기 때문이다("축구 얘기는 / 여기서 끝까지.").
+ * 헤드라인 30px/500/-1px. title/description이 ReactNode인 것은 재설정 화면처럼
+ * 상태에 따라 문구를 갈아 끼우는 곳을 위해서다(현재 카피는 전부 평문이다).
  *
  * ⚠ 워드마크(에메랄드 볼)를 두지 않는다 — 이 화면의 컬러 이벤트는 제출 버튼 하나다.
  */
