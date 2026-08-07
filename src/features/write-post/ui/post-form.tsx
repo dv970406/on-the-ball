@@ -84,6 +84,19 @@ export function PostForm({
   const dirty = title.length > 0 || content.length > 0 || category !== "";
 
   /**
+   * **초기값에서 실제로 바뀌었는지** — 임시저장 캡션 전용이다.
+   *
+   * ⚠ `dirty`로 판정하면 안 된다. 수정 모드는 `initial`이 채워진 채 시작하므로 dirty가
+   *   마운트부터 참이라, **아무것도 건드리지 않았는데 900ms 뒤 "임시저장됨"이 떴다.**
+   *   실제 저장 기능이 없는 자리표시라(핸드오프 7장) 하지도 않은 저장을 했다고 말하는 셈이다.
+   *   `dirty`는 이탈 확인용으로 그대로 둔다 — 두 판정의 목적이 다르다.
+   */
+  const changed =
+    title !== (initial?.title ?? "") ||
+    content !== (initial?.content ?? "") ||
+    category !== (initial?.category ?? "");
+
+  /**
    * 등록 버튼 활성 조건 — **저렴한 검사만** 한다.
    * 진짜 검증(zod)은 제출 시점의 validatePost가 하므로 여기서 또 돌릴 이유가 없다.
    * 두 판정이 갈리지 않도록 기준은 postSchema와 같은 것을 쓴다(hasVisibleChar·코드포인트 길이).
@@ -105,10 +118,10 @@ export function PostForm({
 
   /** 임시저장 캡션 — 입력이 멎고 900ms 뒤에 뜬다(실제 저장은 하지 않는다, 핸드오프 7장) */
   useEffect(() => {
-    if (!dirty) return;
+    if (!changed) return;
     const timer = setTimeout(() => setSavedAt("임시저장됨 · 방금"), 900);
     return () => clearTimeout(timer);
-  }, [dirty, category, title, content]);
+  }, [changed, category, title, content]);
 
   /**
    * 중복 제출 동기 가드.

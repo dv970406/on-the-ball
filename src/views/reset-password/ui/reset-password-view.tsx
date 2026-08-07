@@ -91,9 +91,22 @@ export function ResetPasswordView() {
   const awaitingExchange =
     arrivedFromLink && !isPasswordRecovery && status === "authenticated" && !exchangeTimedOut;
 
-  if (status === "loading" || awaitingExchange) {
+  /**
+   * ⚠ **변경에 성공한 뒤에는 아래 안내 분기로 내려가면 안 된다.**
+   *   supabase가 updateUser 성공과 함께 `USER_UPDATED`를 발행하고, 스토어는 설계대로
+   *   `isPasswordRecovery`를 내린다(session-store 주석 — 공용 PC에서 두 번 바꾸는 걸 막는 장치).
+   *   그러면 목록으로 이동(RSC 왕복)이 끝나기 전에 `!isPasswordRecovery` 분기가 열려
+   *   **성공한 사용자에게 "재설정 링크가 필요해요"가 노출된다.**
+   *   이동이 끝나 이 화면이 언마운트될 때까지 대기 화면을 유지한다.
+   */
+  if (status === "loading" || awaitingExchange || updatePassword.isSuccess) {
     return (
-      <AuthShell title="비밀번호 재설정" description="링크를 확인하고 있어요.">
+      <AuthShell
+        title={updatePassword.isSuccess ? "비밀번호를 바꿨어요" : "비밀번호 재설정"}
+        description={
+          updatePassword.isSuccess ? "잠시 후 이동할게요." : "링크를 확인하고 있어요."
+        }
+      >
         <div className="flex flex-col gap-4">
           <Skeleton className="h-16 w-full" />
           <Skeleton className="h-16 w-full" />

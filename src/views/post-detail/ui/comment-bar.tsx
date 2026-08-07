@@ -19,6 +19,11 @@ interface CommentBarProps {
   postId: number;
   replyTo: ReplyTarget | null;
   onCancelReply: () => void;
+  /**
+   * 전송 실패로 되돌릴 때 답글 대상을 복원한다.
+   * ⚠ 입력창 복구만 있으면 재전송이 **루트 댓글로 등록된다** — 아래 handleSubmit 주석 참고.
+   */
+  onRestoreReply: (target: ReplyTarget) => void;
 }
 
 /**
@@ -27,13 +32,27 @@ interface CommentBarProps {
  * 알약형 인풋은 "버튼 6px 라운드" 규칙의 명시적 예외 4곳 중 하나다.
  * 답글 모드면 입력창 바로 위에 대상 표시 바가 뜬다.
  */
-export function CommentBar({ postId, replyTo, onCancelReply }: CommentBarProps) {
+export function CommentBar({
+  postId,
+  replyTo,
+  onCancelReply,
+  onRestoreReply,
+}: CommentBarProps) {
   const status = useSessionStore((s) => s.status);
   const pathname = usePathname();
   const writeComment = useWriteComment(postId);
   const [content, setContent] = useState("");
   const [error, setError] = useState<string>();
   const inputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * 최신 입력값 — 전송 실패 콜백이 "그 사이 사용자가 새로 입력했는지"를 판정하는 데 쓴다.
+   * 콜백은 렌더 밖(뮤테이션 완료 시점)에서 도므로 클로저의 content로는 알 수 없다.
+   */
+  const contentRef = useRef(content);
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
 
   /**
    * 중복 제출 동기 가드.
@@ -99,7 +118,8 @@ export function CommentBar({ postId, replyTo, onCancelReply }: CommentBarProps) 
     setError(undefined);
 
     submittingRef.current = true;
-    const parentId = replyTo?.commentId ?? null;
+    const target = replyTo;
+    const parentId = target?.commentId ?? null;
 
     /**
      * ⚠ 입력창은 **제출 즉시** 비운다.
@@ -107,13 +127,28 @@ export function CommentBar({ postId, replyTo, onCancelReply }: CommentBarProps) 
      *   **뒤에** 실행된다. 거기서 비우면 느린 회선에서 리페치가 끝나는 순간, 그 사이
      *   사용자가 타이핑해 둔 다음 댓글이 통째로 지워졌다.
      *   답글 대상도 함께 초기화하고, 실패하면 **둘 다** 되돌린다.
+     *
+     * ⚠⚠ **답글 대상 복원을 빠뜨리면 안 된다.** 전에는 입력창만 되돌려서,
+     *   답글 전송이 실패한 뒤 사용자가 그대로 다시 보내면 parentId가 null이 되어
+     *   **답글이 루트 댓글로 등록됐다**(화면에도 아무 단서가 없다).
      */
     setContent("");
+    // ⚠ ref도 **동기로** 비운다. 뮤테이션이 즉시 실패하면(예: env 미설정으로 클라이언트 생성
+    //   실패) onError가 위 setContent의 커밋보다 먼저 돌아, 동기화 effect가 아직 안 뛴
+    //   ref에는 옛 값이 남아 "사용자가 새로 입력했다"로 오판한다.
+    contentRef.current = "";
     onCancelReply();
     writeComment.mutate(
       { content: trimmed, parentId },
       {
-        onError: () => setContent((current) => (current === "" ? trimmed : current)),
+        onError: () => {
+          // 그 사이 사용자가 새로 입력했다면 덮지 않는다 — 대상도 **같은 기준으로 함께** 판단한다.
+          // ⚠ 판정을 setContent 업데이터 안에서 하면 안 된다. 업데이터는 순수해야 하고
+          //   StrictMode에서 두 번 불릴 수 있어 onRestoreReply가 중복 실행된다 → ref로 읽는다.
+          if (contentRef.current !== "") return;
+          setContent(trimmed);
+          if (target) onRestoreReply(target);
+        },
       },
     );
   };

@@ -234,7 +234,13 @@ export function PostDetailView({ postId }: { postId: number }) {
         />
       </main>
 
-      <CommentBar postId={post.id} replyTo={replyTo} onCancelReply={() => setReplyTo(null)} />
+      {/* 전송 실패 시 답글 대상까지 되돌려야 재전송이 루트 댓글이 되지 않는다 (comment-bar 주석) */}
+      <CommentBar
+        postId={post.id}
+        replyTo={replyTo}
+        onCancelReply={() => setReplyTo(null)}
+        onRestoreReply={setReplyTo}
+      />
 
       <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} label="글 메뉴">
         {isMine ? (
