@@ -71,6 +71,23 @@
 - 로그인 필수 화면(`/posts/new`·`/posts/[id]/edit`)은 `robots: { index: false }`. 본문이 스켈레톤뿐인 페이지가 정적 프리렌더되어 색인될 수 있다.
 - `global-error.tsx`에서는 `metadata`가 동작하지 않는다 — React `<title>`을 직접 쓴다(Next 16 문서 명시).
 
+### 아이콘·OG 이미지 (파일 컨벤션)
+
+`app/` 루트의 파일이 곧 메타데이터다 — `icon.svg`(+`icon.png`·`favicon.ico` 폴백) · `apple-icon.png` · `opengraph-image.png`(+`.alt.txt`).
+
+- ⚠ **`opengraph-image.alt.txt`는 파일 내용이 그대로 들어간다.** 끝에 개행을 남기면 `og:image:alt` 값에 `\n`이 붙는다(실측). 개행 없이 저장한다.
+- ⚠ **`apple-icon`은 SVG를 지원하지 않는다**(`.jpg|.jpeg|.png`만). 그리고 iOS가 자체 마스크를 씌우므로 **모서리를 둥글리지 않은 전면 채움**으로 만든다 — 라운드된 타일을 넣으면 모서리가 두 번 깎인다. 투명 영역은 검게 칠해지므로 알파도 없앤다.
+- ⚠ **`metadataBase`가 없으면 `og:image`가 localhost 절대 URL로 나간다.** `env.siteUrl`(`NEXT_PUBLIC_SITE_URL` → `VERCEL_URL` → localhost)을 루트 layout에서 쓴다.
+
+#### ⚠ 세그먼트가 `openGraph`를 채우면 루트의 이미지가 사라진다
+
+`app/opengraph-image.png`는 하위 라우트로 **자동 상속되지만**, 그 세그먼트의 `generateMetadata`가
+`openGraph`를 직접 반환하는 순간 **통째로 대체되어 이미지가 빠진다**(실측 — 글 상세만 이미지 없는
+카드로 나갔다). `twitter`도 마찬가지다.
+
+→ `og:title`을 글마다 바꾸는 라우트에서는 `images`를 **명시**한다(`app/posts/[id]/page.tsx`의 `OG_IMAGE`).
+  검증은 `curl`로 실제 응답의 `og:image` 유무를 본다 — 빌드는 조용히 통과한다.
+
 ## 같은 리소스는 라우트마다 **같은 판정**을 내려야 한다
 
 `/posts/[id]`는 없는 글에 404를 주는데 `/posts/[id]/edit`는 `parsePostId` 실패만 보고 있어서

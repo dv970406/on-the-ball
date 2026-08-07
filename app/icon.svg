@@ -1,0 +1,15 @@
+<!--
+  탭 파비콘 — 에메랄드 타일 + 잉크 말풍선 볼.
+  icon_ontheball 키트의 app-icon/ontheball-icon-emerald.svg 파생본으로, 심선(seam) 두 path를 뺐다.
+  키트 README 규칙: "심선이 있는 마크는 32px까지. 그 이하는 favicon/ 을 쓰세요(심선이 뭉개집니다)."
+  오각형은 favicon/favicon.svg의 소형 전용 지오메트리(M50 30 …)다 — 앱 아이콘 것(M50 33 …)보다
+  크게 그려져 있어, 아트가 타일의 58.6%로 줄어드는 여기서는 이쪽이 맞다.
+  타일 rx·아트 배치 수치는 앱 아이콘과 정렬을 맞추기 위해 원본 그대로 둔다.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect width="1024" height="1024" rx="228" fill="#3ecf8e" />
+  <g transform="translate(212 212) scale(6)">
+    <path d="M33.1 79.8 12 87l6.2-22.1A36 36 0 1 1 33.1 79.8z" fill="#171717" />
+    <path d="M50 30 67.4 42.6 60.7 63.1H39.3L32.6 42.6z" fill="#3ecf8e" />
+  </g>
+</svg>

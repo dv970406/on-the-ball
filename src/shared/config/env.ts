@@ -6,7 +6,47 @@
 export const env = {
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
   supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
+  /**
+   * 절대 URL이 필요한 메타데이터(`metadataBase` → og:image)의 기준 오리진.
+   *
+   * ⚠ 비워 두면 localhost로 폴백해 **공유 프리뷰 이미지가 열리지 않는다**.
+   *   배포 도메인이 정해지면 `NEXT_PUBLIC_SITE_URL`을 채운다.
+   *   Vercel은 프리뷰 배포마다 도메인이 달라지므로 `VERCEL_URL`을 그다음으로 본다.
+   * ⚠ `NEXT_PUBLIC_*`는 **빌드 시점에 인라인된다.** 런타임에만 주입하는 배포(도커 등)에서는
+   *   값이 잡히지 않고 조용히 localhost가 나가므로, 반드시 빌드 환경에 넣어야 한다.
+   */
+  siteUrl: resolveSiteUrl(),
 };
+
+/** 스킴이 빠진 값이 흔해서 붙여준다 — `new URL("example.com")`은 그대로 두면 throw한다 */
+function withScheme(value: string): string {
+  return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+}
+
+/**
+ * ⚠ **반드시 유효한 절대 URL을 돌려줘야 한다.** 이 값은 루트 layout의 `metadataBase`에서
+ *   `new URL()`에 들어가는데, 그건 모듈 최상위라 throw하면 **앱의 모든 라우트가 죽는다**
+ *   (메시지도 `Invalid URL` 한 줄이라 원인이 드러나지 않는다).
+ *   깨진 설정 하나로 서비스가 내려가는 것보다, 로그를 남기고 폴백해 뜨는 편이 낫다.
+ */
+function resolveSiteUrl(): string {
+  const fallback = "http://localhost:3000";
+  const raw =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
+  if (!raw) return fallback;
+
+  try {
+    // origin이 아니라 href다 — basePath 배포(`https://example.com/app`)의 경로를 잘라내지 않는다
+    return new URL(withScheme(raw)).href;
+  } catch {
+    console.error(
+      `[env] NEXT_PUBLIC_SITE_URL이 올바른 URL이 아니에요: ${JSON.stringify(raw)} — ` +
+        `${fallback}으로 대체합니다. 공유 프리뷰 이미지가 열리지 않습니다.`,
+    );
+    return fallback;
+  }
+}
 
 /** Supabase 환경변수가 채워졌는지 여부 (미설정 시 화면·API에서 안내 노출) */
 export function isSupabaseConfigured(): boolean {

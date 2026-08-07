@@ -16,6 +16,21 @@ const META_TITLE_MAX = 60;
 /** 공유 프리뷰 설명 길이 — 대부분의 플랫폼이 이 언저리에서 자른다 */
 const META_DESCRIPTION_MAX = 120;
 
+/**
+ * 공유 카드 이미지 — 루트의 `app/opengraph-image.png`가 서빙되는 경로.
+ *
+ * 글마다 다른 이미지는 만들지 않는다: `ImageResponse`(satori)는 woff2를 읽지 못하는데
+ * 이 프로젝트의 Pretendard는 woff2 동적 서브셋뿐이라, 한글 제목을 그리려면 한글 TTF를
+ * 통째로 리포에 넣어야 한다. 카드의 제목·설명은 이미 글마다 다르므로 이미지만 공통으로 둔다.
+ */
+const OG_IMAGE = {
+  url: "/opengraph-image.png",
+  type: "image/png",
+  width: 1200,
+  height: 630,
+  alt: "온더볼 — 모든 축구팬들을 위한 커뮤니티",
+};
+
 /** 글이 존재하는지 + 제목·본문 요약을 확인한 결과 */
 type PostHead =
   | { state: "found"; title: string; content: string }
@@ -84,8 +99,13 @@ export async function generateMetadata(props: PageProps<"/posts/[id]">): Promise
       title,
       description,
       siteName: "온더볼",
+      // ⚠ images를 여기서 **명시해야 한다.** 세그먼트가 openGraph를 직접 채우면
+      //   루트 opengraph-image.png의 자동 주입이 통째로 대체되어 사라진다(실측 확인) —
+      //   생략했더니 글 상세만 이미지 없는 카드로 나갔다.
+      //   metadataBase가 절대 URL로 만들어 준다.
+      images: OG_IMAGE,
     },
-    twitter: { card: "summary", title, description },
+    twitter: { card: "summary_large_image", title, description, images: OG_IMAGE },
   };
 }
 
