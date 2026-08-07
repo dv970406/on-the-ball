@@ -28,7 +28,6 @@ const eslintConfig = defineConfig([
     // 디자인 핸드오프 레퍼런스 (구현 대상 아님 — 린트 제외).
     // 프로토타입은 CDN Babel + 전역 스코프(window)로 도는 정적 파일이라
     // 모듈 기준 린트가 통째로 오탐한다.
-    "design_handoff_ontheball/**",
     "handoff_community/**",
     // supabase CLI가 생성하는 파일 — 손으로 고쳐도 `pnpm db:types`에 덮인다
     "src/types/database.types.ts",

@@ -2,10 +2,15 @@
 @import "./pretendard-subset.css";
 
 /* =========================================================
-   Tifo 디자인 토큰 — design_handoff_ontheball/prototype/design/colors_and_type.css 기준
+   Tifo 디자인 토큰.
    규칙: 한 뷰포트당 컬러 이벤트는 에메랄드 1개, 에메랄드 위 텍스트는 항상 ink(#171717),
         버튼 라운드 6px, 그림자 대신 1px 헤어라인, 이징 cubic-bezier(0.2,0,0,1)
    ⚠ 이 블록은 파운데이션 이후 동결 — 필요한 특수값은 arbitrary value로 사용
+
+   ⚠ 출처: 원본이던 `design_handoff_ontheball/prototype/design/colors_and_type.css`는
+     리포에 더 이상 없다. **지금은 이 블록 자체가 단일 소스다** — 대조할 상위 문서가 없으므로
+     값을 바꾸려면 docs/conventions/styling.md와 함께 고친다.
+     (남아 있는 핸드오프는 `handoff_community/` 하나뿐이고 토큰 정의를 담고 있지 않다)
    ========================================================= */
 @theme {
   /* 브랜드 & 액센트 */

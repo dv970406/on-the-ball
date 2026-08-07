@@ -89,7 +89,16 @@ RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 
 
 ## SECURITY DEFINER RPC
 
-쓰기가 RLS를 넘어야 할 때만 RPC로 내린다. 현재 `toggle_post_like`·`soft_delete_post`·`increment_post_view` + 트리거 4종(`sync_post_like_count`·`sync_post_comment_count`·`touch_updated_at`·`check_comment_depth`).
+쓰기가 RLS를 넘어야 할 때만 RPC로 내린다. `security definer` 함수의 **전량**은 다음과 같다 — 새로 만들면 여기에 추가한다.
+
+| 종류 | 함수 | 비고 |
+|---|---|---|
+| RPC(클라이언트가 직접 호출) | `toggle_post_like` · `soft_delete_post` · `increment_post_view` | `increment_post_view`만 anon에 열려 있다(아래 예외 항목) |
+| 트리거 | `sync_post_like_count` · `sync_post_comment_count` · `touch_updated_at` · `check_comment_depth` | `post`·`post_like`·`comment` |
+| 트리거 | **`handle_new_user`** (`on_auth_user_created`, `after insert on auth.users`) | 가입 시 `profiles` 행 생성. **호출자 권한으로 돌면 `profiles` insert 권한이 없어 가입 자체가 실패한다** |
+| 정책 헬퍼 | `post_is_alive` (`stable`) | `comment`의 select·insert 정책이 공유 — 인라인 서브쿼리를 쓰지 않는 이유는 아래 참고 |
+
+⚠ **`has_visible_char`는 이 목록이 아니다.** CHECK 제약 평가 함수라 성질이 다르고, 오히려 **쓰기 권한이 있는 역할에 EXECUTE를 열어야** 한다(바로 아래 항목).
 
 - **유저 id를 인자로 받지 않는다.** `security definer`는 RLS를 우회하므로 유저를 클라이언트가 넘기면 남의 명의로 조작할 수 있다. 함수 안에서 `auth.uid()`로 확정한다 — PostgREST가 access token을 검증해 `request.jwt.claims`에 심어둔 값이라 위조가 불가능하다. `security definer`가 바꾸는 것은 "무엇을 할 수 있는가"(권한)이지 "누가 호출했는가"(세션 컨텍스트)가 아니다.
 - **`set search_path = ''` + `public.` 접두사.** 호출자가 search_path를 조작해 다른 스키마의 동명 테이블을 붙잡게 만드는 권한 상승을 막는다.

@@ -105,10 +105,17 @@ function cardClassName(peek: boolean) {
 | 댓글 전송 버튼 | `views/post-detail/ui/comment-bar.tsx` |
 | 글쓰기 FAB | `views/post-list/ui/post-list-view.tsx` |
 
-경계가 헷갈리는 두 가지:
+**이 규칙이 말하는 "버튼"은 라벨을 담은 직사각형 컨트롤이다.** 그 밖의 `rounded-full`은 애초에 이 규칙의 대상이 아니므로 예외 목록에 넣지 않는다:
 
-- **`size-11 rounded-full` 아이콘 버튼은 이 예외가 아니다** (`sub-header`·`post-detail-view`·`app-bar`). 버튼 라운드가 아니라 **원형 히트 영역**이라 범주가 다르다. 도트·아바타·`Pill`·`RatioBar` 같은 순수 표시 요소도 마찬가지로 무관하다.
-- **대비 선례 — `Chip`(말머리)은 `rounded-sm`이다.** "칩이니까 알약"이 아니다. 실제로 같은 화면에서 `Chip`은 6px, `ActionChip`은 알약으로 공존한다.
+| 대상이 아닌 것 | 이유 | 실제 위치 |
+|---|---|---|
+| `size-11`/`size-9` 원형 아이콘 **버튼** | 버튼 라운드가 아니라 **원형 히트 영역** | `sub-header` · `post-detail-view` · `app-bar` |
+| 원형 아이콘 **컨테이너**(클릭 불가) | 히트 영역도 아닌 순수 장식 | `shared/ui/empty-state.tsx` · `app-bar`의 안쪽 `span` |
+| 도트·아바타·`Pill`·`RatioBar`·워드마크의 볼 | 컨트롤이 아닌 **표시 요소** | `live-dot` · `avatar` · `pill` · `ratio-bar` · `wordmark` · `post-card`의 구분점 |
+
+경계가 헷갈리는 대비 선례:
+
+- **`Chip`(말머리)은 `rounded-sm`이다.** "칩이니까 알약"이 아니다. 실제로 같은 화면에서 `Chip`은 6px, `ActionChip`은 알약으로 공존한다.
 
 ### 그림자 예외 — "떠 있는 레이어"만
 
