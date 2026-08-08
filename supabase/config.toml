@@ -147,12 +147,14 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-# dev 서버 origin과 반드시 일치시킨다 — 어긋나면 메일 링크가 조용히 site_url로 되돌아온다
+# dev 서버 origin과 반드시 일치시킨다 — 소셜 로그인의 redirectTo가 허용 목록을 벗어나면
+# GoTrue가 조용히 이 값으로 되돌려 보내 ?next=가 통째로 사라진다(docs/oauth-setup.md)
 site_url = "http://localhost:3000"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-# 비밀번호 재설정의 redirectTo(/reset-password)가 이 목록에 없으면 site_url로 덮여버린다
-# 127.0.0.1도 함께 넣는다 — 브라우저가 127.0.0.1로 접속하면 resetPasswordForEmail의
-# redirectTo(window.location.origin 기반)가 목록에 없어 조용히 site_url로 되돌아간다
+# 소셜 로그인 복귀 주소(/sign-in?next=…)가 이 목록에 없으면 site_url로 덮여버린다.
+# 127.0.0.1도 함께 넣는다 — 브라우저가 127.0.0.1로 접속하면 redirectTo가
+# (window.location.origin 기반이라) 목록에 없어 조용히 site_url로 되돌아간다.
+# ⚠ dev 서버가 3000이 아닌 포트로 뜨면 같은 이유로 깨진다 — 그 포트도 여기 추가할 것
 additional_redirect_urls = ["http://localhost:3000/**", "http://127.0.0.1:3000/**"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
@@ -168,7 +170,7 @@ refresh_token_reuse_interval = 10
 # Allow/disallow new user signups to your project.
 enable_signup = true
 # Allow/disallow anonymous sign-ins to your project.
-# 이메일 로그인 도입으로 익명 세션은 폐기했다 — 익명 유저도 auth.uid()를 가져 로그인 판정이 흐려진다
+# 익명 세션은 쓰지 않는다 — 익명 유저도 auth.uid()를 가져 로그인 판정이 흐려진다
 enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
 enable_manual_linking = false
@@ -180,7 +182,8 @@ password_requirements = ""
 
 [auth.rate_limit]
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
-# 로컬 전용 상향 — 기본값 2는 비밀번호 재설정을 두 번 테스트하면 막힌다
+# 로컬 전용 상향. 앱에는 메일 발송 경로가 없고(소셜 로그인 전용) 이 값은
+# seed-users.sh 등 테스트 계정 생성용으로만 의미가 있다 — 원격에는 밀지 말 것
 email_sent = 100
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
@@ -201,6 +204,10 @@ web3 = 30
 # provider = "hcaptcha"
 # secret = ""
 
+# ⚠ **이메일 provider는 화면이 아니라 검증 자산을 위해 켜 둔다.**
+#   앱의 로그인 수단은 소셜뿐이지만, supabase/tests/rls.sql과 seed-users.sh가
+#   이메일 가입으로 테스트 계정(alice/bob)을 만든다. 즉 `POST /auth/v1/signup` 경로가
+#   열려 있다는 뜻이다 — **원격에는 이 값을 그대로 밀지 말 것**(docs/oauth-setup.md §4).
 [auth.email]
 # Allow/disallow new user signups via email to your project.
 enable_signup = true
@@ -217,8 +224,8 @@ enable_confirmations = false
 #     갓 만든 세션으로 비밀번호 변경  → 200
 #     created_at을 2일 전으로 민 세션 → 400 reauthentication_needed
 #   즉 로그인한 지 하루가 안 된 브라우저에서는 기존 비밀번호 없이 변경이 통과한다.
-#   실제 방어는 앱이 한다 — /reset-password는 복구 링크로 확립된 세션
-#   (PASSWORD_RECOVERY 이벤트)에서만 폼을 연다(reset-password-view.tsx 주석 참고).
+#   앱에 비밀번호 변경 화면이 없으므로(소셜 로그인 전용) 현재 이 값은 유휴 설정이다.
+#   이메일 인증을 되살린다면 이 한계를 아는 채로 앱이 따로 방어해야 한다.
 secure_password_change = true
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
 max_frequency = "1s"
@@ -310,9 +317,41 @@ max_frequency = "5s"
 # enroll_enabled = true
 # verify_enabled = true
 
+# =====================================================================
+# 소셜 로그인 — 이 앱의 **유일한** 로그인 수단이다.
+#
+# ⚠ 값은 프로젝트 루트 `.env.local`에서 온다(CLI가 godotenv로 읽는다).
+#   키를 채운 뒤에는 `supabase db reset`이 아니라 **`supabase stop && supabase start`** 가
+#   필요하다 — gotrue 컨테이너의 환경변수라 재기동해야 반영된다.
+#
+# ⚠ 각 콘솔에 등록할 Redirect URI는 **앱 주소가 아니라 supabase의 콜백**이다:
+#     로컬  http://127.0.0.1:64321/auth/v1/callback
+#     원격  https://<project-ref>.supabase.co/auth/v1/callback
+#   앱으로 돌아오는 주소(/sign-in)는 아래 additional_redirect_urls가 담당한다.
+#
+# ⚠ 네이버는 여기에 넣을 수 없다 — supabase가 지원하는 provider 목록에 없다.
+# =====================================================================
+[auth.external.kakao]
+enabled = true
+# 카카오 개발자 콘솔 → 앱 키의 **REST API 키**
+client_id = "env(SUPABASE_AUTH_EXTERNAL_KAKAO_CLIENT_ID)"
+# 카카오 로그인 → 보안 → **Client Secret**(활성화 상태여야 한다)
+secret = "env(SUPABASE_AUTH_EXTERNAL_KAKAO_SECRET)"
+# ⚠ 카카오의 이메일 제공은 **별도 심사 항목**이라 승인 전에는 이메일이 오지 않는다.
+#   false로 두면 그 사용자들의 로그인이 통째로 실패한다. 닉네임은 이메일이 아니라
+#   raw_user_meta_data에서 뽑으므로(handle_new_user) 이메일이 없어도 화면은 정상이다.
+email_optional = true
+
+[auth.external.google]
+enabled = true
+# Google Cloud 콘솔 → 사용자 인증 정보 → OAuth 2.0 클라이언트 ID(웹 애플리케이션)
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+
 # Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
 # `twitter`, `slack`, `spotify`, `workos`, `zoom`.
+# (문서에 빠져 있지만 `kakao`도 지원한다 — CLI 구조체에 ExternalKakaoEnabled가 있다)
 [auth.external.apple]
 enabled = false
 client_id = ""
