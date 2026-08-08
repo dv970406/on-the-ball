@@ -446,7 +446,7 @@ select p.proname
                     where cfg like 'search\_path=%');
 
 \echo '-- 17d. anon이 EXECUTE 가능한 함수 중 화이트리스트 밖'
-\echo '   허용: post_is_alive(글 생존 판정) / has_visible_char(CHECK 평가에 필요)'
+\echo '   허용: post_is_alive(글 생존 판정) / has_visible_char·normalize_nickname(CHECK 평가에 필요)'
 \echo '        increment_post_view(조회수 — 이 시스템의 유일한 비로그인 쓰기 경로, 의도된 예외.'
 \echo '        조회는 비로그인이 대부분이라 authenticated 전용이면 숫자가 의미를 잃는다.'
 \echo '        대가로 부풀리기를 막을 수 없어 view_count는 "대략치"로 취급한다 — 컬럼 주석 참고)'
@@ -454,7 +454,7 @@ select p.proname
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
  where n.nspname = 'public'
    and has_function_privilege('anon', p.oid, 'EXECUTE')
-   and p.proname not in ('post_is_alive', 'has_visible_char', 'increment_post_view');
+   and p.proname not in ('post_is_alive', 'has_visible_char', 'normalize_nickname', 'increment_post_view');
 
 -- ---------------------------------------------------------------------
 \echo ''
@@ -641,6 +641,81 @@ select public.soft_delete_post(:pid);
 reset role; :login_anon
 \echo '[0 기대] 글이 소프트 삭제되면 답글도 함께 감춰진다 (comment_select_alive_post)'
 select count(*) from public.comment where post_id = :pid;
+rollback to s;
+
+\echo ''
+\echo '=== 23. 소셜 로그인 닉네임 (handle_new_user + oauth_display_name) ==='
+\echo '    카카오는 이메일을 주지 않을 수 있다 — 그때 이메일 로컬파트만 보면 전원이 user가 된다.'
+
+create or replace function pg_temp.mkuser(p_meta jsonb, p_email text) returns text
+language plpgsql as $$
+declare v_id uuid := gen_random_uuid();
+begin
+  insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data,
+                          encrypted_password, created_at, updated_at)
+  values (v_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+          p_email, p_meta, 'x', now(), now());
+  return (select nickname from public.profiles where id = v_id);
+end $$;
+
+savepoint s;
+\echo '[홍길동 기대] 카카오형 — name만 있고 이메일이 없다'
+select pg_temp.mkuser('{"name":"홍길동"}'::jsonb, null);
+\echo '[홍길동-2 기대] 같은 표시 이름으로 또 가입 — 충돌 재시도가 살아 있는가'
+select pg_temp.mkuser('{"name":"홍길동"}'::jsonb, null);
+rollback to s;
+
+savepoint s;
+\echo '[Chan Kim 기대] 구글형 — full_name 폴백 (name 키가 없다)'
+select pg_temp.mkuser('{"full_name":"Chan Kim","email":"chan@gmail.com"}'::jsonb, 'chan@gmail.com');
+rollback to s;
+
+savepoint s;
+\echo '[user 기대] 메타도 이메일도 없다'
+select pg_temp.mkuser(null, null);
+rollback to s;
+
+savepoint s;
+\echo '[zw 기대] 표시 이름이 제로폭 문자뿐 — btrim은 못 거른다, has_visible_char가 걸러 이메일로 폴백'
+select pg_temp.mkuser('{"name":"​​"}'::jsonb, 'zw@test.com');
+rollback to s;
+
+savepoint s;
+\echo '[손흥민 기대] 앞뒤 공백은 다듬는다 (profiles_nickname_trimmed CHECK 위반 방지)'
+select pg_temp.mkuser('{"name":"  손흥민  "}'::jsonb, null);
+rollback to s;
+
+savepoint s;
+\echo '[16자 기대] 접미사 -999가 붙어도 20자를 넘지 않도록 16자로 자른다'
+select char_length(pg_temp.mkuser('{"name":"매우매우매우매우매우매우긴닉네임입니다요"}'::jsonb, null));
+rollback to s;
+
+\echo ''
+\echo '--- 23b. 사칭 차단 (20260808000001) — 보이지 않는 문자로 lower() 유일성을 우회할 수 없다'
+\echo '    ⚠ base가 GoTrue 검증 이메일에서 클라이언트 자유 입력으로 바뀌면서 btrim만으로는 부족해졌다.'
+savepoint s;
+\echo '[alice-N 기대] ZWSP를 끼운 alice — 정규형이 alice가 되어 기존 alice와 충돌해야 한다'
+select pg_temp.mkuser(jsonb_build_object('name', 'ali' || U&'\200B' || 'ce'), null);
+rollback to s;
+savepoint s;
+\echo '[alice-N 기대] NBSP 선행 alice (20260801000006이 막았다고 선언한 그 사칭)'
+select pg_temp.mkuser(jsonb_build_object('name', U&'\00A0' || 'alice'), null);
+rollback to s;
+savepoint s;
+\echo '[alice-N 기대] soft hyphen(U+00AD)을 끼운 alice'
+select pg_temp.mkuser(jsonb_build_object('name', 'ali' || U&'\00AD' || 'ce'), null);
+rollback to s;
+savepoint s;
+\echo '[0행 기대] 정규형이 아닌 닉네임은 CHECK가 거부한다 (profiles_nickname_canonical)'
+select count(*) from public.profiles where nickname <> public.normalize_nickname(nickname);
+rollback to s;
+savepoint s;
+\echo '[user 기대] name이 문자열이 아니면(배열·객체·숫자) 직렬화된 JSON이 닉네임이 되지 않는다'
+select pg_temp.mkuser('{"name":["a","b"]}'::jsonb, null);
+rollback to s;
+savepoint s;
+\echo '[Chan Kim 기대] 정상 이름의 내부 공백은 보존한다 (지우면 ChanKim이 된다)'
+select pg_temp.mkuser('{"name":"Chan Kim"}'::jsonb, null);
 rollback to s;
 
 rollback;
