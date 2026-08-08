@@ -13,7 +13,8 @@ interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "id
 
 /**
  * 라벨 + 인풋 + 에러를 한 덩어리로 묶은 폼 필드.
- * 인증 화면 4개와 게시글 작성/수정에서 공유한다.
+ * ⚠ **현재 호출부가 없다** — 이메일 로그인을 걷어내면서 8곳이 한 번에 사라졌다.
+ *   폼 입력이 다시 생기면(닉네임 편집 등) 그대로 쓸 수 있다(reuse.md의 미사용 목록 참고).
  */
 export function TextField({ label, error, hint, className, ...inputProps }: TextFieldProps) {
   const id = useId();

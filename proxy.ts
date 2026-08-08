@@ -20,12 +20,12 @@ import { parsePostId } from "@/shared/lib/post-id";
 /**
  * 로그인 상태로 접근하면 목록으로 보낼 경로.
  *
- * ⚠ /forget-password는 **일부러 빼 두었다.** 여기 있으면 로그인한 사용자가
- *   재설정 링크를 요청할 수 없고, /reset-password는 복구 링크로만 열리므로
- *   "로그인한 채로는 비밀번호를 바꿀 방법이 없는" 막다른 길이 된다.
- *   app/(auth) 그룹에서 뺀 것과 같은 이유다(app/forget-password/page.tsx 주석 참고).
+ * ⚠ 소셜 로그인 복귀 지점이 **바로 이 경로다**(`/sign-in?code=...`). 그래도 문제가 없는 이유는
+ *   proxy가 보는 세션이 **쿠키**인데, 코드 교환은 브라우저에서 일어나 그 시점에 쿠키가 아직
+ *   없기 때문이다 — 복귀 요청은 비로그인으로 통과하고, 교환이 끝나면 GuestOnly가 목적지로
+ *   보낸다. 여기에 예외를 파지 않는다(파면 로그인한 채 /sign-in을 열 수 있게 된다).
  */
-const GUEST_ONLY: string[] = [ROUTES.signIn, ROUTES.signUp];
+const GUEST_ONLY: string[] = [ROUTES.signIn];
 
 /**
  * 경로 비교 전 정규화.
