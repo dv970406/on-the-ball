@@ -8,10 +8,10 @@
 
 - `app` — FSD app 레이어: `providers`(QueryClient + AuthProvider), `fonts`, `styles/globals.css`
 - `views` — 화면 조립. ⚠ **`pages` 금지** (Next Pages Router로 오감지됨 → 반드시 `views`)
-  post-list / post-detail / post-write / post-edit / sign-in / sign-up / forget-password / reset-password
+  post-list / post-detail / post-write / post-edit / sign-in
 - `widgets` — app-bar / bottom-tab-bar / sub-header / tab-scroll-area / auth-shell / auth-status
 - `features` — 사용자 액션 1개 = 슬라이스 1개
-  sign-in / sign-up / sign-out / request-password-reset / update-password /
+  sign-in(소셜 OAuth) / sign-out /
   write-post / delete-post / write-comment / delete-comment / toggle-post-like / view-post
 - `entities` — session / post / comment / profile (도메인 타입·쿼리 훅·도메인 UI)
 - `shared` — ui / api / lib / config

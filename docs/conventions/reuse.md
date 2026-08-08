@@ -78,17 +78,19 @@
 
 ## `@/shared/ui`
 **현역(게시판 v2가 실제로 쓰는 것)** — 새로 만들기 전 여기부터 확인:
-`Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·`TextField`·`Markdown`·
+`Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·`Markdown`·
 `Chip`·`ActionChip`·`actionChipClassName`·`Dialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`
 
-**v1 보존 자산(현재 미사용)** — `docs/legacy/v1-inventory.md`가 보존 대상으로 명시한 것들이다. 트리셰이킹되어 번들 비용은 0이니 지우지 않는다. 다만 **"검증된 현역"으로 오인하지 말 것**:
+**현재 미사용** — 트리셰이킹되어 번들 비용은 0이니 지우지 않는다. 다만 **"검증된 현역"으로 오인하지 말 것**:
 `TabHeader`·`MarkdownEditor`·`Flag`·`Shirt`·`RatioBar`·`SectionHead`·`LiveDot`·`LiveStatusPill`·`NightCard`·`PlayerSilhouette`
+(앞의 10개는 `docs/legacy/v1-inventory.md`가 보존 대상으로 명시한 v1 자산이다)
+· **`TextField`** — 이쪽은 v1 자산이 아니다. 이메일 로그인을 걷어내면서 호출부 8곳이 한 번에 사라졌다.
+  폼 입력이 다시 생기면(닉네임 편집 등) 그대로 쓸 수 있다.
 
 > ⚠ 이 두 목록은 **실사용 여부로만 판정한다**(`grep -rE "<Name\b" src app --include='*.tsx'`).
 > 커뮤니티 이식 때 실제로 어긋났다 — `TabHeader`·`MarkdownEditor`는 현역으로 적혀 있었지만 호출부가 0이었고, 반대로 `Pill`·`Avatar`·`Wordmark`는 v1 미사용으로 적혀 있는 채 화면에서 쓰이고 있었다.
 > **이 문서의 존재 이유가 "새로 만들기 전 확인"이라 목록이 틀리면 문서가 없느니만 못하다.** UI를 추가·제거하면 여기부터 고친다.
 
-- `TextField` — 라벨 + 인풋 + 에러 한 덩어리. 인증 화면 4개와 글 작성에서 공유.
 - `Markdown` — 마크다운 렌더(GFM). `"use client"` **없음** — 서버 렌더 가능.
 - `Chip` — 말머리 칩. **`rounded-sm`(6px)** 이다 — 칩이라고 알약이 아니다(`styling.md` 예외 목록 참고).
 - `ActionChip` / `actionChipClassName` — 좋아요·댓글 카운터 칩. 클래스 함수가 분리된 이유는 `Button`↔`buttonClassName`과 같다 — 비로그인 좋아요는 `Link`로 렌더해야 하는데 `Link` 안에 `button`을 넣을 수 없어 **클래스만** 필요하다.
@@ -102,5 +104,5 @@
 - `BottomTabBar` — 하단 탭바. **`backdrop-blur`가 허용된 유일한 요소**다(`styling.md`).
 - `SubHeader` — 상세·작성·수정 화면 상단(뒤로가기 + 공유).
 - `TabScrollArea` — 목록 스크롤 영역(`<main>` 제공 + 스크롤 복원).
-- `AuthShell` — 인증 화면 4개의 공통 껍데기.
+- `AuthShell` — 인증 화면의 공통 껍데기. 소셜 로그인으로 바뀌면서 소비자는 `/sign-in` 하나다.
 - `AuthStatus` — 세션 표시 + 로그인 링크 / 로그아웃. 세션을 아는 레이어라 `useProfileQuery(user?.id)`에 id를 넘기는 선례이기도 하다.

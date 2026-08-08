@@ -112,17 +112,17 @@ const handleSubmit = (e) => {
 
 | 가드를 둔다 | 두지 않는다 |
 |---|---|
-| **행이 생긴다** — 글 작성(`PostForm`), 댓글 작성(`CommentBar`) | **인증 폼 4개** — 로그인·가입·비밀번호 찾기/재설정 |
+| **행이 생긴다** — 글 작성(`PostForm`), 댓글 작성(`CommentBar`) | **소셜 로그인** — 버튼을 누르면 페이지가 프로바이더로 넘어가 화면 자체가 사라진다 |
 | **행이 사라진다** — 글 삭제(`PostDetailView`), 댓글 삭제(`CommentSection`) | **낙관적 업데이트** — 좋아요(의도적으로 `disabled`조차 두지 않는다, 아래 절 참고) |
 
-인증 폼은 같은 요청이 두 번 나가도 **서버 상태가 한 번과 같다**(멱등). 여기까지 `useRef`+`useEffect`를 붙이면 4개 화면에 이유 없는 상용구가 늘어난다 — `code-quality.md`의 "성급한 추상화보다 중복"과 같은 판단이다. `disabled={isPending}`만 두고 끝낸다.
+⚠ **소셜 로그인은 예외적으로 가드가 필요하다.** 화면이 사라지니 불필요해 보이지만, `signInWithOAuth`는 호출마다 **새 PKCE code_verifier를 저장소에 덮어쓴** 뒤 그 challenge를 담은 URL로 이동한다 — 두 호출이 겹치면 저장된 verifier와 커밋된 내비게이션이 어긋나 돌아온 code를 교환할 수 없다(로그인 실패). `features/sign-in`의 `useOAuthSignIn`이 `start()` 안에서 동기 가드를 갖고, `disabled`는 시각 표시로만 남긴다.
 
 ⚠ 새 뮤테이션을 만들 때 **표를 외우지 말고 기준을 적용한다.** 예컨대 "신고하기"는 인증 폼처럼 보여도 행이 쌓이므로 가드가 필요하다.
 
 ### ⚠ 로그인 후 이동은 가드가 단독으로 소유한다
 
 로그인 화면의 mutation `onSuccess`에서 이동시키면 **동작하지 않는다.**
-supabase가 `signInWithPassword` 반환 **전에** `SIGNED_IN`을 발행하므로,
+세션이 서는 순간(소셜 로그인은 `?code=` 교환 완료 시점) `SIGNED_IN`이 발행되므로,
 `status`가 바뀌는 순간 `GuestOnly`가 children을 스켈레톤으로 갈아치워 화면이 언마운트되고
 `onSuccess` 콜백 자체가 실행되지 않는다(레이스가 아니라 결정적 파손).
 

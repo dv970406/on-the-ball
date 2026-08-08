@@ -13,7 +13,8 @@
   }
   ```
   ⚠ 새 동적 라우트를 만든 직후에는 `npx next typegen`을 돌려야 타입이 생긴다.
-- URL의 `[id]`는 **문자열**이다. `Number()` 후 `Number.isSafeInteger`로 검증하고, 실패하면 조회 없이 `notFound()`.
+- URL의 `[id]`는 **문자열**이다. **`@/shared/lib`의 `parsePostId`로만 판정**하고, 실패하면 조회 없이 `notFound()`.
+  ⚠ `Number()`로 직접 검증하지 말 것 — `1e3`·`0x10`·`1.0`을 받아들여 proxy와 판정이 갈렸고 가드가 뚫렸다(아래 proxy 절).
 - ⚠ **`useSearchParams`는 프리렌더를 CSR로 떨어뜨린다.** `<Suspense>`로 감싸는 게 정석이지만, **경계가 children까지 감싸면 페이지 본문 전체가 빈 껍데기가 된다** — 인증 화면 3개가 실제로 그렇게 됐다(서버 HTML에 `BAILOUT_TO_CLIENT_SIDE_RENDERING`만 남았다).
   effect 안에서만 쿼리 값이 필요하다면 **`useSearchParams`를 쓰지 말고** `@/shared/lib`의 `useNextParam`처럼 `useSyncExternalStore`로 읽는다. 그러면 경계 자체가 필요 없다.
 - 로그인 후 복귀 경로(`?next=`)는 **`safeNextPath`로만 검증한다**(`@/shared/config`). 직접 문자열 검사를 짜지 말 것 — 아래 오픈 리다이렉트 항목 참고.
@@ -66,9 +67,25 @@
 
 ## 라우트 그룹
 
-- `app/(auth)/` — 비로그인 전용 화면(로그인·회원가입). layout이 `<GuestOnly>`로 감싼다.
-- ⚠ `/reset-password`는 **일부러 이 그룹 밖**에 둔다. 재설정 링크는 세션을 확립한 뒤 도달하므로 `GuestOnly` 아래면 곧바로 튕겨나가 흐름이 깨진다.
-- ⚠ `/forget-password`도 그룹 밖이다. 안에 있었을 때 **로그인한 사용자가 비밀번호를 바꿀 방법이 아예 없었다** — `/reset-password`는 복구 링크로만 열리는데 그 링크를 요청하는 화면에 진입조차 못 했다. proxy의 `GUEST_ONLY`에서도 함께 빼야 판정이 갈리지 않는다.
+- `app/(auth)/` — 비로그인 전용 화면. 지금은 `/sign-in` 하나뿐이고 layout이 `<GuestOnly>`로 감싼다.
+  **소셜 로그인은 로그인과 가입이 같은 동작**이라 가입 화면이 따로 없다.
+
+### 소셜 로그인 콜백 — 전용 라우트를 만들지 않는다
+
+프로바이더에서 돌아오는 주소는 **`/sign-in?code=…` 자기 자신**이다. `createBrowserClient`의
+`detectSessionInUrl`이 코드를 교환하고, 세션이 생기면 `GuestOnly`가 목적지를 정한다.
+
+→ 전용 `/auth/callback`을 만들면 **목적지 계산이 두 곳으로 갈린다.** "로그인 후 이동은 가드가
+  단독으로 소유한다"(`data-and-state.md`)를 지키려면 복귀 지점을 `/sign-in`으로 두는 편이 맞다.
+  `?next=`도 `redirectTo`에 실어 보내 같은 경로로 되돌아온다.
+
+- ⚠ **proxy의 `GUEST_ONLY`에 `/sign-in` 예외를 파지 않는다.** 복귀 시점에는 아직 쿠키가 없어
+  (교환이 브라우저에서 일어난다) 비로그인으로 통과한다. 예외를 파면 로그인한 채로 `/sign-in`을
+  열 수 있게 되어 가드가 헐거워진다.
+- ⚠ 복귀 화면은 **세 가지를 모두** 처리해야 한다 — `?code=` 동안의 대기 표시, 교환이 끝나지
+  않을 때의 **상한**(supabase는 교환에 실패해도 조용히 빠져나간다), 프로바이더가 돌려준
+  `?error=`·`error_description=`(사용자가 동의를 취소한 경우가 여기로 온다).
+- 설정·트러블슈팅은 [`docs/oauth-setup.md`](../oauth-setup.md).
 
 ## 메타데이터
 

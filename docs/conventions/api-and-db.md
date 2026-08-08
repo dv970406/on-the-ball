@@ -70,6 +70,27 @@ RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 
 - 부수 효과로 **에러 메시지가 좋아진다.** 정책 위반은 Postgres의 영어 42501뿐이라 "왜 거부됐는지"를 설명하지 못하는데, 트리거는 `P0001`로 한국어 사유를 그대로 노출한다(`toDbErrorMessage`가 P0001을 통과시킨다).
 - 판단 기준: **거부 사유를 사용자에게 설명해야 하면 트리거**, 단순 접근 차단이면 정책.
 
+## 닉네임은 **소셜 표시 이름**에서 나온다
+
+로그인 수단이 카카오·구글뿐이라 `auth.users.email`을 믿을 수 없다 — **카카오의 이메일 제공은
+별도 심사 항목**이라 승인 전에는 NULL로 들어온다(`config.toml`의 `email_optional = true`).
+이메일 로컬파트만 보던 옛 트리거를 그대로 두면 **카카오 가입자가 전원 `user`, `user-2` …** 가 된다.
+
+```
+base = oauth_display_name(raw_user_meta_data)   -- name → nickname → full_name
+                                                --  → preferred_username → user_name
+     → split_part(email, '@', 1)
+     → 'user'
+```
+
+- ⚠ **키를 여러 개 순서대로 본다.** 프로바이더별 `raw_user_meta_data` 형태는 supabase 문서에
+  정리돼 있지 않다. 하나만 찍으면 그게 틀렸을 때 해당 프로바이더 가입자가 전원 `user`가 된다.
+- ⚠ 후보는 `has_visible_char`로 거른다. 프로바이더 값도 결국 사용자 입력이라 제로폭 문자만
+  담길 수 있는데 `btrim`은 그걸 못 지운다 → **화면에 아무것도 안 보이는 닉네임**이 된다.
+- 충돌 재시도(`-2`, `-3`, 100회 후 랜덤)·16자 컷·`constraint_name` 판별은 **그대로 유지**한다.
+  카카오 닉네임은 동명이인이 흔해서 이 장치가 이메일 때보다 더 자주 돈다.
+- 검증: `supabase/tests/rls.sql` **섹션 23**(카카오형·구글형·이메일 폴백·제로폭·16자 컷).
+
 ## 문자 검증은 클라이언트와 DB가 **같은 문자 집합**을 써야 한다
 
 `char_length` 길이 제한과 `~ '[^[:space:]]'` 공백 검사만으로는 부족했다:
@@ -96,6 +117,7 @@ RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 
 | RPC(클라이언트가 직접 호출) | `toggle_post_like` · `soft_delete_post` · `increment_post_view` | `increment_post_view`만 anon에 열려 있다(아래 예외 항목) |
 | 트리거 | `sync_post_like_count` · `sync_post_comment_count` · `touch_updated_at` · `check_comment_depth` | `post`·`post_like`·`comment` |
 | 트리거 | **`handle_new_user`** (`on_auth_user_created`, `after insert on auth.users`) | 가입 시 `profiles` 행 생성. **호출자 권한으로 돌면 `profiles` insert 권한이 없어 가입 자체가 실패한다** |
+| 순수 헬퍼 | `oauth_display_name(jsonb)` (`immutable`) | 소셜 메타데이터에서 표시 이름 후보 선택 (아래) |
 | 정책 헬퍼 | `post_is_alive` (`stable`) | `comment`의 select·insert 정책이 공유 — 인라인 서브쿼리를 쓰지 않는 이유는 아래 참고 |
 
 ⚠ **`has_visible_char`는 이 목록이 아니다.** CHECK 제약 평가 함수라 성질이 다르고, 오히려 **쓰기 권한이 있는 역할에 EXECUTE를 열어야** 한다(바로 아래 항목).
@@ -193,8 +215,10 @@ create trigger post_touch_updated_at
 - `config.toml`의 `[auth]` 변경은 `db reset`이 아니라 **`supabase stop && supabase start`** 가 필요하다(gotrue 컨테이너 설정).
 - 로컬 스택은 643xx 포트. API 64321 / DB 64322 / Studio 64323 / **Mailpit 64324**.
 - ⚠ **CLI가 원격 프로젝트에 링크돼 있다**(`supabase/.temp/project-ref`) 그리고 `.env.local`에
-  원격 DB 비밀번호·액세스 토큰이 있어 **확인 프롬프트 없이 통과할 수 있다.**
-  `supabase db push`(플래그 없음)는 **원격**에 적용하고 `db reset --linked`는 원격을 초기화한다.
+  원격 DB 비밀번호·액세스 토큰이 있어 **확인 프롬프트 없이 통과할 수 있다.** 원격을 바꾸는 명령은 셋:
+  `supabase db push`(플래그 없음) · `db reset --linked`(원격 초기화) ·
+  **`config push`**(`config.toml`의 `[auth]`를 통째로 덮는다 — Site URL이 localhost가 되고
+  테스트용으로 켜 둔 `[auth.email] enable_signup`까지 함께 올라간다. `docs/oauth-setup.md` §4).
   로컬 작업에는 반드시 `db reset`(로컬)만 쓴다. `pnpm db:types`는 `--local` 고정이라 안전하다.
 
 ### RLS 정책에 서브쿼리를 인라인으로 쓰지 않는다
@@ -213,7 +237,8 @@ RLS 술어가 security-barrier 서브쿼리 안으로 들어가 바깥의 `fk = 
 
 | 파일 | 용도 |
 |---|---|
-| `supabase/tests/rls.sql` | RLS·컬럼 권한·RPC 전량 검사, 섹션 22까지 (전체 rollback이라 DB에 흔적 없음) |
+| `supabase/tests/rls.sql` | RLS·컬럼 권한·RPC 전량 검사, 섹션 23까지 (전체 rollback이라 DB에 흔적 없음) |
+| — 섹션 23은 **소셜 로그인 닉네임**을 검사 | 카카오형(메타만)·구글형(full_name)·이메일 폴백·제로폭·16자 컷, 그리고 **23b 사칭 차단**(ZWSP·NBSP·soft hyphen을 끼운 닉네임이 정규형으로 접혀 기존 닉네임과 충돌하는지) |
 | — 섹션 22는 **답글**을 검사 | 깊이 1 초과 거부·타 게시글 부모 거부·없는 부모 거부(전부 P0001), cascade가 남의 답글까지 지우는 동작, `comment_count`가 답글 포함 총합인지, 글이 소프트 삭제되면 답글도 함께 감춰지는지 |
 | — 섹션 17은 **테이블명을 하드코딩하지 않는다** | public 스키마 기본 권한이 anon/authenticated에 ALL이라, 새 마이그레이션이 `revoke`를 한 번만 잊어도 즉시 구멍이 된다. 고정 목록만 검사하면 **새 테이블은 검사 대상에 들어오지도 않는다** → RLS 미적용·anon 쓰기 권한·search_path 미고정·anon EXECUTE를 전수로 훑는다 |
 | — 섹션 18은 **INSERT 시점 위조**를 검사 | 섹션 1이 UPDATE만 보고 있어서, `grant insert` 목록이 넓어지는 회귀(카운터·타임스탬프 동봉)를 못 잡았다 |

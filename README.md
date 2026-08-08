@@ -1,6 +1,6 @@
 # ⚽ 온더볼 (On the Ball)
 
-> 글을 쓰고 이야기를 나누는 **모바일 전용** 커뮤니티 게시판
+> 모든 축구팬들을 위한 **모바일 전용** 커뮤니티
 
 ![Next.js](https://img.shields.io/badge/Next.js-16.2-black?logo=next.js)
 ![React](https://img.shields.io/badge/React-19-149eca?logo=react)
@@ -18,7 +18,7 @@
 | 게시글 | 목록 · 상세 · 작성 · 수정 · 삭제(소프트). 본문은 **마크다운**(GFM) |
 | 댓글 | 작성 · 삭제. 글의 `comment_count`는 DB 트리거가 관리 |
 | 좋아요 | 토글(낙관적 업데이트). 동시성은 `SECURITY DEFINER` RPC의 행 잠금으로 직렬화 |
-| 인증 | 이메일 회원가입 · 로그인 · 로그아웃 · 비밀번호 재설정. 에러는 한국어로 매핑 |
+| 인증 | **카카오 · 구글 소셜 로그인**(로그인 = 가입) · 로그아웃. 에러는 한국어로 매핑 |
 | 권한 | **3중 방어** — `proxy.ts` 서버 가드 → 클라이언트 가드 → **RLS + 컬럼 권한(최종)** |
 
 > 데이터 접근에 Route Handler를 두지 않고 **브라우저가 Supabase를 직접 호출**합니다.
@@ -48,7 +48,7 @@
 | Styling | Tailwind CSS v4 (`@theme` 디자인 토큰) |
 | Data Fetching | TanStack Query v5 |
 | Global State | zustand (세션) |
-| Backend / DB | Supabase (PostgreSQL, RLS, 이메일 인증) |
+| Backend / DB | Supabase (PostgreSQL, RLS, 카카오·구글 OAuth) |
 | Markdown | react-markdown + remark-gfm |
 | Validation | Zod 4 |
 | Icons | lucide-react |
@@ -66,15 +66,15 @@
 ```bash
 pnpm install
 supabase start                          # 로컬 스택 기동 (643xx 포트)
-supabase db reset                       # 마이그레이션 6개 적용
-bash supabase/tests/seed-users.sh       # 테스트 계정 alice/bob (비번 test1234)
+supabase db reset                       # 마이그레이션 9개 적용
+bash supabase/tests/seed-users.sh       # 검증용 이메일 계정 alice/bob (화면 로그인은 소셜뿐)
 pnpm dev
 ```
 
 [http://localhost:3000](http://localhost:3000) 에서 확인합니다.
 
 > 로컬 Supabase 스택은 포트 충돌을 피하려고 표준(543xx)이 아닌 **643xx**를 씁니다 (`supabase/config.toml`).
-> API 64321 / DB 64322 / Studio 64323 / **Mailpit 64324**(비밀번호 재설정 메일 확인).
+> API 64321 / DB 64322 / Studio 64323 / **Mailpit 64324**(발송 메일 확인).
 
 > ⚠ `supabase/config.toml`의 `[auth]` 값을 바꾸면 `db reset`이 아니라 **`supabase stop && supabase start`** 가 필요합니다.
 
@@ -92,11 +92,18 @@ pnpm dev
 | `SUPABASE_PROJECT_REF` | `supabase link`용 프로젝트 ref | 배포 시 |
 | `SUPABASE_DB_PASSWORD` | `supabase db push`용 DB 비밀번호 | 배포 시 |
 | `SUPABASE_ACCESS_TOKEN` | CLI/MCP 인증 토큰 | 배포 시 |
+| `SUPABASE_AUTH_EXTERNAL_KAKAO_CLIENT_ID` / `_SECRET` | 카카오 로그인 | ✅ |
+| `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` / `_SECRET` | 구글 로그인 | ✅ |
+| `NEXT_PUBLIC_SITE_URL` | `og:image` 절대 URL 기준(빌드 시점에 인라인) | 배포 시 |
 
 > env가 비어 있어도 빌드는 성공합니다. 런타임에 쿼리 훅이 한국어 안내 에러를 던집니다.
+> 다만 **소셜 로그인 키는 로그인 자체가 유일한 인증 수단이라 필수**입니다 →
+> [소셜 로그인 설정](docs/oauth-setup.md).
 
-> ⚠ **CLI가 원격 프로젝트에 링크돼 있습니다.** `supabase db push`(플래그 없음)는 **원격**에 적용하고
-> `db reset --linked`는 원격을 초기화합니다. 로컬 작업에는 `supabase db reset`만 쓰세요.
+> ⚠ **CLI가 원격 프로젝트에 링크돼 있습니다.** 확인 프롬프트 없이 **원격**을 바꾸는 명령이 셋입니다 —
+> `supabase db push`(플래그 없음) · `db reset --linked`(원격 초기화) · **`config push`**(로컬
+> `config.toml`의 `[auth]`를 통째로 덮어써 Site URL이 localhost가 됩니다).
+> 로컬 작업에는 `supabase db reset`만 쓰세요.
 
 ---
 
@@ -108,23 +115,23 @@ pnpm dev
 
 ```
 app/                     # Next.js 라우팅 전용 (view만 마운트)
-├── (auth)/              #   sign-in · sign-up · forget-password (GuestOnly 셸)
-├── posts/               #   목록 · new · [id] · [id]/edit
-└── reset-password/      #   (auth) 밖 — 재설정 링크는 세션이 선 채로 도착한다
+├── (auth)/              #   sign-in (GuestOnly 셸). 소셜 로그인 복귀 지점이기도 하다
+└── posts/               #   목록 · new · [id] · [id]/edit
 proxy.ts                 # 세션 쿠키 리프레시 + 낙관적 라우트 가드 (Next 16의 middleware)
 src/
 ├── app/                 # providers(QueryClient + AuthProvider), fonts, globals.css
-├── views/               # 화면 조립 8종 (⚠ pages 금지)
-├── widgets/             # sub-header · tab-scroll-area · auth-shell · auth-status
-├── features/            # 사용자 액션 1개 = 슬라이스 1개 (10종)
-├── entities/            # session · post · comment
+├── views/               # 화면 조립 5종 (⚠ pages 금지)
+├── widgets/             # app-bar · bottom-tab-bar · sub-header · tab-scroll-area · auth-shell · auth-status
+├── features/            # 사용자 액션 1개 = 슬라이스 1개 (8종)
+├── entities/            # session · post · comment · profile
 ├── shared/              # ui / api / lib / config
 └── types/               # database.types.ts (supabase 생성 — 손으로 고치지 않는다)
 supabase/
-├── migrations/          # 6개 (스키마 = 보안 설계)
+├── migrations/          # 9개 (스키마 = 보안 설계)
 └── tests/               # rls.sql · concurrency.sh · seed-users.sh
 docs/
 ├── conventions/         # 코딩 컨벤션 7종
+├── oauth-setup.md       # 카카오·구글 앱 등록 → 키 → 검증 절차
 └── legacy/              # v1 인벤토리 (청산 전 스냅샷)
 ```
 
