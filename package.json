@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
-    "db:types": "supabase gen types --local --schema public > src/types/database.types.ts"
+    "db:types": "supabase gen types --local --schema public > src/types/database.types.ts",
+    "build:prod": "set -a && . ./.env.prod && set +a && next build",
+    "start:prod": "set -a && . ./.env.prod && set +a && next start"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",

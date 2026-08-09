@@ -19,6 +19,7 @@
 | 댓글 | 작성 · 삭제. 글의 `comment_count`는 DB 트리거가 관리 |
 | 좋아요 | 토글(낙관적 업데이트). 동시성은 `SECURITY DEFINER` RPC의 행 잠금으로 직렬화 |
 | 인증 | **카카오 · 구글 소셜 로그인**(로그인 = 가입) · 로그아웃. 에러는 한국어로 매핑 |
+| 프로필 | 닉네임(가입 시 랜덤 배정 → 본인이 변경) · 프로필 사진 업로드 · **로그인 수단 연결** |
 | 권한 | **3중 방어** — `proxy.ts` 서버 가드 → 클라이언트 가드 → **RLS + 컬럼 권한(최종)** |
 
 > 데이터 접근에 Route Handler를 두지 않고 **브라우저가 Supabase를 직접 호출**합니다.
@@ -84,17 +85,31 @@ pnpm dev
 
 `.env.example`을 복사해 `.env.local`을 만들고 값을 채웁니다.
 
-| 변수명 | 설명 | 필수 |
-|---|---|:---:|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 URL | ✅ |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon(publishable) 키 | ✅ |
-| `SUPABASE_SERVICE_ROLE_KEY` | 관리 작업용 (런타임 불필요) | — |
-| `SUPABASE_PROJECT_REF` | `supabase link`용 프로젝트 ref | 배포 시 |
-| `SUPABASE_DB_PASSWORD` | `supabase db push`용 DB 비밀번호 | 배포 시 |
-| `SUPABASE_ACCESS_TOKEN` | CLI/MCP 인증 토큰 | 배포 시 |
-| `SUPABASE_AUTH_EXTERNAL_KAKAO_CLIENT_ID` / `_SECRET` | 카카오 로그인 | ✅ |
-| `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` / `_SECRET` | 구글 로그인 | ✅ |
-| `NEXT_PUBLIC_SITE_URL` | `og:image` 절대 URL 기준(빌드 시점에 인라인) | 배포 시 |
+환경 파일은 **둘**입니다 — 소셜 로그인의 **Redirect URI가 supabase 주소에서 파생**되어
+환경마다 다르기 때문입니다.
+
+| 파일 | 바라보는 곳 | 읽히는 방법 | 콘솔에 등록할 Redirect URI |
+|---|---|---|---|
+| `.env.local` | 로컬 스택(643xx) | 자동 (`pnpm dev`·`pnpm build`) | `http://127.0.0.1:64321/auth/v1/callback` |
+| `.env.prod` | 원격 프로젝트 | **`pnpm build:prod` / `pnpm start:prod`** | `https://<project-ref>.supabase.co/auth/v1/callback` |
+
+> ⚠ `.env.prod`는 이름을 `.env.production`으로 바꿔도 자동으로 읽히지 않습니다 —
+> Next 우선순위에서 `.env.local`이 위라 로컬 값이 이깁니다. 그래서 스크립트가 명시적으로 싣습니다.
+
+| 변수명 | 설명 | 어느 파일 | 필수 |
+|---|---|---|:---:|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 URL | 둘 다 | ✅ |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon(publishable) 키 | 둘 다 | ✅ |
+| `NEXT_PUBLIC_SITE_URL` | `og:image` 절대 URL 기준(빌드 시점에 인라인) | 둘 다 | 배포 시 |
+| `SUPABASE_SERVICE_ROLE_KEY` | 관리 작업용 (런타임 불필요) | `.env.local` | — |
+| `SUPABASE_PROJECT_REF` | `supabase link`용 프로젝트 ref | `.env.local` | 배포 시 |
+| `SUPABASE_DB_PASSWORD` | `supabase db push`용 DB 비밀번호 | `.env.local` | 배포 시 |
+| `SUPABASE_ACCESS_TOKEN` | CLI/MCP 인증 토큰 | `.env.local` | 배포 시 |
+| `SUPABASE_AUTH_EXTERNAL_KAKAO_CLIENT_ID` / `_SECRET` | 카카오 로그인 | `.env.local` | ✅ |
+| `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` / `_SECRET` | 구글 로그인 | `.env.local` | ✅ |
+
+> `SUPABASE_*`는 전부 **`.env.local` 전용**입니다 — supabase CLI가 이 이름만 읽습니다.
+> 원격의 소셜 로그인 키는 파일이 아니라 **대시보드 Authentication → Providers**가 소유합니다.
 
 > env가 비어 있어도 빌드는 성공합니다. 런타임에 쿼리 훅이 한국어 안내 에러를 던집니다.
 > 다만 **소셜 로그인 키는 로그인 자체가 유일한 인증 수단이라 필수**입니다 →
@@ -120,14 +135,14 @@ app/                     # Next.js 라우팅 전용 (view만 마운트)
 proxy.ts                 # 세션 쿠키 리프레시 + 낙관적 라우트 가드 (Next 16의 middleware)
 src/
 ├── app/                 # providers(QueryClient + AuthProvider), fonts, globals.css
-├── views/               # 화면 조립 5종 (⚠ pages 금지)
+├── views/               # 화면 조립 6종 (⚠ pages 금지)
 ├── widgets/             # app-bar · bottom-tab-bar · sub-header · tab-scroll-area · auth-shell · auth-status
-├── features/            # 사용자 액션 1개 = 슬라이스 1개 (8종)
+├── features/            # 사용자 액션 1개 = 슬라이스 1개 (10종)
 ├── entities/            # session · post · comment · profile
 ├── shared/              # ui / api / lib / config
 └── types/               # database.types.ts (supabase 생성 — 손으로 고치지 않는다)
 supabase/
-├── migrations/          # 9개 (스키마 = 보안 설계)
+├── migrations/          # 10개 (스키마 = 보안 설계)
 └── tests/               # rls.sql · concurrency.sh · seed-users.sh
 docs/
 ├── conventions/         # 코딩 컨벤션 7종
@@ -141,12 +156,17 @@ docs/
 
 ```bash
 pnpm dev          # 개발 서버 실행
-pnpm build        # 프로덕션 빌드
-pnpm start        # 프로덕션 서버 실행
+pnpm build        # 프로덕션 빌드 (.env.local — 로컬 supabase를 바라본다)
+pnpm start        # 그 빌드 실행
+pnpm build:prod   # .env.prod를 실어 빌드 (원격 supabase를 바라본다)
+pnpm start:prod   # 그 빌드 실행
 pnpm lint         # ESLint 실행
 pnpm lint:fix     # ESLint 자동 수정
 pnpm db:types     # 로컬 스키마 → src/types/database.types.ts 재생성 (마이그레이션 추가 후 필수)
 ```
+
+> ⚠ `build`와 `build:prod`는 **같은 `.next/`를 쓴다.** `build:prod` 뒤에 `pnpm start`를 부르면
+> 원격을 바라보는 빌드가 그대로 뜬다. 로컬로 돌아올 때는 `pnpm build`를 다시 돌릴 것.
 
 ---
 
