@@ -68,7 +68,7 @@
 pnpm install
 supabase start                          # 로컬 스택 기동 (643xx 포트)
 supabase db reset                       # 마이그레이션 9개 적용
-bash supabase/tests/seed-users.sh       # 검증용 이메일 계정 alice/bob (화면 로그인은 소셜뿐)
+# 계정(alice/bob)·글·댓글은 supabase/seed.sql이 db reset 때 자동으로 넣는다
 pnpm dev
 ```
 
@@ -143,7 +143,8 @@ src/
 └── types/               # database.types.ts (supabase 생성 — 손으로 고치지 않는다)
 supabase/
 ├── migrations/          # 10개 (스키마 = 보안 설계)
-└── tests/               # rls.sql · concurrency.sh · seed-users.sh
+├── seed.sql             # db reset이 자동 실행 (계정·글·댓글·좋아요)
+└── tests/               # run-rls.sh · rls.sql · concurrency.sh
 docs/
 ├── conventions/         # 코딩 컨벤션 7종
 ├── oauth-setup.md       # 카카오·구글 앱 등록 → 키 → 검증 절차
@@ -177,7 +178,7 @@ RLS가 유일한 방어선이라 정책을 고칠 때마다 돌려야 합니다.
 
 ```bash
 # RLS · 컬럼 권한 · RPC · 회귀 검사 (전체 rollback이라 DB에 흔적을 남기지 않는다)
-psql "postgresql://postgres:postgres@127.0.0.1:64322/postgres" -f supabase/tests/rls.sql
+bash supabase/tests/run-rls.sh
 
 # 좋아요 동시성 — N명 동시 클릭 후 like_count == count(post_like)
 bash supabase/tests/concurrency.sh

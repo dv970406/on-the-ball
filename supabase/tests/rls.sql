@@ -5,7 +5,8 @@
 --     -f supabase/tests/rls.sql
 --
 -- 전제: alice@test.com / bob@test.com 두 계정이 가입되어 있을 것.
---   bash supabase/tests/seed-users.sh
+--   `supabase db reset`이 supabase/seed.sql로 자동 생성한다.
+--   실행은 supabase/tests/run-rls.sh 를 쓴다(결과를 양방향으로 대조해 준다).
 --
 -- 클라이언트가 supabase를 직접 호출하는 구조라 RLS가 유일한 방어선이다.
 -- 정책을 고칠 때마다 이 스크립트를 다시 돌린다.

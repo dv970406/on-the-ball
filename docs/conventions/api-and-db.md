@@ -277,4 +277,5 @@ RLS 술어가 security-barrier 서브쿼리 안으로 들어가 바깥의 `fk = 
 | — 시드 INSERT는 반드시 `begin;` **아래**에 | 위에 두면 오토커밋으로 새어나가 실행할 때마다 행이 쌓인다(실제로 그랬다) |
 | — 시각 비교 검사는 시드를 과거로 밀 것 | `now()`는 **트랜잭션 시작 시각**이라 한 트랜잭션 안에서 insert의 default와 트리거의 값이 같아진다 → "수정하면 updated_at이 바뀐다"를 증명할 수 없다 |
 | `supabase/tests/concurrency.sh` | 좋아요 동시성 — N명 동시 클릭 후 `like_count == count(post_like)` |
-| `supabase/tests/seed-users.sh` | `db reset` 후 테스트 계정(alice/bob) 재생성 |
+| **`supabase/seed.sql`** | `db reset`이 **자동 실행**한다 — 계정(alice/bob)·글·댓글·좋아요. ⚠ 시드가 없던 시절에는 마이그레이션을 고칠 때마다 reset이 개발 데이터를 통째로 날렸다. 닉네임을 명시적으로 고정하는 이유는 랜덤 배정이면 섹션 13의 유일성 검사가 부딪힐 상대를 잃어 **조용히 무의미해지기** 때문이다 |
+| **`supabase/tests/run-rls.sh`** | rls.sql을 돌리고 **양방향으로** 대조한다 — ① 기대하지 않은 ERROR ② **차단 기대인데 통과한 것**. ②를 안 보면 로그가 깨끗한 채로 검사가 죽어 있다(실제로 2건이 그랬다) |

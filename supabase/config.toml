@@ -56,10 +56,12 @@ enabled = true
 schema_paths = []
 
 [db.seed]
-# SQL 시드는 쓰지 않는다 — 테스트 계정은 비밀번호 해시가 필요해 SQL로 만들 수 없고,
-# auth API를 쓰는 supabase/tests/seed-users.sh가 담당한다.
-# (true로 두면 없는 seed.sql을 가리켜 db reset이 매번 경고를 낸다)
-enabled = false
+# seed.sql이 계정·글·댓글·좋아요를 전부 만든다.
+# ⚠ 시드가 없던 시절에는 마이그레이션을 고칠 때마다 `db reset`이 개발 데이터를 통째로
+#   날렸다(실제로 그랬다). 시드를 코드로 관리해 reset을 안전하게 만든다.
+# ⚠ 비밀번호 해시는 SQL로 만들 수 있다 — pgcrypto의 crypt(..., gen_salt('bf'))가
+#   GoTrue의 bcrypt와 같은 형식이다(실제 로그인으로 확인함).
+enabled = true
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
 sql_paths = ["./seed.sql"]
@@ -187,7 +189,7 @@ password_requirements = ""
 [auth.rate_limit]
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
 # 로컬 전용 상향. 앱에는 메일 발송 경로가 없고(소셜 로그인 전용) 이 값은
-# seed-users.sh 등 테스트 계정 생성용으로만 의미가 있다 — 원격에는 밀지 말 것
+# 로컬 테스트 계정용으로만 의미가 있다 — 원격에는 밀지 말 것
 email_sent = 100
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
@@ -209,7 +211,7 @@ web3 = 30
 # secret = ""
 
 # ⚠ **이메일 provider는 화면이 아니라 검증 자산을 위해 켜 둔다.**
-#   앱의 로그인 수단은 소셜뿐이지만, supabase/tests/rls.sql과 seed-users.sh가
+#   앱의 로그인 수단은 소셜뿐이지만, supabase/tests/rls.sql과 supabase/seed.sql이
 #   이메일 가입으로 테스트 계정(alice/bob)을 만든다. 즉 `POST /auth/v1/signup` 경로가
 #   열려 있다는 뜻이다 — **원격에는 이 값을 그대로 밀지 말 것**(docs/oauth-setup.md §4).
 [auth.email]
