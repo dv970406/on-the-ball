@@ -43,7 +43,7 @@ function normalizePath(pathname: string) {
 
 /** 비로그인으로 접근하면 로그인으로 보낼 경로 */
 function isAuthRequired(pathname: string) {
-  if (pathname === ROUTES.postNew) return true;
+  if (pathname === ROUTES.postNew || pathname === ROUTES.profile) return true;
   const match = /^\/posts\/([^/]+)\/edit$/.exec(pathname);
   return match ? parsePostId(match[1]) !== null : false;
 }

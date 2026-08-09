@@ -12,6 +12,8 @@ export const ROUTES = {
 
   // 인증 — 소셜 로그인은 로그인과 가입이 같은 동작이라 화면이 하나다
   signIn: "/sign-in",
+  // 프로필 — 닉네임·사진 수정과 로그인 수단 연결
+  profile: "/profile",
 } as const;
 
 /**

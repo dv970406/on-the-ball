@@ -3,20 +3,8 @@
 import { useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { requireBrowserSupabase } from "@/shared/api";
-import { ROUTES, withNext } from "@/shared/config";
+import { ROUTES, withNext, type OAuthProvider } from "@/shared/config";
 import { toAuthErrorMessage } from "@/entities/session";
-
-/**
- * 지원 프로바이더 — **supabase 설정과 갈리면 안 된다.**
- * 값을 늘리려면 `supabase/config.toml`의 `[auth.external.*]`도 함께 켜야 한다.
- *
- * ⚠ 네이버는 여기 없다. supabase가 naver provider를 지원하지 않는다
- *   (auth-js의 `Provider` 유니온에도, supabase CLI가 아는 external provider 20종에도 없다).
- *   넣으려면 service_role로 세션을 직접 발급하는 서버 경로가 필요한데,
- *   그건 "Route Handler를 두지 않는다"(api-and-db.md)를 깨는 결정이라 따로 논의한다.
- */
-export const OAUTH_PROVIDERS = ["kakao", "google"] as const;
-export type OAuthProvider = (typeof OAUTH_PROVIDERS)[number];
 
 /**
  * 소셜 로그인 시작 — 프로바이더 동의 화면으로 **페이지를 통째로 넘긴다.**

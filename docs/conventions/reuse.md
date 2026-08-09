@@ -63,15 +63,19 @@
 - 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/keys`·`lib/plain-summary`·`lib/hot`을 직접 import.
 
 ## `@/entities/profile`
-- `useProfileQuery(userId)` / `profileKeys` — 닉네임 등 프로필 조회.
-- `MyProfile` / `ProfileRow` — 도메인 타입 / DB 행 타입.
+- `useProfileQuery(userId)` / `profileKeys` / `PROFILE_SELECT` / `buildProfile` — 닉네임·아바타 조회.
+- `MyProfile` / `ProfileRow` — 도메인 타입 / DB 행 타입. `MyProfile.avatarPath`는 **경로**다(전체 URL이 아니다).
 - ⚠ **`userId`를 인자로 받는다.** 세션을 직접 읽지 않는 이유는 `entities`끼리 서로 import할 수 없기 때문이다 — 세션을 아는 **상위 레이어**(`widgets/auth-status`가 선례)가 `user?.id`를 넘긴다.
+- ⚠ **`avatarUrl`은 여기 없다 → `@/shared/config`.** 아바타를 쓰는 곳이 `entities/comment`·`entities/post`(상세)·`views/profile` 셋인데 entities끼리는 import할 수 없다(`OAUTH_PROVIDERS`와 같은 사정).
+- 서버에서는 배럴 대신 `model/types`·`api/keys`·`api/mappers`를 직접 import(`post`·`comment`와 같은 형태).
 
 ## `@/shared/config`
 - `ROUTES` — 경로 헬퍼. **경로 문자열 하드코딩 금지**(`"/posts"` ❌ → `ROUTES.postList`).
 - `signInWithNext(pathname)` / `withNext(path, next)` — 복귀 경로를 붙인 URL. proxy(서버 가드)와 클라 가드가 **같은 형태**를 만들어야 하므로 여기로 모았다.
 - **`safeNextPath(next, origin)`** — `?next=` 값을 앱 내부 경로로만 통과시킨다. **직접 문자열 검사를 짜지 말 것** — `startsWith("/") && !startsWith("//")`로는 `/\evil.com`도 `/..//evil.com`도 못 막는다(둘 다 실제로 뚫렸다).
 - `COLOR` — JS 인라인 style용 색 상수. **토큰 hex 하드코딩 금지**. (`shared/ui/live-status-pill.tsx`가 `COLOR.ink`를 쓴다)
+- **`OAUTH_PROVIDERS` / `OAUTH_PROVIDER_LABEL`** — 지원 소셜 프로바이더의 단일 소스. `supabase/config.toml`의 `[auth.external.*]`와 갈리면 안 된다. ⚠ `shared`에 있는 이유는 로그인(`features/sign-in`)과 계정 연결(`features/link-identity`)이 같은 목록을 써야 하는데 features끼리는 import할 수 없어서다.
+- **`avatarUrl(path)` / `AVATAR_BUCKET`** — 아바타 **경로** → 공개 URL. ⚠ DB에는 전체 URL이 아니라 경로만 저장한다(호스트가 환경마다 다르다: 로컬 `127.0.0.1:64321` ↔ 원격 `*.supabase.co`). 조립은 이 함수 한 곳에서만. `shared`에 있는 이유는 `OAUTH_PROVIDERS`와 같다 — entities 셋이 함께 쓴다. 버킷명 문자열도 여기서 가져다 쓴다(`features/update-profile`이 선례).
 - **`env`** — `NEXT_PUBLIC_*` 환경변수의 단일 소스(`supabaseUrl`·`supabaseAnonKey`·`siteUrl`). **`process.env`를 호출부에서 다시 읽지 말 것** — `proxy.ts`가 화면·훅과 같은 값을 봐야 판정이 갈리지 않는다.
   - `siteUrl`은 `og:image`를 절대 URL로 만드는 `metadataBase`(루트 layout)용이다. `NEXT_PUBLIC_SITE_URL` → `VERCEL_URL` → `localhost:3000` 순으로 폴백한다.
 - **`isSupabaseConfigured()`** — env가 채워졌는지. 값이 비어도 빌드는 성공해야 하므로 `env`는 throw하지 않는다 → **가드는 호출부의 책임**이고, 그 가드를 각자 짜지 말고 이걸 쓴다(`proxy.ts`가 선례).
@@ -79,13 +83,11 @@
 ## `@/shared/ui`
 **현역(게시판 v2가 실제로 쓰는 것)** — 새로 만들기 전 여기부터 확인:
 `Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·`Markdown`·
-`Chip`·`ActionChip`·`actionChipClassName`·`Dialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`
+`Chip`·`ActionChip`·`actionChipClassName`·`Dialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`
 
 **현재 미사용** — 트리셰이킹되어 번들 비용은 0이니 지우지 않는다. 다만 **"검증된 현역"으로 오인하지 말 것**:
 `TabHeader`·`MarkdownEditor`·`Flag`·`Shirt`·`RatioBar`·`SectionHead`·`LiveDot`·`LiveStatusPill`·`NightCard`·`PlayerSilhouette`
-(앞의 10개는 `docs/legacy/v1-inventory.md`가 보존 대상으로 명시한 v1 자산이다)
-· **`TextField`** — 이쪽은 v1 자산이 아니다. 이메일 로그인을 걷어내면서 호출부 8곳이 한 번에 사라졌다.
-  폼 입력이 다시 생기면(닉네임 편집 등) 그대로 쓸 수 있다.
+(`MarkdownEditor`를 뺀 9개가 `docs/legacy/v1-inventory.md`가 보존 대상으로 명시한 v1 자산이다. `MarkdownEditor`는 v2에서 만들었다가 프로토타입에 미리보기 탭이 없어 쓰이지 않는다)
 
 > ⚠ 이 두 목록은 **실사용 여부로만 판정한다**(`grep -rE "<Name\b" src app --include='*.tsx'`).
 > 커뮤니티 이식 때 실제로 어긋났다 — `TabHeader`·`MarkdownEditor`는 현역으로 적혀 있었지만 호출부가 0이었고, 반대로 `Pill`·`Avatar`·`Wordmark`는 v1 미사용으로 적혀 있는 채 화면에서 쓰이고 있었다.
@@ -106,3 +108,4 @@
 - `TabScrollArea` — 목록 스크롤 영역(`<main>` 제공 + 스크롤 복원).
 - `AuthShell` — 인증 화면의 공통 껍데기. 소셜 로그인으로 바뀌면서 소비자는 `/sign-in` 하나다.
 - `AuthStatus` — 세션 표시 + 로그인 링크 / 로그아웃. 세션을 아는 레이어라 `useProfileQuery(user?.id)`에 id를 넘기는 선례이기도 하다.
+  **닉네임이 `/profile` 링크다 — 현재 프로필 화면의 유일한 진입점**(하단 탭바의 "내 활동"에는 아직 라우트가 없다). ⚠ 조회 실패로 닉네임이 비면 라벨 없는 링크가 되므로 폴백 문구를 둔다.

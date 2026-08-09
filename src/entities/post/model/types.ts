@@ -101,4 +101,9 @@ export interface PostListPage {
  */
 export interface PostDetail extends Omit<PostListItem, "excerpt"> {
   content: PostRow["content"];
+  /**
+   * 작성자 아바타의 **경로**(전체 URL이 아니다) — `avatarUrl()`로 조립한다.
+   * ⚠ 목록에는 없다. 목록 카드가 아바타를 그리지 않아 select에서 뺐다(api/mappers.ts).
+   */
+  authorAvatarPath: ProfileRow["avatar_path"];
 }

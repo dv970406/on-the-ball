@@ -2,6 +2,8 @@
 
 import type { ReactNode } from "react";
 import { CornerDownRight } from "lucide-react";
+// ⚠ avatarUrl은 shared에 있다 — entities끼리 import할 수 없어서다(shared/config/avatar.ts 주석)
+import { avatarUrl } from "@/shared/config";
 import { cn, formatRelativeTime } from "@/shared/lib";
 import { Avatar, Icon } from "@/shared/ui";
 import type { Comment } from "../model/types";
@@ -45,6 +47,7 @@ export function CommentItem({
         <div className="flex gap-2.5">
           <Avatar
             label={comment.authorNickname}
+            src={avatarUrl(comment.authorAvatarPath)}
             size={reply ? 24 : 28}
             className={reply ? "text-[11px]" : "text-xs"}
           />

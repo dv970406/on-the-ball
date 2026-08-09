@@ -15,6 +15,8 @@ export interface Comment {
   userId: CommentRow["user_id"];
   /** profiles 임베딩에서 온다 */
   authorNickname: ProfileRow["nickname"];
+  /** 아바타의 **경로**(전체 URL이 아니다) — 화면이 `avatarUrl()`로 조립한다 */
+  authorAvatarPath: ProfileRow["avatar_path"];
   content: CommentRow["content"];
   /** null = 루트 댓글. 깊이는 DB 트리거(check_comment_depth)가 1로 제한한다 */
   parentId: CommentRow["parent_id"];

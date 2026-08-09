@@ -9,3 +9,5 @@ export { useSessionStore } from "./model/session-store";
 export { AuthProvider } from "./model/auth-provider";
 export { AuthRequired, GuestOnly } from "./model/guards";
 export { toAuthErrorMessage } from "./lib/auth-error-message";
+export { useLinkedIdentitiesQuery } from "./api/queries";
+export { identityKeys } from "./api/keys";

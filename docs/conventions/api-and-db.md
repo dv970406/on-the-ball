@@ -70,26 +70,56 @@ RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 
 - 부수 효과로 **에러 메시지가 좋아진다.** 정책 위반은 Postgres의 영어 42501뿐이라 "왜 거부됐는지"를 설명하지 못하는데, 트리거는 `P0001`로 한국어 사유를 그대로 노출한다(`toDbErrorMessage`가 P0001을 통과시킨다).
 - 판단 기준: **거부 사유를 사용자에게 설명해야 하면 트리거**, 단순 접근 차단이면 정책.
 
-## 닉네임은 **소셜 표시 이름**에서 나온다
+## 닉네임은 **랜덤 배정 후 사용자가 바꾼다**
 
-로그인 수단이 카카오·구글뿐이라 `auth.users.email`을 믿을 수 없다 — **카카오의 이메일 제공은
-별도 심사 항목**이라 승인 전에는 NULL로 들어온다(`config.toml`의 `email_optional = true`).
-이메일 로컬파트만 보던 옛 트리거를 그대로 두면 **카카오 가입자가 전원 `user`, `user-2` …** 가 된다.
+가입 시 `random_nickname()`이 축구 테마 조합(수식어+명사, 480가지)을 배정하고, 사용자가
+프로필 화면에서 바꾼다. **프로바이더 표시 이름은 읽지 않는다.**
 
-```
-base = oauth_display_name(raw_user_meta_data)   -- name → nickname → full_name
-                                                --  → preferred_username → user_name
-     → split_part(email, '@', 1)
-     → 'user'
-```
+한때 `raw_user_meta_data`의 표시 이름을 base로 썼는데 세 가지가 걸렸다:
 
-- ⚠ **키를 여러 개 순서대로 본다.** 프로바이더별 `raw_user_meta_data` 형태는 supabase 문서에
-  정리돼 있지 않다. 하나만 찍으면 그게 틀렸을 때 해당 프로바이더 가입자가 전원 `user`가 된다.
-- ⚠ 후보는 `has_visible_char`로 거른다. 프로바이더 값도 결국 사용자 입력이라 제로폭 문자만
-  담길 수 있는데 `btrim`은 그걸 못 지운다 → **화면에 아무것도 안 보이는 닉네임**이 된다.
-- 충돌 재시도(`-2`, `-3`, 100회 후 랜덤)·16자 컷·`constraint_name` 판별은 **그대로 유지**한다.
-  카카오 닉네임은 동명이인이 흔해서 이 장치가 이메일 때보다 더 자주 돈다.
-- 검증: `supabase/tests/rls.sql` **섹션 23**(카카오형·구글형·이메일 폴백·제로폭·16자 컷).
+- 사용자가 카카오/구글 프로필을 바꾸면 우리 닉네임과 어긋난다
+- 표시 이름이 실명인 경우가 많아 **커뮤니티에 실명이 노출된다**
+- 무엇보다 base가 **클라이언트가 정하는 값**이라 사칭 방어를 계속 짊어져야 했다
+  (실제로 제로폭 문자로 `alice`를 흉내내는 구멍이 열렸다 — 아래 정규형이 그 대응이다)
+
+⚠ 충돌 시 접미사(`-2`)를 붙이지 않고 **다시 뽑는다.** 랜덤이라 재시도가 자연스럽고
+`왼발의마법사-2`보다 다른 조합이 낫다. 20회 넘게 부딪히면 그때 임의 접미사를 붙인다.
+
+### 닉네임 정규형 — 사용자가 고칠 수 있게 되면서 필수가 됐다
+
+`normalize_nickname()`이 보이지 않는 문자를 지우고, 빈 자리를 그리는 문자(NBSP·전각공백)를
+보통 공백으로 접고, 연속 공백을 하나로 만든다. 문자 집합은 `has_visible_char`의 클래스를
+**둘로 쪼갠 것**이고 합집합이 원본과 같아야 한다(한쪽만 고치지 말 것).
+
+- `profiles_nickname_canonical` CHECK가 정규형이 아닌 값을 거부한다 →
+  `lower(nickname)` 유일성이 **실제 유일성**이 된다(제로폭으로 우회 불가).
+- `profiles_normalize_nickname` **트리거**가 쓰기 직전에 정규화하므로, 사용자가 공백을 붙여
+  보내도 CHECK 위반(23514)이 아니라 조용히 다듬어진다.
+- ⚠ CHECK 안의 함수는 **호출자 권한으로 평가**되므로 `normalize_nickname`은
+  `anon`·`authenticated`에 EXECUTE가 열려 있어야 한다(`has_visible_char`와 같은 함정).
+
+## 아바타는 **경로**로 저장한다
+
+`profiles.avatar_path`에는 전체 URL이 아니라 `avatars` 버킷 안의 경로(`{user_id}/{uuid}.webp`)만
+넣는다. 전체 URL을 저장하면 로컬(`127.0.0.1:64321`)과 원격(`*.supabase.co`)의 호스트가 달라
+환경을 옮길 때마다 모든 행이 깨진다. URL 조립은 **`@/shared/config`의 `avatarUrl()`** 한 곳에서만
+(entities 셋이 함께 써야 해서 `shared`에 있다).
+
+- ⚠ `profiles_avatar_path_own` CHECK가 **자기 폴더만** 허용한다. Storage 정책이 업로드를 막아도
+  **이미 존재하는 남의 파일 경로는 참조할 수 있기** 때문에 두 겹으로 막는다.
+- ⚠ **`starts_with`로는 부족하다**(실측). `{내 uuid}/../{남의 uuid}/x.webp`가 통과하고, URL을
+  만드는 순간 브라우저 파서가 `..`를 정규화해 **남의 파일이 뜬다.** 아바타가 상세·댓글에
+  노출되므로 그대로 사칭 벡터가 된다 → 정규식으로 `{내 uuid}/{파일명}` **두 세그먼트**를 강제한다.
+  (`rls.sql` 섹션 24가 경로 탈출·하위 폴더·확장자 없음을 전부 검사한다)
+- **1계정 : 1프로필사진.** 교체는 `list()`로 내 폴더를 훑어 **전부 지운 뒤** 업로드한다.
+  반대 순서(업로드 → DB → 옛 파일 삭제)로 두면 마지막 삭제가 실패할 때마다 고아가 쌓이고
+  되돌릴 방법이 없다. ⚠ 지울 대상을 **캐시에서 받지 않는다** — 리페치가 실패하면 옛 경로에
+  머물러 엉뚱한 파일을 지운다. 지운 뒤 업로드가 실패하면 `avatar_path`도 `null`로 맞춰
+  "DB엔 있는데 파일이 없는" 불일치를 남기지 않는다.
+- ⚠ 파일명은 업로드마다 새로 만든다(uuid). 같은 이름을 덮어쓰면 공개 URL이 그대로라
+  브라우저·CDN 캐시 때문에 옛 사진이 계속 보인다.
+- 버킷의 `file_size_limit`(2MiB)·`allowed_mime_types`가 **실제 방어선**이다 —
+  클라이언트 리사이즈는 UX일 뿐 우회 가능하다(RLS와 같은 구조).
 
 ## 문자 검증은 클라이언트와 DB가 **같은 문자 집합**을 써야 한다
 
@@ -117,7 +147,8 @@ base = oauth_display_name(raw_user_meta_data)   -- name → nickname → full_na
 | RPC(클라이언트가 직접 호출) | `toggle_post_like` · `soft_delete_post` · `increment_post_view` | `increment_post_view`만 anon에 열려 있다(아래 예외 항목) |
 | 트리거 | `sync_post_like_count` · `sync_post_comment_count` · `touch_updated_at` · `check_comment_depth` | `post`·`post_like`·`comment` |
 | 트리거 | **`handle_new_user`** (`on_auth_user_created`, `after insert on auth.users`) | 가입 시 `profiles` 행 생성. **호출자 권한으로 돌면 `profiles` insert 권한이 없어 가입 자체가 실패한다** |
-| 순수 헬퍼 | `oauth_display_name(jsonb)` (`immutable`) | 소셜 메타데이터에서 표시 이름 후보 선택 (아래) |
+| 트리거 | `normalize_profile_nickname` (`profiles_normalize_nickname`) | 쓰기 직전 닉네임 정규화 — 사용자 입력이 CHECK를 깨지 않게 |
+| 순수 헬퍼 | `random_nickname()` (`volatile`) | 가입 시 배정하는 축구 테마 랜덤 닉네임 |
 | 정책 헬퍼 | `post_is_alive` (`stable`) | `comment`의 select·insert 정책이 공유 — 인라인 서브쿼리를 쓰지 않는 이유는 아래 참고 |
 
 ⚠ **`has_visible_char`는 이 목록이 아니다.** CHECK 제약 평가 함수라 성질이 다르고, 오히려 **쓰기 권한이 있는 역할에 EXECUTE를 열어야** 한다(바로 아래 항목).
@@ -237,8 +268,9 @@ RLS 술어가 security-barrier 서브쿼리 안으로 들어가 바깥의 `fk = 
 
 | 파일 | 용도 |
 |---|---|
-| `supabase/tests/rls.sql` | RLS·컬럼 권한·RPC 전량 검사, 섹션 23까지 (전체 rollback이라 DB에 흔적 없음) |
-| — 섹션 23은 **소셜 로그인 닉네임**을 검사 | 카카오형(메타만)·구글형(full_name)·이메일 폴백·제로폭·16자 컷, 그리고 **23b 사칭 차단**(ZWSP·NBSP·soft hyphen을 끼운 닉네임이 정규형으로 접혀 기존 닉네임과 충돌하는지) |
+| `supabase/tests/rls.sql` | RLS·컬럼 권한·RPC 전량 검사, 섹션 24까지 (전체 rollback이라 DB에 흔적 없음) |
+| — 섹션 24는 **프로필 편집**을 검사 | 본인만 수정·남의 닉네임 0행·아바타 경로가 자기 폴더인지·`created_at` 위조 차단·랜덤 닉네임 배정, 그리고 **24b 스토리지 정책**(남의 폴더에 업로드 불가) |
+| — 섹션 23은 **닉네임 정규형**을 검사 | 제로폭·NBSP·soft hyphen을 끼운 닉네임이 정규형으로 접혀 기존 닉네임과 충돌하는지(사칭 차단) |
 | — 섹션 22는 **답글**을 검사 | 깊이 1 초과 거부·타 게시글 부모 거부·없는 부모 거부(전부 P0001), cascade가 남의 답글까지 지우는 동작, `comment_count`가 답글 포함 총합인지, 글이 소프트 삭제되면 답글도 함께 감춰지는지 |
 | — 섹션 17은 **테이블명을 하드코딩하지 않는다** | public 스키마 기본 권한이 anon/authenticated에 ALL이라, 새 마이그레이션이 `revoke`를 한 번만 잊어도 즉시 구멍이 된다. 고정 목록만 검사하면 **새 테이블은 검사 대상에 들어오지도 않는다** → RLS 미적용·anon 쓰기 권한·search_path 미고정·anon EXECUTE를 전수로 훑는다 |
 | — 섹션 18은 **INSERT 시점 위조**를 검사 | 섹션 1이 UPDATE만 보고 있어서, `grant insert` 목록이 넓어지는 회귀(카운터·타임스탬프 동봉)를 못 잡았다 |

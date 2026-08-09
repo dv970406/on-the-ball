@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signInWithNext } from "@/shared/config";
+import { ROUTES, signInWithNext } from "@/shared/config";
 import { Skeleton, buttonClassName } from "@/shared/ui";
 import { useSessionStore } from "@/entities/session";
 import { useProfileQuery } from "@/entities/profile";
@@ -48,9 +48,18 @@ export function AuthStatus() {
       {profilePending ? (
         <Skeleton className="h-4 w-16" />
       ) : (
-        <span className="max-w-[140px] truncate text-[13px] text-ink-mute">
-          {profile?.nickname ?? ""}
-        </span>
+        /*
+          프로필 화면의 유일한 진입점이다 — 하단 탭바의 "내 활동"에는 아직 라우트가 없다.
+          ⚠ 닉네임이 비면 **라벨 없는 링크**가 된다(조회 실패 시 isPending=false·data=undefined).
+            접근 가능한 이름도 없고 클릭 영역도 0이라 프로필로 들어갈 방법이 사라진다
+            → 조회가 실패해도 진입은 살려 둔다.
+        */
+        <Link
+          href={ROUTES.profile}
+          className="max-w-[140px] truncate text-[13px] text-ink-mute underline decoration-hairline-strong underline-offset-[3px]"
+        >
+          {profile?.nickname ?? "내 프로필"}
+        </Link>
       )}
       <button
         type="button"

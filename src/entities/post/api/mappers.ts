@@ -22,7 +22,12 @@ const BASE_COLUMNS =
 // ⚠ 그냥 `profiles(nickname)`이라고 쓰면 PGRST201로 실패한다 —
 //   post → profiles 경로가 둘(author_id 직접 FK / post_like 경유 many-to-many)이라 모호하다.
 //   FK 컬럼명(author_id)으로 경로를 지정하고 별칭 author를 붙여 뜻을 드러낸다.
+// ⚠ **profiles 컬럼을 여기에 추가하면 `features/update-profile`의 무효화 대상도 늘려야 한다.**
+//   프로필을 바꿔도 이 캐시는 저절로 갱신되지 않아 옛 값이 남는다(avatar_path가 그 선례다).
 const AUTHOR_EMBED = "author:author_id(nickname)";
+// ⚠ 아바타는 **상세에만** 싣는다. 목록 카드는 아바타를 그리지 않으므로(프로토타입에 자리가 없다)
+//   30건마다 쓰이지 않을 컬럼을 실어 나를 이유가 없다.
+const AUTHOR_EMBED_DETAIL = "author:author_id(nickname, avatar_path)";
 // post_like는 SELECT 정책이 "내 행만"이라 결과 배열이 곧 "내가 눌렀는지"다
 const MY_LIKE_EMBED = "post_like(user_id)";
 
@@ -30,7 +35,7 @@ const MY_LIKE_EMBED = "post_like(user_id)";
 //   content(최대 20000자)를 30건 실어 보내면 최악 600KB다.
 export const POST_LIST_SELECT = `${BASE_COLUMNS}, excerpt, ${AUTHOR_EMBED}, ${MY_LIKE_EMBED}`;
 // 상세는 본문 전체가 필요하다. excerpt는 content에서 파생하므로 여기서 다시 받지 않는다.
-export const POST_DETAIL_SELECT = `${BASE_COLUMNS}, content, ${AUTHOR_EMBED}, ${MY_LIKE_EMBED}`;
+export const POST_DETAIL_SELECT = `${BASE_COLUMNS}, content, ${AUTHOR_EMBED_DETAIL}, ${MY_LIKE_EMBED}`;
 
 /**
  * 위 select가 돌려주는 행의 형태.
@@ -53,7 +58,12 @@ type PostSelectRow = Pick<
   excerpt?: PostRow["excerpt"];
   /** 상세에만 온다 */
   content?: PostRow["content"];
-  author: Pick<ProfileRow, "nickname"> | null;
+  author:
+    | (Pick<ProfileRow, "nickname"> & {
+        /** 상세에만 온다 (AUTHOR_EMBED_DETAIL) */
+        avatar_path?: ProfileRow["avatar_path"];
+      })
+    | null;
   post_like: Pick<PostLikeRow, "user_id">[] | null;
 };
 
@@ -86,7 +96,12 @@ export function buildPostListItem(row: PostSelectRow): PostListItem {
 }
 
 export function buildPostDetail(row: PostSelectRow): PostDetail {
-  return { ...mapBase(row), content: row.content ?? "" };
+  return {
+    ...mapBase(row),
+    content: row.content ?? "",
+    // 경로만 담는다 — URL 조립은 화면이 avatarUrl()로 한다(호스트가 환경마다 다르다)
+    authorAvatarPath: row.author?.avatar_path ?? null,
+  };
 }
 
 /** 수정된 글인지 — created_at과 updated_at이 다르면 수정됨 (트리거가 서버 시각으로 찍는다) */

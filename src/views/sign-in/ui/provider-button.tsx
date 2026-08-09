@@ -1,7 +1,7 @@
 "use client";
 
+import { type OAuthProvider } from "@/shared/config";
 import { cn } from "@/shared/lib";
-import type { OAuthProvider } from "@/features/sign-in";
 
 /**
  * 소셜 로그인 버튼.

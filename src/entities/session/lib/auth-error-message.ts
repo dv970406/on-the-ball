@@ -4,8 +4,12 @@ import { AuthError } from "@supabase/supabase-js";
  * supabase 인증 에러 → 사용자에게 보여줄 한국어 문구.
  *
  * ErrorCode 유니온에는 80개가 넘게 있지만(@supabase/auth-js의 lib/error-codes.d.ts)
- * 이메일+비밀번호 흐름에서 실제로 나올 수 있는 것만 추린다. 나머지는 일반 문구로 덮는다 —
- * MFA·SAML·SSO·전화번호 관련 코드를 전부 번역해봐야 이 앱에서는 도달할 수 없다.
+ * **이 앱이 실제로 도달할 수 있는 흐름**의 것만 추린다 — 소셜 로그인, 계정 연결/해제, 세션.
+ * 나머지는 일반 문구로 덮는다(MFA·SAML·SSO·전화번호는 이 앱에 없다).
+ *
+ * ⚠ **커버리지가 곧 기능이다.** identity 코드를 빠뜨렸더니 "이미 다른 계정에 연결된 구글"처럼
+ *   **재시도로는 구조적으로 절대 성공할 수 없는** 실패가 "잠시 후 다시 시도해 주세요"로 접혔다.
+ *   사용자는 일시 장애로 읽고 계속 눌렀다. 새 흐름을 붙이면 여기부터 확인한다.
  *
  * ⚠ 순수 함수다("use client" 없음). 데이터·로깅은 features의 훅이, 노출은 컴포넌트가 맡는다.
  */
@@ -40,6 +44,23 @@ const AUTH_ERROR_MESSAGE: Record<string, string> = {
   reauthentication_needed: "보안을 위해 다시 로그인한 뒤 비밀번호를 변경해 주세요.",
   reauthentication_not_valid: "재인증에 실패했어요. 다시 로그인해 주세요.",
   reauth_nonce_missing: "재인증이 필요해요. 다시 로그인해 주세요.",
+
+  // 계정 연결 (features/link-identity)
+  // ⚠ 이 셋은 **재시도로 풀리지 않는다.** 그런데 문구가 "잠시 후 다시" 계열이면 사용자는
+  //   계속 누른다 → 원인과 다음 행동을 문장 안에 담는다.
+  identity_already_exists:
+    "이미 다른 계정에 연결된 로그인 수단이에요. 그 계정으로 로그인해 주세요.",
+  single_identity_not_deletable: "마지막 로그인 수단은 해제할 수 없어요.",
+  email_conflict_identity_not_deletable:
+    "이 수단을 해제하면 계정 이메일이 사라져 해제할 수 없어요.",
+  identity_not_found: "이미 해제된 로그인 수단이에요.",
+  manual_linking_disabled: "계정 연결 기능이 꺼져 있어요. 관리자에게 문의해 주세요.",
+
+  // 소셜 로그인
+  provider_disabled: "지금은 이 방법으로 로그인할 수 없어요.",
+  provider_email_needs_verification: "프로바이더에서 이메일 인증을 먼저 완료해 주세요.",
+  bad_oauth_state: "로그인 정보가 만료되었어요. 다시 시도해 주세요.",
+  bad_oauth_callback: "로그인을 마치지 못했어요. 다시 시도해 주세요.",
 
   // 세션
   session_expired: "로그인이 만료되었어요. 다시 로그인해 주세요.",

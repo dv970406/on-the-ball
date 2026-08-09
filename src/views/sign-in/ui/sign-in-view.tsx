@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ROUTES } from "@/shared/config";
+import { OAUTH_PROVIDERS, ROUTES } from "@/shared/config";
 import { useNextParam } from "@/shared/lib";
 import { Skeleton } from "@/shared/ui";
 import { AuthShell } from "@/widgets/auth-shell";
-import { OAUTH_PROVIDERS, useOAuthSignIn } from "@/features/sign-in";
+import { useOAuthSignIn } from "@/features/sign-in";
 import { ProviderButton } from "./provider-button";
 
 /**

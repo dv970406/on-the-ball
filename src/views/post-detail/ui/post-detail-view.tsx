@@ -13,7 +13,7 @@ import {
   Trash2,
   UserX,
 } from "lucide-react";
-import { ROUTES } from "@/shared/config";
+import { ROUTES, avatarUrl } from "@/shared/config";
 import {
   clearScrollRestore,
   formatCount,
@@ -169,8 +169,13 @@ export function PostDetailView({ postId }: { postId: number }) {
             </h1>
 
             <div className="mt-4 flex items-center gap-2.5">
-              {/* profiles에 아바타 이미지가 없다 — 닉네임 첫 글자 이니셜을 쓴다 */}
-              <Avatar label={post.authorNickname} size={34} className="text-[13px]" />
+              {/* 사진이 없으면 Avatar가 닉네임 첫 글자 이니셜로 떨어진다 */}
+              <Avatar
+                label={post.authorNickname}
+                src={avatarUrl(post.authorAvatarPath)}
+                size={34}
+                className="text-[13px]"
+              />
               <div className="min-w-0">
                 <div className="truncate text-[13px] font-medium text-ink">
                   {post.authorNickname}
