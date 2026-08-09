@@ -266,40 +266,31 @@ insert into public.comment (post_id, user_id, content) values (:bpid, :'alice', 
 rollback to s;
 
 \echo ''
-\echo '=== 10. 회귀: email이 빈 문자열이어도 가입이 죽지 않는다 ==='
+\echo '=== 10. 회귀: 이메일이 어떤 형태든 가입이 죽지 않는다 ==='
+\echo '    닉네임은 이제 이메일에서 파생되지 않지만(랜덤 배정 — 섹션 23), 그렇다고'
+\echo '    이 검사가 무의미해지지 않는다: handle_new_user가 만든 값이 profiles의 어떤'
+\echo '    제약이든 위반하면 auth.users insert까지 통째로 롤백되어 **가입 자체가 실패**한다.'
 savepoint s;
 -- ⚠ 데이터 수정 CTE의 결과는 같은 문장의 다른 부분에서 보이지 않는다(스냅샷 규칙) →
 --   트리거가 만든 profiles 행을 보려면 문장을 나눠야 한다. 그래서 uuid를 고정한다.
+\echo '[0행 기대] 빈 이메일·공백 로컬파트·아주 긴 로컬파트·NULL 전부 닉네임이 붙는다'
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
 values ('00000000-0000-0000-0000-0000000000ff', '00000000-0000-0000-0000-000000000000',
-        'authenticated', 'authenticated', '', 'x', now(), now());
-\echo '[user 기대] nickname (여기서 에러가 나면 빈 이메일이 가입 전체를 죽인다는 뜻)'
-select nickname from public.profiles where id = '00000000-0000-0000-0000-0000000000ff';
+        'authenticated', 'authenticated', '', 'x', now(), now()),
+       ('00000000-0000-0000-0000-0000000000fd', '00000000-0000-0000-0000-000000000000',
+        'authenticated', 'authenticated', '  spaced  @test.com', 'x', now(), now()),
+       ('00000000-0000-0000-0000-0000000000fc', '00000000-0000-0000-0000-000000000000',
+        'authenticated', 'authenticated', 'ab cdefghijklmno p@test.com', 'x', now(), now()),
+       ('00000000-0000-0000-0000-0000000000fb', '00000000-0000-0000-0000-000000000000',
+        'authenticated', 'authenticated', null, 'x', now(), now());
+select u.id, p.nickname
+  from auth.users u left join public.profiles p on p.id = u.id
+ where u.id in ('00000000-0000-0000-0000-0000000000ff','00000000-0000-0000-0000-0000000000fd',
+                '00000000-0000-0000-0000-0000000000fc','00000000-0000-0000-0000-0000000000fb')
+   and (p.nickname is null                                   -- 프로필이 안 생겼다
+        or p.nickname <> public.normalize_nickname(p.nickname)); -- 정규형이 아니다
 rollback to s;
 
-\echo ''
-\echo '=== 10-b. 회귀: 이메일 로컬파트에 공백이 있어도 가입이 죽지 않는다 ==='
-\echo '    (handle_new_user가 만든 값이 profiles_nickname_trimmed를 위반하면 트랜잭션 전체가 롤백된다.'
-\echo '     지금은 GoTrue가 그런 주소를 400으로 막지만, 방어선이 그것 하나뿐이면 안 된다)'
-savepoint s;
-insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
-values ('00000000-0000-0000-0000-0000000000fd', '00000000-0000-0000-0000-000000000000',
-        'authenticated', 'authenticated', '  spaced  @test.com', 'x', now(), now());
-\echo '[spaced 기대] 앞뒤 공백이 깎인 닉네임'
-select nickname from public.profiles where id = '00000000-0000-0000-0000-0000000000fd';
-rollback to s;
-
-savepoint s;
--- 16자 컷 경계에서 끝에 공백이 남는 경우 (left() 이후에도 다듬는지)
-insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
-values ('00000000-0000-0000-0000-0000000000fc', '00000000-0000-0000-0000-000000000000',
-        'authenticated', 'authenticated', 'ab cdefghijklmno p@test.com', 'x', now(), now());
-\echo '[끝에 공백이 없어야 한다]'
-select nickname, nickname = btrim(nickname) as trimmed from public.profiles
- where id = '00000000-0000-0000-0000-0000000000fc';
-rollback to s;
-
-\echo ''
 \echo '=== 11. anon은 어디에도 쓸 수 없다 ==='
 \echo '    (revoke all → grant select 구조라 다음 마이그레이션에서 grant 한 줄 잘못 쓰면 조용히 뚫린다)'
 -- ⚠ \echo는 **줄 전체**를 인자로 먹는다. SQL을 같은 줄에 붙이면 실행되지 않고
@@ -359,11 +350,13 @@ savepoint s;
 update public.profiles set nickname = ' alice' where id = :'bob';
 rollback to s;
 savepoint s;
-\echo '[alice-2 기대] 같은 로컬파트로 가입하면 접미사가 붙는다'
+\echo '[t 기대] 같은 로컬파트로 가입해도 닉네임이 이메일과 무관하다'
+\echo '        (전에는 alice-2가 붙었다 — 이제 배정은 랜덤이라 로컬파트가 새어나가지 않는다)'
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
 values ('00000000-0000-0000-0000-0000000000fe', '00000000-0000-0000-0000-000000000000',
         'authenticated', 'authenticated', 'alice@other.com', 'x', now(), now());
-select nickname from public.profiles where id = '00000000-0000-0000-0000-0000000000fe';
+select nickname not like 'alice%' as email_not_leaked
+  from public.profiles where id = '00000000-0000-0000-0000-0000000000fe';
 rollback to s;
 
 \echo ''
@@ -644,8 +637,10 @@ select count(*) from public.comment where post_id = :pid;
 rollback to s;
 
 \echo ''
-\echo '=== 23. 소셜 로그인 닉네임 (handle_new_user + oauth_display_name) ==='
-\echo '    카카오는 이메일을 주지 않을 수 있다 — 그때 이메일 로컬파트만 보면 전원이 user가 된다.'
+\echo '=== 23. 가입 시 닉네임 배정 (handle_new_user + random_nickname) ==='
+\echo '    프로바이더 표시 이름은 읽지 않는다 — 실명 노출·프로필 변경 시 불일치에 더해,'
+\echo '    base가 클라이언트 자유 입력이라 사칭 방어를 영구히 짊어져야 했다.'
+\echo '    (그 값이 무시된다는 확인은 섹션 24에 있다. 여기서는 배정 자체의 성질을 본다)'
 
 create or replace function pg_temp.mkuser(p_meta jsonb, p_email text) returns text
 language plpgsql as $$
@@ -659,63 +654,153 @@ begin
 end $$;
 
 savepoint s;
-\echo '[홍길동 기대] 카카오형 — name만 있고 이메일이 없다'
-select pg_temp.mkuser('{"name":"홍길동"}'::jsonb, null);
-\echo '[홍길동-2 기대] 같은 표시 이름으로 또 가입 — 충돌 재시도가 살아 있는가'
-select pg_temp.mkuser('{"name":"홍길동"}'::jsonb, null);
+\echo '[0행 기대] 메타 형태가 어떻든 가입이 깨지지 않는다 — 이제 파싱하지 않으므로'
+\echo '           카카오형(name만)·구글형(full_name)·메타 없음·제로폭·비문자열을 모두 받는다'
+select v.label from (values
+  ('카카오형(name만, 이메일 없음)', '{"name":"홍길동"}'::jsonb, null),
+  ('구글형(full_name)',             '{"full_name":"Chan Kim"}'::jsonb, 'chan@gmail.com'),
+  ('메타도 이메일도 없음',           null::jsonb,                       null),
+  ('제로폭 문자뿐',                  jsonb_build_object('name', U&'\200B\200B'), null),
+  ('name이 배열',                    '{"name":["a","b"]}'::jsonb,      null),
+  ('사칭 시도(ali<ZWSP>ce)',        jsonb_build_object('name', 'ali' || U&'\200B' || 'ce'), null)
+) as v(label, meta, email)
+where pg_temp.mkuser(v.meta, v.email) is null;   -- 닉네임이 안 붙은 경우만 남는다
 rollback to s;
 
 savepoint s;
-\echo '[Chan Kim 기대] 구글형 — full_name 폴백 (name 키가 없다)'
-select pg_temp.mkuser('{"full_name":"Chan Kim","email":"chan@gmail.com"}'::jsonb, 'chan@gmail.com');
+\echo '[t 기대] 같은 메타로 두 번 가입해도 닉네임이 갈린다 — 충돌 시 접미사가 아니라 재추첨이다'
+select pg_temp.mkuser('{"name":"홍길동"}'::jsonb, null)
+    <> pg_temp.mkuser('{"name":"홍길동"}'::jsonb, null) as distinct_nicknames;
 rollback to s;
 
 savepoint s;
-\echo '[user 기대] 메타도 이메일도 없다'
-select pg_temp.mkuser(null, null);
+\echo '[0행 기대] 랜덤 조합 전수 — 어떤 조합도 길이(1~20)·정규형 CHECK를 어기지 않는다'
+\echo '           480가지뿐이라 하나만 어겨도 그 사용자는 가입 자체가 실패한다'
+select n from (select public.random_nickname() as n from generate_series(1, 2000)) t
+ where n <> public.normalize_nickname(n)
+    or char_length(n) not between 1 and 20;
 rollback to s;
 
 savepoint s;
-\echo '[zw 기대] 표시 이름이 제로폭 문자뿐 — btrim은 못 거른다, has_visible_char가 걸러 이메일로 폴백'
-select pg_temp.mkuser('{"name":"​​"}'::jsonb, 'zw@test.com');
-rollback to s;
-
-savepoint s;
-\echo '[손흥민 기대] 앞뒤 공백은 다듬는다 (profiles_nickname_trimmed CHECK 위반 방지)'
-select pg_temp.mkuser('{"name":"  손흥민  "}'::jsonb, null);
-rollback to s;
-
-savepoint s;
-\echo '[16자 기대] 접미사 -999가 붙어도 20자를 넘지 않도록 16자로 자른다'
-select char_length(pg_temp.mkuser('{"name":"매우매우매우매우매우매우긴닉네임입니다요"}'::jsonb, null));
+\echo '[0행 기대] 좁은 이름 공간에서 연속 가입 — 재추첨이 끝까지 도는가 (중복이 나오면 행이 남는다)'
+select nickname, count(*) from (
+  select pg_temp.mkuser(null, null) as nickname from generate_series(1, 120)
+) t group by nickname having count(*) > 1;
 rollback to s;
 
 \echo ''
-\echo '--- 23b. 사칭 차단 (20260808000001) — 보이지 않는 문자로 lower() 유일성을 우회할 수 없다'
-\echo '    ⚠ base가 GoTrue 검증 이메일에서 클라이언트 자유 입력으로 바뀌면서 btrim만으로는 부족해졌다.'
+\echo '--- 23b. normalize_nickname 자체의 성질'
+\echo '    사용자가 닉네임을 고칠 수 있게 되면서 정규형이 필수가 됐다(적용은 섹션 24).'
+\echo '    ⚠ 문자 집합은 has_visible_char의 클래스를 둘로 쪼갠 것이고, 합집합이 원본과 같아야 한다.'
 savepoint s;
-\echo '[alice-N 기대] ZWSP를 끼운 alice — 정규형이 alice가 되어 기존 alice와 충돌해야 한다'
-select pg_temp.mkuser(jsonb_build_object('name', 'ali' || U&'\200B' || 'ce'), null);
+\echo '[전부 t 기대] 지우는 문자(제로폭·BOM·soft hyphen)는 사라지고,'
+\echo '              빈 자리를 그리는 문자(NBSP·전각공백)는 보통 공백으로 접히며 연속 공백은 하나가 된다'
+select public.normalize_nickname('ali' || U&'\200B' || 'ce')      = 'alice'    as zwsp_removed,
+       public.normalize_nickname('ali' || U&'\00AD' || 'ce')      = 'alice'    as shy_removed,
+       public.normalize_nickname(U&'\FEFF' || 'alice')            = 'alice'    as bom_removed,
+       public.normalize_nickname(U&'\00A0' || 'alice')            = 'alice'    as nbsp_folded,
+       public.normalize_nickname('Chan' || U&'\3000' || 'Kim')    = 'Chan Kim' as ideographic_folded,
+       public.normalize_nickname('  Chan   Kim  ')                = 'Chan Kim' as spaces_collapsed,
+       public.normalize_nickname('Chan Kim')                      = 'Chan Kim' as inner_space_kept;
 rollback to s;
 savepoint s;
-\echo '[alice-N 기대] NBSP 선행 alice (20260801000006이 막았다고 선언한 그 사칭)'
-select pg_temp.mkuser(jsonb_build_object('name', U&'\00A0' || 'alice'), null);
+\echo '[t 기대] 멱등이다 — 트리거가 두 번 발화해도 값이 흔들리지 않아야 한다'
+select bool_and(public.normalize_nickname(n) = public.normalize_nickname(public.normalize_nickname(n)))
+  from (values ('  a' || U&'\00A0\200B' || ' b  '), ('alice'), (U&'\FEFF'), ('  ')) as v(n);
 rollback to s;
 savepoint s;
-\echo '[alice-N 기대] soft hyphen(U+00AD)을 끼운 alice'
-select pg_temp.mkuser(jsonb_build_object('name', 'ali' || U&'\00AD' || 'ce'), null);
+\echo '[0행 기대] 기존 행이 전부 정규형이다 (profiles_nickname_canonical)'
+select id, nickname from public.profiles where nickname <> public.normalize_nickname(nickname);
 rollback to s;
-savepoint s;
-\echo '[0행 기대] 정규형이 아닌 닉네임은 CHECK가 거부한다 (profiles_nickname_canonical)'
-select count(*) from public.profiles where nickname <> public.normalize_nickname(nickname);
+
+\echo ''
+\echo '=== 24. 프로필 편집 (20260809000001) ==='
+\echo '    편집 UI가 생기면서 20260801000006이 회수했던 UPDATE 권한을 되살렸다 —'
+\echo '    그때의 우려(사칭)를 정규형 CHECK가 막는지 함께 확인한다.'
+
+savepoint s; :login_alice
+\echo '[성공] 본인 닉네임 변경'
+update public.profiles set nickname = '왼발의마법사' where id = :'alice';
 rollback to s;
-savepoint s;
-\echo '[user 기대] name이 문자열이 아니면(배열·객체·숫자) 직렬화된 JSON이 닉네임이 되지 않는다'
-select pg_temp.mkuser('{"name":["a","b"]}'::jsonb, null);
+
+savepoint s; :login_alice
+\echo '[손흥민 기대] 앞뒤 공백·제로폭은 트리거가 다듬는다 (사용자 입력이 CHECK를 깨지 않게)'
+update public.profiles set nickname = '  손' || U&'\200B' || '흥민  ' where id = :'alice';
+reset role;
+select nickname from public.profiles where id = :'alice';
 rollback to s;
+
+savepoint s; :login_alice
+\echo '[UPDATE 0 기대] 남의 닉네임 변경 — RLS가 필터로 걸러 조용히 무시된다'
+update public.profiles set nickname = '탈취됨' where id = :'bob';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 남의 폴더를 아바타 경로로 지정 (profiles_avatar_path_own)'
+update public.profiles set avatar_path = :'bob' || '/x.webp' where id = :'alice';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[성공] 본인 폴더 아바타 경로'
+update public.profiles set avatar_path = :'alice' || '/a.webp' where id = :'alice';
+rollback to s;
+
+-- ⚠ starts_with만 쓰던 시절에는 아래가 전부 통과했고, URL을 만드는 순간 브라우저 파서가
+--   `..`를 정규화해 **남의 파일이 떴다**(실측). 아바타가 댓글·상세에 노출되면서 사칭 벡터가
+--   되므로 정규식으로 `{내 uuid}/{파일명}` 두 세그먼트를 강제한다.
+savepoint s; :login_alice
+\echo '[❌차단] 경로 탈출 — 내 폴더로 시작하지만 ..로 남의 폴더를 가리킨다'
+update public.profiles set avatar_path = :'alice' || '/../' || :'bob' || '/x.webp' where id = :'alice';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 세그먼트 3개 (하위 폴더)'
+update public.profiles set avatar_path = :'alice' || '/sub/x.webp' where id = :'alice';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 확장자 없는 파일명'
+update public.profiles set avatar_path = :'alice' || '/x' where id = :'alice';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 폴더만 있고 파일이 없다'
+update public.profiles set avatar_path = :'alice' || '/' where id = :'alice';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[성공] null 로 비우기 (사진 삭제 — 업로드 실패 시 정리 경로)'
+update public.profiles set avatar_path = null where id = :'alice';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] created_at 위조 (컬럼 권한 없음 — 수정 가능한 컬럼만 열었다)'
+update public.profiles set created_at = now() where id = :'alice';
+rollback to s;
+
 savepoint s;
-\echo '[Chan Kim 기대] 정상 이름의 내부 공백은 보존한다 (지우면 ChanKim이 된다)'
-select pg_temp.mkuser('{"name":"Chan Kim"}'::jsonb, null);
+\echo '[t 기대] 랜덤 닉네임이 배정되는가 — 프로바이더 표시 이름을 더 이상 읽지 않는다'
+insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data,
+                        encrypted_password, created_at, updated_at)
+values ('00000000-0000-0000-0000-0000000000fd', '00000000-0000-0000-0000-000000000000',
+        'authenticated', 'authenticated', null, '{"name":"홍길동"}'::jsonb, 'x', now(), now());
+select nickname <> '홍길동' as ignored_provider_name,
+       nickname = public.normalize_nickname(nickname) as canonical
+  from public.profiles where id = '00000000-0000-0000-0000-0000000000fd';
+rollback to s;
+
+\echo ''
+\echo '--- 24b. 아바타 스토리지 정책 (남의 폴더에 못 올린다)'
+savepoint s; :login_alice
+\echo '[❌차단] bob 폴더에 업로드'
+insert into storage.objects (bucket_id, name, owner)
+values ('avatars', :'bob' || '/hack.webp', :'alice');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[성공] 본인 폴더에 업로드'
+insert into storage.objects (bucket_id, name, owner)
+values ('avatars', :'alice' || '/me.webp', :'alice');
 rollback to s;
 
 rollback;

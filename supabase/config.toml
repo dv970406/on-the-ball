@@ -173,7 +173,11 @@ enable_signup = true
 # 익명 세션은 쓰지 않는다 — 익명 유저도 auth.uid()를 가져 로그인 판정이 흐려진다
 enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
-enable_manual_linking = false
+# ⚠ **켜 둔다.** 카카오·구글이 서로 다른 이메일을 주면 자동 연결(이메일 일치 + 검증)이 성립하지
+#   않아 같은 사람이 계정 2개를 갖게 된다. 프로필 화면에서 linkIdentity()로 직접 연결한다.
+#   ⚠ 한 번 계정이 갈린 뒤에는 수동 연결도 실패한다(auth.identities의 (provider, provider_id)
+#     유니크 제약) — 그래서 가입 직후에 연결을 유도한다.
+enable_manual_linking = true
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
 minimum_password_length = 6
 # Passwords that do not meet the following requirements will be rejected as weak. Supported values

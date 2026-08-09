@@ -146,16 +146,19 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_path: string | null
           created_at: string
           id: string
           nickname: string
         }
         Insert: {
+          avatar_path?: string | null
           created_at?: string
           id: string
           nickname: string
         }
         Update: {
+          avatar_path?: string | null
           created_at?: string
           id?: string
           nickname?: string
@@ -169,7 +172,9 @@ export type Database = {
     Functions: {
       has_visible_char: { Args: { p_text: string }; Returns: boolean }
       increment_post_view: { Args: { p_post_id: number }; Returns: undefined }
+      normalize_nickname: { Args: { p_text: string }; Returns: string }
       post_is_alive: { Args: { p_id: number }; Returns: boolean }
+      random_nickname: { Args: never; Returns: string }
       soft_delete_post: { Args: { p_post_id: number }; Returns: undefined }
       toggle_post_like: { Args: { p_post_id: number }; Returns: boolean }
     }
