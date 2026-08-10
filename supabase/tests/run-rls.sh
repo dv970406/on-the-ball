@@ -24,15 +24,23 @@ src = pathlib.Path("supabase/tests/rls.sql").read_text().splitlines()
 err = pathlib.Path(sys.argv[2]).read_text()
 errlines = {int(m.group(1)) for m in re.finditer(r"psql:supabase/tests/rls\.sql:(\d+): ERROR", err)}
 blocked = re.compile(r"echo '\[(❌차단|거부 기대)")
+any_label = re.compile(r"^\s*\\echo '\[")
 
-# 라벨 위치 → 그 아래 12줄 안에 에러가 났는지로 판정한다(한 검사가 그보다 길지 않다)
-labels = [(i + 1, l.strip()[:80]) for i, l in enumerate(src) if blocked.search(l)]
-missed = [(ln, l) for ln, l in labels if not any(x in errlines for x in range(ln + 1, ln + 13))]
+# ⚠ 각 라벨의 판정 범위는 **다음 라벨 직전까지**다. 고정 줄수(12줄)로 잡았더니 검사가 촘촘한
+#   구간에서 **다음 검사의 ERROR를 자기 것으로 오인**해, 실제로는 통과해 버린 검사를
+#   "차단됨"으로 보고했다(섹션 12가 그렇게 새어나갔다). 창을 라벨 경계로 자른다.
+label_lines = [i + 1 for i, l in enumerate(src) if any_label.search(l)]
+def scope(ln):
+    nxt = next((x for x in label_lines if x > ln), len(src) + 1)
+    return range(ln + 1, nxt)
+
+labels = [(ln, src[ln - 1].strip()[:80]) for ln in label_lines if blocked.search(src[ln - 1])]
+missed = [(ln, l) for ln, l in labels if not any(x in errlines for x in scope(ln))]
 
 unexpected = []
 for ln in sorted(errlines):
-    lab = next((src[i] for i in range(ln - 1, max(-1, ln - 12), -1)
-                if src[i].lstrip().startswith("\\echo '[")), None)
+    owner = max((x for x in label_lines if x < ln), default=None)
+    lab = src[owner - 1] if owner else None
     if not lab or not blocked.search(lab):
         unexpected.append((ln, (lab or "(라벨 없음)").strip()[:80]))
 

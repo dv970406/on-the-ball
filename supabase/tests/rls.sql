@@ -322,15 +322,11 @@ update public.profiles set nickname = 'x' where id = :'alice';
 rollback to s;
 
 \echo ''
-\echo '=== 12. profiles — 닉네임은 가입 트리거가 정한 값으로 고정된다 ==='
-savepoint s; :login_alice
-\echo '[❌차단] 본인 닉네임 변경 (편집 UI가 없어 권한을 회수했다)'
-update public.profiles set nickname = 'alice-new' where id = :'alice';
-rollback to s;
-savepoint s; :login_alice
-\echo '[❌차단] 남의 닉네임 변경'
-update public.profiles set nickname = 'stolen' where id = :'bob';
-rollback to s;
+\echo '=== 12. profiles — 행 자체는 가입/탈퇴 트리거만 만들고 지운다 ==='
+\echo '    ⚠ 이 섹션은 한때 "닉네임 변경 차단"을 검사했다(편집 UI가 없어 20260801000006이'
+\echo '      UPDATE 권한을 회수했던 시절). 20260809000001이 편집 UI와 함께 권한을 되살려'
+\echo '      그 검사는 거짓이 됐다 — 실행하면 UPDATE 1로 통과하는데도 "차단됨"으로 보였다.'
+\echo '      수정 권한 검사는 섹션 24가 갖는다. 여기는 insert/delete만 본다.'
 savepoint s; :login_alice
 \echo '[❌차단] profiles 직접 insert (가입 트리거 전용)'
 insert into public.profiles (id, nickname) values (gen_random_uuid(), 'ghost');
