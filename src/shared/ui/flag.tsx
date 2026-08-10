@@ -1,3 +1,4 @@
+import { COLOR } from "@/shared/config";
 import { cn } from "@/shared/lib";
 
 /** 지원 국기 코드 — 프로토타입 인라인 SVG 18개국 이식 */
@@ -189,8 +190,10 @@ function flagShapes(code: string) {
         </>
       );
     default:
-      // 미지원 코드는 회색 placeholder
-      return <rect width="30" height="20" fill="#dfdfdf" />;
+      // 미지원 코드는 회색 placeholder.
+      // ⚠ 이 파일의 다른 hex는 전부 국기 색(콘텐츠라 허용)이지만 이건 헤어라인 색이라
+      //   토큰과 같은 값을 하드코딩하면 안 된다 → COLOR 참조(styling.md)
+      return <rect width="30" height="20" fill={COLOR.hairline} />;
   }
 }
 

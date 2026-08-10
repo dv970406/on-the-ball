@@ -1,6 +1,8 @@
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { cn } from "@/shared/lib";
+// ⚠ 배럴이 아니라 직접 경로다 — 이 파일에 "use client"를 붙이지 않은 이유가 서버 렌더 여지를
+//   남기기 위해서인데(architecture.md), 배럴을 쓰면 그 여지를 스스로 좁힌다.
+import { cn } from "@/shared/lib/cn";
 
 /**
  * 마크다운 렌더러.

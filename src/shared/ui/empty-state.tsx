@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { cn } from "@/shared/lib";
+// ⚠ 배럴이 아니라 직접 경로다 — `@/shared/lib`는 "use client" 훅을 포함하는데 이 컴포넌트는
+//   서버에서 렌더된다(app/not-found.tsx). 배럴 자신이 index.ts에 "서버는 여기서 import 금지"를
+//   적어 두었고, 같은 디렉터리의 button-class.ts가 같은 이유로 직접 경로를 쓴다.
+import { cn } from "@/shared/lib/cn";
 import { Icon } from "./icon";
 import { Button } from "./button";
 

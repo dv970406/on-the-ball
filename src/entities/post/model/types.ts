@@ -21,8 +21,6 @@ export type PostCategory = PostRow["category"];
 /**
  * 칩 레일 노출 순서. 값 자체는 스키마에서 오지만 **순서는 디자인이 정한다**.
  * satisfies로 묶어 두어 enum에 없는 값을 적으면 컴파일 에러가 난다.
- * ⚠ 반대 방향(enum에 값이 추가됐는데 여기 빠뜨림)은 이 배열이 잡아주지 못한다 —
- *   Record<PostCategory, ...> 형태의 맵이 있다면 그쪽이 잡는다.
  */
 export const POST_CATEGORIES = [
   "이적설",
@@ -31,6 +29,23 @@ export const POST_CATEGORIES = [
   "유니폼",
   "잡담",
 ] as const satisfies readonly PostCategory[];
+
+/**
+ * ⚠ **반대 방향을 막는 검사다.** `satisfies`는 "없는 값을 적으면" 잡지만
+ *   "enum에 있는 값을 빠뜨리면" 못 잡는다. 그대로 두면 `alter type ... add value`로
+ *   말머리를 추가하고 위 배열에 안 넣었을 때 **칩 레일과 작성 폼에서 조용히 빠지고**,
+ *   `z.enum(POST_CATEGORIES)`가 그 값을 거부해 수정도 막힌다.
+ *   `POST_SORT_LABEL`은 `Record<PostSort, …>`라 망라성이 보장되는데 여기만 비대칭이었다.
+ *
+ * ⚠ **타입 별칭만 선언하면 아무것도 검사하지 못한다**(`type X = never`는 그냥 선언일 뿐이다).
+ *   실제로 컴파일 에러를 내려면 그 타입에 **값을 할당**해야 한다. 처음에 별칭만 두었다가
+ *   음성 대조(값을 일부러 빼고 tsc)로 무력함을 확인하고 이 형태로 바꿨다.
+ *   `satisfies`는 반대 방향(없는 값)만 잡으므로 둘이 함께 있어야 양방향이 닫힌다.
+ */
+const _CATEGORIES_EXHAUSTIVE: Exclude<PostCategory, (typeof POST_CATEGORIES)[number]> extends never
+  ? true
+  : never = true;
+void _CATEGORIES_EXHAUSTIVE;
 
 /** 목록 정렬 — 화면의 "최신 / 인기 / 댓글순"에 1:1 대응 */
 export const POST_SORTS = ["latest", "popular", "comments"] as const;
