@@ -247,7 +247,11 @@ src/
 - **`shared/lib`**: `cn` · `useDelayedReveal`(선택→지연→리빌 시퀀스) · `useScrollRestore`(탭 스크롤 복원)
 - **`shared/config`**: `ROUTES` 경로 헬퍼 · `COLOR` JS 색 상수
 - **디자인 시스템 전체**: `src/app/styles/globals.css`의 Tailwind v4 `@theme` 토큰, Pretendard 서브셋 92개 + JetBrains Mono
-- **`design_handoff_ontheball/`**: 하이파이 프로토타입(화면 6종 jsx + 디자인 토큰 CSS) — v1의 원본 소스
+- **`design_handoff_ontheball/`**: 하이파이 프로토타입(화면 6종 jsx + 디자인 토큰 CSS) — v1의 원본 소스.
+  ⚠ 이 디렉터리는 현재 저장소에 없다(있는 것은 v2용 `handoff_community/`).
+  **v1 청산(`fb96ce6`, 2026-08-01)과는 별건이다** — 그때는 그대로 남아 있었고,
+  사흘 뒤 프로토타입을 교체한 `6de2618`(2026-08-04)이 지웠다.
+  실물은 `6de2618^` 이전 이력에서 꺼낸다(`git show 6de2618^:design_handoff_ontheball/...`).
 
 ### v1 프론트에서 특기할 만한 처리
 

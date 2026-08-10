@@ -67,7 +67,7 @@
 ```bash
 pnpm install
 supabase start                          # 로컬 스택 기동 (643xx 포트)
-supabase db reset                       # 마이그레이션 9개 적용
+supabase db reset                       # 마이그레이션 적용 + seed.sql 자동 실행
 # 계정(alice/bob)·글·댓글은 supabase/seed.sql이 db reset 때 자동으로 넣는다
 pnpm dev
 ```
@@ -131,7 +131,8 @@ pnpm dev
 ```
 app/                     # Next.js 라우팅 전용 (view만 마운트)
 ├── (auth)/              #   sign-in (GuestOnly 셸). 소셜 로그인 복귀 지점이기도 하다
-└── posts/               #   목록 · new · [id] · [id]/edit
+├── posts/               #   목록 · new · [id] · [id]/edit
+└── profile/             #   닉네임·사진 수정 + 계정 연결. 계정 연결의 복귀 지점
 proxy.ts                 # 세션 쿠키 리프레시 + 낙관적 라우트 가드 (Next 16의 middleware)
 src/
 ├── app/                 # providers(QueryClient + AuthProvider), fonts, globals.css
@@ -145,6 +146,7 @@ supabase/
 ├── migrations/          # 10개 (스키마 = 보안 설계)
 ├── seed.sql             # db reset이 자동 실행 (계정·글·댓글·좋아요)
 └── tests/               # run-rls.sh · rls.sql · concurrency.sh
+handoff_community/       # 디자인 핸드오프 레퍼런스 (구현 대상 아님 — 린트 제외)
 docs/
 ├── conventions/         # 코딩 컨벤션 7종
 ├── oauth-setup.md       # 카카오·구글 앱 등록 → 키 → 검증 절차

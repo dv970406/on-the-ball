@@ -61,7 +61,7 @@ export function SubHeader({ title, fallbackHref = ROUTES.home, actions }: SubHea
   return (
     // ⚠ 배경은 불투명이다. blur는 하단 탭바에서만 허용된다(핸드오프 6-3) —
     //   전에 쓰던 bg-canvas/92 + backdrop-blur를 걷어냈다.
-    // ⚠ z는 핸드오프의 스케일을 따른다: 앱바 5 < 서브헤더 20 < 하단바 60.
+    // ⚠ z는 핸드오프의 스케일을 따른다: 앱바 5 < 서브헤더 20 < 하단바 70 < 오버레이 80.
     <header className="sticky top-0 z-20 flex items-center gap-0.5 border-b border-hairline-cool bg-canvas px-2 pb-2.5 pt-[max(16px,env(safe-area-inset-top))]">
       <button
         type="button"

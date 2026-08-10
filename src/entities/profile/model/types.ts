@@ -10,7 +10,7 @@ export interface MyProfile {
   /**
    * avatars 버킷 안의 **경로**다(전체 URL이 아니다).
    * 호스트가 환경마다 다르므로(로컬 127.0.0.1:64321 ↔ 원격 supabase.co) URL은 화면이 조립한다.
-   * → `avatarUrl(path)` (entities/profile/lib/avatar-url)
+   * → `avatarUrl(path)` (`@/shared/config` — entities 셋이 함께 써야 해서 shared에 있다)
    */
   avatarPath: ProfileRow["avatar_path"];
 }

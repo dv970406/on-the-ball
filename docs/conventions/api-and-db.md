@@ -40,7 +40,7 @@ pnpm db:types   # supabase gen types --local --schema public > src/types/databas
 - **UPDATE 정책에는 `with check`를 반드시 함께 둔다.** 없으면 `author_id`를 남의 uuid로 바꾸는 소유권 이전이 가능하다.
 - **zod는 UX이지 방어가 아니다.** 길이 제한은 DB `check` 제약으로도 반드시 건다(두 값이 어긋나면 클라는 통과하고 서버가 거부한다).
 - `(select auth.uid())`로 감싼다 — 행마다 재평가되지 않고 InitPlan으로 승격되어 쿼리당 1회 평가된다(Supabase 공식 성능 권고).
-- 정책을 고치면 **`supabase/tests/rls.sql`을 다시 돌린다**. 실패를 기대하는 검사마다 savepoint를 쓴다(없으면 첫 에러가 트랜잭션을 abort시켜 뒤쪽 검사가 전부 무의미해진다).
+- 정책을 고치면 **`bash supabase/tests/run-rls.sh`를 돌린다**(`rls.sql`을 직접 `psql`로 돌리지 말 것 — 래퍼가 결과를 양방향으로 대조해 준다). 실패를 기대하는 검사마다 savepoint를 쓴다(없으면 첫 에러가 트랜잭션을 abort시켜 뒤쪽 검사가 전부 무의미해진다).
 
 ### RLS 위반은 에러가 아니라 0행이다
 
@@ -140,23 +140,45 @@ RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 
 
 ## SECURITY DEFINER RPC
 
-쓰기가 RLS를 넘어야 할 때만 RPC로 내린다. `security definer` 함수의 **전량**은 다음과 같다 — 새로 만들면 여기에 추가한다.
+쓰기가 RLS를 넘어야 할 때만 RPC로 내린다. `security definer` 함수의 **전량은 8개**다 — 새로 만들면 여기에 추가한다.
+
+> 검증: `select proname, prosecdef from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public'`
+> — 표와 실제가 갈리면 **보안 표면 목록이 거짓이 된 것**이다(실제로 3건이 잘못 올라와 있었다).
 
 | 종류 | 함수 | 비고 |
 |---|---|---|
 | RPC(클라이언트가 직접 호출) | `toggle_post_like` · `soft_delete_post` · `increment_post_view` | `increment_post_view`만 anon에 열려 있다(아래 예외 항목) |
-| 트리거 | `sync_post_like_count` · `sync_post_comment_count` · `touch_updated_at` · `check_comment_depth` | `post`·`post_like`·`comment` |
+| 트리거 | `sync_post_like_count` · `sync_post_comment_count` · `check_comment_depth` | `post_like`·`comment` |
 | 트리거 | **`handle_new_user`** (`on_auth_user_created`, `after insert on auth.users`) | 가입 시 `profiles` 행 생성. **호출자 권한으로 돌면 `profiles` insert 권한이 없어 가입 자체가 실패한다** |
-| 트리거 | `normalize_profile_nickname` (`profiles_normalize_nickname`) | 쓰기 직전 닉네임 정규화 — 사용자 입력이 CHECK를 깨지 않게 |
-| 순수 헬퍼 | `random_nickname()` (`volatile`) | 가입 시 배정하는 축구 테마 랜덤 닉네임 |
 | 정책 헬퍼 | `post_is_alive` (`stable`) | `comment`의 select·insert 정책이 공유 — 인라인 서브쿼리를 쓰지 않는 이유는 아래 참고 |
 
-⚠ **`has_visible_char`는 이 목록이 아니다.** CHECK 제약 평가 함수라 성질이 다르고, 오히려 **쓰기 권한이 있는 역할에 EXECUTE를 열어야** 한다(바로 아래 항목).
+⚠ **아래 셋은 한때 이 표에 잘못 올라와 있었다** — 셋 다 `security definer`가 아니다.
+권한 없이도 도는 함수를 "RLS를 우회하는 함수"로 세어두면 보안 검토가 헛돈다.
+
+| 함수 | 왜 definer가 아닌가 |
+|---|---|
+| `touch_updated_at` | 트리거지만 자기 행의 `updated_at`만 채운다 → 권한 상승이 필요 없다 |
+| `normalize_profile_nickname` | 쓰기 직전 `new.nickname`을 다듬을 뿐이라 호출자 권한으로 충분하다 |
+| `random_nickname` | 인자도 테이블 접근도 없는 순수 조합 생성기 |
+
+⚠ **`has_visible_char`·`normalize_nickname`은 처음부터 이 목록이 아니다**(잘못 올라와 있던 게 아니다).
+**CHECK 제약 평가 함수**라 성질이 반대다 — definer로 만들 게 아니라 오히려
+**그 테이블에 쓰는 역할에 EXECUTE를 열어야** 한다(바로 아래 항목).
 
 - **유저 id를 인자로 받지 않는다.** `security definer`는 RLS를 우회하므로 유저를 클라이언트가 넘기면 남의 명의로 조작할 수 있다. 함수 안에서 `auth.uid()`로 확정한다 — PostgREST가 access token을 검증해 `request.jwt.claims`에 심어둔 값이라 위조가 불가능하다. `security definer`가 바꾸는 것은 "무엇을 할 수 있는가"(권한)이지 "누가 호출했는가"(세션 컨텍스트)가 아니다.
 - **`set search_path = ''` + `public.` 접두사.** 호출자가 search_path를 조작해 다른 스키마의 동명 테이블을 붙잡게 만드는 권한 상승을 막는다.
 - **`revoke execute from public, anon`.** 함수는 기본적으로 PUBLIC에 EXECUTE가 부여된다 — 그대로 두면 비로그인도 호출한다.
-  - ⚠ **예외 1건: `increment_post_view`는 anon에도 열려 있다.** 이 시스템의 **유일한 비로그인 쓰기 경로**이고, "anon은 어디에도 쓸 수 없다"는 전제가 여기서만 깨진다(`rls.sql` 섹션 17d의 화이트리스트에 등재). 조회는 비로그인이 대부분이라 authenticated 전용으로 두면 숫자가 의미를 잃기 때문이다.
+  - ⚠ **anon에 EXECUTE가 열린 함수는 전부 4개**이고, 그게 `rls.sql` 섹션 17d의 화이트리스트다.
+    definer는 그중 둘뿐이니 "definer 2개"로만 세면 안 된다.
+
+    | 함수 | definer? | 왜 열려 있나 |
+    |---|:---:|---|
+    | `increment_post_view` | ✅ | **유일한 비로그인 쓰기 경로**(아래) |
+    | `post_is_alive` | ✅ | 비로그인 select 정책이 부르는 **정책 평가 함수** — 읽기 판정만 한다 |
+    | `has_visible_char` | — | **CHECK 제약 평가** — 닫으면 그 테이블의 쓰기가 전부 42501로 죽는다 |
+    | `normalize_nickname` | — | 〃 (CHECK + before-write 트리거) |
+
+  - ⚠ **쓰기 예외는 `increment_post_view` 하나뿐이다.** "anon은 어디에도 쓸 수 없다"는 전제가 여기서만 깨진다. 조회는 비로그인이 대부분이라 authenticated 전용으로 두면 숫자가 의미를 잃기 때문이다.
   - 대가로 **`view_count`는 curl 루프로 부풀릴 수 있는 대략치**다 — 트리거가 단독 관리하는 `like_count`·`comment_count`와 **신뢰 수준이 다르다.** 이 차이는 컬럼 주석에도 적혀 있다. 정확도가 필요해지면 `(post_id, viewer_hash, viewed_on)` 로그 테이블이 필요하다.
 - **에러 코드 규약**: 우리가 의도적으로 띄우는 한국어 메시지는 **`P0001`** 로 던진다(`toDbErrorMessage`가 그대로 노출한다). `42501`은 Postgres 자신의 영어 권한 거부용으로 남겨둔다.
 

@@ -344,8 +344,9 @@ client_id = "env(SUPABASE_AUTH_EXTERNAL_KAKAO_CLIENT_ID)"
 # 카카오 로그인 → 보안 → **Client Secret**(활성화 상태여야 한다)
 secret = "env(SUPABASE_AUTH_EXTERNAL_KAKAO_SECRET)"
 # ⚠ 카카오의 이메일 제공은 **별도 심사 항목**이라 승인 전에는 이메일이 오지 않는다.
-#   false로 두면 그 사용자들의 로그인이 통째로 실패한다. 닉네임은 이메일이 아니라
-#   raw_user_meta_data에서 뽑으므로(handle_new_user) 이메일이 없어도 화면은 정상이다.
+#   false로 두면 그 사용자들의 로그인이 통째로 실패한다. 닉네임은 가입 시
+#   random_nickname()이 배정하므로(handle_new_user — 프로바이더 값을 아예 읽지 않는다)
+#   이메일이 없어도 화면은 정상이다. 프로필의 "로그인 계정" 줄만 비어 보인다.
 email_optional = true
 
 [auth.external.google]

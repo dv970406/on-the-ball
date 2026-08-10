@@ -47,12 +47,16 @@
 - `AuthProvider` — `onAuthStateChange` ↔ 스토어 동기화. `QueryClientProvider` 안쪽에 둔다.
 - `AuthRequired` / `GuestOnly` — 클라이언트 라우트 가드.
 - `toAuthErrorMessage` — supabase `AuthError` → 한국어. **`toDbErrorMessage`와 합치지 않는다**(데이터가 다르다).
+  ⚠ 새 인증 흐름을 붙이면 **여기 커버리지부터 확인한다** — identity 코드를 빠뜨렸더니 "이미 다른 계정에 연결됨"처럼 재시도로 절대 안 풀리는 실패가 "잠시 후 다시 시도"로 접혔다.
+- **`useLinkedIdentitiesQuery(userId)` / `identityKeys`** — 연결된 로그인 수단 조회. 조회는 여기, 쓰기(연결·해제)는 `features/link-identity`다(`entities/post` ↔ `features/toggle-post-like`와 같은 분업). ⚠ 키를 **userId로 스코프**한다 — 계정 전환 시 이전 사용자의 목록이 노출되지 않게.
 
 ## `@/entities/post` · `@/entities/comment`
 - `postKeys` / `commentKeys` — 쿼리 키. 낙관적 업데이트가 prefix 매칭에 의존하므로 계층을 지킨다.
 - `usePostListQuery` / `usePostQuery` / `useCommentListQuery` / `useTodayPostCountQuery`
 - `POST_LIST_LIMIT` / `COMMENT_LIST_LIMIT` — 목록 상한. **화면이 잘림을 안내해야 한다** — 조용히 자르면 그 뒤 항목은 URL을 아는 사람 말고는 도달할 방법이 없다.
 - `POST_LIST_SELECT` / `POST_DETAIL_SELECT` / `COMMENT_SELECT` — PostgREST select 문자열의 단일 소스.
+  - ⚠ **아바타(`avatar_path`)는 상세·댓글에만 있고 목록에는 일부러 없다** — 목록 카드에 아바타 자리가 없어서다(프로토타입). 누락이 아니니 되넣지 말 것. 그래서 임베딩도 `AUTHOR_EMBED`(목록)와 `AUTHOR_EMBED_DETAIL`(상세)로 갈라져 있다.
+  - ⚠ **여기에 profiles 컬럼을 추가하면 `features/update-profile`의 무효화 대상도 함께 늘려야 한다.** 프로필을 바꿔도 이 캐시는 저절로 갱신되지 않아 옛 값이 남는다.
 - `buildPostListItem` / `buildPostDetail` / `buildComment` — row(snake) → 도메인(camel).
 - `isEdited` — `created_at !== updated_at` 판정("수정됨" 표시).
 - **`POST_CATEGORIES` / `POST_SORTS` / `POST_SORT_LABEL`** — 말머리·정렬의 단일 소스. 말머리는 **DB의 `post_category` enum에서 생성된 타입**이라 목록을 손으로 다시 적지 않는다(`Record<PostCategory, ...>` 맵이 값 추가 시 누락을 컴파일 에러로 잡아준다).
