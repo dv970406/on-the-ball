@@ -72,7 +72,11 @@ export function PostDetailView({ postId }: { postId: number }) {
   useRecordPostView(postId);
 
   const header = (extra?: React.ReactNode) => (
-    <SubHeader title={post?.category ?? "게시글"} fallbackHref={ROUTES.postList} actions={extra} />
+    <SubHeader
+      title={post?.category ?? "게시글"}
+      fallbackHref={ROUTES.postList}
+      actions={extra}
+    />
   );
 
   if (isPending) {
@@ -116,7 +120,10 @@ export function PostDetailView({ postId }: { postId: number }) {
       <>
         {header()}
         <main>
-          <EmptyState title="글을 찾을 수 없어요" description="삭제되었거나 없는 글이에요." />
+          <EmptyState
+            title="글을 찾을 수 없어요"
+            description="삭제되었거나 없는 글이에요."
+          />
         </main>
       </>
     );
@@ -181,8 +188,11 @@ export function PostDetailView({ postId }: { postId: number }) {
                   {post.authorNickname}
                 </div>
                 <div className="mt-0.5 font-mono text-[10px] tabular-nums tracking-[0.2px] text-ink-mute-2">
-                  <time dateTime={post.createdAt}>{formatRelativeTime(post.createdAt)}</time>
-                  {isEdited(post) && " · 수정됨"} · 조회 {formatCount(post.viewCount)}
+                  <time dateTime={post.createdAt}>
+                    {formatRelativeTime(post.createdAt)}
+                  </time>
+                  {isEdited(post) && " · 수정됨"} · 조회{" "}
+                  {formatCount(post.viewCount)}
                 </div>
               </div>
               {/*
@@ -216,8 +226,14 @@ export function PostDetailView({ postId }: { postId: number }) {
           */}
           {/* -mx-5 px-5: article의 좌우 패딩 안에 있으면서 헤어라인만 화면 끝까지 긋는다 */}
           <footer className="-mx-5 mt-[22px] flex items-center gap-2 border-y border-hairline-cool px-5 py-3.5">
-            <LikeButton postId={post.id} likeCount={post.likeCount} isLiked={post.isLiked} />
-            <ActionChip icon={MessageCircle} aria-label="댓글 수">
+            <LikeButton
+              postId={post.id}
+              likeCount={post.likeCount}
+              isLiked={post.isLiked}
+            />
+            {/* ⚠ 표시 전용이다 — 누를 수 있는데 아무 일도 안 일어나면 고장으로 읽힌다.
+                  옆의 저장 칩과 같이 disabled로 둔다(댓글은 바로 아래에 이어진다). */}
+            <ActionChip icon={MessageCircle} aria-label="댓글 수" disabled>
               {formatCount(post.commentCount)}
             </ActionChip>
             {/* 저장(북마크)은 DB에 테이블이 없다 — 자리만 두고 토스트를 발명하지 않는다 */}
@@ -247,7 +263,11 @@ export function PostDetailView({ postId }: { postId: number }) {
         onRestoreReply={setReplyTo}
       />
 
-      <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} label="글 메뉴">
+      <Sheet
+        open={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        label="글 메뉴"
+      >
         {isMine ? (
           <>
             <SheetItem
@@ -312,7 +332,10 @@ export function PostDetailView({ postId }: { postId: number }) {
 
       {deletePost.error && (
         // 하단 고정 댓글 입력(z-60) 위, 오버레이(80~95) 아래 — 시트가 열린 동안은 가려도 된다
-        <p role="alert" className="absolute inset-x-0 bottom-24 z-[66] px-5 text-center text-[12px] text-crimson">
+        <p
+          role="alert"
+          className="absolute inset-x-0 bottom-24 z-[66] px-5 text-center text-[12px] text-crimson"
+        >
           {deletePost.error.message}
         </p>
       )}

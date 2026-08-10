@@ -29,6 +29,18 @@ export function LikeButton({ postId, likeCount, isLiked }: LikeButtonProps) {
   const pathname = usePathname();
   const toggleLike = useTogglePostLike(postId);
 
+  // ⚠ 세션 복원 전(`loading`)에는 **판단을 미룬다.** 비로그인과 똑같이 다루면 로그인한
+  //   사용자가 콜드 로드 직후 하트를 눌렀을 때 로그인 화면으로 튄다(같은 화면의 CommentBar는
+  //   이미 loading을 따로 다룬다 — 두 컴포넌트의 판정이 갈리면 안 된다).
+  if (status === "loading") {
+    return (
+      <span className={actionChipClassName({ className: "opacity-40" })}>
+        <Icon as={Heart} size={15} />
+        {formatCount(likeCount)}
+      </span>
+    );
+  }
+
   // 비로그인은 아예 로그인으로 유도한다 — 훅의 RPC 호출은 어차피 DB가 거부한다.
   // Link 안에 button을 넣지 않으므로 클래스만 공유한다(buttonClassName과 같은 패턴).
   if (status !== "authenticated") {

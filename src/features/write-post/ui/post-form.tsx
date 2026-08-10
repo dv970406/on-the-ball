@@ -66,7 +66,6 @@ export function PostForm({
   const [title, setTitle] = useState(initial?.title ?? "");
   const [content, setContent] = useState(initial?.content ?? "");
   const [fieldErrors, setFieldErrors] = useState<PostFieldErrors>({});
-  const [savedAt, setSavedAt] = useState("");
   const [askLeave, setAskLeave] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
@@ -84,29 +83,18 @@ export function PostForm({
   const dirty = title.length > 0 || content.length > 0 || category !== "";
 
   /**
-   * **초기값에서 실제로 바뀌었는지** — 임시저장 캡션 전용이다.
-   *
-   * ⚠ `dirty`로 판정하면 안 된다. 수정 모드는 `initial`이 채워진 채 시작하므로 dirty가
-   *   마운트부터 참이라, **아무것도 건드리지 않았는데 900ms 뒤 "임시저장됨"이 떴다.**
-   *   실제 저장 기능이 없는 자리표시라(핸드오프 7장) 하지도 않은 저장을 했다고 말하는 셈이다.
-   *   `dirty`는 이탈 확인용으로 그대로 둔다 — 두 판정의 목적이 다르다.
-   */
-  const changed =
-    title !== (initial?.title ?? "") ||
-    content !== (initial?.content ?? "") ||
-    category !== (initial?.category ?? "");
-
-  /**
    * 등록 버튼 활성 조건 — **저렴한 검사만** 한다.
    * 진짜 검증(zod)은 제출 시점의 validatePost가 하므로 여기서 또 돌릴 이유가 없다.
    * 두 판정이 갈리지 않도록 기준은 postSchema와 같은 것을 쓴다(hasVisibleChar·코드포인트 길이).
    */
+  // ⚠ 길이는 **trim한 뒤** 잰다. zod가 `.trim()` 후 검사하므로 원본으로 재면 판정이 갈린다 —
+  //   120자 제목 끝에 공백이 딸려오면(붙여넣기에서 흔하다) zod는 통과시키는데 버튼만 죽었다.
   const ready =
     category !== "" &&
     hasVisibleChar(title) &&
-    codePointLength(title) <= TITLE_MAX &&
+    codePointLength(title.trim()) <= TITLE_MAX &&
     hasVisibleChar(content) &&
-    contentLength <= CONTENT_MAX;
+    codePointLength(content.trim()) <= CONTENT_MAX;
 
   /** 본문 textarea 자동 높이 확장 — scrollHeight를 그대로 반영한다 */
   useEffect(() => {
@@ -116,12 +104,9 @@ export function PostForm({
     el.style.height = `${el.scrollHeight}px`;
   }, [content]);
 
-  /** 임시저장 캡션 — 입력이 멎고 900ms 뒤에 뜬다(실제 저장은 하지 않는다, 핸드오프 7장) */
-  useEffect(() => {
-    if (!changed) return;
-    const timer = setTimeout(() => setSavedAt("임시저장됨 · 방금"), 900);
-    return () => clearTimeout(timer);
-  }, [changed, category, title, content]);
+  // ⚠ 프로토타입에는 "임시저장됨 · 방금" 캡션이 있었지만 **저장 기능이 없어서 걷어냈다.**
+  //   저장 로직·임시저장함 화면·복원 경로가 전부 없는데 캡션만 띄우면, 사용자가 그 말을 믿고
+  //   이탈해 작성물을 잃는다. 초안 저장을 실제로 붙일 때 캡션도 함께 되살린다.
 
   /**
    * 중복 제출 동기 가드.
@@ -166,10 +151,16 @@ export function PostForm({
 
         <form onSubmit={handleSubmit}>
           <header className="sticky top-0 z-20 flex items-center border-b border-hairline-cool bg-canvas px-2 pb-2.5 pt-[max(16px,env(safe-area-inset-top))]">
+            {/*
+              ⚠ 저장 중에는 취소도 막는다. 뮤테이션을 중단할 방법이 없어서, 저장 왕복 중에
+                나가면 **화면만 돌아가고 INSERT/UPDATE는 그대로 커밋된다**(사용자는 취소했다고
+                믿는다). 작성 모드는 언마운트로 호출부 콜백까지 죽어 토스트도 안 뜬다.
+            */}
             <button
               type="button"
               onClick={handleCancel}
-              className="px-2.5 py-2 text-sm font-medium text-ink-mute"
+              disabled={isPending}
+              className="px-2.5 py-2 text-sm font-medium text-ink-mute disabled:opacity-40"
             >
               취소
             </button>
@@ -286,8 +277,6 @@ export function PostForm({
                 {error.message}
               </p>
             )}
-
-            <p className="mt-5 font-mono text-[10px] tracking-[0.3px] text-ink-faint">{savedAt}</p>
           </div>
         </form>
       </main>
@@ -323,7 +312,7 @@ export function PostForm({
         onCancel={() => setAskLeave(false)}
         onConfirm={onCancel}
         title="작성을 그만둘까요?"
-        description="지금까지 쓴 내용은 임시저장함에 남겨둘게요."
+        description="지금 나가면 작성 중인 내용이 사라져요."
         cancelLabel="계속 쓰기"
         confirmLabel="나가기"
       />

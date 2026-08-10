@@ -42,29 +42,49 @@ export function CommentSection({
   // 목록은 최근 COMMENT_LIST_LIMIT개만 가져오므로 헤딩 카운트는 글의 값(트리거가 관리)을 쓴다 —
   // comments.length를 쓰면 상단 헤딩과 액션 바 숫자가 어긋난다.
   //
-  // ⚠ 잘림 판정은 **목록 길이만으로** 한다. `commentCount > comments.length`로 하면,
-  //   댓글 작성 후 글 상세와 댓글 목록이 병렬로 무효화되는 사이 상세가 먼저 도착했을 때
-  //   (카운트 6 / 목록 5) 댓글 6개짜리 글에 "최근 200개만 표시" 문구가 잘못 뜬다.
-  const truncated = (comments?.length ?? 0) >= COMMENT_LIST_LIMIT;
+  // ⚠ 잘림 판정은 **두 조건을 **함께** 본다. 목록 길이만 보면 정확히 200개일 때(잘린 게 없는데)도 뜨고,
+  //   카운트만 보면 위 레이스에서 잘못 뜬다. 상한에 닿았고 **동시에** 실제 총합이 더 클 때만 참이다.
+  const truncated =
+    (comments?.length ?? 0) >= COMMENT_LIST_LIMIT && commentCount > (comments?.length ?? 0);
   const threads = comments ? buildCommentThreads(comments) : undefined;
 
   /**
    * 삭제 중복 실행 동기 가드 — PostForm·CommentBar·글 삭제와 같은 패턴.
    *
-   * ⚠ `disabled={busy}`만으로는 못 막는다. isPending은 **렌더 이후에야** DOM에 반영되는데
-   *   TanStack Query의 상태 변경은 마이크로태스크로 배치되므로 같은 tick의 두 번째 클릭이
-   *   아직 enabled인 버튼을 누른다. 두 번째 DELETE는 이미 지워진 행이라 0행이 되고,
-   *   use-delete-comment가 그걸 에러로 승격해 **권한이 있었는데도
-   *   "삭제 권한이 없어요" 배너가 뜬다**(실측).
+   * ⚠ `disabled={busy}`만으로는 못 막는다 — isPending은 렌더 이후에야 DOM에 반영되는데
+   *   같은 tick의 두 번째 클릭은 아직 enabled인 버튼을 누른다. 두 번째 DELETE는 이미 지워진
+   *   행이라 0행이 되고, use-delete-comment가 에러로 승격해 잘못된 배너가 뜬다(실측).
    */
-  const deletingRef = useRef(false);
+  /**
+   * **삭제를 보낸 댓글 id 집합**. boolean 하나도, id 하나도 아니어야 한다.
+   *
+   * ⚠ 세 번 갈아엎은 자리라 이유를 남긴다.
+   *   - boolean 하나: A를 지우는 동안 B가 **활성인데 클릭이 무시되는 무증상 잠금**이 됐다.
+   *   - id 하나: `useDeleteComment`는 **훅이 하나뿐**이라 B를 누르면 `variables`가 B로 갈아탄다
+   *     → A의 버튼이 다시 활성화되고(`busy=false`) A의 per-call `onSuccess`(토스트)가 버려진다.
+   *     그 상태로 A를 또 누르면 이미 지워진 행에 DELETE → 0행 → **"삭제 권한이 없어요."**
+   *   - Set: 보낸 것은 전부 기억하므로 위 두 가지가 동시에 닫힌다.
+   *
+   * ⚠ 성공하면 그 댓글은 목록에서 사라지므로 집합에서 지울 필요가 없다. 실패했을 때만
+   *   다시 시도할 수 있게 비운다(그 경우 화면에 에러가 떠 있다).
+   */
+  const sentRef = useRef<Set<number>>(new Set());
+  /**
+   * 시각 표시는 **state**로 따로 둔다 — ref는 렌더 중에 읽을 수 없고(리렌더도 유발하지 않는다),
+   * 반대로 state는 비동기라 동기 가드로 쓸 수 없다. 두 역할을 한 값에 겹치지 않는다.
+   */
+  const [sentIds, setSentIds] = useState<ReadonlySet<number>>(new Set());
+
   useEffect(() => {
-    if (!deleteComment.isPending) deletingRef.current = false;
+    // 뮤테이션이 끝나면(성공·실패 무관) 다시 시도할 수 있게 연다.
+    // 성공한 댓글은 목록에서 사라지므로 재클릭 대상이 아니다.
+    if (!deleteComment.isPending) sentRef.current.clear();
   }, [deleteComment.isPending]);
 
   const removeComment = (commentId: number) => {
-    if (deletingRef.current) return;
-    deletingRef.current = true;
+    if (sentRef.current.has(commentId)) return;
+    sentRef.current.add(commentId);
+    setSentIds((prev) => new Set(prev).add(commentId));
     deleteComment.mutate(commentId, {
       onSuccess: () => toast("댓글을 삭제했어요"),
     });
@@ -73,7 +93,11 @@ export function CommentSection({
   /** 삭제 버튼 — 답글이 달린 루트면 확인 다이얼로그를 거친다 */
   const deleteAction = (comment: Comment, replyCount: number) => {
     if (comment.userId !== user?.id) return undefined;
-    const busy = deleteComment.isPending && deleteComment.variables === comment.id;
+    // ⚠ `variables === comment.id`로 판정하면 안 된다 — 훅이 하나라 다른 댓글을 누르는 순간
+    //   갈아타서, 아직 처리 중인 댓글의 버튼이 다시 활성화된다(위 sentRef 주석 참고).
+    // ⚠ `isPending`을 함께 보므로 남은 id를 따로 지울 필요가 없다 — 뮤테이션이 끝나는 렌더에서
+    //   모든 버튼이 한 번에 풀린다(그때 sentRef도 비워져 재시도가 열린다).
+    const busy = deleteComment.isPending && sentIds.has(comment.id);
     return (
       <button
         type="button"
@@ -82,8 +106,6 @@ export function CommentSection({
             ? setConfirmTarget({ id: comment.id, replyCount })
             : removeComment(comment.id)
         }
-        // 훅은 하나지만 variables로 "지금 지우는 중인 댓글"을 특정한다 →
-        // 한 개를 지우는 동안 나머지 삭제 버튼까지 잠기지 않는다
         disabled={busy}
         // 시각 크기는 그대로 두고 히트 영역만 44px까지 넓힌다(ActionChip과 같은 방식)
         className="relative py-1.5 text-[11px] text-ink-faint after:absolute after:-inset-x-3.5 after:-inset-y-2 after:content-[''] disabled:opacity-40"

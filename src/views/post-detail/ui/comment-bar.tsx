@@ -183,6 +183,9 @@ export function CommentBar({
           onChange={(e) => {
             setContent(e.target.value);
             setError(undefined);
+            // ⚠ 뮤테이션 에러는 다음 mutate까지 남는다 — 다시 입력하는 순간 지워야
+            //   이미 해소된 실패 문구가 계속 떠 있지 않다.
+            if (writeComment.error) writeComment.reset();
           }}
           aria-invalid={error ? true : undefined}
           placeholder={replyTo ? "답글을 남겨보세요" : "한 줄 거들기"}

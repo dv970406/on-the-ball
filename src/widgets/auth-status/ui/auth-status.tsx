@@ -69,6 +69,16 @@ export function AuthStatus() {
       >
         로그아웃
       </button>
+      {/*
+        훅이 한국어로 바꿔 던진 에러를 노출한다(data-and-state.md — 변환은 훅, 노출은 컴포넌트).
+        전에는 이 한 곳만 버려서, 실패해도 버튼이 잠깐 흐려졌다 돌아올 뿐이라
+        로그아웃이 됐는지 안 됐는지 알 수 없었다.
+      */}
+      {signOut.error && (
+        <span role="alert" className="text-[12px] text-crimson">
+          {signOut.error.message}
+        </span>
+      )}
     </div>
   );
 }

@@ -64,7 +64,13 @@ export function SignInView({ hasCode, canExchange, errorCode, errorDescription }
     return () => clearTimeout(timer);
   }, [hasCode, canExchange]);
 
-  const exchangeFailed = !canExchange || exchangeTimedOut;
+  /**
+   * ⚠ **`hasCode`가 반드시 앞에 와야 한다.** `canExchange`는 PKCE verifier 쿠키 유무인데,
+   *   OAuth를 시작한 적 없는 브라우저에는 그 쿠키가 아예 없다(교환 후에도 삭제된다).
+   *   그래서 `!canExchange`만 보면 **첫 방문·로그아웃 후 재방문·`?next=` 진입 전부**
+   *   "로그인을 마치지 못했어요"가 떴다. 실패는 **코드를 들고 돌아왔을 때만** 성립한다.
+   */
+  const exchangeFailed = hasCode && (!canExchange || exchangeTimedOut);
 
   // 코드를 들고 돌아왔다면 교환 결과가 반영될 때까지 기다린다 — 단 무한정은 아니다.
   // (성공하면 GuestOnly가 이 화면을 걷어내므로 여기서 끝을 볼 일이 없다)

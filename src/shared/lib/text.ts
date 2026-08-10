@@ -50,3 +50,36 @@ export function hasVisibleChar(value: string): boolean {
 export function codePointLength(value: string): number {
   return [...value].length;
 }
+
+/**
+ * 지우는 문자 집합 — `normalize_nickname`의 1)단계와 **글자 하나까지 같아야 한다**
+ * (`supabase/migrations/20260807000001_oauth_nickname.sql`).
+ */
+const INVISIBLE = new RegExp(
+  "[\\u0001-\\u0008\\u000E-\\u001F\\u007F-\\u009F\\u00AD\\u034F\\u061C\\u180E" +
+    "\\u200B-\\u200F\\u202A-\\u202E\\u2060-\\u2064\\u206A-\\u206F\\uFEFF]",
+  "gu",
+);
+/** 빈 자리를 그리는 문자 → 보통 공백. `normalize_nickname`의 2)단계와 같은 집합이다. */
+const BLANK = new RegExp(
+  "[\\u0009-\\u000D\\u0020\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]",
+  "gu",
+);
+
+/**
+ * 닉네임 정규형 — **DB의 `public.normalize_nickname`과 같은 결과**를 낸다.
+ *
+ * ⚠ 왜 클라이언트에도 필요한가: 길이 검사를 원본으로 하면 판정이 갈린다. 가족 이모지
+ *   (👨‍👩‍👧‍👦)는 ZWJ 3개를 포함해 코드포인트 7개인데 DB는 ZWJ를 지우고 4로 센다 →
+ *   3개만 붙여도 클라이언트는 21자로 보고 거부하지만 **서버는 12자로 받아들인다.**
+ *
+ * ⚠ 위 두 문자 집합은 마이그레이션과 **한 쌍**이다. 한쪽만 고치면 다시 갈린다.
+ *   합집합이 `hasVisibleChar`의 클래스와 같아야 한다는 제약도 그대로다.
+ */
+export function normalizeNickname(value: string): string {
+  return value
+    .replace(INVISIBLE, "")
+    .replace(BLANK, " ")
+    .replace(/ {2,}/g, " ")
+    .trim();
+}

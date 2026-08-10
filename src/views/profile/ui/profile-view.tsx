@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import { Camera } from "lucide-react";
 import { ROUTES, avatarUrl } from "@/shared/config";
 import { useToast } from "@/shared/lib";
@@ -25,6 +32,21 @@ interface ProfileViewProps {
   errorDescription: string | null;
 }
 
+/** 교환 결과가 반영되기를 기다릴 상한 — `/sign-in`의 EXCHANGE_TIMEOUT_MS와 같은 취지 */
+const LINK_EXCHANGE_TIMEOUT_MS = 8000;
+
+/** URL은 내비게이션 없이 바뀌지 않으므로 구독할 것이 없다 — 리렌더 때 다시 읽힌다(useNextParam과 같다) */
+function subscribeToUrl() {
+  return () => {};
+}
+function hasCodeParam() {
+  return new URLSearchParams(window.location.search).has("code");
+}
+/** 서버 판정은 `linkPending` prop이 대신하므로 여기서는 그와 어긋나지 않게 true를 준다 */
+function hasCodeParamOnServer() {
+  return true;
+}
+
 /**
  * 계정 연결에서 돌아왔을 때 프로바이더가 돌려준 실패 사유.
  * ⚠ 원문은 영어다. 동의 취소(access_denied)가 대부분이라 그것만 따로 옮기고 나머지는 원문을
@@ -44,9 +66,9 @@ function toLinkErrorMessage(code: string, description: string | null): string {
  * 프로필 사진은 프로바이더 것을 쓰지 않고 직접 업로드받는다.
  *
  * ⚠ **이 화면은 OAuth 복귀 지점이기도 하다.** `linkIdentity`가 `?code=`를 들고 여기로
- *   돌아온다 → `/sign-in`과 같은 세 가지를 처리해야 한다(nextjs.md): 교환 중 대기 표시,
- *   상한, 프로바이더의 `?error=`. 상한은 여기서 별도로 두지 않는다 — 이 화면은 이미
- *   렌더돼 있고 교환이 실패해도 프로필 자체는 정상 동작하므로, 배너만 걷어내면 된다.
+ *   돌아온다 → `/sign-in`과 같은 세 가지를 처리한다(nextjs.md): 교환 중 대기 표시, 상한,
+ *   프로바이더의 `?error=`. 다만 상한의 역할이 다르다 — 이 화면은 이미 렌더돼 있고 교환이
+ *   실패해도 프로필 자체는 동작하므로, 화면을 대체하는 게 아니라 **배너만 걷어낸다.**
  */
 export function ProfileView({ linkPending, errorCode, errorDescription }: ProfileViewProps) {
   const user = useSessionStore((s) => s.user);
@@ -125,6 +147,26 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
     updateAvatar.mutate(file, { onSuccess: () => toast("프로필 사진을 바꿨어요") });
   };
 
+  /**
+   * 계정 연결 진행 표시.
+   *
+   * ⚠ 서버가 내려준 `linkPending`만 보면 **영원히 안 사라진다.** 교환이 끝나면 auth-js가
+   *   `history.replaceState`로 `?code=`만 지우는데 그건 서버 컴포넌트를 다시 실행하지 않는다
+   *   → prop은 계속 true. 성공·실패 양쪽 모두 "연결하는 중"이 갇혔다.
+   * → URL을 **클라이언트에서 직접 읽는다.** 교환이 끝나면 세션이 바뀌어(SIGNED_IN) 이 화면이
+   *   리렌더되고, 그때 스냅샷이 다시 읽혀 배너가 걷힌다. `useNextParam`과 같은 방식이며
+   *   effect에서 setState하면 `react-hooks/set-state-in-effect`에 걸린다.
+   * ⚠ 상한도 둔다 — supabase는 교환에 실패해도 조용히 빠져나가므로 리렌더가 안 올 수 있다.
+   */
+  const codeInUrl = useSyncExternalStore(subscribeToUrl, hasCodeParam, hasCodeParamOnServer);
+  const [exchangeTimedOut, setExchangeTimedOut] = useState(false);
+  useEffect(() => {
+    if (!linkPending) return;
+    const timer = setTimeout(() => setExchangeTimedOut(true), LINK_EXCHANGE_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [linkPending]);
+  const linking = linkPending && codeInUrl && !exchangeTimedOut;
+
   const header = <SubHeader title="프로필" fallbackHref={ROUTES.postList} />;
   const linkError = errorCode ? toLinkErrorMessage(errorCode, errorDescription) : null;
 
@@ -183,7 +225,7 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
             {linkError}
           </p>
         )}
-        {!linkError && linkPending && (
+        {!linkError && linking && (
           <p
             role="status"
             className="border-b border-hairline bg-canvas-soft px-5 py-2.5 text-[12px] text-ink-mute"
@@ -251,6 +293,9 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
             onChange={(e) => {
               setNickname(e.target.value);
               setNicknameError(undefined);
+              // ⚠ 뮤테이션 에러는 다음 mutate까지 남는다 — "이미 사용 중인 값이에요."가
+              //   전혀 다른 닉네임을 입력하는 동안 계속 빨갛게 떠 있었다.
+              if (updateNickname.error) updateNickname.reset();
             }}
           />
           <Button

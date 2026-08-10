@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
-import { codePointLength, hasVisibleChar } from "@/shared/lib";
+import { codePointLength, hasVisibleChar, normalizeNickname } from "@/shared/lib";
 import { commentKeys } from "@/entities/comment";
 import { postKeys } from "@/entities/post";
 import { profileKeys } from "@/entities/profile";
@@ -17,7 +17,9 @@ export const NICKNAME_MAX = 20;
  */
 export function validateNickname(value: string): string | null {
   if (!hasVisibleChar(value)) return "닉네임을 입력해 주세요.";
-  if (codePointLength(value.trim()) > NICKNAME_MAX) {
+  // ⚠ **정규형으로 센다.** `.trim()`은 ZWJ·제로폭을 못 지워서, DB가 4자로 보는
+  //   가족 이모지(👨‍👩‍👧‍👦)를 7자로 세고 3개만 붙여도 거부했다(서버는 받아들이는 값이다).
+  if (codePointLength(normalizeNickname(value)) > NICKNAME_MAX) {
     return `닉네임은 ${NICKNAME_MAX}자까지 쓸 수 있어요.`;
   }
   return null;

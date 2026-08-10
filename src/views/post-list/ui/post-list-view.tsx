@@ -45,12 +45,24 @@ export function PostListView() {
 
         <header className="px-5 pb-0.5 pt-[18px]">
           <h1 className="text-[26px] font-medium tracking-[-0.9px] text-ink">커뮤니티</h1>
+          {/*
+            ⚠ 조회가 끝나기 전이거나 실패했을 때 **0을 단정하지 않는다.** `?? 0`으로 두었더니
+              오늘 글이 12개인데 "오늘 0개의 글이 올라왔어요"를 찍고, 바로 아래 목록에는
+              오늘 글이 보여 화면이 스스로 모순됐다. 같은 판단이 queries.ts에도 적혀 있다 —
+              "count가 null이면 화면 라벨이 0을 찍는 것보다 실제 개수가 낫다".
+          */}
           <p className="mt-1.5 text-[13px] text-ink-mute">
-            오늘{" "}
-            <span className="font-mono tabular-nums text-ink">
-              {formatCount(todayCount.data ?? 0)}
-            </span>
-            개의 글이 올라왔어요
+            {todayCount.data === undefined ? (
+              "오늘 올라온 글을 세는 중이에요"
+            ) : (
+              <>
+                오늘{" "}
+                <span className="font-mono tabular-nums text-ink">
+                  {formatCount(todayCount.data)}
+                </span>
+                개의 글이 올라왔어요
+              </>
+            )}
           </p>
         </header>
 
@@ -102,7 +114,8 @@ export function PostListView() {
             </button>
           ))}
           <span className="ml-auto font-mono text-[10px] tabular-nums tracking-[0.3px] text-ink-faint">
-            {formatCount(data?.total ?? 0)} POSTS
+            {/* ⚠ 로딩·에러에 0을 단정하지 않는다 — 옆의 스켈레톤/에러 박스와 모순된다 */}
+            {data ? `${formatCount(data.total)} POSTS` : "POSTS"}
           </span>
         </div>
 
@@ -165,7 +178,9 @@ export function PostListView() {
         */}
         {posts && posts.length >= POST_LIST_LIMIT && (
           <p className="px-5 pt-3 text-center text-[12px] text-ink-mute-2">
-            최근 {formatCount(POST_LIST_LIMIT)}개만 표시하고 있어요.
+            {/* ⚠ "최근"은 최신순일 때만 참이다 — 인기·댓글순은 시간이 아니라 그 수치로 잘린다 */}
+            {sort === "latest" ? "최근 " : ""}
+            {formatCount(POST_LIST_LIMIT)}개만 표시하고 있어요.
           </p>
         )}
 

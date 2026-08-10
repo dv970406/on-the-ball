@@ -37,6 +37,11 @@ export function useWriteComment(postId: number) {
 
       if (error) {
         console.error("[comment] 작성 실패:", error);
+        // ⚠ 42501은 RLS 거부인데, 화면에서 도달 가능한 원인은 **글이 삭제된 경우**뿐이다
+        //   (남의 명의 위조는 UI 경로가 없다). 일반 "권한이 없어요."로 두면 실제 사유가 가려진다.
+        if ((error as { code?: string }).code === "42501") {
+          throw new Error("삭제된 글에는 댓글을 달 수 없어요.");
+        }
         throw new Error(toDbErrorMessage(error));
       }
     },

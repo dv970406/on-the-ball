@@ -31,7 +31,15 @@ export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
  * ⚠ 가운데를 정사각으로 잘라낸다 — 아바타가 원형이라 비율이 어긋나면 찌그러진다.
  */
 export async function resizeToAvatar(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
+  // ⚠ 확장자만 바꾼 파일도 `file.type` 검사를 통과한다(브라우저가 이름으로 타입을 붙인다).
+  //   디코딩이 여기서 터지면 DOMException의 영어 문장이 화면에 그대로 나갔다.
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch (e) {
+    console.error("[profile] 이미지 디코딩 실패:", e);
+    throw new Error("이미지를 읽지 못했어요. 다른 사진을 골라 주세요.");
+  }
   try {
     const side = Math.min(bitmap.width, bitmap.height);
     const target = Math.min(side, MAX_SIZE);
