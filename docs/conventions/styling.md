@@ -111,7 +111,9 @@ function cardClassName(peek: boolean) {
 |---|---|---|
 | `size-11`/`size-9` 원형 아이콘 **버튼** | 버튼 라운드가 아니라 **원형 히트 영역** | `sub-header` · `post-detail-view` · `profile-view`(사진 변경) |
 | 원형 아이콘 **컨테이너**(클릭 불가) | 히트 영역도 아닌 순수 장식 | `shared/ui/empty-state.tsx` · `app-bar`의 안쪽 `span` |
-| 도트·아바타·`Pill`·`RatioBar`·워드마크의 볼 | 컨트롤이 아닌 **표시 요소** | `live-dot` · `avatar` · `pill` · `ratio-bar` · `wordmark` · `post-card`의 구분점 |
+| 도트·아바타·`Pill`·`RatioBar`·워드마크의 볼 | 컨트롤이 아닌 **표시 요소** | `live-dot` · `avatar` · `pill` · `ratio-bar` · `wordmark` · `post-card`의 구분점 · `profile-view`의 아바타 스켈레톤 |
+
+⚠ 이 세 목록과 위의 알약 예외 4곳은 **`pnpm check:conventions`가 대조한다** — 목록에 없는 `rounded-full`이 생기면 검사가 실패한다. 그림자·`backdrop-blur` 예외도 같다.
 
 경계가 헷갈리는 대비 선례:
 

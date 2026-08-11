@@ -31,6 +31,10 @@
 - `useFocusTrap` — 오버레이(`Dialog`·`Sheet`) 안에 포커스를 가둔다
 - `useToast` / `useToastStore` — 토스트 발행. **표시 영역(`ToastViewport`)은 `@/shared/ui`에 있고 루트에 하나만 둔다** — 상태와 UI가 레이어를 달리한다
 
+> ⚠ **이 배럴에는 호출부가 0인 export를 두지 않는다.** 검증은 `pnpm check:conventions`가 한다(화이트리스트 없이 전수 판정).
+> `shared/ui`의 미사용 자산과 **정책이 갈리는데**, 그건 의도한 것이다 — 순수 함수는 git 이력에서 그대로 복원되고(`docs/legacy/v1-inventory.md`가 `design_handoff_ontheball/`에 이미 같은 처리를 한다: "실물은 `6de2618^` 이전 이력에서 꺼낸다"), 배럴 export가 **재사용 목록을 오염시키는 비용**이 더 크다. 컴포넌트는 프로토타입 치수·상태 조합이 함께 사라져 재현 비용이 다르다.
+> 실제로 `formatPct`·`formatDday`·`isClosed`·`todayUtc`·`formatYearMonth`·`useDelayedReveal` 6개가 호출부 0인 채 이 목록 최상단에 현역처럼 올라와 있었다.
+
 ## `@/types/database.types` (생성 파일 — `pnpm db:types`)
 - `Database` — supabase 스키마 전체. **DB 행 타입을 손으로 적지 말고 여기서 뽑는다.**
   ```ts
@@ -95,7 +99,7 @@
 `TabHeader`·`MarkdownEditor`·`Flag`·`Shirt`·`RatioBar`·`SectionHead`·`LiveDot`·`LiveStatusPill`·`NightCard`·`PlayerSilhouette`
 (`MarkdownEditor`를 뺀 9개가 `docs/legacy/v1-inventory.md`가 보존 대상으로 명시한 v1 자산이다. `MarkdownEditor`는 v2에서 만들었다가 프로토타입에 미리보기 탭이 없어 쓰이지 않는다)
 
-> ⚠ 이 두 목록은 **실사용 여부로만 판정한다**(`grep -rE "<Name\b" src app --include='*.tsx'`).
+> ⚠ 이 두 목록은 **실사용 여부로만 판정한다** — 손으로 세지 말고 **`pnpm check:conventions`** 를 돌린다(호출부 0인 export를 전수로 뽑아 준다).
 > 커뮤니티 이식 때 실제로 어긋났다 — `TabHeader`·`MarkdownEditor`는 현역으로 적혀 있었지만 호출부가 0이었고, 반대로 `Pill`·`Avatar`·`Wordmark`는 v1 미사용으로 적혀 있는 채 화면에서 쓰이고 있었다.
 > **이 문서의 존재 이유가 "새로 만들기 전 확인"이라 목록이 틀리면 문서가 없느니만 못하다.** UI를 추가·제거하면 여기부터 고친다.
 

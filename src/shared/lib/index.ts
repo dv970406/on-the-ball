@@ -19,3 +19,4 @@ export { useNextParam } from "./use-next-param";
 //   "@/shared/lib/text"를 직접 import.
 //   ⚠ "use client"를 붙이지 않은 shared/ui 컴포넌트도 여기 해당한다 — 배럴을 거치면
 //     서버 렌더 여지를 잃는다(선례: shared/ui/empty-state.tsx).
+//   이 목록이 곧 deep import 화이트리스트다 — 검증은 `pnpm check:conventions`가 한다.
