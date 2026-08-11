@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
-import { cn } from "@/shared/lib";
+// ⚠ 배럴이 아니라 직접 경로다 — 서버 렌더 여지를 남긴다(사유는 empty-state.tsx에).
+import { cn } from "@/shared/lib/cn";
 
 const PILL_VARIANT = {
   green: "bg-primary font-medium text-on-primary",

@@ -4,13 +4,8 @@
 
 ## `@/shared/lib/format` (순수 함수 — 서버·클라 공용)
 - `formatCount` — 숫자 → `"28,412"`
-- `formatPct` — 0~1 비율 → `"57%"`
-- `formatDday` — 마감일 → `"D-8"`/`"마감"` (순수 표시용)
-- `isClosed` — 마감 여부 boolean 판정 (표시 문자열 비교 금지, 이 함수로 판정)
-- `todayUtc` — 오늘 날짜 `"YYYY-MM-DD"`(UTC, Postgres `current_date`와 정합)
 - **`startOfTodaySeoul`** — 오늘(한국 기준) 00:00의 ISO 시각. "오늘 N개의 글" 같은 하루 경계에 쓴다.
-  ⚠ **`todayUtc`로 대신하지 말 것** — 그건 Postgres `current_date`와 맞추기 위한 값이라 한국 사용자에게는 **오전 0~9시 사이 "오늘"이 어제가 된다**. 내부에서 `Date.now()`를 부르므로 렌더 중이 아니라 queryFn 안에서만 호출한다.
-- `formatYearMonth` — ISO 날짜 → `"2026.07"`(UTC 기준)
+  ⚠ **UTC 자정으로 대신하지 말 것** — 그건 Postgres `current_date`와 맞추기 위한 값이라 한국 사용자에게는 **오전 0~9시 사이 "오늘"이 어제가 된다**. 내부에서 `Date.now()`를 부르므로 렌더 중이 아니라 queryFn 안에서만 호출한다.
 - `formatRelativeTime` — 과거 시각 → `"방금 전"`/`"3분 전"`/`"2시간 전"`/`"5일 전"`, 7일↑은 `"7월 30일"`, **해가 다르면 `"2025년 7월 30일"`**.
   - 연도를 붙이는 이유: 전에는 무조건 `"7월 30일"`이라 **작년 글이 올해 글과 구분되지 않았다**(`<time dateTime>`은 정확한데 화면 텍스트만 거짓말).
   - ⚠ **내부에서 `Date.now()`·`new Date()`를 쓴다.** 그런데 실제 호출부(`post-card.tsx`·`post-detail-view.tsx`·`comment-item.tsx`)는 이 함수를 **렌더 중에** 부른다 — 목록·상세가 전부 클라이언트 쿼리라 **SSR HTML이 항상 스켈레톤이어서** 지금은 안전할 뿐이다. 서버 프리페치를 붙이는 순간 깨진다(`data-and-state.md` 하이드레이션 절).
@@ -35,7 +30,6 @@
 - `useScrollRestore` / `clearScrollRestore` — 목록 스크롤 위치 저장/복원 (`clearScrollRestore`는 목록을 처음부터 보여야 할 때 저장분을 버린다)
 - `useFocusTrap` — 오버레이(`Dialog`·`Sheet`) 안에 포커스를 가둔다
 - `useToast` / `useToastStore` — 토스트 발행. **표시 영역(`ToastViewport`)은 `@/shared/ui`에 있고 루트에 하나만 둔다** — 상태와 UI가 레이어를 달리한다
-- `useDelayedReveal` — (v1 자산, 현재 미사용)
 
 ## `@/types/database.types` (생성 파일 — `pnpm db:types`)
 - `Database` — supabase 스키마 전체. **DB 행 타입을 손으로 적지 말고 여기서 뽑는다.**

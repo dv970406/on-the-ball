@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
-import { cn } from "@/shared/lib";
+// ⚠ 배럴이 아니라 직접 경로다 — 서버 렌더 여지를 남긴다(사유는 empty-state.tsx에).
+import { cn } from "@/shared/lib/cn";
 
 interface AvatarProps {
   /** 표시할 라벨 — 이미지가 없을 때 첫 글자만 사용 */
