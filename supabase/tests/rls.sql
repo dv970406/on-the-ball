@@ -673,6 +673,10 @@ rollback to s;
 savepoint s;
 \echo '[0행 기대] 랜덤 조합 전수 — 어떤 조합도 길이(1~20)·정규형 CHECK를 어기지 않는다'
 \echo '           480가지뿐이라 하나만 어겨도 그 사용자는 가입 자체가 실패한다'
+-- ⚠ 여기 20은 **컬럼 CHECK가 아니라 생성기의 계약**이다. 20260810000001이 컬럼 상한을
+--   200(abuse bound)으로 올렸지만, 사용자에게 보이는 한도는 여전히 20그래핌이라
+--   랜덤 배정된 닉네임도 그 안에 들어와야 한다(안 그러면 배정받자마자 편집이 막힌다).
+--   컬럼 상한을 따라 200으로 올리면 이 검사는 조용히 무의미해진다 — 올리지 말 것.
 select n from (select public.random_nickname() as n from generate_series(1, 2000)) t
  where n <> public.normalize_nickname(n)
     or char_length(n) not between 1 and 20;
@@ -798,6 +802,78 @@ savepoint s; :login_alice
 \echo '[성공] 본인 폴더에 업로드'
 insert into storage.objects (bucket_id, name, owner)
 values ('avatars', :'alice' || '/me.webp', :'alice');
+rollback to s;
+
+\echo ''
+\echo '=== 25. 길이 한도 (20260810000001 — abuse bound) ==='
+\echo '    화면 한도는 **그래핌**(제목 120·댓글 1000·닉네임 20)이고 클라이언트만 강제한다.'
+\echo '    DB는 그래핌을 셀 수 없어(PG에 분절 기능 없음) 코드포인트 K=10배를 상한으로 둔다.'
+\echo '    ⚠ 두 단위는 어떤 배수로도 완전 일치하지 않는다 — 1그래핌의 코드포인트 수에'
+\echo '      상한이 없기 때문이다. 그래서 클라이언트가 두 한도를 겹쳐 검사한다.'
+\echo '      여기서 검사하는 것은 그중 **DB가 실제로 강제하는 쪽**이다.'
+
+savepoint s; :login_alice
+\echo '[성공] 제목 1,200 코드포인트 (post_title_check 경계)'
+insert into public.post (author_id, title, content, category)
+values (:'alice', repeat('가', 1200), '본문', '잡담');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 제목 1,201 코드포인트'
+insert into public.post (author_id, title, content, category)
+values (:'alice', repeat('가', 1201), '본문', '잡담');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[성공] 이모지 제목 — 그래핌 120개(가족 이모지)가 코드포인트 840으로 들어간다'
+\echo '       이게 이번 변경의 핵심 시나리오다. 옛 한도(120)에서는 거부됐다.'
+insert into public.post (author_id, title, content, category)
+values (:'alice',
+        repeat(U&'\+01F468\200D\+01F469\200D\+01F467\200D\+01F466', 120), '본문', '잡담');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[성공] 댓글 10,000 코드포인트 (comment_content_check 경계)'
+insert into public.comment (post_id, user_id, content)
+values (:pid, :'alice', repeat('가', 10000));
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 댓글 10,001 코드포인트'
+insert into public.comment (post_id, user_id, content)
+values (:pid, :'alice', repeat('가', 10001));
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[성공] 닉네임 200 코드포인트 (profiles_nickname_check 경계)'
+update public.profiles set nickname = repeat('가', 200) where id = :'alice';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 닉네임 201 코드포인트'
+update public.profiles set nickname = repeat('가', 201) where id = :'alice';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[성공] 닉네임 200자가 btree 유니크 인덱스(lower(nickname))에도 들어간다'
+\echo '       ⚠ btree 인덱스 행은 8KB 페이지 기준 2704바이트가 상한이다. 코드포인트 한도를'
+\echo '         빼면 어긋남이 CHECK가 아니라 **인덱스**로 옮겨간다(영어 에러라 번역도 안 된다).'
+\echo '         200 × 최대 4바이트 = 800바이트 < 2704 — 이 한도가 인덱스도 함께 지킨다.'
+update public.profiles set nickname = repeat(U&'\+01F600', 200) where id = :'alice';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[성공] 본문 20,000 코드포인트 — **일부러 올리지 않았다**'
+\echo '       한도가 넓어 이모지가 체감되지 않는데 가장 큰 컬럼이라 10배로 푸는 대가가 크고,'
+\echo '       20,000자 그래핌 계산이 1.5ms(코드포인트의 14배)라 키 입력마다 돌릴 수도 없다.'
+insert into public.post (author_id, title, content, category)
+values (:'alice', '제목', repeat('가', 20000), '잡담');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 본문 20,001 코드포인트'
+insert into public.post (author_id, title, content, category)
+values (:'alice', '제목', repeat('가', 20001), '잡담');
 rollback to s;
 
 rollback;

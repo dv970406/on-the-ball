@@ -2,12 +2,35 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
+import { hasVisibleChar, lengthOverflow, type TextLimit } from "@/shared/lib";
 import { commentKeys } from "@/entities/comment";
 import { postKeys } from "@/entities/post";
 import { useSessionStore } from "@/entities/session";
 
-/** DB의 char_length check와 맞춘다 */
-export const COMMENT_MAX = 1000;
+/**
+ * 댓글 한도 — 화면 1,000그래핌 / DB 10,000코드포인트(`comment_content_check`와 같은 값).
+ * ⚠ 두 값은 **함께** 검사해야 한다. 판정은 `lengthOverflow`가 소유한다.
+ *   규약은 `docs/conventions/api-and-db.md`의 "길이 한도는 두 단위로 겹쳐 건다".
+ */
+export const COMMENT_LIMIT: TextLimit = { grapheme: 1000, codePoint: 10000 };
+
+/**
+ * 댓글 입력 검증 — 통과하면 `null`, 아니면 사용자에게 보일 한국어 문구.
+ *
+ * ⚠ **검증을 뷰에 두지 않는다.** 게시글(`validatePost`)·닉네임(`validateNickname`)과
+ *   같은 형태를 지켜야 "같은 종류는 같은 형태"가 유지되고, 뷰가 한도 상수를 알 이유도 없다.
+ * ⚠ 제출 시점에만 부른다 — 렌더 중에 부르면 그래핌 계산이 매 키 입력마다 돈다.
+ */
+export function validateComment(value: string): string | null {
+  // 제로폭 문자만 있는 댓글도 걸러낸다(화면에 아무것도 안 보이는 댓글이 등록됐다).
+  if (!hasVisibleChar(value)) return "내용을 입력해 주세요.";
+
+  const over = lengthOverflow(value, COMMENT_LIMIT);
+  if (over === "grapheme") return `댓글은 ${COMMENT_LIMIT.grapheme}자까지 쓸 수 있어요.`;
+  // 코드포인트 초과는 결합 문자를 쌓지 않는 한 도달할 수 없다 → 길이로만 말한다.
+  if (over === "codePoint") return "댓글이 너무 길어요.";
+  return null;
+}
 
 export interface WriteCommentInput {
   content: string;

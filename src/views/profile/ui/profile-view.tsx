@@ -17,7 +17,7 @@ import { useProfileQuery } from "@/entities/profile";
 import { useSessionStore } from "@/entities/session";
 import {
   ACCEPTED_IMAGE_TYPES,
-  NICKNAME_MAX,
+  NICKNAME_LIMIT,
   useUpdateAvatar,
   useUpdateNickname,
   validateNickname,
@@ -289,7 +289,7 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
             name="nickname"
             value={nickname}
             error={nicknameError ?? updateNickname.error?.message}
-            hint={`${NICKNAME_MAX}자까지 · 다른 사람과 같을 수 없어요`}
+            hint={`${NICKNAME_LIMIT.grapheme}자까지 · 다른 사람과 같을 수 없어요`}
             onChange={(e) => {
               setNickname(e.target.value);
               setNicknameError(undefined);

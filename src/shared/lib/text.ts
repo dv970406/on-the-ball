@@ -1,6 +1,9 @@
 /**
  * 사용자 입력 텍스트 판정 — 게시글·댓글·DB 제약이 **같은 기준**을 써야 하는 것들만 둔다.
  * (parsePostId를 proxy와 페이지가 공유하는 것과 같은 이유다 — 기준이 갈리면 한쪽만 통과한다)
+ *
+ * 예외가 하나 있다: `graphemeLength`는 **DB에 대응물이 없는** 표시 전용 단위다.
+ * 그래서 한도는 `TextLimit`(그래핌·코드포인트 한 쌍)로 두고 `lengthOverflow`가 둘 다 본다.
  */
 
 /**
@@ -46,9 +49,89 @@ export function hasVisibleChar(value: string): boolean {
  *
  * ⚠ JS의 `String.length`와 `<input maxLength>`는 UTF-16 코드유닛을 센다. 이모지는
  *   서로게이트 페어라 2로 세어져, DB가 120자를 허용하는데 화면에서는 이모지 60개에서 막혔다.
+ *
+ * ⚠ **이걸 `graphemeLength`로 대체하지 말 것.** 사용자에게 보이는 한도는 그래핌이지만
+ *   DB가 강제하는 단위는 여전히 코드포인트라, 두 검사는 **함께** 가야 한다 → `lengthOverflow`.
  */
 export function codePointLength(value: string): number {
   return [...value].length;
+}
+
+/**
+ * 생성 비용이 있어 모듈 스코프에 한 번만 만든다(정규식을 hoist하는 것과 같은 이유).
+ * 요청별 가변 상태를 담지 않아 서버에서 공유해도 안전하다 — `segment()`가 매번 새 값을 낸다.
+ *
+ * ⚠ 로캘을 고정한다. 그래핌 경계는 로캘에 의존하지 않지만, 인자를 비우면 사용자 로캘을
+ *   따라가므로 기기마다 판정이 달라질 여지를 남기지 않는다.
+ */
+const graphemeSegmenter =
+  typeof Intl !== "undefined" && typeof Intl.Segmenter === "function"
+    ? new Intl.Segmenter("ko", { granularity: "grapheme" })
+    : null;
+
+/**
+ * 그래핌(사용자가 세는 "한 글자") 기준 길이 — **화면에 보이는 한도**가 쓰는 단위다.
+ *
+ * 코드포인트로 세면 사용자가 한 글자로 보는 이모지가 여럿으로 세어진다(실측):
+ *   ⚽ 1 / 👍🏽·🇰🇷·❤️ 2 / 👨‍👩‍👧‍👦·🏴󠁧󠁢󠁳󠁣󠁴󠁿 7 / 👨🏻‍❤️‍💋‍👨🏽 10
+ * UAX #29 확장 그래핌 클러스터는 ZWJ 시퀀스·피부톤·국기·키캡·태그 시퀀스를 전부 1로 센다.
+ *
+ * ⚠ **이 함수만으로 한도를 걸면 안 된다.** 1그래핌의 코드포인트 수에는 상한이 없어서
+ *   (`a` + 결합악센트 50개 = 그래핌 1 / 코드포인트 51), 그래핌 한도는 DB `char_length`
+ *   한도를 함의하지 못한다. 게다가 PostgreSQL에는 그래핌 분절이 아예 없어 DB를 이 단위로
+ *   맞출 수도 없다. → 한도를 걸 때는 이 함수를 직접 부르지 말고 **`lengthOverflow`** 를 쓴다.
+ *
+ * ⚠ `Intl.Segmenter`가 없으면 `codePointLength`로 폴백한다. 그래핌 ≤ 코드포인트라
+ *   폴백은 항상 **더 엄격한** 쪽으로 기울고, 그래서 "클라는 통과시켰는데 DB가 거부"를
+ *   만들지 않는다 — 폴백이 안전한 이유가 이 부등호다.
+ *
+ * ⚠ 긴 문자열에는 비싸다 — 20,000자 기준 1.5ms로 `codePointLength`(0.1ms)의 14배다(실측).
+ *   그래서 본문(20,000자 한도)에는 쓰지 않는다. 제목 120자는 0.011ms라 렌더 중에도 무방하다.
+ */
+export function graphemeLength(value: string): number {
+  if (!graphemeSegmenter) return codePointLength(value);
+  // 배열로 펼치지 않고 이터레이터만 돌린다 — 세는 게 목적이라 세그먼트를 담아둘 이유가 없다.
+  const segments = graphemeSegmenter.segment(value)[Symbol.iterator]();
+  let count = 0;
+  while (!segments.next().done) count += 1;
+  return count;
+}
+
+/**
+ * 길이 한도 **한 쌍** — 화면 단위와 DB 단위는 항상 함께 간다.
+ *
+ * 두 값을 `MAX`·`MAX_CODEPOINT`로 따로 두면 한쪽만 검사하기가 자연스러워지는데,
+ * 이 설계의 안전 속성 전체가 "둘 다 건다"에 달려 있다. 그래서 한도를 **하나의 값**으로 묶고
+ * 판정도 `lengthOverflow` 하나가 소유한다(`parsePostId`·`safeNextPath`와 같은 이유 —
+ * 두 곳이 같아야 하는 규약은 함수 하나가 갖는다).
+ */
+export interface TextLimit {
+  /** 사용자에게 보이는 한도. 어떤 이모지도 1자로 센다 */
+  grapheme: number;
+  /** DB `char_length` CHECK와 **같은 값**. 화면 한도의 K=10배로 둔다 */
+  codePoint: number;
+}
+
+/**
+ * 두 한도를 검사해 넘친 쪽을 돌려준다(`null`이면 통과).
+ *
+ * ⚠ **직접 `graphemeLength(v) > MAX`를 짜지 말 것.** 코드포인트 검사를 빠뜨려도
+ *   컴파일·린트·RLS 검사 어느 것도 잡아주지 않고, 그 순간 사용자는 한국어 안내 대신
+ *   DB의 23514(또는 btree 인덱스의 영어 에러)를 보게 된다.
+ *
+ * ⚠ 문구는 만들지 않는다 — 자리마다 다르므로 호출부가 종류만 받아 자기 문구를 쓴다.
+ *   그래핌 초과는 "N자까지 쓸 수 있어요", 코드포인트 초과는 "너무 길어요"가 관례다
+ *   (후자는 결합 문자를 쌓지 않는 한 도달할 수 없다).
+ *
+ * ⚠ 검사 순서가 규약이다. 그래핌을 먼저 봐야 일반 사용자에게 **한도 숫자가 담긴** 문구가 간다.
+ */
+export function lengthOverflow(
+  value: string,
+  limit: TextLimit,
+): "grapheme" | "codePoint" | null {
+  if (graphemeLength(value) > limit.grapheme) return "grapheme";
+  if (codePointLength(value) > limit.codePoint) return "codePoint";
+  return null;
 }
 
 /**

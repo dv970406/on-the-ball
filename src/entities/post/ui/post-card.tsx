@@ -52,7 +52,9 @@ export function PostCard({ post }: { post: PostListItem }) {
             )}
           </div>
 
-          <h2 className="mt-[5px] text-pretty text-[15px] font-medium leading-[1.4] tracking-[-0.3px] text-ink">
+          {/* 제목도 2행에서 자른다 — 화면 한도는 클라이언트만 강제하므로
+              우회 삽입된 긴 제목이 카드를 세로로 늘이지 않게 여기서 막는다 */}
+          <h2 className="mt-[5px] line-clamp-2 text-pretty text-[15px] font-medium leading-[1.4] tracking-[-0.3px] text-ink">
             {post.title}
           </h2>
 

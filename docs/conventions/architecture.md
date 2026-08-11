@@ -47,7 +47,7 @@ Route Handler가 없어지면서 **서버 소비자는 `generateMetadata`와 서
 - `@/entities/post`·`@/entities/comment`·`@/entities/profile` — `"use client"` 쿼리 훅·UI 포함. **서버는 `model/types`·`api/mappers`·`api/keys`를 직접 import**. post의 순수 헬퍼도 마찬가지다 — `app/posts/[id]/page.tsx`가 `@/entities/post/lib/plain-summary`를 직접 경로로 가져와 `og:description`을 만든다.
 - `@/entities/session` — 배럴이 zustand 스토어·Provider·가드를 재export(전부 클라이언트). 순수 함수 `toAuthErrorMessage`는 `lib/auth-error-message`에, 쿼리 키는 `api/keys`에 따로 있다.
 - `@/features/sign-in` — 배럴이 `"use client"` 훅(`useOAuthSignIn`)을 포함한다. **서버가 쓰는 순수 함수 `hasPkceVerifier`는 `@/features/sign-in/lib/pkce-verifier` 직접 경로**로 가져간다(`app/(auth)/sign-in/page.tsx`가 선례). features 레이어에도 같은 예외가 성립한다는 뜻이다 — 배럴이 클라이언트 훅을 담고 있으면 서버 소비자는 직접 경로를 쓴다.
-- 선례: `app/posts/[id]/page.tsx`는 `@/shared/api/supabase-server`만 직접 경로로 쓰고, `@/entities/post` 배럴은 건드리지 않는다.
+- 선례: `app/posts/[id]/page.tsx`는 직접 경로를 **셋** 쓴다 — `@/shared/lib/post-id` · `@/shared/api/supabase-server` · `@/entities/post/lib/plain-summary`. 핵심은 개수가 아니라 **배럴을 하나도 거치지 않는다**는 것이다(`@/views/post-detail`만 배럴인데, 그건 서버가 **렌더**하는 클라이언트 컴포넌트라 합법이다 — 아래 절 참고).
 
 ### 요청당 1회 — 서버 조회는 React `cache()`로 감싼다
 

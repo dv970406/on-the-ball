@@ -5,10 +5,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowUp, CornerDownRight, X } from "lucide-react";
 import { signInWithNext } from "@/shared/config";
-import { codePointLength, hasVisibleChar } from "@/shared/lib";
 import { Icon, buttonClassName } from "@/shared/ui";
 import { useSessionStore } from "@/entities/session";
-import { COMMENT_MAX, useWriteComment } from "@/features/write-comment";
+import { useWriteComment, validateComment } from "@/features/write-comment";
 
 export interface ReplyTarget {
   commentId: number;
@@ -98,21 +97,20 @@ export function CommentBar({
     if (submittingRef.current) return;
 
     const trimmed = content.trim();
-    // 제로폭 문자만 있는 댓글도 걸러낸다(화면에 아무것도 안 보이는 댓글이 등록됐다).
-    // ⚠ 조용히 return하지 않는다 — 버튼 활성 조건은 `content.trim()`이라 눌리기는 하는데
-    //   아무 일도 안 일어나면 고장으로 읽힌다.
-    if (!hasVisibleChar(trimmed)) {
-      setError("내용을 입력해 주세요.");
-      return;
-    }
 
     /**
-     * 길이·빈 값 판정은 게시글 폼과 **같은 기준**을 쓴다(DB CHECK와도 같은 단위).
+     * 빈 값·길이 판정은 전부 features의 validateComment가 소유한다
+     * (게시글의 validatePost·닉네임의 validateNickname과 같은 형태).
+     *
+     * ⚠ 조용히 return하지 않는다 — 버튼 활성 조건은 `content.trim()`이라 눌리기는 하는데
+     *   아무 일도 안 일어나면 고장으로 읽힌다.
      * ⚠ input에 maxLength를 걸면 브라우저가 UTF-16 코드유닛으로 세어
      *   이모지 댓글이 한도의 절반에서 **아무 안내 없이 잘린다.**
+     * ⚠ 여기는 handleSubmit 안(제출 1회)이라 그래핌 계산의 렌더 성능 영향이 없다.
      */
-    if (codePointLength(trimmed) > COMMENT_MAX) {
-      setError(`댓글은 ${COMMENT_MAX}자까지 쓸 수 있어요.`);
+    const invalid = validateComment(trimmed);
+    if (invalid) {
+      setError(invalid);
       return;
     }
     setError(undefined);

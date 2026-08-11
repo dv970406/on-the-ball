@@ -20,7 +20,15 @@
 - `cn` — Tailwind 클래스 병합
 - **`parsePostId`** — URL의 `[id]` → 게시글 id. **새로 정규식을 만들지 말 것** — proxy(서버 가드)와 페이지가 같은 파서를 써야 판정이 갈리지 않는다(전에 `\d+` vs `Number()`로 갈려 가드가 뚫렸다). 서버에서는 `@/shared/lib/post-id` 직접 경로로.
 - **`hasVisibleChar`** — 보이는 글자가 하나라도 있는지. **`.trim()` 대신 이걸 쓴다** — `.trim()`도 Postgres `[:space:]`도 제로폭 문자·BOM을 못 걸러서 "제목이 완전히 비어 보이는 글"이 실제로 만들어졌다. DB의 `public.has_visible_char`와 **문자 집합이 같아야 한다**(한쪽만 고치지 말 것).
+- **`normalizeNickname`** — 닉네임 정규형(보이지 않는 문자 제거 · NBSP·전각공백을 보통 공백으로 · 연속 공백 접기). **DB의 `public.normalize_nickname`과 같은 결과를 내야 한다** — 두 문자 집합(`INVISIBLE`/`BLANK`)의 합집합이 `hasVisibleChar`의 클래스와 같아야 한다는 제약까지 한 쌍이다(한쪽만 고치지 말 것).
+  ⚠ **닉네임 길이는 원본이 아니라 정규형으로 잰다.** DB 트리거가 쓰기 직전에 정규화하므로 원본으로 재면 화면과 저장값이 갈린다 — ZWJ를 지우는 탓에 가족 이모지(👨‍👩‍👧‍👦)는 저장 시점에 👨👩👧👦 4자로 분해된다.
 - **`codePointLength`** — DB `char_length`와 같은 단위의 길이. **`.length`나 `<input maxLength>`로 길이를 제한하지 말 것** — UTF-16 코드유닛이라 이모지가 2로 세어져 한도의 절반에서 막힌다.
+- **`graphemeLength`** — 사용자가 세는 "한 글자"(UAX #29 확장 그래핌 클러스터) 기준 길이. **어떤 이모지도 1로 센다** — 가족 ZWJ·피부톤·국기·키캡·태그 시퀀스 전부. `Intl.Segmenter`가 없으면 `codePointLength`로 폴백하는데, 그래핌 ≤ 코드포인트라 폴백은 항상 **더 엄격한** 쪽이어서 DB 거부를 만들지 않는다.
+  - ⚠ **본문(20,000자)에는 쓰지 않는다** — 20,000자 기준 1.5ms로 `codePointLength`(0.1ms)의 14배다(실측). 제목 120자는 0.011ms라 렌더 중에도 무해하다.
+- **`TextLimit` / `lengthOverflow`** — 길이 한도 **한 쌍**(그래핌=화면 · 코드포인트=DB 정합)과 그 판정. **길이 제한은 이걸로만 건다.**
+  - ⚠ **`graphemeLength(v) > MAX`를 직접 짜지 말 것.** 1그래핌의 코드포인트 수에 상한이 없어(`a`+결합악센트 50개 = 그래핌 1 / 코드포인트 51) 그래핌 한도가 DB `char_length` 한도를 함의하지 못한다. 코드포인트 검사를 빠뜨려도 **컴파일·린트·rls 검사 어느 것도 안 잡아주고**, 그 순간 사용자는 한국어 안내 대신 DB의 23514(또는 btree 인덱스의 영어 에러)를 본다. `parsePostId`·`safeNextPath`와 같은 이유로 규약을 함수 하나가 소유한다.
+  - 짝이 되는 상수는 features가 갖는다 — `TITLE_LIMIT`(`write-post`)·`COMMENT_LIMIT`(`write-comment`)·`NICKNAME_LIMIT`(`update-profile`). 값 표와 K=10 근거는 `api-and-db.md`.
+  - ⚠ **본문만 `TextLimit`이 아니다** — `CONTENT_MAX`(`write-post`, 20,000)는 코드포인트 **단일 값**이고 `lengthOverflow`가 아니라 `codePointLength`로 직접 검사한다. 그래핌을 도입하지 않은 이유(20,000자 계산이 1.5ms)는 `api-and-db.md`에 있다. 본문 길이를 건드릴 때 `TextLimit` 셋만 보고 지나치지 말 것.
 - **`useNextParam`** — 현재 URL의 `?next=`. `useSearchParams` 대신 쓴다(그걸 쓰면 화면 프리렌더가 CSR로 떨어진다).
 - **`useNowMs`** — 마운트 이후의 현재 시각(ms). 마운트 전에는 `null`.
   렌더 중 `Date.now()`를 부르지 않기 위한 훅이다. **시간에 따라 달라지는 표시(HOT 배지 등)는 이걸로 판정한다** — `null`인 첫 렌더에서는 그 표시를 그리지 않으면 서버·클라 출력이 같아진다. 선례: `entities/post`의 `isHotPost(post, nowMs)`.

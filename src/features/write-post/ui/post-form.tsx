@@ -3,12 +3,12 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { BarChart2, Hash, Image as ImageIcon, Link2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { codePointLength, hasVisibleChar } from "@/shared/lib";
+import { codePointLength, hasVisibleChar, lengthOverflow } from "@/shared/lib";
 import { Chip, Dialog, Icon, buttonClassName } from "@/shared/ui";
 import { POST_CATEGORIES, type PostCategory } from "@/entities/post";
 import {
   CONTENT_MAX,
-  TITLE_MAX,
+  TITLE_LIMIT,
   validatePost,
   type PostFieldErrors,
   type PostInput,
@@ -89,10 +89,13 @@ export function PostForm({
    */
   // ⚠ 길이는 **trim한 뒤** 잰다. zod가 `.trim()` 후 검사하므로 원본으로 재면 판정이 갈린다 —
   //   120자 제목 끝에 공백이 딸려오면(붙여넣기에서 흔하다) zod는 통과시키는데 버튼만 죽었다.
+  // ⚠ 제목 한도는 lengthOverflow가 두 단위를 함께 본다(postSchema와 같은 판정기).
+  //   그래핌 계산은 제목 길이(120자)에서 0.011ms라 렌더 중에 불러도 무해하다 —
+  //   본문에 쓰지 않는 이유가 여기 있다(20,000자면 1.5ms로 14배가 된다).
   const ready =
     category !== "" &&
     hasVisibleChar(title) &&
-    codePointLength(title.trim()) <= TITLE_MAX &&
+    !lengthOverflow(title.trim(), TITLE_LIMIT) &&
     hasVisibleChar(content) &&
     codePointLength(content.trim()) <= CONTENT_MAX;
 
