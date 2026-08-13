@@ -45,8 +45,16 @@ export function useFocusTrap(
         (el) => el.offsetParent !== null || el === document.activeElement,
       );
 
-    // 열리면 첫 항목으로 포커스를 옮긴다(없으면 컨테이너 자신 — tabIndex=-1을 붙여 둔다)
-    (focusables()[0] ?? container)?.focus();
+    /**
+     * 열리면 첫 항목으로 포커스를 옮긴다(없으면 컨테이너 자신 — tabIndex=-1을 붙여 둔다).
+     *
+     * ⚠ `preventScroll: true`가 필수다. `Sheet`의 진입 애니메이션은 첫 프레임이
+     *   `translateY(100%)`라 대상이 **프레임 밖**에 있는데, 그냥 `focus()`하면 브라우저가
+     *   scroll-into-view로 430px 앱 프레임을 스크롤시킨다. 프레임이 `overflow-hidden`이라
+     *   **사용자가 되돌릴 방법이 없어** 헤더·본문이 잘린 채 고정됐다(실측 190px).
+     *   오버레이는 이미 화면 안에 있으므로 스크롤이 필요한 경우가 애초에 없다.
+     */
+    (focusables()[0] ?? container)?.focus({ preventScroll: true });
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
