@@ -132,9 +132,12 @@ button {
    ⚠ @theme 토큰이 아니라 **일반 @keyframes**다 — 토큰 블록은 동결이므로 열지 않았다.
      소비는 arbitrary 유틸로 한다: animate-[cm-fade_0.2s_cubic-bezier(0.2,0,0,1)_both]
      (styling.md "그 외는 전부 인라인 arbitrary" 기준).
+   ⚠ duration·이징은 키프레임이 아니라 **소비처**에 있다. 진입은 ease-otb(감속) 0.2~0.28s,
+     **퇴장은 cubic-bezier(0.4,0,1,1)(가속) 0.14s** — 감속 커브를 퇴장에 쓰면 마지막 10%에
+     시간의 절반을 써서 잔상이 남는다(styling.md의 퇴장 예외 항목).
    ⚠ 스크림·다이얼로그는 **불투명도만** 움직인다. 기존 fade-up은 translateY가 섞여 있어
      화면 가운데 고정된 다이얼로그에는 쓸 수 없다.
-   위 prefers-reduced-motion 블록이 duration을 0.01ms로 눌러 자동으로 존중된다.
+   이 파일 말미의 prefers-reduced-motion 블록이 duration을 0.01ms로 눌러 자동으로 존중된다.
    ========================================================= */
 @keyframes cm-fade {
   from {
@@ -145,14 +148,35 @@ button {
   }
 }
 
-@keyframes cm-up {
+@keyframes cm-fade-out {
   from {
-    opacity: 0;
-    transform: translateY(16px);
+    opacity: 1;
   }
   to {
-    opacity: 1;
+    opacity: 0;
+  }
+}
+
+/* 바텀시트 진입/퇴장 — 화면 하단에 붙는 edge-to-edge 시트라 자기 높이만큼(100%) 오르내린다.
+   ⚠ 불투명도를 섞지 않는다. 시트는 사라지는 게 아니라 화면 밖으로 나가는 물건이고,
+     퇴장 중 반투명해지면 스크림 위에 겹쳐 색이 탁해진다.
+   ⚠ 소비하는 요소에 inline style transform을 함께 두지 말 것 — animation이 캐스케이드에서
+     inline style을 이긴다(sheet.tsx는 드래그 오프셋을 안쪽 래퍼로 분리해 두었다). */
+@keyframes cm-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
     transform: translateY(0);
+  }
+}
+
+@keyframes cm-sheet-out {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
   }
 }
 

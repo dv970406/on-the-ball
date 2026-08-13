@@ -93,6 +93,8 @@ const STYLE_ALLOWED = {
     "src/shared/ui/ratio-bar.tsx",
     "src/shared/ui/wordmark.tsx",
     "src/entities/post/ui/post-card.tsx",
+    // "대상이 아닌 것" — 바텀시트 그래버(드래그 어포던스, 클릭 대상이 아니다)
+    "src/shared/ui/sheet.tsx",
   ],
   // 그림자는 "떠 있는 레이어"만 — resting 카드·목록·헤더는 flat + 1px 헤어라인
   "shadow-": [

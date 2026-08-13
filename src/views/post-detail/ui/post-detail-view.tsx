@@ -30,7 +30,6 @@ import {
   Markdown,
   Pill,
   Sheet,
-  SheetCloseItem,
   SheetItem,
   Skeleton,
   buttonClassName,
@@ -304,7 +303,6 @@ export function PostDetailView({ postId }: { postId: number }) {
             </SheetItem>
           </>
         )}
-        <SheetCloseItem onClick={() => setSheetOpen(false)} />
       </Sheet>
 
       <Dialog

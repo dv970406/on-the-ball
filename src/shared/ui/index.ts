@@ -22,7 +22,9 @@ export { Chip } from "./chip";
 export { ActionChip } from "./action-chip";
 // 순수 함수라 Link 등 button이 아닌 요소에서도 같은 외형을 재사용할 수 있다 (buttonClassName과 같은 이유)
 export { actionChipClassName } from "./action-chip-class";
-export { Sheet, SheetItem, SheetCloseItem } from "./sheet";
+// 닫기 수단은 스크림 탭·Escape·그래버(탭·스와이프) — 별도 "닫기" 행을 두지 않는다.
+// 그래버가 `button aria-label="닫기"`를 겸하는 이유는 sheet.tsx 주석에 있다(스크린리더 탈출구).
+export { Sheet, SheetItem } from "./sheet";
 export { Dialog } from "./dialog";
 // 토스트의 상태(useToast·useToastStore)는 @/shared/lib에 있다 — ui는 뷰포트만 노출한다
 export { ToastViewport } from "./toast";
