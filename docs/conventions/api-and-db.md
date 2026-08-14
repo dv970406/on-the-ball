@@ -181,7 +181,7 @@ RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 
 | 본문 | — (도입 안 함) | 20,000 | `CONTENT_MAX` (단일) | `validatePost` |
 
 ⚠ **검증은 features 슬라이스가 소유하고 뷰는 문구만 받는다.** 세 슬라이스가 같은 형태를
-지켜야 한다 — 한때 `write-comment`만 한도 상수를 배럴로 내보내고 뷰가 분기를 직접 짰다.
+지켜야 한다 — 한 슬라이스만 한도 상수를 배럴로 내보내고 뷰가 분기를 직접 짜면 형태가 갈린다.
 
 ⚠ **본문은 일부러 그래핌으로 바꾸지 않았다.** 한도가 넓어 이모지가 체감되지 않는데 가장 큰
 컬럼이라 abuse bound를 10배로 푸는 대가가 크고, 20,000자 그래핌 계산이 **1.5ms로
@@ -204,10 +204,10 @@ RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 
 
 ## SECURITY DEFINER RPC
 
-쓰기가 RLS를 넘어야 할 때만 RPC로 내린다. `security definer` 함수의 **전량은 8개**다 — 새로 만들면 여기에 추가한다.
+쓰기가 RLS를 넘어야 할 때만 RPC로 내린다. `security definer` 함수의 **전량은 아래 표가 전부**다 — 새로 만들면 여기에 추가한다.
 
 > 검증: `select proname, prosecdef from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public'`
-> — 표와 실제가 갈리면 **보안 표면 목록이 거짓이 된 것**이다(실제로 3건이 잘못 올라와 있었다).
+> — 표와 실제가 갈리면 **보안 표면 목록이 거짓이 된 것**이다.
 
 | 종류 | 함수 | 비고 |
 |---|---|---|
@@ -216,7 +216,7 @@ RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 
 | 트리거 | **`handle_new_user`** (`on_auth_user_created`, `after insert on auth.users`) | 가입 시 `profiles` 행 생성. **호출자 권한으로 돌면 `profiles` insert 권한이 없어 가입 자체가 실패한다** |
 | 정책 헬퍼 | `post_is_alive` (`stable`) | `comment`의 select·insert 정책이 공유 — 인라인 서브쿼리를 쓰지 않는 이유는 아래 참고 |
 
-⚠ **아래 셋은 한때 이 표에 잘못 올라와 있었다** — 셋 다 `security definer`가 아니다.
+⚠ **아래 셋은 definer로 오해하기 쉽지만 아니다.**
 권한 없이도 도는 함수를 "RLS를 우회하는 함수"로 세어두면 보안 검토가 헛돈다.
 
 | 함수 | 왜 definer가 아닌가 |
@@ -225,8 +225,8 @@ RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 
 | `normalize_profile_nickname` | 쓰기 직전 `new.nickname`을 다듬을 뿐이라 호출자 권한으로 충분하다 |
 | `random_nickname` | 인자도 테이블 접근도 없는 순수 조합 생성기 |
 
-⚠ **`has_visible_char`·`normalize_nickname`은 처음부터 이 목록이 아니다**(잘못 올라와 있던 게 아니다).
-**CHECK 제약 평가 함수**라 성질이 반대다 — definer로 만들 게 아니라 오히려
+⚠ **CHECK 제약 평가 함수(`has_visible_char`·`normalize_nickname`)는 이 목록의 대상이 아니다.**
+성질이 반대다 — definer로 만들 게 아니라 오히려
 **그 테이블에 쓰는 역할에 EXECUTE를 열어야** 한다(바로 아래 항목).
 
 - **유저 id를 인자로 받지 않는다.** `security definer`는 RLS를 우회하므로 유저를 클라이언트가 넘기면 남의 명의로 조작할 수 있다. 함수 안에서 `auth.uid()`로 확정한다 — PostgREST가 access token을 검증해 `request.jwt.claims`에 심어둔 값이라 위조가 불가능하다. `security definer`가 바꾸는 것은 "무엇을 할 수 있는가"(권한)이지 "누가 호출했는가"(세션 컨텍스트)가 아니다.
@@ -364,5 +364,5 @@ RLS 술어가 security-barrier 서브쿼리 안으로 들어가 바깥의 `fk = 
 | — 시드 INSERT는 반드시 `begin;` **아래**에 | 위에 두면 오토커밋으로 새어나가 실행할 때마다 행이 쌓인다(실제로 그랬다) |
 | — 시각 비교 검사는 시드를 과거로 밀 것 | `now()`는 **트랜잭션 시작 시각**이라 한 트랜잭션 안에서 insert의 default와 트리거의 값이 같아진다 → "수정하면 updated_at이 바뀐다"를 증명할 수 없다 |
 | `supabase/tests/concurrency.sh` | 좋아요 동시성 — N명 동시 클릭 후 `like_count == count(post_like)` |
-| **`supabase/seed.sql`** | `db reset`이 **자동 실행**한다 — 계정(alice/bob)·글·댓글·좋아요. ⚠ 시드가 없던 시절에는 마이그레이션을 고칠 때마다 reset이 개발 데이터를 통째로 날렸다. 닉네임을 명시적으로 고정하는 이유는 랜덤 배정이면 섹션 13의 유일성 검사가 부딪힐 상대를 잃어 **조용히 무의미해지기** 때문이다 |
+| **`supabase/seed.sql`** | `db reset`이 **자동 실행**한다 — 계정(alice/bob)·글·댓글·좋아요. ⚠ 시드가 없으면 마이그레이션을 고칠 때마다 reset이 개발 데이터를 통째로 날린다. 닉네임을 명시적으로 고정하는 이유는 랜덤 배정이면 섹션 13의 유일성 검사가 부딪힐 상대를 잃어 **조용히 무의미해지기** 때문이다 |
 | **`supabase/tests/run-rls.sh`** | rls.sql을 돌리고 **양방향으로** 대조한다 — ① 기대하지 않은 ERROR ② **차단 기대인데 통과한 것**. ②를 안 보면 로그가 깨끗한 채로 검사가 죽어 있다(실제로 2건이 그랬다) |

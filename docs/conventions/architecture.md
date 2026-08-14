@@ -40,7 +40,7 @@ shared ← entities ← features ← widgets ← views
 
 배럴은 "무엇을 노출하지 않을지"도 정한다. `"use client"` 훅이나 `next/headers` 의존 모듈이 잘못된 런타임으로 새지 않게 한다.
 
-Route Handler가 없어지면서 **서버 소비자는 `generateMetadata`와 서버 컴포넌트(page·layout)로 바뀌었다.** 규칙의 형태는 그대로고 주어만 옮겨왔다.
+**서버 소비자는 `generateMetadata`와 서버 컴포넌트(page·layout)다.**
 
 - `@/shared/api` — 클라이언트 안전 모듈만 노출. 서버 전용(`supabase-server` = `next/headers` 의존)은 **직접 경로**로 import: `@/shared/api/supabase-server`.
 - `@/shared/lib` — `"use client"` 훅(`useScrollRestore`·`useNowMs`·`useToast`·`useFocusTrap`·`useNextParam`) 포함. **서버에서는 순수 함수를 직접 경로로 import**: `@/shared/lib/cn`·`format`·`post-id`·`text`. 이 네 경로가 곧 화이트리스트이고 **단일 소스는 `src/shared/lib/index.ts` 말미의 주석**이다.

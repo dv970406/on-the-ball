@@ -30,8 +30,7 @@
 - `useToast` / `useToastStore` — 토스트 발행. **표시 영역(`ToastViewport`)은 `@/shared/ui`에 있고 루트에 하나만 둔다** — 상태와 UI가 레이어를 달리한다
 
 > ⚠ **이 배럴에는 호출부가 0인 export를 두지 않는다.** 검증은 `pnpm check:conventions`가 한다(화이트리스트 없이 전수 판정).
-> `shared/ui`의 미사용 자산과 **정책이 갈리는데**, 그건 의도한 것이다 — 순수 함수는 git 이력에서 그대로 복원되고(`docs/legacy/v1-inventory.md`가 `design_handoff_ontheball/`에 이미 같은 처리를 한다: "실물은 `6de2618^` 이전 이력에서 꺼낸다"), 배럴 export가 **재사용 목록을 오염시키는 비용**이 더 크다. 컴포넌트는 프로토타입 치수·상태 조합이 함께 사라져 재현 비용이 다르다.
-> 실제로 `formatPct`·`formatDday`·`isClosed`·`todayUtc`·`formatYearMonth`·`useDelayedReveal` 6개가 호출부 0인 채 이 목록 최상단에 현역처럼 올라와 있었다.
+> `shared/ui`의 미사용 자산과 **정책이 갈리는데**, 그건 의도한 것이다 — 순수 함수는 git 이력에서 그대로 복원되고(`docs/legacy/v1-inventory.md`가 v1 자산에 이미 같은 처리를 한다: "실물은 이전 이력에서 꺼낸다"), 배럴 export가 **재사용 목록을 오염시키는 비용**이 더 크다. 컴포넌트는 프로토타입 치수·상태 조합이 함께 사라져 재현 비용이 다르다.
 
 ## `@/types/database.types` (생성 파일 — `pnpm db:types`)
 - `Database` — supabase 스키마 전체. **DB 행 타입을 손으로 적지 말고 여기서 뽑는다.**
@@ -95,17 +94,16 @@
 
 **현재 미사용** — 트리셰이킹되어 번들 비용은 0이니 지우지 않는다. 다만 **"검증된 현역"으로 오인하지 말 것**:
 `TabHeader`·`MarkdownEditor`·`Flag`·`Shirt`·`RatioBar`·`SectionHead`·`LiveDot`·`LiveStatusPill`·`NightCard`·`PlayerSilhouette`
-(`MarkdownEditor`를 뺀 9개가 `docs/legacy/v1-inventory.md`가 보존 대상으로 명시한 v1 자산이다. `MarkdownEditor`는 v2에서 만들었다가 프로토타입에 미리보기 탭이 없어 쓰이지 않는다)
+(`MarkdownEditor`를 뺀 나머지가 `docs/legacy/v1-inventory.md`가 보존 대상으로 명시한 v1 자산이다. `MarkdownEditor`는 v2에서 만들었다가 프로토타입에 미리보기 탭이 없어 쓰이지 않는다)
 
 > ⚠ 이 두 목록은 **실사용 여부로만 판정한다** — 손으로 세지 말고 **`pnpm check:conventions`** 를 돌린다(호출부 0인 export를 전수로 뽑아 준다).
-> 커뮤니티 이식 때 실제로 어긋났다 — `TabHeader`·`MarkdownEditor`는 현역으로 적혀 있었지만 호출부가 0이었고, 반대로 `Pill`·`Avatar`·`Wordmark`는 v1 미사용으로 적혀 있는 채 화면에서 쓰이고 있었다.
 > **이 문서의 존재 이유가 "새로 만들기 전 확인"이라 목록이 틀리면 문서가 없느니만 못하다.** UI를 추가·제거하면 여기부터 고친다.
 
 - `Markdown` — 마크다운 렌더(GFM). `"use client"` **없음** — 서버 렌더 가능.
 - `Chip` — 말머리 칩. **`rounded-sm`(6px)** 이다 — 칩이라고 알약이 아니다(`styling.md` 예외 목록 참고).
 - `ActionChip` / `actionChipClassName` — 좋아요·댓글 카운터 칩. 클래스 함수가 분리된 이유는 `Button`↔`buttonClassName`과 같다 — 비로그인 좋아요는 `Link`로 렌더해야 하는데 `Link` 안에 `button`을 넣을 수 없어 **클래스만** 필요하다.
 - `Dialog` / `Sheet`(+`SheetItem`) — 확인 대화상자 / 하단 시트. 포커스 가둠은 `@/shared/lib`의 `useFocusTrap`.
-  - `Sheet`는 화면 하단에 붙는 **edge-to-edge** 시트다(`styling.md`). "닫기" 행을 두지 않는다 — `SheetCloseItem`은 그래서 없앴다.
+  - `Sheet`는 화면 하단에 붙는 **edge-to-edge** 시트다(`styling.md`). "닫기" 행을 두지 않는다.
   - ⚠ 닫기 수단은 스크림 탭 · Escape · 스와이프인데 **셋 다 포인터이거나 물리 키보드다.** 그래서 그래버가 `button aria-label="닫기"`를 겸한다 — 오버플로 메뉴는 남의 글이면 항목이 전부 `disabled`라 **시트 안 활성 컨트롤이 0개**가 되고, 그때 스크린리더·키보드의 유일한 탈출구가 이 버튼이다. `div`로 되돌리지 말 것.
   - ⚠ 진입·퇴장 애니메이션은 **바깥 요소**, 드래그 오프셋은 **안쪽 래퍼**가 갖는다. 한 요소에 겹치면 CSS animation이 캐스케이드에서 inline style을 이겨 드래그가 통째로 무시된다. 새 오버레이에 드래그를 붙일 때 같은 함정을 밟지 말 것.
 - `ToastViewport` — 루트(`AppProviders`)에 **하나만** 둔다. 발행 API(`useToast`)는 `@/shared/lib`에 있다.
@@ -117,6 +115,6 @@
 - `BottomTabBar` — 하단 탭바. **`backdrop-blur`가 허용된 유일한 요소**다(`styling.md`).
 - `SubHeader` — 상세·작성·수정 화면 상단(뒤로가기 + 공유).
 - `TabScrollArea` — 목록 스크롤 영역(`<main>` 제공 + 스크롤 복원).
-- `AuthShell` — 인증 화면의 공통 껍데기. 소셜 로그인으로 바뀌면서 소비자는 `/sign-in` 하나다.
+- `AuthShell` — 인증 화면의 공통 껍데기.
 - `AuthStatus` — 세션 표시 + 로그인 링크 / 로그아웃. 세션을 아는 레이어라 `useProfileQuery(user?.id)`에 id를 넘기는 선례이기도 하다.
-  **닉네임이 `/profile` 링크다 — 현재 프로필 화면의 유일한 진입점**(하단 탭바의 "내 활동"에는 아직 라우트가 없다). ⚠ 조회 실패로 닉네임이 비면 라벨 없는 링크가 되므로 폴백 문구를 둔다.
+  **닉네임이 `/profile` 링크다.** ⚠ 이 링크를 없애려면 **대체 진입점을 먼저 만든다** — 프로필 화면으로 가는 다른 경로가 있는지 확인하지 않고 지우면 화면이 도달 불가능해진다. ⚠ 조회 실패로 닉네임이 비면 라벨 없는 링크가 되므로 폴백 문구를 둔다.
