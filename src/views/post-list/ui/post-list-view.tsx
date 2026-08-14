@@ -12,7 +12,6 @@ import {
 	type PostCategory,
 	type PostSort,
 	usePostListQuery,
-	useTodayPostCountQuery,
 } from "@/entities/post";
 import { ROUTES } from "@/shared/config";
 import { cn, formatCount } from "@/shared/lib";
@@ -34,7 +33,6 @@ export function PostListView() {
 			category,
 			sort,
 		});
-	const todayCount = useTodayPostCountQuery();
 
 	const posts = data?.items;
 
@@ -44,30 +42,14 @@ export function PostListView() {
 				{/* 세션 표시는 프로토타입에 없지만, 없으면 로그아웃 진입점이 앱에서 사라진다 — AppBar 주석 참고 */}
 				<AppBar leading={<AuthStatus />} />
 
-				<header className="px-5 pb-0.5 pt-[18px]">
-					<h1 className="text-[26px] font-medium tracking-[-0.9px] text-ink">
-						커뮤니티
-					</h1>
-					{/*
-            ⚠ 조회가 끝나기 전이거나 실패했을 때 **0을 단정하지 않는다.** `?? 0`으로 두었더니
-              오늘 글이 12개인데 "오늘 0개의 글이 올라왔어요"를 찍고, 바로 아래 목록에는
-              오늘 글이 보여 화면이 스스로 모순됐다. 같은 판단이 queries.ts에도 적혀 있다 —
-              "count가 null이면 화면 라벨이 0을 찍는 것보다 실제 개수가 낫다".
-          */}
-					<p className="mt-1.5 text-[13px] text-ink-mute">
-						{todayCount.data === undefined ? (
-							"오늘 올라온 글을 세는 중이에요"
-						) : (
-							<>
-								오늘{" "}
-								<span className="font-mono tabular-nums text-ink">
-									{formatCount(todayCount.data)}
-								</span>
-								개의 글이 올라왔어요
-							</>
-						)}
-					</p>
-				</header>
+				{/*
+          ⚠ 화면 제목은 **sr-only**다. 첫 화면의 가장 값진 세로 공간(약 90px)을 "커뮤니티"
+            큰 제목과 "오늘 N개의 글이 올라왔어요"가 쓰고 있었는데, 둘 다 새 정보가 아니다 —
+            현재 탭은 하단 탭바가 이미 알리고, 오늘 글 수는 바로 아래 목록이 보여준다.
+            대신 문서 개요는 남겨야 하므로 제목 자체를 지우지는 않는다(글 작성·수정·프로필이
+            같은 처리를 한다).
+        */}
+				<h1 className="sr-only">커뮤니티</h1>
 
 				{/*
           말머리 레일 — 가로 스크롤, 스크롤바 숨김.
@@ -76,11 +58,14 @@ export function PostListView() {
           ⚠ role="radiogroup"이 의미상 더 정확하지만(단일 선택), 그러면 화살표 키 이동 +
             roving tabindex까지 구현해야 규격에 맞는다. 그걸 갖추기 전까지는 키보드 모델을
             거짓으로 알리지 않도록 group + aria-pressed를 유지한다.
+          ⚠ 상하 패딩이 비대칭이다(위 18px · 아래 12px). 헤더를 걷어내면서 이 레일이 스크롤
+            영역의 첫 요소가 됐는데, 12px 대칭으로 두면 스티키 앱바의 헤어라인에 칩이 붙어
+            두 영역이 한 덩어리로 읽힌다. 걷어낸 헤더의 pt와 같은 값이다.
         */}
 				<div
 					role="group"
 					aria-label="말머리"
-					className="no-scrollbar flex gap-1.5 overflow-x-auto px-5 py-3"
+					className="no-scrollbar flex gap-1.5 overflow-x-auto px-5 pb-3 pt-4.5"
 				>
 					<Chip selected={category === null} onClick={() => setCategory(null)}>
 						전체

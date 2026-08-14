@@ -25,10 +25,5 @@ export {
 } from "./api/mappers";
 export { toPlainSummary, clamp } from "./lib/plain-summary";
 export { isHotPost, HOT_LIKE_THRESHOLD, HOT_WINDOW_MS } from "./lib/hot";
-export {
-  usePostListQuery,
-  useTodayPostCountQuery,
-  usePostQuery,
-  POST_LIST_LIMIT,
-} from "./api/queries";
+export { usePostListQuery, usePostQuery, POST_LIST_LIMIT } from "./api/queries";
 export { PostCard } from "./ui/post-card";

@@ -2,8 +2,6 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
-// 이 파일은 "use client"라 배럴을 그대로 쓴다 — 직접 경로 예외는 **서버 모듈**을 위한 것이다
-import { startOfTodaySeoul } from "@/shared/lib";
 import type { PostListFilters, PostListPage } from "../model/types";
 import { postKeys } from "./keys";
 import {
@@ -67,31 +65,6 @@ export function usePostListQuery(filters: PostListFilters) {
       const items = (data ?? []).map(buildPostListItem);
       // count가 null인 경우(헤드 요청 실패 등)는 화면 라벨이 0을 찍는 것보다 실제 개수가 낫다
       return { items, total: count ?? items.length };
-    },
-  });
-}
-
-/**
- * 오늘(한국 기준) 올라온 글 수 — 목록 헤드의 "오늘 N개의 글이 올라왔어요".
- * head: true라 행을 받지 않고 카운트만 가져온다.
- */
-export function useTodayPostCountQuery() {
-  return useQuery<number, Error>({
-    queryKey: postKeys.todayCount(),
-    queryFn: async () => {
-      const supabase = requireBrowserSupabase();
-      // ⚠ 시각은 queryFn 안에서만 읽는다 — queryKey에 넣으면 매 렌더 새 키가 되고,
-      //   렌더 중에 부르면 하이드레이션 규약(Date.now 금지)을 어긴다.
-      const { count, error } = await supabase
-        .from("post")
-        .select("id", { count: "exact", head: true })
-        .gte("created_at", startOfTodaySeoul());
-
-      if (error) {
-        console.error("[post] 오늘 글 수 조회 실패:", error);
-        throw new Error(toDbErrorMessage(error));
-      }
-      return count ?? 0;
     },
   });
 }

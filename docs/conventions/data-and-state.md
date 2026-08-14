@@ -67,7 +67,7 @@ TanStack Query는 성공 후 리페치가 실패해도 `data`를 유지한다(`s
 
 ## 하이드레이션
 
-- 렌더 중 `Date.now()` / `new Date()` / `Math.random()` **직접 호출 금지**. 날짜 표시는 헬퍼로(`formatRelativeTime`), 시각에 따라 달라지는 판정은 `useNowMs`로, 하루 경계는 queryFn 안에서 `startOfTodaySeoul`로.
+- 렌더 중 `Date.now()` / `new Date()` / `Math.random()` **직접 호출 금지**. 날짜 표시는 헬퍼로(`formatRelativeTime`), 시각에 따라 달라지는 판정은 `useNowMs`로, 하루 경계처럼 시각을 읽어야 하는 조회 조건은 **queryFn 안에서만** 계산한다(queryKey에 넣으면 매 렌더 새 키가 된다).
 - ⚠ **헬퍼가 하이드레이션 안전을 보장하지는 않는다.** `formatRelativeTime`은 내부에서 `Date.now()`를 호출한다. 현재 목록·상세가 전부 클라이언트 쿼리라 SSR HTML이 항상 스켈레톤이어서 안전할 뿐이다.
 - **서버 프리페치를 붙이는 순간 깨진다.** 지배 변수는 SSR↔하이드레이션 지연이 아니라 **사용자 기기의 시계 오차**다(서버는 NTP 동기 시각, 브라우저는 기기 시각). 그때는 응답에 **서버 기준 시각을 실어 초기 렌더에 쓰거나**, 카드에 절대시각을 렌더하고 상대시각은 마운트 후 교체한다.
 - `suppressHydrationWarning`으로 덮지 않는다(원인 은폐). Vercel 스킬 `rendering-hydration-suppress-warning`도 이 규칙보다 우선하지 않는다.

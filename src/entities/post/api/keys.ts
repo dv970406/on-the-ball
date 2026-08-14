@@ -14,9 +14,4 @@ export const postKeys = {
   list: (filters: PostListFilters) => [...postKeys.lists(), filters] as const,
   details: () => [...postKeys.all, "detail"] as const,
   detail: (id: number) => [...postKeys.details(), id] as const,
-  /**
-   * ⚠ lists() prefix에 **걸리지 않는다.** 글을 써도 "오늘 N개"가 그대로 남으므로
-   *   use-create-post가 이 키를 따로 무효화한다(use-delete-post는 postKeys.all이라 자동).
-   */
-  todayCount: () => [...postKeys.all, "today-count"] as const,
 } as const;

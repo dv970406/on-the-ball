@@ -36,9 +36,6 @@ export function useCreatePost() {
     //   버튼이 "등록 중…"인 채 이동이 지연된다(삭제 훅과 같은 규약).
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: postKeys.lists() });
-      // ⚠ todayCount는 lists() prefix에 걸리지 않는다 — 따로 무효화하지 않으면
-      //   글을 올려도 목록 헤드의 "오늘 N개"가 그대로 남는다.
-      void queryClient.invalidateQueries({ queryKey: postKeys.todayCount() });
     },
   });
 }

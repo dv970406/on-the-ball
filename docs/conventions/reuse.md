@@ -4,8 +4,6 @@
 
 ## `@/shared/lib/format` (순수 함수 — 서버·클라 공용)
 - `formatCount` — 숫자 → `"28,412"`
-- **`startOfTodaySeoul`** — 오늘(한국 기준) 00:00의 ISO 시각. "오늘 N개의 글" 같은 하루 경계에 쓴다.
-  ⚠ **UTC 자정으로 대신하지 말 것** — 그건 Postgres `current_date`와 맞추기 위한 값이라 한국 사용자에게는 **오전 0~9시 사이 "오늘"이 어제가 된다**. 내부에서 `Date.now()`를 부르므로 렌더 중이 아니라 queryFn 안에서만 호출한다.
 - `formatRelativeTime` — 과거 시각 → `"방금 전"`/`"3분 전"`/`"2시간 전"`/`"5일 전"`, 7일↑은 `"7월 30일"`, **해가 다르면 `"2025년 7월 30일"`**.
   - 연도를 붙이는 이유: 전에는 무조건 `"7월 30일"`이라 **작년 글이 올해 글과 구분되지 않았다**(`<time dateTime>`은 정확한데 화면 텍스트만 거짓말).
   - ⚠ **내부에서 `Date.now()`·`new Date()`를 쓴다.** 그런데 실제 호출부(`post-card.tsx`·`post-detail-view.tsx`·`comment-item.tsx`)는 이 함수를 **렌더 중에** 부른다 — 목록·상세가 전부 클라이언트 쿼리라 **SSR HTML이 항상 스켈레톤이어서** 지금은 안전할 뿐이다. 서버 프리페치를 붙이는 순간 깨진다(`data-and-state.md` 하이드레이션 절).
@@ -58,7 +56,7 @@
 
 ## `@/entities/post` · `@/entities/comment`
 - `postKeys` / `commentKeys` — 쿼리 키. 낙관적 업데이트가 prefix 매칭에 의존하므로 계층을 지킨다.
-- `usePostListQuery` / `usePostQuery` / `useCommentListQuery` / `useTodayPostCountQuery`
+- `usePostListQuery` / `usePostQuery` / `useCommentListQuery`
 - `POST_LIST_LIMIT` / `COMMENT_LIST_LIMIT` — 목록 상한. **화면이 잘림을 안내해야 한다** — 조용히 자르면 그 뒤 항목은 URL을 아는 사람 말고는 도달할 방법이 없다.
 - `POST_LIST_SELECT` / `POST_DETAIL_SELECT` / `COMMENT_SELECT` — PostgREST select 문자열의 단일 소스.
   - ⚠ **아바타(`avatar_path`)는 상세·댓글에만 있고 목록에는 일부러 없다** — 목록 카드에 아바타 자리가 없어서다(프로토타입). 누락이 아니니 되넣지 말 것. 그래서 임베딩도 `AUTHOR_EMBED`(목록)와 `AUTHOR_EMBED_DETAIL`(상세)로 갈라져 있다.
