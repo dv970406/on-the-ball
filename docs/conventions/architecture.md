@@ -71,7 +71,7 @@ shared ← entities ← features ← widgets ← views
 
 ## 파일·네이밍
 
-- 파일명은 **kebab-case** (`split-card.tsx`, `use-cast-vote.ts`, `option-meta.ts`).
+- 파일명은 **kebab-case** (`post-card.tsx`, `use-create-post.ts`, `plain-summary.ts`).
 - 컴포넌트·함수는 **named export** (`page`·`layout`·`template`·`error`·`global-error`·`not-found`의 default export는 Next 요구사항이라 예외).
 - 주석·문서는 **한국어**, 변수·함수명은 영어.
 - 슬라이스 내부 구조: `ui/`(프레젠테이션) · `model/`(상태·타입·훅) · `api/`(쿼리·매퍼) · `lib/`(순수 유틸) + `index.ts`.

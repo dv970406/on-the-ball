@@ -394,6 +394,86 @@ for (const [needle, allowed] of Object.entries(STYLE_ALLOWED)) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// 7. 규약 문서가 가리키는 경로가 실재하는가 (양방향)
+//    AGENTS.md "사라진 심볼·파일을 규칙의 주어로 삼지 않는다"를 기계가 대조한다 —
+//    독자가 열어볼 수 없는 이름에 규칙이 묶이면 규칙째 죽는다.
+//    ⚠ walk()는 .ts|.tsx만 모으므로(위 "파일 수집") 마크다운은 여기서 직접 읽는다.
+// ─────────────────────────────────────────────────────────────
+
+const DOC_FILES = [
+  "AGENTS.md",
+  ...readdirSync(p("docs/conventions"))
+    .filter((f) => f.endsWith(".md"))
+    .map((f) => `docs/conventions/${f}`),
+];
+
+/** 백틱 토큰 중 **경로꼴**만 판정한다. 라우트 문자열·Tailwind 유틸·SQL 식별자는 대상이 아니다. */
+const DOC_PATH_PREFIX = /^(@\/|src\/|app\/|supabase\/|scripts\/|docs\/|\.claude\/)/;
+const DOC_PATH_EXT = /\.(ts|tsx|md|sql|sh|css|json)$/;
+/**
+ * 판정 대상에서 빼는 것 — 애초에 실물을 가리키지 않는 표기다.
+ * 글로브(별표를 낀 경로) · 마이그레이션 파일명 템플릿(YYYY…) · 명령문(공백 포함) · 외부 패키지.
+ */
+const DOC_PATH_SKIP = /[*?\s]|YYYY|^node_modules\//;
+
+/** 문서가 예시로만 쓰는 가상 경로. 실물이 없어도 되는 사유를 적는다(양방향 검사). */
+const DOC_PATH_EXEMPT = new Map([]);
+
+/** 저장소 전체 파일 목록 — 문서의 생략형을 접미사로 맞추기 위해 필요하다. */
+function walkAll(dir, out = []) {
+  if (!existsSync(dir)) return out;
+  for (const name of readdirSync(dir)) {
+    if (name === "node_modules" || name === ".git" || name === ".next") continue;
+    const abs = join(dir, name);
+    if (statSync(abs).isDirectory()) walkAll(abs, out);
+    else out.push(rel(abs));
+  }
+  return out;
+}
+const allPaths = walkAll(ROOT);
+
+/**
+ * 문서가 쓰는 표기 변형을 전부 흡수한다:
+ * `@/` 별칭 · `src/` 생략(`shared/ui/sheet.tsx`) · 파일명만(`post-card.tsx`) ·
+ * 문서끼리 상대 참조(`styling.md`) · `supabase/tests/` 생략(`rls.sql`) · 디렉터리 → `index.ts`.
+ * ⚠ 접미사로 맞추되 **경계(`/`)를 지킨다** — 그래야 `src/없는/경로/post-card.tsx`가 통과하지 않는다.
+ */
+function docPathResolves(token) {
+  const t = (token.startsWith("@/") ? `src/${token.slice(2)}` : token).replace(/\/$/, "");
+  for (const cand of [t, `${t}.ts`, `${t}.tsx`, `${t}/index.ts`]) {
+    if (existsSync(p(cand))) return true;
+    if (allPaths.some((f) => f === cand || f.endsWith(`/${cand}`))) return true;
+  }
+  return false;
+}
+
+const docExemptSeen = new Set();
+for (const doc of DOC_FILES) {
+  readFileSync(p(doc), "utf8")
+    .split("\n")
+    .forEach((line, i) => {
+      for (const m of line.matchAll(/`([^`\n]+)`/g)) {
+        const token = m[1];
+        if (!DOC_PATH_PREFIX.test(token) && !DOC_PATH_EXT.test(token)) continue;
+        if (DOC_PATH_SKIP.test(token)) continue;
+        if (DOC_PATH_EXEMPT.has(token)) {
+          docExemptSeen.add(token);
+          continue;
+        }
+        if (!docPathResolves(token))
+          fail(
+            "doc-dead-path",
+            `${doc}:${i + 1} \`${token}\` — 규약 문서가 없는 경로를 가리킨다(고치거나 DOC_PATH_EXEMPT에 사유를 적는다)`,
+          );
+      }
+    });
+}
+for (const token of DOC_PATH_EXEMPT.keys()) {
+  if (!docExemptSeen.has(token))
+    fail("doc-dead-path", `\`${token}\`가 DOC_PATH_EXEMPT에 있는데 문서에서 사라졌다 — 목록을 정리한다`);
+}
+
+// ─────────────────────────────────────────────────────────────
 // 결과
 // ─────────────────────────────────────────────────────────────
 
