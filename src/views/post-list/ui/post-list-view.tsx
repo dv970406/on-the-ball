@@ -81,7 +81,7 @@ export function PostListView() {
 					))}
 				</div>
 
-				{/* 정렬 행 + 현재 필터의 전체 건수 (그룹 경계·이름은 말머리 레일과 같은 이유) */}
+				{/* 정렬 행 (그룹 경계·이름은 말머리 레일과 같은 이유) */}
 				<div
 					role="group"
 					aria-label="정렬"
@@ -101,10 +101,6 @@ export function PostListView() {
 							{POST_SORT_LABEL[item]}
 						</button>
 					))}
-					<span className="ml-auto font-mono text-[10px] tabular-nums tracking-[0.3px] text-ink-faint">
-						{/* ⚠ 로딩·에러에 0을 단정하지 않는다 — 옆의 스켈레톤/에러 박스와 모순된다 */}
-						{data ? `${formatCount(data.total)} POSTS` : "POSTS"}
-					</span>
 				</div>
 
 				{isPending && <PostListSkeleton />}
@@ -171,8 +167,8 @@ export function PostListView() {
 				{/*
           잘림 안내 — 댓글 목록과 같은 규칙이다. 없으면 31번째 글부터는 화면에서 사라진 채
           사용자에게 아무 단서도 남지 않는다.
-          ⚠ 판정은 **응답 길이만으로** 한다. data.total(서버 카운트)과 비교하면
-            리페치 시점 차이로 잘못 뜬다 — total은 `N POSTS` 라벨 전용이다.
+          ⚠ 판정은 **응답 길이만으로** 한다. 서버 카운트와 비교하면 리페치 시점이 달라
+            잘못된 안내가 뜬다.
         */}
 				{posts && posts.length >= POST_LIST_LIMIT && (
 					<p className="px-5 pt-3 text-center text-[12px] text-ink-mute-2">

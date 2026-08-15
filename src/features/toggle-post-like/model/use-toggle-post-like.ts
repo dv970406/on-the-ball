@@ -68,7 +68,6 @@ export function useTogglePostLike(postId: number) {
       };
 
       // setQueryData가 아니라 setQueriesData(복수형) — 목록 캐시가 여러 키에 존재할 수 있다.
-      // total은 좋아요로 바뀌지 않으므로 items만 손댄다.
       queryClient.setQueriesData<PostListPage>({ queryKey: postKeys.lists() }, (old) =>
         old ? { ...old, items: old.items.map((post) => toggled(post, postId)) } : old,
       );

@@ -25,8 +25,6 @@ export const POST_LIST_LIMIT = 30;
  * 삭제된 글은 RLS의 post_select_alive가 걸러주므로 .is("deleted_at", null)을 붙이지 않는다.
  * 필터를 쿼리마다 반복하면 한 곳만 빠뜨려도 삭제된 글이 새기 때문에, 정책에 박아 두었다.
  *
- * ⚠ count: "exact"로 **목록과 `N POSTS`를 한 왕복에** 얻는다. 카운트를 별도 쿼리로 빼면
- *   필터를 바꿀 때마다 왕복이 2배가 된다.
  * ⚠ placeholderData: 필터를 바꿀 때마다 새 캐시 키라 그냥 두면 isPending이 되어 스켈레톤이
  *   튄다("로딩 중 레이아웃이 튀지 않게 한다" — data-and-state.md).
  */
@@ -36,7 +34,7 @@ export function usePostListQuery(filters: PostListFilters) {
     placeholderData: keepPreviousData,
     queryFn: async () => {
       const supabase = requireBrowserSupabase();
-      let query = supabase.from("post").select(POST_LIST_SELECT, { count: "exact" });
+      let query = supabase.from("post").select(POST_LIST_SELECT);
 
       if (filters.category !== null) query = query.eq("category", filters.category);
 
@@ -54,7 +52,7 @@ export function usePostListQuery(filters: PostListFilters) {
         query = query.order("created_at", { ascending: false });
       }
 
-      const { data, error, count } = await query
+      const { data, error } = await query
         .order("id", { ascending: false })
         .limit(POST_LIST_LIMIT);
 
@@ -62,9 +60,7 @@ export function usePostListQuery(filters: PostListFilters) {
         console.error("[post] 목록 조회 실패:", error);
         throw new Error(toDbErrorMessage(error));
       }
-      const items = (data ?? []).map(buildPostListItem);
-      // count가 null인 경우(헤드 요청 실패 등)는 화면 라벨이 0을 찍는 것보다 실제 개수가 낫다
-      return { items, total: count ?? items.length };
+      return { items: (data ?? []).map(buildPostListItem) };
     },
   });
 }

@@ -98,13 +98,11 @@ export interface PostListItem {
 /**
  * 목록 응답.
  *
- * ⚠ total은 화면의 `N POSTS` 라벨 **전용**이다. "잘렸는지" 판정에 쓰지 않는다 —
- *   목록 배열과 서버 카운트는 리페치 시점이 달라 잘못된 안내가 뜬 적이 있다.
- *   잘림 판정은 items.length >= POST_LIST_LIMIT 하나로만 한다.
+ * ⚠ 잘림 판정은 items.length >= POST_LIST_LIMIT 하나로만 한다. 서버 카운트(count: "exact")를
+ *   함께 받아 비교하면 목록 배열과 리페치 시점이 달라 잘못된 안내가 뜬다.
  */
 export interface PostListPage {
   items: PostListItem[];
-  total: number;
 }
 
 /**
