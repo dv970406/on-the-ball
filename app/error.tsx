@@ -26,7 +26,7 @@ export default function AppError({
   return (
     // main·h1을 직접 둔다 — 이 바운더리가 뜨면 화면 셸까지 대체되어
     // 문서에 랜드마크도 heading도 남지 않는다(EmptyState의 title은 <p>다).
-    <main className="flex h-full items-center justify-center bg-canvas">
+    <main className="flex min-h-0 flex-1 items-center justify-center bg-canvas">
       <h1 className="sr-only">화면을 표시하지 못했어요</h1>
       <EmptyState
         icon={CircleAlert}

@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: "페이지를 찾을 수 없어요" }
  */
 export default function NotFound() {
   return (
-    <main className="flex h-full items-center justify-center bg-canvas">
+    <main className="flex min-h-0 flex-1 items-center justify-center bg-canvas">
       <h1 className="sr-only">페이지를 찾을 수 없어요</h1>
       <EmptyState
         icon={Compass}

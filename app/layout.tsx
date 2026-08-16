@@ -49,8 +49,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <AppProviders>
-          {/* 모바일 전용 프레임 — 데스크톱에서는 430px 센터 고정 */}
-          <div className="relative mx-auto h-dvh max-w-[430px] overflow-hidden bg-canvas sm:border-x sm:border-hairline-cool">
+          {/*
+            모바일 전용 프레임 — 데스크톱에서는 430px 센터 고정.
+
+            ⚠ **`flex flex-col`이어야 한다.** 전에는 블록이라, 흐름에 자리를 차지하는
+              `SubHeader`(71px)와 `h-full`인 `<main>`이 형제로 놓이면 프레임이 그 높이만큼
+              넘쳤다. 프레임은 `overflow-hidden`이라 포커스가 이동해 한 번 밀리면
+              **사용자가 되돌릴 수 없다**(실측 71px). 스크롤 컨테이너는 `h-full`이 아니라
+              `min-h-0 flex-1`을 써서 남는 높이만 차지한다.
+          */}
+          <div className="relative mx-auto flex h-dvh max-w-[430px] flex-col overflow-hidden bg-canvas sm:border-x sm:border-hairline-cool">
             {children}
           </div>
         </AppProviders>

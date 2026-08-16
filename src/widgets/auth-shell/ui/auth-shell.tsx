@@ -20,7 +20,9 @@ interface AuthShellProps {
  */
 export function AuthShell({ title, description, children, belowForm }: AuthShellProps) {
   return (
-    <main className="flex min-h-dvh flex-col px-7 pb-[max(34px,env(safe-area-inset-bottom))] pt-[max(16px,env(safe-area-inset-top))]">
+    // ⚠ `min-h-dvh`가 아니라 `min-h-0 flex-1` — 프레임이 flex 컬럼이고 overflow-hidden이라,
+    //   화면이 작아 내용이 넘치면 잘린 부분에 **도달할 방법이 없다**. 넘칠 때만 스크롤시킨다.
+    <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-7 pb-[max(34px,env(safe-area-inset-bottom))] pt-[max(16px,env(safe-area-inset-top))]">
       <div className="flex flex-1 flex-col justify-center py-14">
         <h1 className="text-pretty text-[30px] font-medium leading-[1.3] tracking-[-1px] text-ink">
           {title}
