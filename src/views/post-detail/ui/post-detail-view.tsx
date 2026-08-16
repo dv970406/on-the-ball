@@ -21,13 +21,15 @@ import {
   Dialog,
   EmptyState,
   Icon,
-  Markdown,
   Pill,
   Sheet,
   SheetItem,
   Skeleton,
   buttonClassName,
 } from "@/shared/ui";
+// ⚠ 배럴이 아니라 직접 경로다 — 배럴에 실으면 react-markdown이 **전 라우트**의 초기 JS에
+//   들어간다(shared/ui/index.ts 주석에 실측치). 본문을 그리는 이 화면만 대가를 치른다.
+import { Markdown } from "@/shared/ui/markdown";
 import { SubHeader } from "@/widgets/sub-header";
 import { isEdited, isHotPost, usePostQuery } from "@/entities/post";
 import { useSessionStore } from "@/entities/session";
@@ -127,8 +129,12 @@ export function PostDetailView({ postId }: { postId: number }) {
         </button>,
       )}
 
-      {/* 하단 고정 댓글 입력이 본문을 가리지 않도록 그 높이만큼 패딩을 둔다 */}
-      <main className="h-full overflow-y-auto pb-[calc(84px+env(safe-area-inset-bottom))]">
+      {/*
+        하단 고정 댓글 입력이 본문을 가리지 않도록 그 높이만큼 패딩을 둔다.
+        ⚠ `h-full`이 아니라 `min-h-0 flex-1` — SubHeader와 형제라 `h-full`이면 프레임이
+          헤더 높이(71px)만큼 넘친다. `relative`는 sr-only가 새어나가지 않게 한다.
+      */}
+      <main className="relative min-h-0 flex-1 overflow-y-auto pb-[calc(84px+env(safe-area-inset-bottom))]">
         {/* 캐시된 글은 그대로 두고 최신화 실패만 알린다 */}
         {error && (
           <p

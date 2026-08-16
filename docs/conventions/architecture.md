@@ -38,6 +38,16 @@ shared ← entities ← features ← widgets ← views
   - ⚠ `pnpm check:conventions`는 이 위반을 **잡지 못한다.** 상대 경로 소비도 "현역"으로 세기 때문이다(배럴 미사용 검사의 목적은 죽은 export를 찾는 것이다).
 - Vercel `react-best-practices`의 `bundle-barrel-imports`는 **서드파티 라이브러리 배럴**(lucide-react·@mui 등, 최대 수천 개 재export) 대상이다. 내부 슬라이스 배럴은 위 deep-import 금지 규칙을 유지한다. 서드파티는 Next의 `optimizePackageImports` **기본 목록이 이미 커버**한다(`lucide-react` 포함 — `next/dist/server/config.js`의 기본값). next.config에 따로 적지 않는다.
 
+### ⚠ 내부 배럴도 트리셰이킹되지 않는다 — 무거운 모듈은 배럴에 싣지 않는다
+
+`@/shared/ui` 배럴은 **루트 layout이 마운트하는 `AppProviders`가 `ToastViewport` 하나 때문에 이미 타고 있다.** 그래서 이 배럴에 실린 모듈은 그것을 쓰지 않는 화면까지 포함해 **전 라우트의 초기 JS에 들어간다.** "안 쓰면 트리셰이킹된다"는 전제는 이 프로젝트의 빌드에서 성립하지 않았다 — react-markdown이 목록·로그인·404에 실려 초기 JS가 **43.6KB(gzip) 부풀어 있었다**(반사실 빌드로 실측).
+
+→ 소비자가 한 화면뿐인데 무거운 모듈은 **배럴에서 빼고 직접 경로로** 가져간다. 그 경로는 `check-conventions`의 **`DEEP_IMPORT_ALLOWED_CLIENT`** 에 등재한다.
+
+- 이 목록은 바로 아래 절의 "서버 소비자의 탈출구"와 **사유가 다르다.** 그쪽은 `"use client"` 파일에 금지지만, 이쪽은 **클라이언트 소비자가 대상**이라 그 금지가 적용되지 않는다. 두 목록을 섞지 않는다.
+- 등재 기준: **"배럴에 두면 전 라우트에 실리는데 실제 소비자는 한 화면뿐"**. 편의로 deep import를 여는 통로가 아니다 — 등재 전에 반사실 빌드로 감소분을 실측한다.
+- 호출부가 **0인** 컴포넌트는 등재도 필요 없다. 배럴에서 빼기만 하면 아무도 참조하지 않아 번들에서 사라진다(`MarkdownEditor`가 그 경우다).
+
 ## 서버/클라이언트 경계 (배럴이 담당)
 
 배럴은 "무엇을 노출하지 않을지"도 정한다. `"use client"` 훅이나 `next/headers` 의존 모듈이 잘못된 런타임으로 새지 않게 한다.

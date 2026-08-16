@@ -28,6 +28,16 @@ export { Sheet, SheetItem } from "./sheet";
 export { Dialog } from "./dialog";
 // 토스트의 상태(useToast·useToastStore)는 @/shared/lib에 있다 — ui는 뷰포트만 노출한다
 export { ToastViewport } from "./toast";
-// Markdown은 "use client"가 없다 — 서버 컴포넌트에서도 렌더 가능 (markdown.tsx 주석 참고)
-export { Markdown } from "./markdown";
-export { MarkdownEditor } from "./markdown-editor";
+/*
+  ⚠ **`Markdown`·`MarkdownEditor`는 이 배럴에 두지 않는다 — 번들 때문이다.**
+
+  이 배럴은 루트 layout이 마운트하는 `AppProviders`가 `ToastViewport` 하나 때문에 이미 타고 있다.
+  그래서 여기에 실린 모듈은 **전 라우트의 초기 JS에 들어간다.** react-markdown + remark-gfm이
+  마크다운을 그리지 않는 목록·로그인·404에까지 실려 **초기 JS가 43.6KB(gzip) 부풀었다**(실측:
+  이 두 줄을 지운 복제본을 빌드해 대조 — `/sign-in` 332.5KB → 288.9KB, 마크다운 청크를 싣는
+  라우트 8개 → 1개).
+
+  소비자는 `@/shared/ui/markdown` 직접 경로로 가져간다(`check-conventions`의
+  `DEEP_IMPORT_ALLOWED_CLIENT`에 등재). `MarkdownEditor`는 호출부가 0이라 아예 노출하지 않는다 —
+  참조되지 않는 모듈은 번들에 들어가지 않으므로 그것만으로 비용이 사라진다.
+*/

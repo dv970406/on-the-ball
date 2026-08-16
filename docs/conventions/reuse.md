@@ -24,7 +24,9 @@
   - ⚠ **본문만 `TextLimit`이 아니다** — `CONTENT_MAX`(`write-post`, 20,000)는 코드포인트 **단일 값**이고 `lengthOverflow`가 아니라 `codePointLength`로 직접 검사한다. 그래핌을 도입하지 않은 이유(20,000자 계산이 1.5ms)는 `api-and-db.md`에 있다. 본문 길이를 건드릴 때 `TextLimit` 셋만 보고 지나치지 말 것.
 - **`useNextParam`** — 현재 URL의 `?next=`. `useSearchParams` 대신 쓴다(그걸 쓰면 화면 프리렌더가 CSR로 떨어진다).
   - ⚠ **읽은 값을 렌더에 쓰는 화면**용이다(로그인 화면의 `redirectTo` 조립). 값이 필요한 시점이 **effect 안뿐**이라면 이걸 쓰지 말고 거기서 직접 읽는다 — 이 훅은 `useSyncExternalStore`로 렌더 중에 읽으므로 렌더타임 의존이 새로 생긴다. 라우트 가드(`useRedirectAfterSignIn`)가 그 경우이고, 사유는 그 훅 주석에 있다.
-- **`useDuplicateGuard(isPending)`** — 렌더를 기다리지 않는 중복 실행 가드. `{ isLocked, lock }`을 돌려준다. **`ref` + `useEffect(!isPending → false)`를 직접 짜지 말 것** — `disabled={isPending}`가 왜 부족한지(같은 tick의 두 번째 클릭)와 무증상 잠금의 조건이 이 훅의 주석에 모여 있다.
+- **`useDuplicateGuard(mutation)`** — 렌더를 기다리지 않는 중복 실행 가드. `{ isLocked, lock }`을 돌려준다. **`ref` + 해제 effect를 직접 짜지 말 것** — `disabled={isPending}`가 왜 부족한지(같은 tick의 두 번째 클릭)가 이 훅의 주석에 모여 있다.
+  - ⚠ **`isPending`(boolean)이 아니라 뮤테이션을 통째로 넘긴다.** 해제가 `status`+`submittedAt`에 걸려 있어서다 — boolean은 "아직 시작 전"과 "이미 끝남"을 구분하지 못해, 마이크로태스크만으로 끝나는 실패(동기 `throw`)에서 deps가 `false → false`가 되어 **자물쇠가 영영 풀리지 않았다.**
+  - ⚠ **`isPending`을 prop으로 받는 컴포넌트에 두지 말 것.** 부모가 리렌더될 때까지 낡은 값을 읽으므로 같은 무증상 잠금이 된다 → 뮤테이션을 조립하는 쪽에 둔다.
   - ⚠ 확인과 잠금이 **나뉜 이유가 규약이다** — 사이에 끼는 검증이 실패하면 잠그지 않고 빠져나가야 한다. 잠그면 뮤테이션이 시작되지 않아 `isPending`이 돌지 않고, 그 자물쇠는 영영 풀리지 않는다.
   - ⚠ 목록의 **항목별** 가드는 이 훅이 아니다 — 렌더 표시용 상태를 함께 가져야 해서 형태가 다르다.
 - **`useNowMs`** — 마운트 이후의 현재 시각(ms). 마운트 전에는 `null`.
@@ -96,17 +98,21 @@
 
 ## `@/shared/ui`
 **현역(게시판 v2가 실제로 쓰는 것)** — 새로 만들기 전 여기부터 확인:
-`Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·`Markdown`·
+`Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·
 `Chip`·`ActionChip`·`actionChipClassName`·`Dialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`
+(+ **배럴 밖의 현역** `Markdown` — `@/shared/ui/markdown` 직접 경로. 사유는 아래)
 
-**현재 미사용** — 트리셰이킹되어 번들 비용은 0이니 지우지 않는다. 다만 **"검증된 현역"으로 오인하지 말 것**:
-`TabHeader`·`MarkdownEditor`·`Flag`·`Shirt`·`RatioBar`·`SectionHead`·`LiveDot`·`LiveStatusPill`·`NightCard`·`PlayerSilhouette`
-(`MarkdownEditor`를 뺀 나머지가 `docs/legacy/v1-inventory.md`가 보존 대상으로 명시한 v1 자산이다. `MarkdownEditor`는 v2에서 만들었다가 프로토타입에 미리보기 탭이 없어 쓰이지 않는다)
+**현재 미사용** — **"검증된 현역"으로 오인하지 말 것**:
+`TabHeader`·`Flag`·`Shirt`·`RatioBar`·`SectionHead`·`LiveDot`·`LiveStatusPill`·`NightCard`·`PlayerSilhouette`
+(전부 `docs/legacy/v1-inventory.md`가 보존 대상으로 명시한 v1 자산이다. `MarkdownEditor`는 v2에서 만들었다가 쓰이지 않아 **배럴에서 뺐다** — 파일은 남아 있다)
+
+⚠ **"미사용이라도 트리셰이킹되어 번들 비용이 0"은 사실이 아니다.** 이 배럴은 루트 layout이 타므로 여기 실린 것은 전 라우트의 초기 JS에 들어간다(실측). 위 v1 자산을 남겨 두는 것은 **재현 비용이 크다는 판단**이지 공짜라서가 아니다 — 무거운 것을 새로 올릴 때는 크기를 먼저 잰다(`architecture.md`).
 
 > ⚠ 이 두 목록은 **실사용 여부로만 판정한다** — 손으로 세지 말고 **`pnpm check:conventions`** 를 돌린다(호출부 0인 export를 전수로 뽑아 준다).
 > **이 문서의 존재 이유가 "새로 만들기 전 확인"이라 목록이 틀리면 문서가 없느니만 못하다.** UI를 추가·제거하면 여기부터 고친다.
 
 - `Markdown` — 마크다운 렌더(GFM). `"use client"` **없음** — 서버 렌더 가능.
+  - ⚠ **이것만 배럴에 없다.** `@/shared/ui/markdown` 직접 경로로 가져간다 — 배럴에 실으면 react-markdown이 전 라우트의 초기 JS에 들어간다(43.6KB gzip, 실측). 사유와 등재 절차는 `architecture.md`.
 - `Chip` — 말머리 칩. **`rounded-sm`(6px)** 이다 — 칩이라고 알약이 아니다(`styling.md` 예외 목록 참고).
 - `ActionChip` / `actionChipClassName` — 좋아요·댓글 카운터 칩. 클래스 함수가 분리된 이유는 `Button`↔`buttonClassName`과 같다 — 비로그인 좋아요는 `Link`로 렌더해야 하는데 `Link` 안에 `button`을 넣을 수 없어 **클래스만** 필요하다.
 - `Dialog` / `Sheet`(+`SheetItem`) — 확인 대화상자 / 하단 시트. 포커스 가둠은 `@/shared/lib`의 `useFocusTrap`.
@@ -115,7 +121,7 @@
   - ⚠ 진입·퇴장 애니메이션은 **바깥 요소**, 드래그 오프셋은 **안쪽 래퍼**가 갖는다. 한 요소에 겹치면 CSS animation이 캐스케이드에서 inline style을 이겨 드래그가 통째로 무시된다. 새 오버레이에 드래그를 붙일 때 같은 함정을 밟지 말 것.
 - `ToastViewport` — 루트(`AppProviders`)에 **하나만** 둔다. 발행 API(`useToast`)는 `@/shared/lib`에 있다.
   - ⚠ **앱의 유일한 라이브 리전이다.** 문구가 없어도 언마운트하지 않는다(리전과 내용이 함께 마운트되면 발화가 불안정하다) — `if (!message) return null`로 되돌리지 말 것. 화면마다 `role="status"`를 새로 만들지 않는 이유는 `code-quality.md`에.
-- `MarkdownEditor` — textarea + 작성/미리보기 탭. **현재 미사용** — 프로토타입에 미리보기 탭이 없어 `PostForm`이 일반 textarea를 쓴다.
+- `MarkdownEditor` — textarea + 작성/미리보기 탭. **현재 미사용이라 배럴에서 뺐다**(파일은 `shared/ui/markdown-editor.tsx`에 남아 있다). 프로토타입에 미리보기 탭이 없어 `PostForm`이 일반 textarea를 쓴다. 되살릴 때 배럴 대신 직접 경로를 쓸지부터 정한다 — 마크다운 의존을 함께 끌고 온다.
 - ⚠ `Link` 안에 `Button`을 넣지 않는다(`<a>` 안의 `<button>`). 버튼형 링크는 `buttonClassName({...})`을 `Link`의 className에 준다.
 
 ## `@/widgets`
