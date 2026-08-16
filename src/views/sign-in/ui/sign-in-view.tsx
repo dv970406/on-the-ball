@@ -131,10 +131,7 @@ export function SignInView({
 			</div>
 
 			{errorMessage && (
-				<p
-					role="alert"
-					className="mt-4 text-center text-[13px] leading-[1.5] text-crimson"
-				>
+				<p className="mt-4 text-center text-[13px] leading-[1.5] text-crimson">
 					{errorMessage}
 				</p>
 			)}

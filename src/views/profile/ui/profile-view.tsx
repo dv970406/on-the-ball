@@ -198,7 +198,6 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
         {header}
         <main className={mainClassName}>
           <EmptyState
-            live
             title="프로필을 불러오지 못했어요"
             description={profile.error.message}
             onRetry={() => void profile.refetch()}
@@ -230,7 +229,6 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
         {/* 계정 연결에서 돌아왔다 — 프로바이더가 거부했으면 사유를, 교환 중이면 진행 상태를 알린다 */}
         {linkError && (
           <p
-            role="alert"
             className="border-b border-hairline bg-canvas-soft px-5 py-2.5 text-[13px] leading-[1.5] text-crimson"
           >
             {linkError}
@@ -238,7 +236,6 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
         )}
         {!linkError && linking && (
           <p
-            role="status"
             className="border-b border-hairline bg-canvas-soft px-5 py-2.5 text-[12px] text-ink-mute"
           >
             계정을 연결하는 중이에요…
@@ -247,7 +244,6 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
 
         {profile.error && (
           <p
-            role="status"
             className="border-b border-hairline bg-canvas-soft px-5 py-2.5 text-[12px] text-ink-mute"
           >
             최신 정보를 불러오지 못했어요. 표시된 내용이 오래된 것일 수 있어요.
@@ -287,7 +283,7 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
             {updateAvatar.isPending ? "올리는 중…" : "JPG · PNG · WebP"}
           </p>
           {updateAvatar.error && (
-            <p role="alert" className="mt-2 text-center text-[13px] text-crimson">
+            <p className="mt-2 text-center text-[13px] text-crimson">
               {updateAvatar.error.message}
             </p>
           )}

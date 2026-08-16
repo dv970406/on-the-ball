@@ -34,24 +34,37 @@ export function ToastViewport() {
     // seq가 의존성에 있어야 같은 문구를 다시 띄웠을 때 타이머가 재시작된다
   }, [message, seq, dismiss]);
 
-  if (!message) return null;
-
   return (
     <div
-      // aria-live로 스크린리더에도 전달한다. 중단성이 없는 알림이라 polite.
+      /**
+       * ⚠ **리전은 항상 DOM에 있고 안의 문구만 바뀐다.** 리전과 내용이 같은 순간에 마운트되면
+       *   발화가 불안정하다(특히 iOS VoiceOver — 이 앱은 모바일 전용이라 그쪽이 주 사용자다).
+       *   그래서 `if (!message) return null`로 통째로 언마운트하지 않는다.
+       * ⚠ **이것이 앱의 유일한 알림 채널이다.** 화면마다 `role="status"`를 뿌리는 대신
+       *   알릴 것은 `useToast()`로 여기 태운다.
+       */
       role="status"
       aria-live="polite"
       className={cn(
-        "absolute left-1/2 z-[95] whitespace-nowrap rounded-sm",
+        // 빈 상태에서도 남아 있으므로 탭을 가로채지 않게 한다(아래 탭바·FAB가 이 영역에 있다)
+        "pointer-events-none absolute left-1/2 z-[95]",
         // ⚠ translate 표준 유틸이 아니라 arbitrary property다 — 같은 요소에 animation이 있으면
         //   `translate` 개별 프로퍼티가 `transform`과 합성되어 조용히 어긋난다(styling.md).
         "[transform:translateX(-50%)]",
-        "bg-ink/95 px-4 py-[11px] text-[13px] text-white",
-        "motion-safe:animate-[cm-fade_0.2s_cubic-bezier(0.2,0,0,1)_both]",
         aboveTabBar ? "bottom-[112px]" : "bottom-10",
       )}
     >
-      {message}
+      {/* 애니메이션은 안쪽 말풍선이 갖는다 — 바깥 리전은 계속 살아 있어야 한다 */}
+      {message && (
+        <div
+          className={cn(
+            "whitespace-nowrap rounded-sm bg-ink/95 px-4 py-[11px] text-[13px] text-white",
+            "motion-safe:animate-[cm-fade_0.2s_cubic-bezier(0.2,0,0,1)_both]",
+          )}
+        >
+          {message}
+        </div>
+      )}
     </div>
   );
 }

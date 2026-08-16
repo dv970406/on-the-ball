@@ -75,7 +75,7 @@ export function AuthStatus() {
         로그아웃이 됐는지 안 됐는지 알 수 없었다.
       */}
       {signOut.error && (
-        <span role="alert" className="text-[12px] text-crimson">
+        <span className="text-[12px] text-crimson">
           {signOut.error.message}
         </span>
       )}

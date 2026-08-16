@@ -104,7 +104,6 @@ export function PostDetailView({ postId }: { postId: number }) {
         {header()}
         <main>
           <EmptyState
-            live
             title="글을 불러오지 못했어요"
             description={error.message}
             onRetry={() => void refetch()}
@@ -150,7 +149,6 @@ export function PostDetailView({ postId }: { postId: number }) {
         {/* 캐시된 글은 그대로 두고 최신화 실패만 알린다 */}
         {error && (
           <p
-            role="status"
             className="border-b border-hairline bg-canvas-soft px-5 py-2.5 text-[12px] text-ink-mute"
           >
             최신 내용을 불러오지 못했어요. 표시된 내용이 오래된 것일 수 있어요.
@@ -232,7 +230,10 @@ export function PostDetailView({ postId }: { postId: number }) {
             />
             {/* ⚠ 표시 전용이다 — 누를 수 있는데 아무 일도 안 일어나면 고장으로 읽힌다.
                   옆의 저장 칩과 같이 disabled로 둔다(댓글은 바로 아래에 이어진다). */}
-            <ActionChip icon={MessageCircle} aria-label="댓글 수" disabled>
+            {/* ⚠ 라벨을 `aria-label`로 붙이지 않는다 — 그러면 버튼 **콘텐츠를 덮어써서**
+                  정작 개수가 읽히지 않는다("댓글 수, 버튼"). sr-only 텍스트는 덮지 않는다. */}
+            <ActionChip icon={MessageCircle} disabled>
+              <span className="sr-only">댓글 </span>
               {formatCount(post.commentCount)}
             </ActionChip>
             {/* 저장(북마크)은 DB에 테이블이 없다 — 자리만 두고 토스트를 발명하지 않는다 */}
@@ -331,7 +332,6 @@ export function PostDetailView({ postId }: { postId: number }) {
       {deletePost.error && (
         // 하단 고정 댓글 입력(z-60) 위, 오버레이(80~95) 아래 — 시트가 열린 동안은 가려도 된다
         <p
-          role="alert"
           className="absolute inset-x-0 bottom-24 z-[66] px-5 text-center text-[12px] text-crimson"
         >
           {deletePost.error.message}

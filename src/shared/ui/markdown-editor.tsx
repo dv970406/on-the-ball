@@ -123,7 +123,7 @@ export function MarkdownEditor({
       )}
 
       {error && (
-        <p id={describedById} className="text-[12px] leading-[1.5] text-crimson" role="alert">
+        <p id={describedById} className="text-[12px] leading-[1.5] text-crimson">
           {error}
         </p>
       )}

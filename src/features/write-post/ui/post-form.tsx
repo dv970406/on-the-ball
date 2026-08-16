@@ -245,7 +245,7 @@ export function PostForm({
               />
             </div>
             {fieldErrors.title && (
-              <p role="alert" className="mt-2 text-[12px] text-crimson">
+              <p className="mt-2 text-[12px] text-crimson">
                 {fieldErrors.title}
               </p>
             )}
@@ -270,13 +270,13 @@ export function PostForm({
               className="min-h-[180px] w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-[15px] leading-[1.65] text-ink-secondary outline-none placeholder:text-ink-faint"
             />
             {fieldErrors.content && (
-              <p role="alert" className="mt-2 text-[12px] text-crimson">
+              <p className="mt-2 text-[12px] text-crimson">
                 {fieldErrors.content}
               </p>
             )}
 
             {error && (
-              <p role="alert" className="mt-4 text-[13px] leading-[1.5] text-crimson">
+              <p className="mt-4 text-[13px] leading-[1.5] text-crimson">
                 {error.message}
               </p>
             )}
@@ -286,8 +286,6 @@ export function PostForm({
 
       {/* 하단 고정 툴바 — 첨부 4종은 자리만, 우측은 글자 수 카운터 */}
       <footer
-        role="toolbar"
-        aria-label="첨부"
         className="absolute inset-x-0 bottom-0 z-[60] flex items-center gap-1 border-t border-hairline-cool bg-canvas px-3.5 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5"
       >
         {TOOLS.map((tool) => (

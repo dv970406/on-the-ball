@@ -54,7 +54,6 @@ export function LinkedAccounts({ userId }: { userId: string | undefined }) {
       {/* 보여줄 데이터가 없을 때만 전체 대체한다(data-and-state.md) */}
       {identities.error && !identities.data && (
         <EmptyState
-          live
           title="연결 정보를 불러오지 못했어요"
           description={identities.error.message}
           onRetry={() => void identities.refetch()}
@@ -100,7 +99,7 @@ export function LinkedAccounts({ userId }: { userId: string | undefined }) {
       )}
 
       {actionError && (
-        <p role="alert" className="mt-3 text-[13px] leading-[1.5] text-crimson">
+        <p className="mt-3 text-[13px] leading-[1.5] text-crimson">
           {actionError}
         </p>
       )}

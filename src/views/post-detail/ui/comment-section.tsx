@@ -142,7 +142,6 @@ export function CommentSection({
       */}
       {error && !comments && (
         <EmptyState
-          live
           title="댓글을 불러오지 못했어요"
           description={error.message}
           onRetry={() => void refetch()}
@@ -150,7 +149,7 @@ export function CommentSection({
       )}
 
       {error && comments && (
-        <p role="status" className="px-5 py-3 text-center text-[12px] text-ink-mute-2">
+        <p className="px-5 py-3 text-center text-[12px] text-ink-mute-2">
           최신 댓글을 불러오지 못했어요.{" "}
           <button
             type="button"
@@ -205,7 +204,7 @@ export function CommentSection({
       )}
 
       {deleteComment.error && (
-        <p role="alert" className="px-5 py-2 text-[12px] text-crimson">
+        <p className="px-5 py-2 text-[12px] text-crimson">
           {deleteComment.error.message}
         </p>
       )}

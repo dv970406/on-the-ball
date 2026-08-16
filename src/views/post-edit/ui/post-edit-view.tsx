@@ -47,7 +47,7 @@ export function PostEditView({ postId }: { postId: number }) {
    *   (PostForm이 useState로 들고 있다). 리페치 실패는 폼을 유지한 채 배너로만 알린다.
    */
   if (error && !post) {
-    return shell(<EmptyState live title="글을 불러오지 못했어요" description={error.message} />);
+    return shell(<EmptyState title="글을 불러오지 못했어요" description={error.message} />);
   }
 
   if (!post) {
@@ -74,7 +74,6 @@ export function PostEditView({ postId }: { postId: number }) {
       notice={
         error ? (
           <p
-            role="status"
             className="border-b border-hairline bg-canvas-soft px-5 py-2.5 text-[12px] text-ink-mute"
           >
             최신 내용을 불러오지 못했어요. 그대로 저장하면 다른 곳에서 수정된 내용을 덮어쓸 수

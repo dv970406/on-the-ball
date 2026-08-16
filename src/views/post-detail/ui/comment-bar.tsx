@@ -202,7 +202,7 @@ export function CommentBar({
       </form>
 
       {(error ?? writeComment.error) && (
-        <p role="alert" className="mt-1.5 text-[12px] text-crimson">
+        <p className="mt-1.5 text-[12px] text-crimson">
           {error ?? writeComment.error?.message}
         </p>
       )}

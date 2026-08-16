@@ -113,7 +113,6 @@ export function PostListView() {
         */}
 				{error && !posts && (
 					<EmptyState
-						live
 						title="글을 불러오지 못했어요"
 						description={error.message}
 						onRetry={() => void refetch()}
@@ -122,10 +121,7 @@ export function PostListView() {
 
 				{/* 캐시된 목록은 그대로 두고 최신화 실패만 알린다 (상세·수정·댓글과 같은 규약) */}
 				{error && posts && (
-					<p
-						role="status"
-						className="px-5 py-3 text-center text-[12px] text-ink-mute-2"
-					>
+					<p className="px-5 py-3 text-center text-[12px] text-ink-mute-2">
 						최신 글을 불러오지 못했어요.{" "}
 						<button
 							type="button"

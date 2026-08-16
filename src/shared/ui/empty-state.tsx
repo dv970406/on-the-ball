@@ -19,14 +19,6 @@ interface EmptyStateProps {
   retryLabel?: string;
   /** 재시도 버튼 톤 (기본 "dark") */
   retryVariant?: "dark" | "secondary";
-  /**
-   * 조회 실패 등 **비동기로 나타나는** 상태인지.
-   *
-   * 로딩 스켈레톤이 이 컴포넌트로 통째로 교체되는 게 화면상으로는 명확하지만,
-   * 스크린리더에는 아무 알림도 가지 않았다(스켈레톤은 aria-hidden이다).
-   * 처음부터 화면에 있는 빈 상태("아직 글이 없어요")는 알림이 필요 없으므로 기본값은 false다.
-   */
-  live?: boolean;
   className?: string;
 }
 
@@ -39,7 +31,6 @@ export function EmptyState({
   onRetry,
   retryLabel = "다시 시도",
   retryVariant = "dark",
-  live = false,
   className,
 }: EmptyStateProps) {
   // action 우선, 없으면 onRetry로 재시도 버튼 구성
@@ -53,7 +44,6 @@ export function EmptyState({
 
   return (
     <div
-      role={live ? "status" : undefined}
       className={cn(
         "flex flex-col items-center justify-center gap-2 px-8 py-14 text-center",
         className,

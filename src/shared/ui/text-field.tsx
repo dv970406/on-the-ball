@@ -48,10 +48,6 @@ export function TextField({ label, error, hint, className, ...inputProps }: Text
       {(error || hint) && (
         <p
           id={describedById}
-          // 제출 후 동적으로 뜨는 에러는 role="alert"가 없으면 스크린리더가 침묵한다
-          // (aria-describedby만으로는 포커스가 이미 그 필드에 있을 때만 읽힌다).
-          // 앱의 다른 모든 에러 표시가 role="alert"라 형태도 여기서 맞춘다.
-          role={error ? "alert" : undefined}
           className={cn("text-[12px] leading-[1.5]", error ? "text-crimson" : "text-ink-mute-2")}
         >
           {error ?? hint}

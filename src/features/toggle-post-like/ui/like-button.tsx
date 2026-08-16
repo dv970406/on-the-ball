@@ -68,7 +68,7 @@ export function LikeButton({ postId, likeCount, isLiked }: LikeButtonProps) {
         <span className="sr-only">좋아요</span>
       </ActionChip>
       {toggleLike.error && (
-        <span role="alert" className="text-[12px] text-crimson">
+        <span className="text-[12px] text-crimson">
           {toggleLike.error.message}
         </span>
       )}
