@@ -32,6 +32,29 @@
   - 동작을 문자열 sentinel로 분기(`color === "var(--color-primary)"`) — 의미 기반 prop(`tone`)으로(예측 가능성).
   - 화면에서만 권한을 막고 끝내기 — 화면 차단은 안내이고 **실제 방어는 RLS**다. 둘 다 필요하다(결합도가 아니라 계층).
 
+## ARIA는 두 경우에만 쓴다
+
+접근성 속성은 많이 붙일수록 좋아지지 않는다 — **틀린 ARIA는 없는 것보다 나쁘다.** 아래 둘에만 쓰고 그 밖에는 붙이지 않는다.
+
+1. **텍스트가 없는 컨트롤에 이름을 준다** — 아이콘만 있는 버튼의 `aria-label`. 지우면 이름 없는 버튼이 되고, 음성 제어와 `getByRole("button", { name })`이 함께 죽는다.
+2. **요소가 무엇인지 말한다** — 오버레이의 `role="dialog"`·`aria-modal`, 폼 에러를 필드에 묶는 `aria-invalid`·`aria-describedby`.
+
+### ⚠ `aria-label`은 콘텐츠를 **덮어쓴다**
+
+숫자를 담은 칩에 `aria-label="댓글 수"`를 붙였더니 라벨이 콘텐츠를 대체해 **정작 개수가 읽히지 않았다.** 안에 텍스트가 있는 요소에는 `aria-label`을 붙이지 않는다 — 라벨을 덧붙이려면 콘텐츠를 덮지 않는 `sr-only` 텍스트를 쓴다.
+
+### 알림(라이브 리전)은 `ToastViewport` 하나가 소유한다
+
+화면마다 `role="status"`·`role="alert"`를 뿌리지 않는다.
+
+- **리전과 내용이 같은 순간에 마운트되면 발화가 불안정하다.** `{error && <p role="status">…</p>}`가 그 형태다. 리전은 **먼저 존재하고 안의 내용만 바뀌어야** 한다 — `ToastViewport`가 빈 상태에서도 언마운트되지 않는 이유다.
+- **서버가 내려준 값으로 그리는 문구에는 라이브 리전이 아무 일도 하지 않는다.** 초기 렌더 콘텐츠는 읽히지 않기 때문이다(OAuth 복귀 화면의 `?error=` 배너가 그렇다). 그 경로에서 알려야 한다면 role이 아니라 포커스 이동이다.
+- 알려야 할 것이 생기면 `useToast()`로 이 채널에 태운다.
+
+### 롤은 키보드 모델을 약속한다
+
+`role="radiogroup"`·`tablist`·`toolbar`는 화살표 키 이동(roving tabindex)을 선언하는 것이다. 구현이 없으면 붙이지 않는다 — 말머리·정렬 레일이 `group` + `aria-pressed`에 머무는 이유다.
+
 ## FSD와의 관계
 
 결합도 기준은 FSD 단방향 의존(`shared ← entities ← features ← widgets ← views`)으로 구체화된다. 동일 레이어 간 import 금지, 배럴 공개 API 준수는 `architecture.md`를 따른다.
