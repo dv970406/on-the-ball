@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { UserIdentity } from "@supabase/supabase-js";
 import { requireBrowserSupabase } from "@/shared/api";
 import { ROUTES, type OAuthProvider } from "@/shared/config";
+import { useDuplicateGuard } from "@/shared/lib";
 import { identityKeys, toAuthErrorMessage } from "@/entities/session";
 
 /**
@@ -42,15 +42,11 @@ export function useLinkIdentity() {
     },
   });
 
-  // 렌더를 기다리지 않는 동기 가드 — disabled는 시각 표시로만 남는다
-  const startingRef = useRef(false);
-  useEffect(() => {
-    if (!mutation.isPending) startingRef.current = false;
-  }, [mutation.isPending]);
+  const guard = useDuplicateGuard(mutation.isPending);
 
   const start = (provider: OAuthProvider) => {
-    if (startingRef.current) return;
-    startingRef.current = true;
+    if (guard.isLocked()) return;
+    guard.lock();
     mutation.mutate(provider);
   };
 
@@ -86,14 +82,11 @@ export function useUnlinkIdentity() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: identityKeys.all }),
   });
 
-  const removingRef = useRef(false);
-  useEffect(() => {
-    if (!mutation.isPending) removingRef.current = false;
-  }, [mutation.isPending]);
+  const guard = useDuplicateGuard(mutation.isPending);
 
   const remove = (identity: UserIdentity) => {
-    if (removingRef.current) return;
-    removingRef.current = true;
+    if (guard.isLocked()) return;
+    guard.lock();
     mutation.mutate(identity);
   };
 

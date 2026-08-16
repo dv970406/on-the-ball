@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { requireBrowserSupabase } from "@/shared/api";
 import { ROUTES, withNext, type OAuthProvider } from "@/shared/config";
+import { useDuplicateGuard } from "@/shared/lib";
 import { toAuthErrorMessage } from "@/entities/session";
 
 /**
@@ -20,7 +20,7 @@ import { toAuthErrorMessage } from "@/entities/session";
  *   전용 콜백 라우트를 만드는 것보다 이 편이 맞다 — 목적지 계산이 두 곳으로 갈리지 않는다.
  *
  * ⚠ `?next=`는 OAuth 왕복을 건너야 하므로 redirectTo에 실어 보낸다.
- *   돌아온 값의 검증은 `GuestOnly`의 `safeNextPath`가 이미 한다 — 여기서 또 짜지 않는다.
+ *   돌아온 값의 검증은 `useRedirectAfterSignIn`의 `safeNextPath`가 이미 한다 — 여기서 또 짜지 않는다.
  */
 export function useOAuthSignIn(next: string | null) {
   const mutation = useMutation({
@@ -42,20 +42,16 @@ export function useOAuthSignIn(next: string | null) {
   /**
    * 중복 시작 동기 가드.
    *
-   * ⚠ `disabled={isPending}`만으로는 막지 못한다 — `isPending`은 **렌더 이후에야** DOM에
-   *   반영되는데 TanStack Query의 상태 변경은 마이크로태스크로 배치된다(data-and-state.md).
-   *   여기서 겹치면 대가가 크다: `signInWithOAuth`는 호출마다 **새 code_verifier를 저장소에
-   *   덮어쓴** 뒤 그 challenge를 담은 URL로 이동한다. 저장된 verifier(마지막 호출)와 실제로
-   *   커밋된 내비게이션(다른 호출)이 어긋나면 돌아온 code를 교환할 수 없어 로그인이 실패한다.
+   * ⚠ 화면이 프로바이더로 넘어가니 불필요해 보이지만, **여기서 겹치면 대가가 크다**:
+   *   `signInWithOAuth`는 호출마다 **새 code_verifier를 저장소에 덮어쓴** 뒤 그 challenge를
+   *   담은 URL로 이동한다. 저장된 verifier(마지막 호출)와 실제로 커밋된 내비게이션(다른 호출)이
+   *   어긋나면 돌아온 code를 교환할 수 없어 로그인이 실패한다.
    */
-  const startingRef = useRef(false);
-  useEffect(() => {
-    if (!mutation.isPending) startingRef.current = false;
-  }, [mutation.isPending]);
+  const guard = useDuplicateGuard(mutation.isPending);
 
   const start = (provider: OAuthProvider) => {
-    if (startingRef.current) return;
-    startingRef.current = true;
+    if (guard.isLocked()) return;
+    guard.lock();
     mutation.mutate(provider);
   };
 
