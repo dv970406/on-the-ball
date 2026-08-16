@@ -54,7 +54,7 @@ query-core는 훅 레벨 `onSuccess`(무효화 Promise)를 **await한 뒤** succ
 **리페치가 끝나는 순간** 비워진다 — 느린 회선에서 그 사이 타이핑한 내용이 통째로 날아갔다.
 
 입력창 초기화처럼 즉시성이 필요한 것은 **제출 직후에 하고 실패 시 되돌린다**
-(선례 `CommentBar` — `views/post-detail/ui/comment-bar.tsx`).
+(선례 `useCommentComposer` — `views/post-detail/model/use-comment-composer.ts`).
 
 ### 에러 화면으로 갈아치우는 건 **보여줄 데이터가 없을 때뿐이다**
 
@@ -94,18 +94,25 @@ TanStack Query는 성공 후 리페치가 실패해도 `data`를 유지한다(`s
 아직 enabled인 버튼을 누른다 — 실측에서 3연타에 **같은 글이 3개 생성**됐다.
 
 렌더를 기다리지 않는 **동기 가드**를 둔다. `disabled`는 시각 표시로만 남긴다.
+판정은 `@/shared/lib`의 **`useDuplicateGuard`가 단독으로 소유한다** — `ref` + 해제 effect를 직접 짜지 않는다.
 
 ```ts
-const submittingRef = useRef(false);
-useEffect(() => { if (!isPending) submittingRef.current = false; }, [isPending]);
+const guard = useDuplicateGuard(mutation.isPending);
 
 const handleSubmit = (e) => {
   e.preventDefault();
-  if (submittingRef.current) return;
-  submittingRef.current = true;
-  onSubmit(...);
+  if (guard.isLocked()) return;
+
+  const message = validate(value);
+  if (message) return setError(message); // ⚠ 검증 실패는 잠그지 않는다
+
+  guard.lock();
+  mutation.mutate(value);
 };
 ```
+
+⚠ **잠근 뒤에는 반드시 `isPending`을 토글하는 뮤테이션을 시작해야 한다.** 시작하지 않으면
+자물쇠가 풀리지 않아 버튼은 활성인데 클릭만 삼켜지는 **무증상 잠금**이 된다.
 
 #### 어디에 두는가 — **연타가 흔적을 남기는 뮤테이션에만**
 
@@ -113,10 +120,20 @@ const handleSubmit = (e) => {
 
 | 가드를 둔다 | 두지 않는다 |
 |---|---|
-| **행이 생긴다** — 글 작성(`PostForm`), 댓글 작성(`CommentBar`) | **소셜 로그인** — 버튼을 누르면 페이지가 프로바이더로 넘어가 화면 자체가 사라진다 |
-| **행이 사라진다** — 글 삭제(`PostDetailView`), 댓글 삭제(`CommentSection`) | **낙관적 업데이트** — 좋아요(의도적으로 `disabled`조차 두지 않는다, 아래 절 참고) |
+| **행이 생긴다** — 글 작성(`PostForm`), 댓글 작성(`useCommentComposer`) | **소셜 로그인** — 버튼을 누르면 페이지가 프로바이더로 넘어가 화면 자체가 사라진다 |
+| **행이 사라진다** — 글 삭제(`usePostDeletion`), 댓글 삭제(`useCommentDeletion`), 연결 해제(`useUnlinkIdentity`) | **낙관적 업데이트** — 좋아요(의도적으로 `disabled`조차 두지 않는다, 아래 절 참고) |
+| | **멱등한 UPDATE** — 닉네임 변경은 연타해도 행이 늘지 않아 `isPending` 확인으로 족하다 |
 
-⚠ **소셜 로그인은 예외적으로 가드가 필요하다.** 화면이 사라지니 불필요해 보이지만, `signInWithOAuth`는 호출마다 **새 PKCE code_verifier를 저장소에 덮어쓴** 뒤 그 challenge를 담은 URL로 이동한다 — 두 호출이 겹치면 저장된 verifier와 커밋된 내비게이션이 어긋나 돌아온 code를 교환할 수 없다(로그인 실패). `features/sign-in`의 `useOAuthSignIn`이 `start()` 안에서 동기 가드를 갖고, `disabled`는 시각 표시로만 남긴다.
+#### 자리는 **그 뮤테이션을 조립하는 훅**이다
+
+가드를 컴포넌트에 남기면 다음 호출부가 방어를 다시 짜야 하고, 그러면 방어가 **호출자의 기억력**에 걸린다.
+그래서 위 표의 이름들이 전부 훅이다. 그 훅이 features일 수도(`useUnlinkIdentity`) 화면 슬라이스의 `model/`일 수도 있다 — per-call 콜백이 이동 목적지·입력창 복원 같은 **상위 레이어의 결정**을 담고 있으면 features로 내리지 않는다.
+
+⚠ 유일한 예외가 **`PostForm`** 이다. `onSubmit` prop만 받아 그것이 뮤테이션인지 모르므로 폼이 자기 제출을 방어하고, `isPending`도 prop으로 받아 잠금 해제 시점을 맞춘다.
+
+⚠ **소셜 로그인·계정 연결은 예외적으로 가드가 필요하다.** 화면이 사라지니 불필요해 보이지만, `signInWithOAuth`·`linkIdentity`는 호출마다 **새 PKCE code_verifier를 저장소에 덮어쓴** 뒤 그 challenge를 담은 URL로 이동한다 — 두 호출이 겹치면 저장된 verifier와 커밋된 내비게이션이 어긋나 돌아온 code를 교환할 수 없다(로그인 실패). `useOAuthSignIn`·`useLinkIdentity`가 `start()` 안에서 가드를 갖고, `disabled`는 시각 표시로만 남긴다.
+
+⚠ **목록의 항목별 삭제는 boolean 하나로 부족하다.** 뮤테이션 훅이 하나뿐이라 다른 항목을 누르는 순간 `variables`가 갈아타 처리 중이던 항목의 버튼이 되살아난다 → 보낸 id의 **집합**을 기억하고, 동기 판정용 ref와 렌더 표시용 상태를 **따로** 둔다(선례 `useCommentDeletion`).
 
 ⚠ 새 뮤테이션을 만들 때 **표를 외우지 말고 기준을 적용한다.** 예컨대 "신고하기"는 인증 폼처럼 보여도 행이 쌓이므로 가드가 필요하다.
 

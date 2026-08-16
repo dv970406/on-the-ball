@@ -23,6 +23,10 @@
   - 짝이 되는 상수는 features가 갖는다 — `TITLE_LIMIT`(`write-post`)·`COMMENT_LIMIT`(`write-comment`)·`NICKNAME_LIMIT`(`update-profile`). 값 표와 K=10 근거는 `api-and-db.md`.
   - ⚠ **본문만 `TextLimit`이 아니다** — `CONTENT_MAX`(`write-post`, 20,000)는 코드포인트 **단일 값**이고 `lengthOverflow`가 아니라 `codePointLength`로 직접 검사한다. 그래핌을 도입하지 않은 이유(20,000자 계산이 1.5ms)는 `api-and-db.md`에 있다. 본문 길이를 건드릴 때 `TextLimit` 셋만 보고 지나치지 말 것.
 - **`useNextParam`** — 현재 URL의 `?next=`. `useSearchParams` 대신 쓴다(그걸 쓰면 화면 프리렌더가 CSR로 떨어진다).
+  - ⚠ **읽은 값을 렌더에 쓰는 화면**용이다(로그인 화면의 `redirectTo` 조립). 값이 필요한 시점이 **effect 안뿐**이라면 이걸 쓰지 말고 거기서 직접 읽는다 — 이 훅은 `useSyncExternalStore`로 렌더 중에 읽으므로 렌더타임 의존이 새로 생긴다. 라우트 가드(`useRedirectAfterSignIn`)가 그 경우이고, 사유는 그 훅 주석에 있다.
+- **`useDuplicateGuard(isPending)`** — 렌더를 기다리지 않는 중복 실행 가드. `{ isLocked, lock }`을 돌려준다. **`ref` + `useEffect(!isPending → false)`를 직접 짜지 말 것** — `disabled={isPending}`가 왜 부족한지(같은 tick의 두 번째 클릭)와 무증상 잠금의 조건이 이 훅의 주석에 모여 있다.
+  - ⚠ 확인과 잠금이 **나뉜 이유가 규약이다** — 사이에 끼는 검증이 실패하면 잠그지 않고 빠져나가야 한다. 잠그면 뮤테이션이 시작되지 않아 `isPending`이 돌지 않고, 그 자물쇠는 영영 풀리지 않는다.
+  - ⚠ 목록의 **항목별** 가드는 이 훅이 아니다 — 렌더 표시용 상태를 함께 가져야 해서 형태가 다르다.
 - **`useNowMs`** — 마운트 이후의 현재 시각(ms). 마운트 전에는 `null`.
   렌더 중 `Date.now()`를 부르지 않기 위한 훅이다. **시간에 따라 달라지는 표시(HOT 배지 등)는 이걸로 판정한다** — `null`인 첫 렌더에서는 그 표시를 그리지 않으면 서버·클라 출력이 같아진다. 선례: `entities/post`의 `isHotPost(post, nowMs)`.
 - `useScrollRestore` / `clearScrollRestore` — 목록 스크롤 위치 저장/복원 (`clearScrollRestore`는 목록을 처음부터 보여야 할 때 저장분을 버린다)
@@ -47,8 +51,11 @@
 
 ## `@/entities/session`
 - `useSessionStore` — zustand 세션 스토어. 셀렉터로 구독한다.
-- `AuthProvider` — `onAuthStateChange` ↔ 스토어 동기화. `QueryClientProvider` 안쪽에 둔다.
-- `AuthRequired` / `GuestOnly` — 클라이언트 라우트 가드.
+- `AuthProvider` — 세션 동기화의 마운트 지점. `QueryClientProvider` 안쪽에 둔다.
+  로직은 `use-session-sync`(`onAuthStateChange` ↔ 스토어 + 유저 전환 시 캐시 리싱크)와
+  `use-server-session-check`(로그인 시 1회 서버 검증)가 나눠 갖는다.
+- `AuthRequired` / `GuestOnly` — 클라이언트 라우트 가드. 렌더 분기만 갖고,
+  **이동은 `use-auth-redirect`가 소유한다** — 로그인 후 목적지를 정하는 곳은 앱에서 거기 하나다.
 - `toAuthErrorMessage` — supabase `AuthError` → 한국어. **`toDbErrorMessage`와 합치지 않는다**(데이터가 다르다).
   ⚠ 새 인증 흐름을 붙이면 **여기 커버리지부터 확인한다** — identity 코드를 빠뜨렸더니 "이미 다른 계정에 연결됨"처럼 재시도로 절대 안 풀리는 실패가 "잠시 후 다시 시도"로 접혔다.
 - **`useLinkedIdentitiesQuery(userId)` / `identityKeys`** — 연결된 로그인 수단 조회. 조회는 여기, 쓰기(연결·해제)는 `features/link-identity`다(`entities/post` ↔ `features/toggle-post-like`와 같은 분업). ⚠ 키를 **userId로 스코프**한다 — 계정 전환 시 이전 사용자의 목록이 노출되지 않게.

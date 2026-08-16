@@ -34,6 +34,8 @@ shared ← entities ← features ← widgets ← views
 - 소비는 **슬라이스 루트**에서: `import { ROUTES } from "@/shared/config"`.
 - **deep import 금지**: `@/shared/config/palette` ❌ → `@/shared/config` ✅.
 - 이점: 캡슐화 / 파일 이동에 강함(배럴만 수정) / 단방향 의존 감시 용이.
+- **슬라이스 내부 훅은 배럴에 올리지 않는다.** 배럴은 **다른 레이어가 소비하는 것**만 담는다. 화면 슬라이스의 배럴을 읽는 것은 서버 컴포넌트(`app/**`의 page·layout)인데 서버는 `"use client"` 훅을 **호출할 수 없으므로**(아래 절), 올려 봐야 아무도 부를 수 없는 값이 공개 API에 남는다. 같은 슬라이스 안에서는 상대 경로로 가져온다 — 선례 `shared/ui/sheet.tsx`가 `./use-sheet-drag`를 직접 가져온다.
+  - ⚠ `pnpm check:conventions`는 이 위반을 **잡지 못한다.** 상대 경로 소비도 "현역"으로 세기 때문이다(배럴 미사용 검사의 목적은 죽은 export를 찾는 것이다).
 - Vercel `react-best-practices`의 `bundle-barrel-imports`는 **서드파티 라이브러리 배럴**(lucide-react·@mui 등, 최대 수천 개 재export) 대상이다. 내부 슬라이스 배럴은 위 deep-import 금지 규칙을 유지한다. 서드파티는 Next의 `optimizePackageImports` **기본 목록이 이미 커버**한다(`lucide-react` 포함 — `next/dist/server/config.js`의 기본값). next.config에 따로 적지 않는다.
 
 ## 서버/클라이언트 경계 (배럴이 담당)
@@ -75,3 +77,5 @@ shared ← entities ← features ← widgets ← views
 - 컴포넌트·함수는 **named export** (`page`·`layout`·`template`·`error`·`global-error`·`not-found`의 default export는 Next 요구사항이라 예외).
 - 주석·문서는 **한국어**, 변수·함수명은 영어.
 - 슬라이스 내부 구조: `ui/`(프레젠테이션) · `model/`(상태·타입·훅) · `api/`(쿼리·매퍼) · `lib/`(순수 유틸) + `index.ts`.
+  - 화면 슬라이스(`views`)와 위젯도 `model/`을 갖는다 — 무엇을 `model/`로 빼는지는 `code-quality.md`가 정한다.
+  - ⚠ **컴포넌트 하나 전용 훅은 예외적으로 그 컴포넌트 옆(`ui/`)에 둔다.** 도메인을 모르는 순수 메커니즘(제스처·요소 측정·마운트 유지)이라 `model/`의 성격이 아니고, `shared`에는 애초에 `model/`이 없어(훅·상태를 `lib/`에 두는 선례) 이 배치가 선택이 아니라 강제다.
