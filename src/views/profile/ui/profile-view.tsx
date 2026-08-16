@@ -10,8 +10,9 @@ import {
 } from "react";
 import { Camera } from "lucide-react";
 import { ROUTES, avatarUrl } from "@/shared/config";
-import { useToast } from "@/shared/lib";
+import { cn, useToast } from "@/shared/lib";
 import { Avatar, Button, EmptyState, Icon, Skeleton, TextField } from "@/shared/ui";
+import { BottomTabBar } from "@/widgets/bottom-tab-bar";
 import { SubHeader } from "@/widgets/sub-header";
 import { useProfileQuery } from "@/entities/profile";
 import { useSessionStore } from "@/entities/session";
@@ -168,16 +169,24 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
   const linking = linkPending && codeInUrl && !exchangeTimedOut;
 
   const header = <SubHeader title="프로필" fallbackHref={ROUTES.postList} />;
+  /**
+   * 이 화면은 하단 탭바의 두 목적지 중 하나다 — 탭으로 들어왔는데 탭바가 사라지면
+   * 커뮤니티로 돌아갈 수단이 뒤로가기뿐이 된다. 상태 분기마다 함께 렌더한다.
+   */
+  const tabBar = <BottomTabBar active="프로필" />;
+  /** 탭바는 떠 있으므로 스크롤 영역 하단을 비운다 — `TabScrollArea`와 같은 계산(72+18+여유) */
+  const mainClassName = "h-full overflow-y-auto pb-[calc(122px+env(safe-area-inset-bottom))]";
   const linkError = errorCode ? toLinkErrorMessage(errorCode, errorDescription) : null;
 
   if (profile.isPending) {
     return (
       <>
         {header}
-        <main className="flex flex-col gap-4 px-5 py-8">
+        <main className={cn(mainClassName, "flex flex-col gap-4 px-5 pt-8")}>
           <Skeleton className="size-24 rounded-full" />
           <Skeleton className="h-[50px] w-full" />
         </main>
+        {tabBar}
       </>
     );
   }
@@ -187,7 +196,7 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
     return (
       <>
         {header}
-        <main>
+        <main className={mainClassName}>
           <EmptyState
             live
             title="프로필을 불러오지 못했어요"
@@ -195,6 +204,7 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
             onRetry={() => void profile.refetch()}
           />
         </main>
+        {tabBar}
       </>
     );
   }
@@ -203,9 +213,10 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
     return (
       <>
         {header}
-        <main>
+        <main className={mainClassName}>
           <EmptyState title="프로필을 찾을 수 없어요" description="다시 로그인해 주세요." />
         </main>
+        {tabBar}
       </>
     );
   }
@@ -213,7 +224,7 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
   return (
     <>
       {header}
-      <main className="h-full overflow-y-auto pb-10">
+      <main className={mainClassName}>
         <h1 className="sr-only">프로필</h1>
 
         {/* 계정 연결에서 돌아왔다 — 프로바이더가 거부했으면 사유를, 교환 중이면 진행 상태를 알린다 */}
@@ -316,6 +327,7 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
           </p>
         )}
       </main>
+      {tabBar}
     </>
   );
 }

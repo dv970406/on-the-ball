@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Flame, Home, MessagesSquare, SplitSquareVertical, User } from "lucide-react";
+import { MessagesSquare, User } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/shared/lib";
 import { ROUTES } from "@/shared/config";
@@ -8,21 +8,17 @@ import { Icon } from "@/shared/ui";
 interface TabItem {
   label: string;
   icon: LucideIcon;
-  /** 라우트가 있는 탭만 이동한다. 없으면 자리만 지킨다 */
-  href?: string;
+  href: string;
 }
 
 /**
- * 기존 앱 공용 탭 5개. **커뮤니티만 라우트가 있다.**
- * 나머지 4개는 프로토타입에 자리가 잡혀 있을 뿐 대상 화면이 없다 —
- * 동작을 발명하지 않고(핸드오프 0장) aria-disabled로 남긴다.
+ * **대상 화면이 있는 탭만 둔다.** 프로토타입에는 홈·밸런스·TMI 자리가 더 있었지만
+ * 눌러도 아무 일도 일어나지 않는 자리표시였다 — 동작을 발명하지 않고 걷어냈다.
+ * 탭을 되살리려면 라우트를 **먼저** 만든다(빈 자리를 되넣지 말 것).
  */
 const TABS: TabItem[] = [
-  { label: "홈", icon: Home },
-  { label: "밸런스", icon: SplitSquareVertical },
   { label: "커뮤니티", icon: MessagesSquare, href: ROUTES.postList },
-  { label: "TMI", icon: Flame },
-  { label: "내 활동", icon: User },
+  { label: "프로필", icon: User, href: ROUTES.profile },
 ];
 
 /**
@@ -64,7 +60,7 @@ export function BottomTabBar({ active = "커뮤니티" }: { active?: string }) {
           isActive ? "bg-white/[0.08] text-white" : "text-white/55",
         );
 
-        return tab.href ? (
+        return (
           <Link
             key={tab.label}
             href={tab.href}
@@ -73,13 +69,6 @@ export function BottomTabBar({ active = "커뮤니티" }: { active?: string }) {
           >
             {content}
           </Link>
-        ) : (
-          // ⚠ aria-disabled를 붙이지 않는다 — span의 암묵 role은 generic이라 aria-* 상태를
-          //   지원하지 않아 접근성 트리에서 그대로 버려진다(효과 0의 죽은 속성).
-          //   대상 화면이 없는 자리표시라 라벨만 남기고 시각적으로만 흐린다.
-          <span key={tab.label} className={cn(className, "opacity-60")}>
-            {content}
-          </span>
         );
       })}
     </nav>
