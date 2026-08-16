@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn, useFocusTrap } from "@/shared/lib";
 import { Icon } from "./icon";
+import { useExitTransition } from "./use-exit-transition";
 import { useSheetDrag } from "./use-sheet-drag";
 
 interface SheetProps {
@@ -37,9 +38,9 @@ export function Sheet({ open, onClose, label, children }: SheetProps) {
   const ref = useRef<HTMLDivElement>(null);
   /** 드래그 오프셋을 지는 안쪽 래퍼 — 스냅백 도중의 실제 위치를 읽는 데 쓴다 */
   const panelRef = useRef<HTMLDivElement>(null);
-  /** DOM에 남아 있는가 — open이 false가 된 뒤에도 퇴장 애니메이션 동안 true */
-  const [visible, setVisible] = useState(open);
-  const [prevOpen, setPrevOpen] = useState(open);
+  // 퇴장 동안 DOM에 남겨 두는 것은 전부 훅이 진다(폴백 타이머 포함).
+  // ⚠ 300ms는 퇴장 애니메이션(0.14s)의 두 배다 — 아래 duration을 바꾸면 이 값도 함께 옮긴다.
+  const exit = useExitTransition(open, 300);
 
   // 그래버 제스처(끌어 닫기·탭해서 닫기)는 전부 훅이 진다
   const { dragY, snapping, grabberProps } = useSheetDrag({
@@ -52,28 +53,9 @@ export function Sheet({ open, onClose, label, children }: SheetProps) {
   // 퇴장 중에는 active=false여야 포커스가 트리거로 돌아가고 Escape 리스너가 떨어진다
   useFocusTrap(ref, open, onClose);
 
-  // prop 변화에 따른 상태 조정은 **렌더 중**에 한다(React 공식 "adjusting state when a prop changes").
-  // effect에 두면 커밋 후 재렌더가 한 번 더 도는 cascading render가 되어 린트가 막는다.
-  if (open !== prevOpen) {
-    setPrevOpen(open);
-    if (open) setVisible(true);
-  }
+  if (!exit.mounted) return null;
 
-  /**
-   * `animationend`가 오지 않는 경우의 폴백. 애니메이션은 탭이 백그라운드면 멈추고,
-   * 그 상태에서 시트를 닫으면 이벤트가 오지 않아 **시트가 DOM에 남는다**(실측).
-   * 여기서만 언마운트를 이벤트에 걸어 두면 화면이 잠긴 것처럼 보이는 상태가 만들어진다.
-   * ⚠ 퇴장 애니메이션(0.14s)의 두 배로 잡는다 — duration을 바꾸면 이 값도 함께 옮긴다.
-   */
-  useEffect(() => {
-    if (open || !visible) return;
-    const timer = setTimeout(() => setVisible(false), 300);
-    return () => clearTimeout(timer);
-  }, [open, visible]);
-
-  if (!visible) return null;
-
-  const closing = !open;
+  const closing = exit.closing;
 
   return (
     <>
@@ -105,10 +87,7 @@ export function Sheet({ open, onClose, label, children }: SheetProps) {
         // 그대로 두면 보조기술이 모달을 둘로 보고(삭제하기 → Dialog 전환이 실제로 그렇다)
         // 페이지 나머지가 가려진 것으로 취급한다. inert가 포커스·접근성 트리·포인터를 함께 끊는다.
         inert={closing || undefined}
-        // 진입 애니메이션도 자식 애니메이션의 버블링과 섞이지 않게 대상을 확인한다
-        onAnimationEnd={(event) => {
-          if (event.target === event.currentTarget && closing) setVisible(false);
-        }}
+        onAnimationEnd={exit.onAnimationEnd}
         className={cn(
           "absolute inset-x-0 bottom-0 z-[81] flex max-h-[85%] flex-col outline-none",
           // ⚠ 퇴장은 **accelerate**(0.4,0,1,1)다 — 진입용 ease-otb는 감속 커브라 마지막 10%에
