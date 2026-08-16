@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bell,
@@ -14,13 +14,7 @@ import {
   UserX,
 } from "lucide-react";
 import { ROUTES, avatarUrl } from "@/shared/config";
-import {
-  clearScrollRestore,
-  formatCount,
-  formatRelativeTime,
-  useNowMs,
-  useToast,
-} from "@/shared/lib";
+import { formatCount, formatRelativeTime, useNowMs } from "@/shared/lib";
 import {
   ActionChip,
   Avatar,
@@ -37,35 +31,24 @@ import {
 import { SubHeader } from "@/widgets/sub-header";
 import { isEdited, isHotPost, usePostQuery } from "@/entities/post";
 import { useSessionStore } from "@/entities/session";
-import { useDeletePost } from "@/features/delete-post";
 import { LikeButton } from "@/features/toggle-post-like";
 import { useRecordPostView } from "@/features/view-post";
-import { CommentBar, type ReplyTarget } from "./comment-bar";
+import type { ReplyTarget } from "../model/reply-target";
+import { usePostDeletion } from "../model/use-post-deletion";
+import { CommentBar } from "./comment-bar";
 import { CommentSection } from "./comment-section";
 
 export function PostDetailView({ postId }: { postId: number }) {
   const router = useRouter();
   const { data: post, isPending, error, refetch } = usePostQuery(postId);
   const user = useSessionStore((s) => s.user);
-  const deletePost = useDeletePost(postId);
-  const toast = useToast();
+  const deletion = usePostDeletion(postId);
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [askDelete, setAskDelete] = useState(false);
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
   // HOT 판정용 — 렌더 중 Date.now()는 순수하지 않다(use-now.ts 주석 참고)
   const nowMs = useNowMs();
-
-  /**
-   * 삭제 중복 실행 동기 가드 — PostForm·CommentBar와 같은 패턴.
-   * 다이얼로그가 확인 즉시 닫히지만 `disabled`는 렌더 이후에야 반영되므로, 같은 tick의
-   * 두 번째 클릭이 RPC를 한 번 더 쏜다. 두 번째는 이미 삭제된 글이라
-   * "존재하지 않는 게시글입니다"로 실패해 **이동 직전에 엉뚱한 에러가 깜빡인다.**
-   */
-  const deletingRef = useRef(false);
-  useEffect(() => {
-    if (!deletePost.isPending) deletingRef.current = false;
-  }, [deletePost.isPending]);
 
   // 상세 진입 시 조회수 +1 (세션당 1회, 실패는 삼킨다)
   useRecordPostView(postId);
@@ -311,16 +294,7 @@ export function PostDetailView({ postId }: { postId: number }) {
         onCancel={() => setAskDelete(false)}
         onConfirm={() => {
           setAskDelete(false);
-          if (deletingRef.current) return;
-          deletingRef.current = true;
-          deletePost.mutate(undefined, {
-            onSuccess: () => {
-              // 방금 본 글이 목록에서 빠져 위치가 밀린다 → 복원하지 않고 맨 위에서 시작
-              clearScrollRestore(ROUTES.postList);
-              router.replace(ROUTES.postList);
-              toast("글을 삭제했어요");
-            },
-          });
+          deletion.remove();
         }}
         title="이 글을 삭제할까요?"
         description={`댓글 ${formatCount(post.commentCount)}개도 같이 사라져요. 되돌릴 수 없습니다.`}
@@ -329,12 +303,12 @@ export function PostDetailView({ postId }: { postId: number }) {
         destructive
       />
 
-      {deletePost.error && (
+      {deletion.error && (
         // 하단 고정 댓글 입력(z-60) 위, 오버레이(80~95) 아래 — 시트가 열린 동안은 가려도 된다
         <p
           className="absolute inset-x-0 bottom-24 z-[66] px-5 text-center text-[12px] text-crimson"
         >
-          {deletePost.error.message}
+          {deletion.error.message}
         </p>
       )}
     </>

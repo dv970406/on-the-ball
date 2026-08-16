@@ -1,8 +1,7 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useState } from "react";
 import { formatCount } from "@/shared/lib";
-import { useToast } from "@/shared/lib";
 import { Dialog, EmptyState, Skeleton } from "@/shared/ui";
 import {
   COMMENT_LIST_LIMIT,
@@ -12,8 +11,8 @@ import {
   type Comment,
 } from "@/entities/comment";
 import { useSessionStore } from "@/entities/session";
-import { useDeleteComment } from "@/features/delete-comment";
-import type { ReplyTarget } from "./comment-bar";
+import { useCommentDeletion } from "../model/use-comment-deletion";
+import type { ReplyTarget } from "../model/reply-target";
 
 interface CommentSectionProps {
   postId: number;
@@ -32,8 +31,7 @@ export function CommentSection({
 }: CommentSectionProps) {
   const { data: comments, isPending, error, refetch } = useCommentListQuery(postId);
   const user = useSessionStore((s) => s.user);
-  const deleteComment = useDeleteComment(postId);
-  const toast = useToast();
+  const deletion = useCommentDeletion(postId);
   /** 답글이 달린 루트 댓글은 cascade로 남의 답글까지 지우므로 확인을 받는다 */
   const [confirmTarget, setConfirmTarget] = useState<{ id: number; replyCount: number } | null>(
     null,
@@ -48,63 +46,17 @@ export function CommentSection({
     (comments?.length ?? 0) >= COMMENT_LIST_LIMIT && commentCount > (comments?.length ?? 0);
   const threads = comments ? buildCommentThreads(comments) : undefined;
 
-  /**
-   * 삭제 중복 실행 동기 가드 — PostForm·CommentBar·글 삭제와 같은 패턴.
-   *
-   * ⚠ `disabled={busy}`만으로는 못 막는다 — isPending은 렌더 이후에야 DOM에 반영되는데
-   *   같은 tick의 두 번째 클릭은 아직 enabled인 버튼을 누른다. 두 번째 DELETE는 이미 지워진
-   *   행이라 0행이 되고, use-delete-comment가 에러로 승격해 잘못된 배너가 뜬다(실측).
-   */
-  /**
-   * **삭제를 보낸 댓글 id 집합**. boolean 하나도, id 하나도 아니어야 한다.
-   *
-   * ⚠ 세 번 갈아엎은 자리라 이유를 남긴다.
-   *   - boolean 하나: A를 지우는 동안 B가 **활성인데 클릭이 무시되는 무증상 잠금**이 됐다.
-   *   - id 하나: `useDeleteComment`는 **훅이 하나뿐**이라 B를 누르면 `variables`가 B로 갈아탄다
-   *     → A의 버튼이 다시 활성화되고(`busy=false`) A의 per-call `onSuccess`(토스트)가 버려진다.
-   *     그 상태로 A를 또 누르면 이미 지워진 행에 DELETE → 0행 → **"삭제 권한이 없어요."**
-   *   - Set: 보낸 것은 전부 기억하므로 위 두 가지가 동시에 닫힌다.
-   *
-   * ⚠ 성공하면 그 댓글은 목록에서 사라지므로 집합에서 지울 필요가 없다. 실패했을 때만
-   *   다시 시도할 수 있게 비운다(그 경우 화면에 에러가 떠 있다).
-   */
-  const sentRef = useRef<Set<number>>(new Set());
-  /**
-   * 시각 표시는 **state**로 따로 둔다 — ref는 렌더 중에 읽을 수 없고(리렌더도 유발하지 않는다),
-   * 반대로 state는 비동기라 동기 가드로 쓸 수 없다. 두 역할을 한 값에 겹치지 않는다.
-   */
-  const [sentIds, setSentIds] = useState<ReadonlySet<number>>(new Set());
-
-  useEffect(() => {
-    // 뮤테이션이 끝나면(성공·실패 무관) 다시 시도할 수 있게 연다.
-    // 성공한 댓글은 목록에서 사라지므로 재클릭 대상이 아니다.
-    if (!deleteComment.isPending) sentRef.current.clear();
-  }, [deleteComment.isPending]);
-
-  const removeComment = (commentId: number) => {
-    if (sentRef.current.has(commentId)) return;
-    sentRef.current.add(commentId);
-    setSentIds((prev) => new Set(prev).add(commentId));
-    deleteComment.mutate(commentId, {
-      onSuccess: () => toast("댓글을 삭제했어요"),
-    });
-  };
-
   /** 삭제 버튼 — 답글이 달린 루트면 확인 다이얼로그를 거친다 */
   const deleteAction = (comment: Comment, replyCount: number) => {
     if (comment.userId !== user?.id) return undefined;
-    // ⚠ `variables === comment.id`로 판정하면 안 된다 — 훅이 하나라 다른 댓글을 누르는 순간
-    //   갈아타서, 아직 처리 중인 댓글의 버튼이 다시 활성화된다(위 sentRef 주석 참고).
-    // ⚠ `isPending`을 함께 보므로 남은 id를 따로 지울 필요가 없다 — 뮤테이션이 끝나는 렌더에서
-    //   모든 버튼이 한 번에 풀린다(그때 sentRef도 비워져 재시도가 열린다).
-    const busy = deleteComment.isPending && sentIds.has(comment.id);
+    const busy = deletion.isDeleting(comment.id);
     return (
       <button
         type="button"
         onClick={() =>
           replyCount > 0
             ? setConfirmTarget({ id: comment.id, replyCount })
-            : removeComment(comment.id)
+            : deletion.remove(comment.id)
         }
         disabled={busy}
         // 시각 크기는 그대로 두고 히트 영역만 44px까지 넓힌다(ActionChip과 같은 방식)
@@ -203,9 +155,9 @@ export function CommentSection({
         </ul>
       )}
 
-      {deleteComment.error && (
+      {deletion.error && (
         <p className="px-5 py-2 text-[12px] text-crimson">
-          {deleteComment.error.message}
+          {deletion.error.message}
         </p>
       )}
 
@@ -217,7 +169,7 @@ export function CommentSection({
         open={confirmTarget !== null}
         onCancel={() => setConfirmTarget(null)}
         onConfirm={() => {
-          if (confirmTarget) removeComment(confirmTarget.id);
+          if (confirmTarget) deletion.remove(confirmTarget.id);
           setConfirmTarget(null);
         }}
         title="이 댓글을 삭제할까요?"
