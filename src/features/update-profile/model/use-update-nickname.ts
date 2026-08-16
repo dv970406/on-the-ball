@@ -6,6 +6,7 @@ import {
   hasVisibleChar,
   lengthOverflow,
   normalizeNickname,
+  useToast,
   type TextLimit,
 } from "@/shared/lib";
 import { commentKeys } from "@/entities/comment";
@@ -55,6 +56,7 @@ export function validateNickname(value: string): string | null {
  */
 export function useUpdateNickname(userId: string | undefined) {
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   return useMutation({
     mutationFn: async (nickname: string) => {
@@ -88,5 +90,7 @@ export function useUpdateNickname(userId: string | undefined) {
         queryClient.invalidateQueries({ queryKey: postKeys.all }),
         queryClient.invalidateQueries({ queryKey: commentKeys.all }),
       ]),
+    // 실패를 앱의 유일한 알림 채널로 — 필드 아래 문구는 조건부 평문이라 낭독되지 않는다
+    onError: (error) => toast(error.message),
   });
 }

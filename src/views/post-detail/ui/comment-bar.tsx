@@ -7,7 +7,7 @@ import { ArrowUp, CornerDownRight, X } from "lucide-react";
 import { signInWithNext } from "@/shared/config";
 import { Icon, buttonClassName } from "@/shared/ui";
 import { useSessionStore } from "@/entities/session";
-import { useCommentComposer } from "../model/use-comment-composer";
+import { COMMENT_ERROR_ID, useCommentComposer } from "../model/use-comment-composer";
 import type { ReplyTarget } from "../model/reply-target";
 
 interface CommentBarProps {
@@ -102,7 +102,10 @@ export function CommentBar({
       </form>
 
       {composer.error && (
-        <p className="mt-1.5 text-[12px] text-crimson">{composer.error}</p>
+        // id는 입력의 aria-describedby가 가리키는 곳이다 — 상수를 함께 쓴다
+        <p id={COMMENT_ERROR_ID} className="mt-1.5 text-[12px] text-crimson">
+          {composer.error}
+        </p>
       )}
     </>,
   );

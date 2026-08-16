@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
+import { useToast } from "@/shared/lib";
 import { postKeys } from "@/entities/post";
 import { useSessionStore } from "@/entities/session";
 import type { PostInput } from "./post-schema";
@@ -10,6 +11,7 @@ import type { PostInput } from "./post-schema";
 export function useCreatePost() {
   const queryClient = useQueryClient();
   const user = useSessionStore((s) => s.user);
+  const toast = useToast();
 
   return useMutation({
     mutationFn: async ({ category, title, content }: PostInput) => {
@@ -37,5 +39,7 @@ export function useCreatePost() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: postKeys.lists() });
     },
+    // 실패를 앱의 유일한 알림 채널로 — 폼 하단 문구는 조건부 평문이라 낭독되지 않는다
+    onError: (error) => toast(error.message),
   });
 }

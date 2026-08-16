@@ -2,12 +2,14 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
+import { useToast } from "@/shared/lib";
 import { postKeys } from "@/entities/post";
 import type { PostInput } from "./post-schema";
 
 /** 글 수정 — 본인 글만. updated_at은 DB 트리거가 찍는다(클라가 보내지 않는다) */
 export function useUpdatePost(postId: number) {
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   return useMutation({
     mutationFn: async ({ category, title, content }: PostInput) => {
@@ -35,5 +37,7 @@ export function useUpdatePost(postId: number) {
       void queryClient.invalidateQueries({ queryKey: postKeys.lists() });
       void queryClient.invalidateQueries({ queryKey: postKeys.detail(postId) });
     },
+    // 실패를 앱의 유일한 알림 채널로 — 폼 하단 문구는 조건부 평문이라 낭독되지 않는다
+    onError: (error) => toast(error.message),
   });
 }

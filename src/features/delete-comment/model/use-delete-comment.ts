@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
+import { useToast } from "@/shared/lib";
 import { commentKeys } from "@/entities/comment";
 import { postKeys } from "@/entities/post";
 
@@ -11,6 +12,7 @@ import { postKeys } from "@/entities/post";
  */
 export function useDeleteComment(postId: number) {
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   return useMutation({
     mutationFn: async (commentId: number) => {
@@ -34,5 +36,7 @@ export function useDeleteComment(postId: number) {
         queryClient.invalidateQueries({ queryKey: postKeys.detail(postId) }),
         queryClient.invalidateQueries({ queryKey: postKeys.lists() }),
       ]),
+    // 실패를 앱의 유일한 알림 채널로 — 화면 문구는 조건부 평문이라 스크린리더에 닿지 않는다
+    onError: (error) => toast(error.message),
   });
 }

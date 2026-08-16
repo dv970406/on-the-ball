@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query";
+import { useToast } from "@/shared/lib";
 import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
 import {
   postKeys,
@@ -42,6 +43,7 @@ function toggled<T extends Pick<PostListItem, "id" | "isLiked" | "likeCount">>(
  */
 export function useTogglePostLike(postId: number) {
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   return useMutation<boolean, Error, void, LikeSnapshot>({
     mutationFn: async () => {
@@ -78,9 +80,12 @@ export function useTogglePostLike(postId: number) {
       return snapshot;
     },
 
-    onError: (_error, _vars, snapshot) => {
+    onError: (error, _vars, snapshot) => {
       snapshot?.lists.forEach(([key, value]) => queryClient.setQueryData(key, value));
       queryClient.setQueryData(postKeys.detail(postId), snapshot?.detail);
+      // 롤백은 하트를 조용히 되돌릴 뿐이라, 알리지 않으면 **눌린 적이 없는 것처럼 보인다**.
+      // 화면 문구는 조건부 평문이라 스크린리더에 닿지 않는다 → 유일한 알림 채널로 보낸다.
+      toast(error.message);
     },
 
     onSettled: () => {

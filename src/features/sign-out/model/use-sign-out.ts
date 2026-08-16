@@ -2,6 +2,7 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { requireBrowserSupabase } from "@/shared/api";
+import { useToast } from "@/shared/lib";
 import { toAuthErrorMessage } from "@/entities/session";
 
 /**
@@ -15,6 +16,8 @@ import { toAuthErrorMessage } from "@/entities/session";
  *   서버 가드와 판정이 갈리는 상태(`entities/session`의 `use-server-session-check` 주석)를 만든다.
  */
 export function useSignOut() {
+  const toast = useToast();
+
   return useMutation({
     mutationFn: async () => {
       const supabase = requireBrowserSupabase();
@@ -24,5 +27,11 @@ export function useSignOut() {
         throw new Error(toAuthErrorMessage(error));
       }
     },
+    /**
+     * ⚠ 실패를 반드시 알린다. 로그아웃은 **성공하면 화면이 통째로 바뀌므로**, 실패했을 때
+     *   버튼이 잠깐 흐려졌다 돌아오는 것 말고는 단서가 없어 "됐는지 안 됐는지 알 수 없는"
+     *   상태가 된다. 공용 기기에서는 그 오해의 대가가 크다.
+     */
+    onError: (error) => toast(error.message),
   });
 }

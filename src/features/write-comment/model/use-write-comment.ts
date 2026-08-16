@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
-import { hasVisibleChar, lengthOverflow, type TextLimit } from "@/shared/lib";
+import { hasVisibleChar, lengthOverflow, useToast, type TextLimit } from "@/shared/lib";
 import { commentKeys } from "@/entities/comment";
 import { postKeys } from "@/entities/post";
 import { useSessionStore } from "@/entities/session";
@@ -48,6 +48,7 @@ export interface WriteCommentInput {
 export function useWriteComment(postId: number) {
   const queryClient = useQueryClient();
   const user = useSessionStore((s) => s.user);
+  const toast = useToast();
 
   return useMutation({
     mutationFn: async ({ content, parentId }: WriteCommentInput) => {
@@ -76,5 +77,7 @@ export function useWriteComment(postId: number) {
         queryClient.invalidateQueries({ queryKey: postKeys.detail(postId) }),
         queryClient.invalidateQueries({ queryKey: postKeys.lists() }),
       ]),
+    // 실패를 앱의 유일한 알림 채널로 — 입력창 아래 문구는 조건부 평문이라 낭독되지 않는다
+    onError: (error) => toast(error.message),
   });
 }

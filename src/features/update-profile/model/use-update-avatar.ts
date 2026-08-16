@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
 import { AVATAR_BUCKET } from "@/shared/config";
+import { useToast } from "@/shared/lib";
 import { commentKeys } from "@/entities/comment";
 import { postKeys } from "@/entities/post";
 import { profileKeys } from "@/entities/profile";
@@ -34,6 +35,7 @@ import {
  */
 export function useUpdateAvatar(userId: string | undefined) {
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   return useMutation({
     mutationFn: async (file: File) => {
@@ -119,6 +121,9 @@ export function useUpdateAvatar(userId: string | undefined) {
         queryClient.invalidateQueries({ queryKey: postKeys.all }),
         queryClient.invalidateQueries({ queryKey: commentKeys.all }),
       ]),
+    // ⚠ 실패를 반드시 알린다 — 이 훅은 업로드 전에 기존 사진을 지우므로,
+    //   놓치면 사진이 사라진 이유를 알 수 없다.
+    onError: (error) => toast(error.message),
   });
 }
 

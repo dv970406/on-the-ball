@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
+import { useToast } from "@/shared/lib";
 import { postKeys } from "@/entities/post";
 
 /**
@@ -16,6 +17,7 @@ import { postKeys } from "@/entities/post";
  */
 export function useDeletePost(postId: number) {
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   return useMutation({
     mutationFn: async () => {
@@ -32,5 +34,8 @@ export function useDeletePost(postId: number) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: postKeys.all });
     },
+    // 실패는 앱의 유일한 알림 채널로 보낸다 — 화면의 빨간 문구는 조건부로 마운트되는
+    // 평문이라 스크린리더에 닿지 않는다(code-quality.md의 라이브 리전 절)
+    onError: (error) => toast(error.message),
   });
 }
