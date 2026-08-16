@@ -17,17 +17,29 @@ export function useShareLink(title: string) {
 
   return async () => {
     const url = window.location.href;
-    try {
-      if (navigator.share) {
+
+    // ⚠ 공유 시트가 **있다고 성공하는 것은 아니다.** 권한 정책·비보안 컨텍스트·임베드에서는
+    //   NotAllowedError로 거절된다. 전에는 이 경우에도 클립보드로 내려가지 못해
+    //   "링크를 복사하지 못했어요"로 끝났다 — 복사는 시도조차 안 한 채였다.
+    if (navigator.share) {
+      try {
         await navigator.share({ title, url });
         return;
+      } catch (e) {
+        // 사용자가 시트를 닫은 것은 실패가 아니다 — 여기서 폴백하면 원치 않은 복사가 된다
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        console.error("[share] 공유 시트 실패 — 클립보드로 폴백:", e);
       }
+    }
+
+    try {
+      // navigator.clipboard는 보안 컨텍스트에서만 존재한다(http 실기기 테스트에서 undefined) —
+      // 그냥 두면 TypeError가 catch에 삼켜져 무반응이 된다
       if (!navigator.clipboard) throw new Error("clipboard unavailable");
       await navigator.clipboard.writeText(url);
       toast("링크를 복사했어요");
     } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") return;
-      console.error("[share] 공유 실패:", e);
+      console.error("[share] 링크 복사 실패:", e);
       toast("링크를 복사하지 못했어요");
     }
   };

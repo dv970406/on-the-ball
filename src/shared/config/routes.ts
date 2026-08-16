@@ -17,6 +17,17 @@ export const ROUTES = {
 } as const;
 
 /**
+ * **하단 탭바를 렌더하는 화면.** 탭바(`widgets/bottom-tab-bar`)와 토스트(`shared/ui/toast`)가
+ * 이 목록을 함께 본다.
+ *
+ * ⚠ 두 곳이 갈리면 조용히 어긋난다 — 전에는 토스트가 `pathname === ROUTES.postList`만 보고
+ *   위치를 올렸는데 프로필에도 탭바가 생기면서 **토스트가 탭바를 덮었다.**
+ *   탭을 추가·제거하면 여기만 고친다.
+ * ⚠ `shared`에 있는 이유는 `OAUTH_PROVIDERS`와 같다 — `shared/ui`가 `widgets`를 import할 수 없다.
+ */
+export const TAB_BAR_ROUTES: readonly string[] = [ROUTES.postList, ROUTES.profile];
+
+/**
  * 로그인 후 원래 목적지로 돌려보내기 위한 `next` 파라미터를 붙인 로그인 경로.
  * proxy(서버 가드)와 AuthRequired(클라 가드)가 같은 형태를 만들어야 하므로 여기로 모은다.
  */

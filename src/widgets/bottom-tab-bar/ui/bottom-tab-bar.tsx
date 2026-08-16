@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { MessagesSquare, User } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/shared/lib";
@@ -29,7 +32,14 @@ const TABS: TabItem[] = [
  *   목록 화면의 컬러 이벤트를 0개로 세는 기준에서 탭바는 앱 크롬이라 별도로 취급한다
  *   (프로토타입도 목록에 탭바를 두면서 "목록 = 컬러 이벤트 없음"이라고 적었다).
  */
-export function BottomTabBar({ active = "커뮤니티" }: { active?: string }) {
+export function BottomTabBar() {
+  /**
+   * ⚠ 활성 탭은 **현재 경로로 판정한다.** 전에는 호출부가 `active="프로필"`처럼 라벨 문자열을
+   *   넘겼는데, 라벨을 고치면 활성 탭이 0개가 되면서 `aria-current`까지 조용히 사라졌다
+   *   (타입이 `string`이라 컴파일도 통과했다).
+   */
+  const pathname = usePathname();
+
   return (
     <nav
       aria-label="주요 메뉴"
@@ -44,7 +54,7 @@ export function BottomTabBar({ active = "커뮤니티" }: { active?: string }) {
       )}
     >
       {TABS.map((tab) => {
-        const isActive = tab.label === active;
+        const isActive = pathname === tab.href;
         // 아이콘 20px + 라벨 10px, 높이 56px — 44px 최소 히트 영역을 넉넉히 넘는다
         const content = (
           <>

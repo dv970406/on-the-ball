@@ -44,9 +44,15 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
    * 이 화면은 하단 탭바의 두 목적지 중 하나다 — 탭으로 들어왔는데 탭바가 사라지면
    * 커뮤니티로 돌아갈 수단이 뒤로가기뿐이 된다. 상태 분기마다 함께 렌더한다.
    */
-  const tabBar = <BottomTabBar active="프로필" />;
-  /** 탭바는 떠 있으므로 스크롤 영역 하단을 비운다 — `TabScrollArea`와 같은 계산(72+18+여유) */
-  const mainClassName = "h-full overflow-y-auto pb-[calc(122px+env(safe-area-inset-bottom))]";
+  const tabBar = <BottomTabBar />;
+  /**
+   * 탭바는 떠 있으므로 스크롤 영역 하단을 비운다 — `TabScrollArea`와 같은 계산(72+18+여유).
+   * ⚠ `h-full`이 아니라 `min-h-0 flex-1` — SubHeader와 형제라 `h-full`이면 프레임이 헤더
+   *   높이(71px)만큼 넘쳐, 하단 버튼에 포커스가 가는 순간 화면이 밀리고 되돌릴 수 없다.
+   * ⚠ `relative` — 숨은 파일 input의 `sr-only`(position:absolute)가 프레임까지 새지 않게 한다.
+   */
+  const mainClassName =
+    "relative min-h-0 flex-1 overflow-y-auto pb-[calc(122px+env(safe-area-inset-bottom))]";
 
   if (profile.isPending) {
     return (

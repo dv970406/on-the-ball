@@ -9,7 +9,14 @@ import { createSupabaseServerClient } from "@/shared/api/supabase-server";
 import { clamp, toPlainSummary } from "@/entities/post/lib/plain-summary";
 import { PostDetailView } from "@/views/post-detail";
 
+/** 조회 실패("unknown")로 화면은 띄우되 제목을 알 수 없을 때 */
 const FALLBACK_METADATA: Metadata = { title: "게시글" };
+/**
+ * 없는 글 — `Page`가 `notFound()`를 부르므로 **404 화면과 같은 제목**이어야 한다.
+ * ⚠ 이걸 `FALLBACK_METADATA`로 뭉뚱그리면 서버 HTML은 "페이지를 찾을 수 없어요"인데
+ *   하이드레이션 후 탭 제목만 "게시글"로 바뀐다(실측). 문구는 `app/not-found.tsx`와 같이 간다.
+ */
+const NOT_FOUND_METADATA: Metadata = { title: "페이지를 찾을 수 없어요" };
 
 /** <title>·og:title에 실을 최대 길이 — 원문을 그대로 넣으면 120자 제목이 통째로 들어간다 */
 const META_TITLE_MAX = 60;
@@ -86,6 +93,7 @@ export async function generateMetadata(props: PageProps<"/posts/[id]">): Promise
   if (postId === null) return FALLBACK_METADATA;
 
   const head = await fetchPostHead(postId);
+  if (head.state === "missing") return NOT_FOUND_METADATA;
   if (head.state !== "found") return FALLBACK_METADATA;
 
   const title = clamp(head.title, META_TITLE_MAX);

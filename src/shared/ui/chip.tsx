@@ -20,7 +20,10 @@ export function Chip({ selected, className, ...props }: ChipProps) {
       aria-pressed={selected}
       className={cn(
         "shrink-0 rounded-sm border px-[13px] py-[9px] text-[13px] font-medium leading-none",
-        "transition-colors duration-150 ease-otb",
+        // ⚠ **글자색은 전환하지 않는다.** 배경(잉크↔흰색)과 글자색(흰색↔잉크)을 같은
+        //   150ms로 함께 보간하면 중간 지점에서 회색 위 회색이 되어 **라벨이 사라진 것처럼
+        //   보인다**(실측 ~75ms). 배경·테두리만 전환하고 글자는 즉시 바꾼다.
+        "transition-[background-color,border-color] duration-150 ease-otb",
         selected
           ? "border-ink bg-ink text-white"
           : "border-hairline bg-canvas text-ink-mute active:bg-canvas-soft",

@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { cn, useToastStore } from "@/shared/lib";
-import { ROUTES } from "@/shared/config";
+import { TAB_BAR_ROUTES } from "@/shared/config";
 
 /** 자동 소멸까지 — 프로토타입과 동일 */
 const TOAST_DURATION_MS = 1800;
@@ -16,16 +16,18 @@ const TOAST_DURATION_MS = 1800;
  *   `mx-auto h-dvh`라 좌표가 결과적으로 일치한다 — 프레임 정렬을 바꾸면 여기도 봐야 한다.
  *
  * ⚠ 탭바가 있는 화면에서는 토스트를 그 위로 올려야 가리지 않는다(112px / 40px).
- *   전에는 목록 화면이 전역 스토어에 present를 올리는 방식이었는데,
- *   탭바를 렌더하는 화면이 목록 하나뿐이라 **경로만 보면 충분하다.**
- *   그 편이 shared가 "탭바"라는 상위 도메인 개념을 모르게 되고,
- *   boolean 스토어가 화면 2개에서 서로 덮어쓰는 문제도 원천적으로 없다.
+ *   전에는 목록 화면이 전역 스토어에 present를 올리는 방식이었는데, 경로로 판정하는 편이
+ *   shared가 "탭바"라는 상위 도메인 개념을 모르게 되고 boolean 스토어가 화면 둘에서 서로
+ *   덮어쓰는 문제도 없다.
+ * ⚠ **판정 목록은 `TAB_BAR_ROUTES`가 단독으로 소유한다.** 여기서 `pathname === ROUTES.postList`로
+ *   직접 비교하던 시절, 프로필에도 탭바가 생기면서 **토스트가 탭바를 덮었다** — 두 곳이 같아야
+ *   하는 규약은 상수 하나가 갖는다.
  */
 export function ToastViewport() {
   const message = useToastStore((s) => s.message);
   const seq = useToastStore((s) => s.seq);
   const dismiss = useToastStore((s) => s.dismiss);
-  const aboveTabBar = usePathname() === ROUTES.postList;
+  const aboveTabBar = TAB_BAR_ROUTES.includes(usePathname());
 
   useEffect(() => {
     if (!message) return;

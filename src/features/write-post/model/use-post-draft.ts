@@ -1,15 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { codePointLength, hasVisibleChar, lengthOverflow } from "@/shared/lib";
+import { codePointLength } from "@/shared/lib";
 import type { PostCategory } from "@/entities/post";
-import {
-  CONTENT_MAX,
-  TITLE_LIMIT,
-  validatePost,
-  type PostFieldErrors,
-  type PostInput,
-} from "./post-schema";
+import { validatePost, type PostFieldErrors, type PostInput } from "./post-schema";
 
 /**
  * 폼이 들고 있는 **검증 전** 값.
@@ -30,8 +24,8 @@ export interface PostDraftFields {
  * 그건 개수 문제가 아니라 "이 훅이 관심사를 몇 개 들고 있는가"의 신호다 — 여기서는 하나다
  * (한 폼의 초안). 그래서 쪼개지 않고 묶는다.
  *
- * ⚠ 중복 제출 가드는 **여기 없다.** `PostForm`은 `onSubmit` prop만 받고 그것이 뮤테이션인지
- *   모르므로 폼 자신이 `isPending`을 prop으로 받아 방어한다(`use-duplicate-guard` 주석).
+ * ⚠ 중복 제출 가드는 **여기도, 폼에도 없다.** 뮤테이션을 조립하는 뷰가 갖는다
+ *   (`PostWriteView`·`PostEditView` — 사유는 `use-duplicate-guard.ts`).
  */
 export function usePostDraft(initial: PostInput | undefined) {
   const [draft, setDraft] = useState<PostDraftFields>({
@@ -61,22 +55,19 @@ export function usePostDraft(initial: PostInput | undefined) {
   const dirty = draft.title.length > 0 || draft.content.length > 0 || draft.category !== "";
 
   /**
-   * 등록 버튼 활성 조건 — **저렴한 검사만** 한다.
-   * 진짜 검증(zod)은 제출 시점의 validatePost가 하므로 여기서 또 돌릴 이유가 없다.
-   * 두 판정이 갈리지 않도록 기준은 postSchema와 같은 것을 쓴다(hasVisibleChar·코드포인트 길이).
+   * 등록 버튼 활성 조건 — **"아직 안 쓴 칸이 있는가"만** 본다.
    *
-   * ⚠ 길이는 **trim한 뒤** 잰다. zod가 `.trim()` 후 검사하므로 원본으로 재면 판정이 갈린다 —
-   *   120자 제목 끝에 공백이 딸려오면(붙여넣기에서 흔하다) zod는 통과시키는데 버튼만 죽었다.
-   * ⚠ 제목 한도는 lengthOverflow가 두 단위를 함께 본다(postSchema와 같은 판정기).
-   *   그래핌 계산은 제목 길이(120자)에서 0.011ms라 렌더 중에 불러도 무해하다 —
-   *   본문에 쓰지 않는 이유가 여기 있다(20,000자면 1.5ms로 14배가 된다).
+   * ⚠ **여기서 길이·형식까지 검사하면 안 된다.** 전에는 `lengthOverflow`·`hasVisibleChar`를
+   *   함께 봤는데, 그러면 제목이 한도를 넘거나 보이지 않는 문자만 든 순간 **버튼이 죽어
+   *   제출 자체가 막히고**, 제출해야 도는 `validate()`가 사유를 말할 기회를 잃는다 →
+   *   사용자는 "왜 등록이 안 되는지 알 수 없는" 상태가 된다(실측: 이모지 121자·제로폭 입력에서
+   *   안내 문구 0건). 댓글·닉네임은 문구가 뜨는데 여기만 침묵해 **형태도 갈렸다.**
+   *
+   * → 버튼은 **비어 있을 때만** 막고, 나머지 판정은 전부 제출 시점의 `validatePost`가
+   *   문구와 함께 돌려준다. 덤으로 렌더마다 돌던 그래핌 계산이 사라진다.
    */
   const ready =
-    draft.category !== "" &&
-    hasVisibleChar(draft.title) &&
-    !lengthOverflow(draft.title.trim(), TITLE_LIMIT) &&
-    hasVisibleChar(draft.content) &&
-    codePointLength(draft.content.trim()) <= CONTENT_MAX;
+    draft.category !== "" && draft.title.length > 0 && draft.content.length > 0;
 
   /** 제출 시점 검증 — 통과하면 `PostInput`, 실패하면 `null`(에러 상태를 채운다) */
   const validate = (): PostInput | null => {
