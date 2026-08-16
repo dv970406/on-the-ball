@@ -43,7 +43,10 @@ export function LikeButton({ postId, likeCount, isLiked }: LikeButtonProps) {
 
   // 비로그인은 아예 로그인으로 유도한다 — 훅의 RPC 호출은 어차피 DB가 거부한다.
   // Link 안에 button을 넣지 않으므로 클래스만 공유한다(buttonClassName과 같은 패턴).
-  if (status !== "authenticated") {
+  // ⚠ `!== "authenticated"`가 아니라 **`=== "guest"`로 판정한다.** 지금은 위에서 loading을
+  //   걸렀으니 둘이 같지만, 상태가 하나 늘면 부정형만 그 새 상태를 조용히 게스트로 취급한다.
+  //   같은 판정을 하는 CommentBar·AuthStatus가 긍정형이라 형태도 맞춘다.
+  if (status === "guest") {
     return (
       <Link
         href={signInWithNext(pathname)}
