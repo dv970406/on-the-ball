@@ -1,18 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { BarChart2, Hash, Image as ImageIcon, Link2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { codePointLength, hasVisibleChar, lengthOverflow } from "@/shared/lib";
+import { useDuplicateGuard } from "@/shared/lib";
 import { Chip, Dialog, Icon, buttonClassName } from "@/shared/ui";
-import { POST_CATEGORIES, type PostCategory } from "@/entities/post";
-import {
-  CONTENT_MAX,
-  TITLE_LIMIT,
-  validatePost,
-  type PostFieldErrors,
-  type PostInput,
-} from "../model/post-schema";
+import { POST_CATEGORIES } from "@/entities/post";
+import { CONTENT_MAX, type PostInput } from "../model/post-schema";
+import { usePostDraft } from "../model/use-post-draft";
+import { useAutoGrowTextarea } from "./use-auto-grow-textarea";
 
 interface PostFormProps {
   /** 수정 모드면 헤더 문구와 이탈 방어 동작이 달라진다 */
@@ -62,50 +58,11 @@ export function PostForm({
   onSubmit,
 }: PostFormProps) {
   const editing = mode === "edit";
-  const [category, setCategory] = useState<PostCategory | "">(initial?.category ?? "");
-  const [title, setTitle] = useState(initial?.title ?? "");
-  const [content, setContent] = useState(initial?.content ?? "");
-  const [fieldErrors, setFieldErrors] = useState<PostFieldErrors>({});
+  const { draft, errors, change, validate, status } = usePostDraft(initial);
   const [askLeave, setAskLeave] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
-  /**
-   * ⚠ 렌더마다 도는 계산은 **최소한으로** 둔다.
-   *   전에는 `dirty`의 .trim() ×2 + `ready`의 validatePost(내부 codePointLength = [...content]
-   *   스프레드 ×2) + 하단 카운터의 codePointLength ×1이 **키 입력 한 프레임마다** 돌았다.
-   *   본문 상한이 20,000자라 최대 2만 원소 배열을 프레임당 3번 할당하는 셈이고,
-   *   같은 프레임에 textarea 자동높이의 scrollHeight 강제 리플로가 겹친다.
-   *   → 길이는 여기서 **한 번만** 세고 아래 카운터와 공유한다.
-   */
-  const contentLength = codePointLength(content);
-
-  // 길이 0 판정에는 .trim()이 필요 없다(공백만 있는 입력도 "쓰다 만 것"이므로 dirty가 맞다)
-  const dirty = title.length > 0 || content.length > 0 || category !== "";
-
-  /**
-   * 등록 버튼 활성 조건 — **저렴한 검사만** 한다.
-   * 진짜 검증(zod)은 제출 시점의 validatePost가 하므로 여기서 또 돌릴 이유가 없다.
-   * 두 판정이 갈리지 않도록 기준은 postSchema와 같은 것을 쓴다(hasVisibleChar·코드포인트 길이).
-   */
-  // ⚠ 길이는 **trim한 뒤** 잰다. zod가 `.trim()` 후 검사하므로 원본으로 재면 판정이 갈린다 —
-  //   120자 제목 끝에 공백이 딸려오면(붙여넣기에서 흔하다) zod는 통과시키는데 버튼만 죽었다.
-  // ⚠ 제목 한도는 lengthOverflow가 두 단위를 함께 본다(postSchema와 같은 판정기).
-  //   그래핌 계산은 제목 길이(120자)에서 0.011ms라 렌더 중에 불러도 무해하다 —
-  //   본문에 쓰지 않는 이유가 여기 있다(20,000자면 1.5ms로 14배가 된다).
-  const ready =
-    category !== "" &&
-    hasVisibleChar(title) &&
-    !lengthOverflow(title.trim(), TITLE_LIMIT) &&
-    hasVisibleChar(content) &&
-    codePointLength(content.trim()) <= CONTENT_MAX;
-
-  /** 본문 textarea 자동 높이 확장 — scrollHeight를 그대로 반영한다 */
-  useEffect(() => {
-    const el = bodyRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [content]);
+  useAutoGrowTextarea(bodyRef, draft.content);
 
   // ⚠ 프로토타입에는 "임시저장됨 · 방금" 캡션이 있었지만 **저장 기능이 없어서 걷어냈다.**
   //   저장 로직·임시저장함 화면·복원 경로가 전부 없는데 캡션만 띄우면, 사용자가 그 말을 믿고
@@ -114,36 +71,27 @@ export function PostForm({
   /**
    * 중복 제출 동기 가드.
    *
-   * ⚠ `disabled={isPending}`만으로는 못 막는다. isPending은 **렌더 이후에야** DOM에
-   *   반영되는데, TanStack Query의 상태 변경은 마이크로태스크로 배치되므로
-   *   첫 클릭과 거의 동시에 들어온 두 번째 클릭은 아직 enabled인 버튼을 누른다.
-   *   실측에서 3연타 → 같은 글 3개가 실제로 생성됐다.
-   *   ref는 렌더를 기다리지 않으므로 같은 tick의 연타도 막는다.
+   * ⚠ **가드가 훅이 아니라 이 폼에 있는 이유**: `PostForm`은 `onSubmit` prop만 받고 그것이
+   *   뮤테이션인지 모른다(작성·수정 두 훅이 들어온다). 뮤테이션을 소유한 쪽이 방어한다는
+   *   규약의 예외이며, 그래서 `isPending`도 prop으로 받아 잠금 해제 시점을 맞춘다.
    */
-  const submittingRef = useRef(false);
-
-  // 제출이 끝나면(성공·실패 무관) 다시 열어준다
-  useEffect(() => {
-    if (!isPending) submittingRef.current = false;
-  }, [isPending]);
+  const guard = useDuplicateGuard(isPending);
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (submittingRef.current) return;
+    if (guard.isLocked()) return;
 
-    const result = validatePost({ category, title, content });
-    if (!result.ok) {
-      setFieldErrors(result.errors);
-      return;
-    }
-    setFieldErrors({});
-    submittingRef.current = true;
-    onSubmit(result.value);
+    // ⚠ 검증 실패는 잠그지 않는다 — 고쳐서 다시 누를 수 있어야 한다.
+    const input = validate();
+    if (!input) return;
+
+    guard.lock();
+    onSubmit(input);
   };
 
   /** 이탈 방어는 **생성 모드에서만** — 수정은 원본이 남아 있으므로 바로 돌아간다 */
   const handleCancel = () => {
-    if (!editing && dirty) setAskLeave(true);
+    if (!editing && status.dirty) setAskLeave(true);
     else onCancel();
   };
 
@@ -181,8 +129,8 @@ export function PostForm({
               {/* 이 화면의 유일한 컬러 이벤트 */}
               <button
                 type="submit"
-                disabled={!ready || isPending}
-                className={buttonClassName({ size: "sm", disabled: !ready || isPending })}
+                disabled={!status.ready || isPending}
+                className={buttonClassName({ size: "sm", disabled: !status.ready || isPending })}
               >
                 {editing ? "수정 완료" : "등록"}
               </button>
@@ -202,11 +150,8 @@ export function PostForm({
                 {POST_CATEGORIES.map((item) => (
                   <Chip
                     key={item}
-                    selected={category === item}
-                    onClick={() => {
-                      setCategory(item);
-                      setFieldErrors((prev) => ({ ...prev, category: undefined }));
-                    }}
+                    selected={draft.category === item}
+                    onClick={() => change("category", item)}
                   >
                     {item}
                   </Chip>
@@ -215,10 +160,10 @@ export function PostForm({
             </fieldset>
             {/*
               말머리 미선택 안내. 별도의 zod 에러 표시는 두지 않는다 —
-              `ready`가 미선택 상태의 제출을 막으므로 fieldErrors.category가 채워질 경로가 없다
+              `status.ready`가 미선택 상태의 제출을 막으므로 errors.category가 채워질 경로가 없다
               (전에 있던 분기는 도달 불가였다).
             */}
-            {!category && (
+            {!draft.category && (
               <p className="mt-2.5 text-[11px] text-ink-faint">말머리를 하나 골라 주세요</p>
             )}
 
@@ -235,19 +180,14 @@ export function PostForm({
                 id="post-title"
                 name="title"
                 placeholder="제목을 입력하세요"
-                value={title}
-                aria-invalid={fieldErrors.title ? true : undefined}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  setFieldErrors((prev) => ({ ...prev, title: undefined }));
-                }}
+                value={draft.title}
+                aria-invalid={errors.title ? true : undefined}
+                onChange={(e) => change("title", e.target.value)}
                 className="w-full border-0 bg-transparent p-0 text-2xl font-medium leading-[1.3] tracking-[-0.7px] text-ink outline-none placeholder:text-ink-faint"
               />
             </div>
-            {fieldErrors.title && (
-              <p className="mt-2 text-[12px] text-crimson">
-                {fieldErrors.title}
-              </p>
+            {errors.title && (
+              <p className="mt-2 text-[12px] text-crimson">{errors.title}</p>
             )}
 
             <hr className="my-4 border-0 border-t border-hairline-cool" />
@@ -261,18 +201,13 @@ export function PostForm({
               name="content"
               rows={1}
               placeholder={"무슨 얘기를 나눌까요?\n소문이면 출처를 같이 적어주면 좋아요."}
-              value={content}
-              aria-invalid={fieldErrors.content ? true : undefined}
-              onChange={(e) => {
-                setContent(e.target.value);
-                setFieldErrors((prev) => ({ ...prev, content: undefined }));
-              }}
+              value={draft.content}
+              aria-invalid={errors.content ? true : undefined}
+              onChange={(e) => change("content", e.target.value)}
               className="min-h-[180px] w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-[15px] leading-[1.65] text-ink-secondary outline-none placeholder:text-ink-faint"
             />
-            {fieldErrors.content && (
-              <p className="mt-2 text-[12px] text-crimson">
-                {fieldErrors.content}
-              </p>
+            {errors.content && (
+              <p className="mt-2 text-[12px] text-crimson">{errors.content}</p>
             )}
 
             {error && (
@@ -304,7 +239,7 @@ export function PostForm({
         {/* ⚠ 코드포인트로 센다 — .length(UTF-16)로 세면 이모지가 2로 잡혀 DB 한도와 어긋난다.
             위에서 이미 센 값을 재사용한다(렌더당 1회). */}
         <span className="ml-auto font-mono text-[11px] tabular-nums text-ink-faint">
-          {contentLength.toLocaleString("ko-KR")} / {CONTENT_MAX.toLocaleString("ko-KR")}
+          {status.contentLength.toLocaleString("ko-KR")} / {CONTENT_MAX.toLocaleString("ko-KR")}
         </span>
       </footer>
 
