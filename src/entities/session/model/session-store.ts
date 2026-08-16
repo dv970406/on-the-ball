@@ -6,7 +6,7 @@ interface SessionState {
   status: SessionStatus;
   user: SessionUser | null;
   /**
-   * AuthProvider의 onAuthStateChange 콜백 전용.
+   * `useSessionSync`의 onAuthStateChange 콜백 전용.
    * 컴포넌트나 features 훅에서 직접 부르지 않는다 — 세션의 단일 소스는 supabase이고
    * 스토어는 그 사본일 뿐이다. 여기서 직접 세팅하면 supabase와 어긋난다.
    */
