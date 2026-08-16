@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { ROUTES, safeNextPath, signInWithNext } from "@/shared/config";
+import type { ReactNode } from "react";
 import { Skeleton } from "@/shared/ui";
 import { useSessionStore } from "./session-store";
+import { useRedirectAfterSignIn, useRedirectGuestToSignIn } from "./use-auth-redirect";
 
 /**
  * 세션 판정 전에 보여줄 자리끼움.
@@ -26,16 +25,12 @@ function AuthGateSkeleton() {
  * proxy.ts의 서버 가드가 하드 내비게이션을 이미 막지만, SPA 전이나
  * 화면에 머무는 동안의 세션 만료는 서버가 잡지 못한다 — 그 구멍을 이쪽이 메운다.
  * 실제 차단은 두 층 모두 아니고 DB의 RLS다.
+ *
+ * 이동은 `useRedirectGuestToSignIn`이, 그 동안 무엇을 그릴지는 여기가 정한다.
  */
 export function AuthRequired({ children }: { children: ReactNode }) {
   const status = useSessionStore((s) => s.status);
-  const router = useRouter();
-  const pathname = usePathname();
-
-  useEffect(() => {
-    // 렌더 중 부작용은 금지고 redirect()는 이벤트 핸들러/effect에서 못 쓰므로 router로 이동한다
-    if (status === "guest") router.replace(signInWithNext(pathname));
-  }, [status, router, pathname]);
+  useRedirectGuestToSignIn(status);
 
   if (status !== "authenticated") return <AuthGateSkeleton />;
   return children;
@@ -44,36 +39,17 @@ export function AuthRequired({ children }: { children: ReactNode }) {
 /**
  * 비로그인 전용 화면(현재는 소셜 로그인 하나).
  *
- * ⚠ **로그인 후 목적지를 정하는 곳은 여기 하나다.**
- *   로그인 화면 쪽에서 이동시키면 안 된다 — 세션이 서는 순간 이 가드가 children을
- *   스켈레톤으로 갈아치워 그 화면이 언마운트되므로, 거기 걸어둔 콜백은 아예 실행되지 않는다
- *   (이메일 로그인 시절 실측으로 확인했고, 소셜 로그인은 프로바이더에서 돌아오는 구조라
- *   화면이 한 번 더 갈아엎이므로 더 그렇다).
- *
- * ⚠ 소셜 로그인 복귀 지점이 `/sign-in?code=…` 자기 자신이다. 코드 교환이 끝나 SIGNED_IN이
- *   오면 여기가 `?next=`를 읽어 목적지로 보낸다 — 전용 콜백 라우트를 두지 않는 이유다.
- *
- * ⚠ `?next=`를 useSearchParams가 아니라 **effect 안에서 window.location.search로** 읽는다.
- *   useSearchParams는 프리렌더를 CSR로 떨어뜨리는데, 이 컴포넌트가 레이아웃에 있어서
- *   그 폴백이 인증 화면 3개의 **본문 전체를 삼켰다**(빌드 산출물이 빈 body + BAILOUT였다).
- *   목적지 계산은 effect 안에서만 필요하고 effect는 클라이언트에서만 도니 이걸로 충분하다.
- *   덕분에 <Suspense> 경계도 필요 없어진다.
+ * 목적지 계산은 `useRedirectAfterSignIn`이 단독으로 소유한다 — 왜 여기 한 곳뿐인지,
+ * `?next=`를 어떤 방식으로 읽는지는 전부 그 훅의 주석에 있다.
  */
 export function GuestOnly({ children }: { children: ReactNode }) {
   const status = useSessionStore((s) => s.status);
-  const router = useRouter();
-
-  useEffect(() => {
-    if (status !== "authenticated") return;
-    // 외부 URL 주입(오픈 리다이렉트)은 safeNextPath가 걸러낸다
-    const next = new URLSearchParams(window.location.search).get("next");
-    router.replace(safeNextPath(next, window.location.origin) ?? ROUTES.postList);
-  }, [status, router]);
+  useRedirectAfterSignIn(status);
 
   // ⚠ AuthRequired와 달리 "loading"에서도 children을 그린다 — 이 화면은 **서버가 이미 걸렀다.**
   //   로그인 상태로 /sign-in에 하드 진입하면 proxy가 목록으로 리다이렉트하므로,
   //   여기까지 온 요청은 사실상 비로그인이다. 그리고 status가 "loading"인 순간은
-  //   최초 로드뿐이라(AuthProvider가 한 번 확정하면 유지) SPA 전이에는 해당하지 않는다.
+  //   최초 로드뿐이라(useSessionSync가 한 번 확정하면 유지) SPA 전이에는 해당하지 않는다.
   //   앱 안에 로그인 유저에게 노출되는 /sign-in 링크도 없다(전부 guest 분기).
   //   덕분에 로그인 폼이 **서버 HTML에 그대로 담긴다** — 느린 회선에서 백지를 보지 않는다.
   if (status === "authenticated") return <AuthGateSkeleton />;
