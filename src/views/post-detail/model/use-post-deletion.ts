@@ -28,7 +28,7 @@ export function usePostDeletion(postId: number) {
   const router = useRouter();
   const toast = useToast();
   const deletePost = useDeletePost(postId);
-  const guard = useDuplicateGuard(deletePost.isPending);
+  const guard = useDuplicateGuard(deletePost);
 
   const remove = () => {
     if (guard.isLocked()) return;

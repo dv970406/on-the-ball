@@ -12,6 +12,12 @@ import { useWriteComment, validateComment } from "@/features/write-comment";
 import type { ReplyTarget } from "./reply-target";
 
 /**
+ * 입력창 ↔ 에러 문구를 잇는 id. 두 곳이 같은 문자열을 써야 `aria-describedby`가 성립하므로
+ * 상수 하나가 소유한다. 화면에 댓글 입력창은 하나뿐이라 고정 id로 충분하다.
+ */
+export const COMMENT_ERROR_ID = "comment-error";
+
+/**
  * 댓글·답글 입력 조립 — 입력값, 검증, 낙관적 초기화와 실패 롤백.
  *
  * ⚠ **`content`를 그대로 노출하지 않는다.** 아래 `contentRef`와의 동기성 규약이 호출부로
@@ -40,7 +46,7 @@ export function useCommentComposer(
     contentRef.current = content;
   }, [content]);
 
-  const guard = useDuplicateGuard(writeComment.isPending);
+  const guard = useDuplicateGuard(writeComment);
 
   // 답글 모드로 들어가면 바로 쓸 수 있게 포커스를 옮긴다
   useEffect(() => {
@@ -124,6 +130,12 @@ export function useCommentComposer(
       onChange: handleChange,
       // ⚠ 로컬 검증 실패에만 붙인다 — 서버 에러는 아래 error 문구가 알린다
       "aria-invalid": error ? true : undefined,
+      /**
+       * ⚠ **문구를 필드에 묶는다.** `aria-invalid`만 있으면 "잘못됐다"는 알려도
+       *   **왜 잘못됐는지는 말하지 못한다.** 서버 에러까지 포함해 묶는 이유는,
+       *   그쪽도 이 문구 자리에 그려지는데 조건부 마운트라 낭독 경로가 따로 없기 때문이다.
+       */
+      "aria-describedby": error ?? writeComment.error ? COMMENT_ERROR_ID : undefined,
     },
     /** 로컬 검증 문구 ?? 서버 에러 문구 */
     error: error ?? writeComment.error?.message,

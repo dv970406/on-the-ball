@@ -3,7 +3,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { requireBrowserSupabase } from "@/shared/api";
 import { ROUTES, withNext, type OAuthProvider } from "@/shared/config";
-import { useDuplicateGuard } from "@/shared/lib";
+import { useDuplicateGuard, useToast } from "@/shared/lib";
 import { toAuthErrorMessage } from "@/entities/session";
 
 /**
@@ -23,6 +23,8 @@ import { toAuthErrorMessage } from "@/entities/session";
  *   돌아온 값의 검증은 `useRedirectAfterSignIn`의 `safeNextPath`가 이미 한다 — 여기서 또 짜지 않는다.
  */
 export function useOAuthSignIn(next: string | null) {
+  const toast = useToast();
+
   const mutation = useMutation({
     mutationFn: async (provider: OAuthProvider) => {
       const supabase = requireBrowserSupabase();
@@ -37,6 +39,9 @@ export function useOAuthSignIn(next: string | null) {
         throw new Error(toAuthErrorMessage(error));
       }
     },
+    // 성공하면 화면이 프로바이더로 넘어가므로, **실패했을 때만** 이 화면에 남는다 →
+    // 그 사실을 알림 채널로도 보낸다
+    onError: (error) => toast(error.message),
   });
 
   /**
@@ -47,7 +52,7 @@ export function useOAuthSignIn(next: string | null) {
    *   담은 URL로 이동한다. 저장된 verifier(마지막 호출)와 실제로 커밋된 내비게이션(다른 호출)이
    *   어긋나면 돌아온 code를 교환할 수 없어 로그인이 실패한다.
    */
-  const guard = useDuplicateGuard(mutation.isPending);
+  const guard = useDuplicateGuard(mutation);
 
   const start = (provider: OAuthProvider) => {
     if (guard.isLocked()) return;

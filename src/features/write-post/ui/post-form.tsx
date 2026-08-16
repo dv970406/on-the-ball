@@ -1,9 +1,8 @@
 "use client";
 
-import { useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { BarChart2, Hash, Image as ImageIcon, Link2 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useDuplicateGuard } from "@/shared/lib";
 import { Chip, Dialog, Icon, buttonClassName } from "@/shared/ui";
 import { POST_CATEGORIES } from "@/entities/post";
 import { CONTENT_MAX, type PostInput } from "../model/post-schema";
@@ -26,9 +25,12 @@ interface PostFormProps {
   /** 취소 — 생성 모드에서 입력이 있으면 이탈 확인을 거친 뒤 호출된다 */
   onCancel: () => void;
   /**
-   * ⚠ **반드시 `isPending`을 토글하는 뮤테이션을 시작해야 한다.**
-   *   중복 제출 가드가 자기가 잠근 자물쇠를 `isPending`이 false로 돌아올 때 푼다.
-   *   mutate하지 않고 반환하면 버튼은 활성인데 클릭이 무시되는 무증상 잠금이 된다.
+   * 검증을 통과한 입력만 올라온다 — 폼은 값이 유효한지까지만 책임진다.
+   *
+   * ⚠ **중복 제출 방어는 호출부가 갖는다.** 이 폼은 `isPending`을 prop으로 받는데,
+   *   부모가 리렌더되기 전까지는 낡은 값을 다시 읽을 뿐이라 여기서 가드를 들면
+   *   **해제 신호가 오지 않아 영구 잠금**이 된다(실측: 실패 후 등록 3연타 → 요청 1건).
+   *   가드는 뮤테이션을 조립하는 쪽에 둔다 — `use-duplicate-guard.ts` 참고.
    */
   onSubmit: (input: PostInput) => void;
 }
@@ -61,6 +63,12 @@ export function PostForm({
   const { draft, errors, change, validate, status } = usePostDraft(initial);
   const [askLeave, setAskLeave] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  /**
+   * 에러 문구를 필드에 묶을 id. `aria-invalid`만으로는 "잘못됐다"만 알리고
+   * **왜 잘못됐는지는 말하지 못한다** — `TextField`가 이미 두 속성을 짝으로 갖는다.
+   */
+  const titleErrorId = useId();
+  const contentErrorId = useId();
 
   useAutoGrowTextarea(bodyRef, draft.content);
 
@@ -68,24 +76,11 @@ export function PostForm({
   //   저장 로직·임시저장함 화면·복원 경로가 전부 없는데 캡션만 띄우면, 사용자가 그 말을 믿고
   //   이탈해 작성물을 잃는다. 초안 저장을 실제로 붙일 때 캡션도 함께 되살린다.
 
-  /**
-   * 중복 제출 동기 가드.
-   *
-   * ⚠ **가드가 훅이 아니라 이 폼에 있는 이유**: `PostForm`은 `onSubmit` prop만 받고 그것이
-   *   뮤테이션인지 모른다(작성·수정 두 훅이 들어온다). 뮤테이션을 소유한 쪽이 방어한다는
-   *   규약의 예외이며, 그래서 `isPending`도 prop으로 받아 잠금 해제 시점을 맞춘다.
-   */
-  const guard = useDuplicateGuard(isPending);
-
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (guard.isLocked()) return;
-
-    // ⚠ 검증 실패는 잠그지 않는다 — 고쳐서 다시 누를 수 있어야 한다.
+    // 검증에 실패하면 호출부까지 가지 않는다 → 그쪽 가드도 잠기지 않아 고쳐서 다시 누를 수 있다
     const input = validate();
     if (!input) return;
-
-    guard.lock();
     onSubmit(input);
   };
 
@@ -97,7 +92,8 @@ export function PostForm({
 
   return (
     <>
-      <main className="h-full overflow-y-auto pb-[calc(140px+env(safe-area-inset-bottom))]">
+      {/* 프레임이 flex 컬럼이라 `h-full`이 아니라 `min-h-0 flex-1`. `relative`는 sr-only 누출 방지 */}
+      <main className="relative min-h-0 flex-1 overflow-y-auto pb-[calc(140px+env(safe-area-inset-bottom))]">
         <h1 className="sr-only">{editing ? "글 수정" : "글쓰기"}</h1>
 
         <form onSubmit={handleSubmit}>
@@ -182,12 +178,15 @@ export function PostForm({
                 placeholder="제목을 입력하세요"
                 value={draft.title}
                 aria-invalid={errors.title ? true : undefined}
+                aria-describedby={errors.title ? titleErrorId : undefined}
                 onChange={(e) => change("title", e.target.value)}
                 className="w-full border-0 bg-transparent p-0 text-2xl font-medium leading-[1.3] tracking-[-0.7px] text-ink outline-none placeholder:text-ink-faint"
               />
             </div>
             {errors.title && (
-              <p className="mt-2 text-[12px] text-crimson">{errors.title}</p>
+              <p id={titleErrorId} className="mt-2 text-[12px] text-crimson">
+                {errors.title}
+              </p>
             )}
 
             <hr className="my-4 border-0 border-t border-hairline-cool" />
@@ -203,11 +202,14 @@ export function PostForm({
               placeholder={"무슨 얘기를 나눌까요?\n소문이면 출처를 같이 적어주면 좋아요."}
               value={draft.content}
               aria-invalid={errors.content ? true : undefined}
+              aria-describedby={errors.content ? contentErrorId : undefined}
               onChange={(e) => change("content", e.target.value)}
               className="min-h-[180px] w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-[15px] leading-[1.65] text-ink-secondary outline-none placeholder:text-ink-faint"
             />
             {errors.content && (
-              <p className="mt-2 text-[12px] text-crimson">{errors.content}</p>
+              <p id={contentErrorId} className="mt-2 text-[12px] text-crimson">
+                {errors.content}
+              </p>
             )}
 
             {error && (

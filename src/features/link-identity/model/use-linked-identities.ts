@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { UserIdentity } from "@supabase/supabase-js";
 import { requireBrowserSupabase } from "@/shared/api";
 import { ROUTES, type OAuthProvider } from "@/shared/config";
-import { useDuplicateGuard } from "@/shared/lib";
+import { useDuplicateGuard, useToast } from "@/shared/lib";
 import { identityKeys, toAuthErrorMessage } from "@/entities/session";
 
 /**
@@ -28,6 +28,8 @@ import { identityKeys, toAuthErrorMessage } from "@/entities/session";
  *   돌아오는 곳은 `/profile`이고, 그 화면이 `?error=`를 처리한다(app/profile/page.tsx).
  */
 export function useLinkIdentity() {
+  const toast = useToast();
+
   const mutation = useMutation({
     mutationFn: async (provider: OAuthProvider) => {
       const supabase = requireBrowserSupabase();
@@ -40,9 +42,11 @@ export function useLinkIdentity() {
         throw new Error(toAuthErrorMessage(error));
       }
     },
+    // 실패를 앱의 유일한 알림 채널로 — 목록 아래 문구는 조건부 평문이라 낭독되지 않는다
+    onError: (error) => toast(error.message),
   });
 
-  const guard = useDuplicateGuard(mutation.isPending);
+  const guard = useDuplicateGuard(mutation);
 
   const start = (provider: OAuthProvider) => {
     if (guard.isLocked()) return;
@@ -67,6 +71,7 @@ export function useLinkIdentity() {
  */
 export function useUnlinkIdentity() {
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   const mutation = useMutation({
     mutationFn: async (identity: UserIdentity) => {
@@ -80,9 +85,10 @@ export function useUnlinkIdentity() {
     // 낙관적 업데이트가 없으므로 무효화 Promise를 반환한다 —
     // 리페치가 끝날 때까지 isPending을 유지해 목록이 갱신되기 전 재클릭을 막는다.
     onSuccess: () => queryClient.invalidateQueries({ queryKey: identityKeys.all }),
+    onError: (error) => toast(error.message),
   });
 
-  const guard = useDuplicateGuard(mutation.isPending);
+  const guard = useDuplicateGuard(mutation);
 
   const remove = (identity: UserIdentity) => {
     if (guard.isLocked()) return;

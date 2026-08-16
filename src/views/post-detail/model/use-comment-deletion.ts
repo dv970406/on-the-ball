@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useToast } from "@/shared/lib";
 import { useDeleteComment } from "@/features/delete-comment";
 
@@ -8,7 +8,7 @@ import { useDeleteComment } from "@/features/delete-comment";
  * 댓글 삭제 — 목록의 **항목별** 삭제라 가드가 키를 받는다.
  *
  * ⚠ `@/shared/lib`의 `useDuplicateGuard`를 쓰지 않는다. 그쪽은 렌더 표시용 상태가 없는
- *   boolean 하나이고, 여기는 아래처럼 **ref(동기 판정) + state(렌더 표시)** 두 개가 본질이다
+ *   전역 잠금이고, 여기는 아래처럼 **ref(동기 판정) + state(렌더 표시)** 두 개가 본질이다
  *   — 형태가 달라 합치지 않는다.
  *
  * ⚠ `disabled={busy}`만으로는 못 막는다 — isPending은 렌더 이후에야 DOM에 반영되는데
@@ -28,9 +28,6 @@ export function useCommentDeletion(postId: number) {
    *     → A의 버튼이 다시 활성화되고(`busy=false`) A의 per-call `onSuccess`(토스트)가 버려진다.
    *     그 상태로 A를 또 누르면 이미 지워진 행에 DELETE → 0행 → **"삭제 권한이 없어요."**
    *   - Set: 보낸 것은 전부 기억하므로 위 두 가지가 동시에 닫힌다.
-   *
-   * ⚠ 성공하면 그 댓글은 목록에서 사라지므로 집합에서 지울 필요가 없다. 실패했을 때만
-   *   다시 시도할 수 있게 비운다(그 경우 화면에 에러가 떠 있다).
    */
   const sentRef = useRef<Set<number>>(new Set());
   /**
@@ -39,11 +36,26 @@ export function useCommentDeletion(postId: number) {
    */
   const [sentIds, setSentIds] = useState<ReadonlySet<number>>(new Set());
 
-  useEffect(() => {
-    // 뮤테이션이 끝나면(성공·실패 무관) 다시 시도할 수 있게 연다.
-    // 성공한 댓글은 목록에서 사라지므로 재클릭 대상이 아니다.
-    if (!deleteComment.isPending) sentRef.current.clear();
-  }, [deleteComment.isPending]);
+  /**
+   * 두 값에서 그 id를 **함께** 지운다 — 이 쌍이 계약이라 한쪽만 지우지 않는다.
+   *
+   * ⚠ **해제를 effect가 아니라 per-call 콜백에 건다.** 전에는 `!isPending` effect가
+   *   `sentRef`만 비웠는데, 그 탓에 두 가지가 동시에 어긋났다.
+   *   ① 실패해서 목록에 **남은** 댓글 A의 id가 `sentIds`에 계속 쌓여, 나중에 B를 지우는 동안
+   *      `isDeleting(A)`가 참이 되어 **A 버튼까지 "삭제 중…"으로 잠겼다**(실측 2.5초).
+   *   ② effect로 옮겨도 `isPending`(boolean)은 마이크로태스크만으로 끝나는 실패에서
+   *      `false → false`라 아예 돌지 않는다(`use-duplicate-guard.ts`와 같은 함정).
+   *   콜백은 **보낸 항목별로** 정확히 도착하므로 렌더 타이밍에 기대지 않는다.
+   */
+  const release = (commentId: number) => {
+    sentRef.current.delete(commentId);
+    setSentIds((prev) => {
+      if (!prev.has(commentId)) return prev;
+      const next = new Set(prev);
+      next.delete(commentId);
+      return next;
+    });
+  };
 
   const remove = (commentId: number) => {
     if (sentRef.current.has(commentId)) return;
@@ -51,6 +63,9 @@ export function useCommentDeletion(postId: number) {
     setSentIds((prev) => new Set(prev).add(commentId));
     deleteComment.mutate(commentId, {
       onSuccess: () => toast("댓글을 삭제했어요"),
+      // 성공하면 그 댓글은 목록에서 사라지지만, 그래도 지운다 —
+      // "보낸 것만 담는다"는 집합의 뜻을 성공·실패 어느 쪽에서도 흐리지 않는다.
+      onSettled: () => release(commentId),
     });
   };
 
@@ -60,8 +75,8 @@ export function useCommentDeletion(postId: number) {
    *
    * ⚠ `variables === commentId`로 판정하면 안 된다 — 훅이 하나라 다른 댓글을 누르는 순간
    *   갈아타서, 아직 처리 중인 댓글의 버튼이 다시 활성화된다(위 sentRef 주석 참고).
-   * ⚠ `isPending`을 함께 보므로 남은 id를 따로 지울 필요가 없다 — 뮤테이션이 끝나는 렌더에서
-   *   모든 버튼이 한 번에 풀린다(그때 sentRef도 비워져 재시도가 열린다).
+   * ⚠ `isPending`을 함께 보는 것은 **집합이 정확할 때만** 옳다. 위 `release`가 항목별로
+   *   비우는 것이 이 판정의 전제다 — 남은 id가 있으면 엉뚱한 버튼이 잠긴다.
    */
   const isDeleting = (commentId: number) =>
     deleteComment.isPending && sentIds.has(commentId);

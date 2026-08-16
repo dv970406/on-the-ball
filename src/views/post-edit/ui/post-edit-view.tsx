@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ROUTES } from "@/shared/config";
-import { useToast } from "@/shared/lib";
+import { useDuplicateGuard, useToast } from "@/shared/lib";
 import { EmptyState, Skeleton } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
 import { usePostQuery } from "@/entities/post";
@@ -14,6 +14,9 @@ export function PostEditView({ postId }: { postId: number }) {
   const router = useRouter();
   const { data: post, isPending, error } = usePostQuery(postId);
   const updatePost = useUpdatePost(postId);
+  // ⚠ 가드가 폼이 아니라 여기 있는 이유는 PostWriteView와 같다 — 폼은 isPending을 prop으로
+  //   받아 낡은 값을 읽으므로 거기서 잠그면 풀리지 않는다(use-duplicate-guard.ts).
+  const guard = useDuplicateGuard(updatePost);
   const user = useSessionStore((s) => s.user);
   const toast = useToast();
 
@@ -85,14 +88,16 @@ export function PostEditView({ postId }: { postId: number }) {
       error={updatePost.error}
       // 수정 모드는 이탈 확인 없이 바로 상세로 복귀한다(원본이 남아 있다)
       onCancel={() => router.replace(ROUTES.post(postId))}
-      onSubmit={(input) =>
+      onSubmit={(input) => {
+        if (guard.isLocked()) return;
+        guard.lock();
         updatePost.mutate(input, {
           onSuccess: () => {
             router.replace(ROUTES.post(postId));
             toast("수정했어요");
           },
-        })
-      }
+        });
+      }}
     />
   );
 }

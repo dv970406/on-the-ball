@@ -97,7 +97,7 @@ TanStack Query는 성공 후 리페치가 실패해도 `data`를 유지한다(`s
 판정은 `@/shared/lib`의 **`useDuplicateGuard`가 단독으로 소유한다** — `ref` + 해제 effect를 직접 짜지 않는다.
 
 ```ts
-const guard = useDuplicateGuard(mutation.isPending);
+const guard = useDuplicateGuard(mutation);
 
 const handleSubmit = (e) => {
   e.preventDefault();
@@ -120,20 +120,24 @@ const handleSubmit = (e) => {
 
 | 가드를 둔다 | 두지 않는다 |
 |---|---|
-| **행이 생긴다** — 글 작성(`PostForm`), 댓글 작성(`useCommentComposer`) | **소셜 로그인** — 버튼을 누르면 페이지가 프로바이더로 넘어가 화면 자체가 사라진다 |
+| **행이 생긴다** — 글 작성(`PostWriteView`), 댓글 작성(`useCommentComposer`) | **소셜 로그인** — 버튼을 누르면 페이지가 프로바이더로 넘어가 화면 자체가 사라진다 |
 | **행이 사라진다** — 글 삭제(`usePostDeletion`), 댓글 삭제(`useCommentDeletion`), 연결 해제(`useUnlinkIdentity`) | **낙관적 업데이트** — 좋아요(의도적으로 `disabled`조차 두지 않는다, 아래 절 참고) |
 | | **멱등한 UPDATE** — 닉네임 변경은 연타해도 행이 늘지 않아 `isPending` 확인으로 족하다 |
 
-#### 자리는 **그 뮤테이션을 조립하는 훅**이다
+#### 자리는 **그 뮤테이션을 조립하는 곳**이다
 
-가드를 컴포넌트에 남기면 다음 호출부가 방어를 다시 짜야 하고, 그러면 방어가 **호출자의 기억력**에 걸린다.
-그래서 위 표의 이름들이 전부 훅이다. 그 훅이 features일 수도(`useUnlinkIdentity`) 화면 슬라이스의 `model/`일 수도 있다 — per-call 콜백이 이동 목적지·입력창 복원 같은 **상위 레이어의 결정**을 담고 있으면 features로 내리지 않는다.
+가드를 뮤테이션과 떨어뜨려 두면 다음 호출부가 방어를 다시 짜야 하고, 그러면 방어가 **호출자의 기억력**에 걸린다.
+대개는 훅이다 — features일 수도(`useUnlinkIdentity`) 화면 슬라이스의 `model/`일 수도 있고(per-call 콜백이 이동 목적지·입력창 복원 같은 **상위 레이어의 결정**을 담고 있으면 features로 내리지 않는다),
+`mutate`를 인라인으로 부르는 뷰라면 그 뷰다(`PostWriteView`).
+**기준은 "훅인가"가 아니라 "그 뮤테이션의 `status`를 직접 읽는가"** 다 — 아래 예외 항목이 그 이유다.
 
-⚠ 유일한 예외가 **`PostForm`** 이다. `onSubmit` prop만 받아 그것이 뮤테이션인지 모르므로 폼이 자기 제출을 방어하고, `isPending`도 prop으로 받아 잠금 해제 시점을 맞춘다.
+⚠ **예외를 두지 않는다.** 한때 `PostForm`이 자기 제출을 방어했는데(`onSubmit` prop만 받아 그것이 뮤테이션인지 모르므로), **`isPending`을 prop으로 받는 컴포넌트는 가드를 들 수 없다** — 부모가 리렌더되기 전까지 자식은 낡은 값을 다시 읽을 뿐이라 해제 신호가 오지 않고, 첫 실패 이후 그 화면에서 영영 제출할 수 없게 된다(실측: 등록 3연타 → 요청 1건). 폼은 검증까지만 하고 유효한 입력만 올려보내며, 가드는 뮤테이션을 조립하는 뷰(`PostWriteView`·`PostEditView`)가 갖는다.
 
 ⚠ **소셜 로그인·계정 연결은 예외적으로 가드가 필요하다.** 화면이 사라지니 불필요해 보이지만, `signInWithOAuth`·`linkIdentity`는 호출마다 **새 PKCE code_verifier를 저장소에 덮어쓴** 뒤 그 challenge를 담은 URL로 이동한다 — 두 호출이 겹치면 저장된 verifier와 커밋된 내비게이션이 어긋나 돌아온 code를 교환할 수 없다(로그인 실패). `useOAuthSignIn`·`useLinkIdentity`가 `start()` 안에서 가드를 갖고, `disabled`는 시각 표시로만 남긴다.
 
-⚠ **목록의 항목별 삭제는 boolean 하나로 부족하다.** 뮤테이션 훅이 하나뿐이라 다른 항목을 누르는 순간 `variables`가 갈아타 처리 중이던 항목의 버튼이 되살아난다 → 보낸 id의 **집합**을 기억하고, 동기 판정용 ref와 렌더 표시용 상태를 **따로** 둔다(선례 `useCommentDeletion`).
+⚠ **목록의 항목별 삭제는 boolean 하나로 부족하다.** 뮤테이션 훅이 하나뿐이라 다른 항목을 누르는 순간 `variables`가 갈아타 처리 중이던 항목의 버튼이 되살아난다 → 보낸 id의 **집합**을 기억하고, 동기 판정용 ref와 렌더 표시용 상태를 **따로** 둔다(선례 `useCommentDeletion`). 해제는 **보낸 항목별 per-call 콜백**에서 두 값을 함께 지운다 — 한쪽만 지우면 실패해서 남은 id가 **다른 항목을 지우는 동안 엉뚱한 버튼을 잠근다.**
+
+⚠ **다만 "항목 수 자체가 불변조건인 목록"은 반대다 — boolean 전역 잠금이 맞다.** 로그인 수단 해제(`useUnlinkIdentity`)가 그 자리다. 지켜야 하는 것이 "이 항목이 두 번 지워지지 않는다"가 아니라 **"목록이 0개가 되지 않는다"** 인데, 항목별 가드는 다른 항목을 열어 두므로 그 불변조건을 지키지 못한다(화면의 `canUnlink`는 리페치 전 stale 값이라 같은 tick에 둘을 누르면 둘 다 통과한다). 위 규칙에 맞춘다며 Set 가드로 바꾸지 말 것.
 
 ⚠ 새 뮤테이션을 만들 때 **표를 외우지 말고 기준을 적용한다.** 예컨대 "신고하기"는 인증 폼처럼 보여도 행이 쌓이므로 가드가 필요하다.
 
