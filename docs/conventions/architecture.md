@@ -38,15 +38,16 @@ shared ← entities ← features ← widgets ← views
   - ⚠ `pnpm check:conventions`는 이 위반을 **잡지 못한다.** 상대 경로 소비도 "현역"으로 세기 때문이다(배럴 미사용 검사의 목적은 죽은 export를 찾는 것이다).
 - Vercel `react-best-practices`의 `bundle-barrel-imports`는 **서드파티 라이브러리 배럴**(lucide-react·@mui 등, 최대 수천 개 재export) 대상이다. 내부 슬라이스 배럴은 위 deep-import 금지 규칙을 유지한다. 서드파티는 Next의 `optimizePackageImports` **기본 목록이 이미 커버**한다(`lucide-react` 포함 — `next/dist/server/config.js`의 기본값). next.config에 따로 적지 않는다.
 
-### ⚠ 내부 배럴도 트리셰이킹되지 않는다 — 무거운 모듈은 배럴에 싣지 않는다
+### ⚠ 배럴의 트리셰이킹은 `package.json`의 `sideEffects` 선언에 달려 있다
 
-`@/shared/ui` 배럴은 **루트 layout이 마운트하는 `AppProviders`가 `ToastViewport` 하나 때문에 이미 타고 있다.** 그래서 이 배럴에 실린 모듈은 그것을 쓰지 않는 화면까지 포함해 **전 라우트의 초기 JS에 들어간다.** "안 쓰면 트리셰이킹된다"는 전제는 이 프로젝트의 빌드에서 성립하지 않았다 — react-markdown이 목록·로그인·404에 실려 초기 JS가 **43.6KB(gzip) 부풀어 있었다**(반사실 빌드로 실측).
+`@/shared/ui` 배럴은 **루트 layout이 마운트하는 `AppProviders`가 `ToastViewport` 하나 때문에 이미 타고 있다.** 그래서 이 배럴이 재export하는 모듈 중 털리지 않는 것이 생기면 그것을 쓰지 않는 화면까지 포함해 **전 라우트의 초기 JS에 들어간다.**
 
-→ 소비자가 한 화면뿐인데 무거운 모듈은 **배럴에서 빼고 직접 경로로** 가져간다. 그 경로는 `check-conventions`의 **`DEEP_IMPORT_ALLOWED_CLIENT`** 에 등재한다.
+실제로 그런 일이 있었다 — react-markdown이 목록·로그인·404에까지 실려 초기 JS가 **43.6KB(gzip) 부풀어 있었다.** 원인은 배럴이 아니라 **`package.json`에 `sideEffects` 선언이 없던 것**이었다(반사실 빌드로 실측: 배럴을 그대로 둔 채 선언만 추가하니 `/sign-in`이 332.5KB → 290KB로 떨어지고 마크다운은 글 상세 한 라우트에만 남았다).
 
-- 이 목록은 바로 아래 절의 "서버 소비자의 탈출구"와 **사유가 다르다.** 그쪽은 `"use client"` 파일에 금지지만, 이쪽은 **클라이언트 소비자가 대상**이라 그 금지가 적용되지 않는다. 두 목록을 섞지 않는다.
-- 등재 기준: **"배럴에 두면 전 라우트에 실리는데 실제 소비자는 한 화면뿐"**. 편의로 deep import를 여는 통로가 아니다 — 등재 전에 반사실 빌드로 감소분을 실측한다.
-- 호출부가 **0인** 컴포넌트는 등재도 필요 없다. 배럴에서 빼기만 하면 아무도 참조하지 않아 번들에서 사라진다(`MarkdownEditor`가 그 경우다).
+- **순수한 모듈은 선언이 없어도 털린다.** 미사용 v1 컴포넌트 9종은 선언 전에도 프로덕션 청크에 0건이었다. 문제가 된 것은 **서드파티 의존을 끌고 있어 번들러가 순수성을 증명하지 못한** 모듈 하나뿐이었다.
+- 그러므로 **무거운 모듈이 생겼다고 배럴에서 빼지 않는다.** 먼저 `sideEffects`가 선언돼 있는지 보고, 그래도 남으면 그때 FSD가 권하는 형태(`shared/ui`·`shared/lib`를 컴포넌트별 index로 쪼개기)를 검토한다 — deep import를 여는 것은 **공개 API 규칙 위반**이다(FSD: "Modules outside of this slice/segment can only reference the public API").
+
+⚠ **`sideEffects`는 번들러에 대한 약속이다.** 지금 이 프로젝트에서 import 시점 부작용은 `globals.css` 두 곳뿐이라 `["*.css"]`로 선언했다. 앞으로 **import만으로 무언가를 등록하는 모듈**(폴리필·전역 초기화·analytics 부트스트랩)을 추가하면, 아무도 그 export를 쓰지 않을 때 **조용히 통째로 삭제된다.** 그런 모듈이 생기면 목록에 함께 적는다.
 
 ## 서버/클라이언트 경계 (배럴이 담당)
 

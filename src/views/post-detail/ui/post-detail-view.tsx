@@ -21,15 +21,13 @@ import {
   Dialog,
   EmptyState,
   Icon,
+  Markdown,
   Pill,
   Sheet,
   SheetItem,
   Skeleton,
   buttonClassName,
 } from "@/shared/ui";
-// ⚠ 배럴이 아니라 직접 경로다 — 배럴에 실으면 react-markdown이 **전 라우트**의 초기 JS에
-//   들어간다(shared/ui/index.ts 주석에 실측치). 본문을 그리는 이 화면만 대가를 치른다.
-import { Markdown } from "@/shared/ui/markdown";
 import { SubHeader } from "@/widgets/sub-header";
 import { isEdited, isHotPost, usePostQuery } from "@/entities/post";
 import { useSessionStore } from "@/entities/session";

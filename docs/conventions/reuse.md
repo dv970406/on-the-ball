@@ -98,21 +98,19 @@
 
 ## `@/shared/ui`
 **현역(게시판 v2가 실제로 쓰는 것)** — 새로 만들기 전 여기부터 확인:
-`Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·
+`Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·`Markdown`·
 `Chip`·`ActionChip`·`actionChipClassName`·`Dialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`
-(+ **배럴 밖의 현역** `Markdown` — `@/shared/ui/markdown` 직접 경로. 사유는 아래)
 
 **현재 미사용** — **"검증된 현역"으로 오인하지 말 것**:
 `TabHeader`·`Flag`·`Shirt`·`RatioBar`·`SectionHead`·`LiveDot`·`LiveStatusPill`·`NightCard`·`PlayerSilhouette`
 (전부 `docs/legacy/v1-inventory.md`가 보존 대상으로 명시한 v1 자산이다. `MarkdownEditor`는 v2에서 만들었다가 쓰이지 않아 **배럴에서 뺐다** — 파일은 남아 있다)
 
-⚠ **"미사용이라도 트리셰이킹되어 번들 비용이 0"은 사실이 아니다.** 이 배럴은 루트 layout이 타므로 여기 실린 것은 전 라우트의 초기 JS에 들어간다(실측). 위 v1 자산을 남겨 두는 것은 **재현 비용이 크다는 판단**이지 공짜라서가 아니다 — 무거운 것을 새로 올릴 때는 크기를 먼저 잰다(`architecture.md`).
+⚠ 위 v1 자산은 **실측상 번들에 실리지 않는다**(프로덕션 청크에서 9종 전량 0건). 다만 그건 각 모듈이 순수해서이지 "배럴이라 공짜"여서가 아니다 — 서드파티 의존을 끌고 오는 무거운 모듈은 `sideEffects` 선언이 없으면 그대로 실린다(`architecture.md`의 트리셰이킹 절).
 
 > ⚠ 이 두 목록은 **실사용 여부로만 판정한다** — 손으로 세지 말고 **`pnpm check:conventions`** 를 돌린다(호출부 0인 export를 전수로 뽑아 준다).
 > **이 문서의 존재 이유가 "새로 만들기 전 확인"이라 목록이 틀리면 문서가 없느니만 못하다.** UI를 추가·제거하면 여기부터 고친다.
 
 - `Markdown` — 마크다운 렌더(GFM). `"use client"` **없음** — 서버 렌더 가능.
-  - ⚠ **이것만 배럴에 없다.** `@/shared/ui/markdown` 직접 경로로 가져간다 — 배럴에 실으면 react-markdown이 전 라우트의 초기 JS에 들어간다(43.6KB gzip, 실측). 사유와 등재 절차는 `architecture.md`.
 - `Chip` — 말머리 칩. **`rounded-sm`(6px)** 이다 — 칩이라고 알약이 아니다(`styling.md` 예외 목록 참고).
 - `ActionChip` / `actionChipClassName` — 좋아요·댓글 카운터 칩. 클래스 함수가 분리된 이유는 `Button`↔`buttonClassName`과 같다 — 비로그인 좋아요는 `Link`로 렌더해야 하는데 `Link` 안에 `button`을 넣을 수 없어 **클래스만** 필요하다.
 - `Dialog` / `Sheet`(+`SheetItem`) — 확인 대화상자 / 하단 시트. 포커스 가둠은 `@/shared/lib`의 `useFocusTrap`.

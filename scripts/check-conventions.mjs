@@ -41,19 +41,6 @@ const DEEP_IMPORT_ALLOWED = new Set([
 /** `@/entities/<slice>/...` 형태로 모든 엔티티에 공통 허용되는 서버 안전 경로 */
 const DEEP_IMPORT_ALLOWED_ENTITY_SUFFIX = ["model/types", "api/mappers", "api/keys"];
 
-/**
- * **번들 때문에** 배럴에서 뺀 모듈. 위 목록과 사유가 다르다 —
- * 저쪽은 "서버 소비자의 탈출구"라 `"use client"` 파일에는 금지지만,
- * 여기는 **클라이언트 소비자가 대상**이라 그 금지가 적용되지 않는다.
- *
- * ⚠ 아무거나 올리지 않는다. 기준은 "배럴에 두면 **전 라우트**의 초기 JS에 실리는데
- *   실제 소비자는 한 화면뿐"이다(`@/shared/ui` 배럴은 루트 layout이 `ToastViewport`
- *   때문에 이미 타고 있다). 등재 전에 반사실 빌드로 감소분을 실측한다.
- */
-const DEEP_IMPORT_ALLOWED_CLIENT = new Set([
-  // react-markdown + remark-gfm = 43.6KB gzip. 소비자는 글 상세 하나뿐이다
-  "@/shared/ui/markdown",
-]);
 
 /**
  * 배럴이 공개하지만 **아직 호출부가 없는** export. "잊고 안 지운 것"과 구분하기 위해
@@ -61,10 +48,9 @@ const DEEP_IMPORT_ALLOWED_CLIENT = new Set([
  * 여기 있는데 현역이 돼도 실패한다(그래야 목록이 죽지 않는다).
  */
 const DOCUMENTED_UNUSED = new Map([
-  // reuse.md `@/shared/ui`의 "현재 미사용" 목록.
-  // ⚠ **번들 비용이 0이 아니다.** 이 배럴은 루트 layout이 타므로 여기 실린 것은 전 라우트의
-  //   초기 JS에 들어간다(실측). 그래도 남겨 두는 것은 v1 자산의 재현 비용 때문이라는 판단이고,
-  //   비용이 큰 것(마크다운)은 배럴에서 뺐다 — 새로 추가할 때는 크기를 먼저 잰다.
+  // reuse.md `@/shared/ui`의 "현재 미사용" 목록. 실측상 번들에 실리지 않는다
+  // (미사용 컴포넌트 9종 전량이 프로덕션 청크에서 0건) — 다만 그건 각 모듈이
+  // 순수해서이지 "배럴이라 공짜"여서가 아니다. 근거는 architecture.md의 트리셰이킹 절.
   ["TabHeader", "v1 자산 (reuse.md 미사용 목록)"],
   ["Flag", "v1 자산 (reuse.md 미사용 목록)"],
   ["Shirt", "v1 자산 (reuse.md 미사용 목록)"],
@@ -353,15 +339,13 @@ for (const f of files) {
     if (parts.length <= 3) continue;
 
     const suffix = parts.slice(3).join("/");
-    const bundleAllowed = DEEP_IMPORT_ALLOWED_CLIENT.has(spec);
     const allowed =
-      bundleAllowed ||
       DEEP_IMPORT_ALLOWED.has(spec) ||
       (layer === "entities" && DEEP_IMPORT_ALLOWED_ENTITY_SUFFIX.includes(suffix));
 
     if (!allowed) {
       fail("deep-import", `${r} → ${spec} (배럴을 거치거나 화이트리스트에 등재한다)`);
-    } else if (isClient && !bundleAllowed) {
+    } else if (isClient) {
       fail(
         "deep-import-client",
         `${r} → ${spec} (deep import는 **서버 소비자**의 탈출구다. "use client" 파일은 배럴을 쓴다)`,
