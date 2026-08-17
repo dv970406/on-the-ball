@@ -126,7 +126,7 @@ function cardClassName(peek: boolean) {
 | 대상이 아닌 것 | 이유 | 실제 위치 |
 |---|---|---|
 | `size-11`/`size-9` 원형 아이콘 **버튼** | 버튼 라운드가 아니라 **원형 히트 영역** | `sub-header` · `post-detail-view` · `profile-view`(사진 변경) |
-| 원형 아이콘 **컨테이너**(클릭 불가) | 히트 영역도 아닌 순수 장식 | `shared/ui/empty-state.tsx` · `app-bar`의 안쪽 `span` |
+| 원형 아이콘 **컨테이너**(클릭 불가) | 히트 영역도 아닌 순수 장식 | `shared/ui/empty-state.tsx` |
 | 도트·아바타·`Pill`·`RatioBar`·워드마크의 볼 | 컨트롤이 아닌 **표시 요소** | `live-dot` · `avatar` · `pill` · `ratio-bar` · `wordmark` · `post-card`의 구분점 · `profile-view`의 아바타 스켈레톤 |
 | 바텀시트 **그래버**(36×4px 바) | 누르는 컨트롤이 아니라 **드래그 어포던스** — 아래로 끌면 시트가 따라 내려간다 | `shared/ui/sheet.tsx` |
 

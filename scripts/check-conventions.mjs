@@ -87,7 +87,6 @@ const STYLE_ALLOWED = {
     "src/views/profile/ui/profile-view.tsx",
     // "대상이 아닌 것" — 원형 아이콘 컨테이너
     "src/shared/ui/empty-state.tsx",
-    "src/widgets/app-bar/ui/app-bar.tsx",
     // "대상이 아닌 것" — 표시 요소
     "src/shared/ui/live-dot.tsx",
     "src/shared/ui/avatar.tsx",

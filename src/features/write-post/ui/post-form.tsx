@@ -227,7 +227,7 @@ export function PostForm({
       >
         {TOOLS.map((tool) => (
           // ⚠ aria-disabled + pointer-events-none이 아니라 disabled — 전자는 키보드 포커스를
-          //   막지 못해 툴바에서 무반응 요소를 연속 4번 지나게 된다(app-bar와 같은 판단)
+          //   막지 못해 툴바에서 무반응 요소를 연속 4번 지나게 된다
           <button
             key={tool.label}
             type="button"

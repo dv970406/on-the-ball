@@ -123,7 +123,7 @@
 - ⚠ `Link` 안에 `Button`을 넣지 않는다(`<a>` 안의 `<button>`). 버튼형 링크는 `buttonClassName({...})`을 `Link`의 className에 준다.
 
 ## `@/widgets`
-- `AppBar` — 목록 화면 상단(워드마크 + 액션).
+- `AppBar` — 목록 화면 상단(워드마크 + `leading` 슬롯).
 - `BottomTabBar` — 하단 탭바. **`backdrop-blur`가 허용된 유일한 요소**다(`styling.md`).
 - `SubHeader` — 상세·작성·수정 화면 상단(뒤로가기 + 공유).
 - `TabScrollArea` — 목록 스크롤 영역(`<main>` 제공 + 스크롤 복원).
