@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
-  Bell,
   Bookmark,
   Flag,
   Flame,
@@ -13,7 +12,7 @@ import {
   Trash2,
   UserX,
 } from "lucide-react";
-import { ROUTES, avatarUrl } from "@/shared/config";
+import { ROUTES, avatarUrl, signInWithNext } from "@/shared/config";
 import { formatCount, formatRelativeTime, useNowMs } from "@/shared/lib";
 import {
   ActionChip,
@@ -33,19 +32,25 @@ import { usePollQuery } from "@/entities/poll";
 import { isEdited, isHotPost, usePostQuery } from "@/entities/post";
 import { useSessionStore } from "@/entities/session";
 import { PollVote } from "@/features/cast-poll-vote";
+import { ReportReasonList } from "@/features/report-post";
 import { LikeButton } from "@/features/toggle-post-like";
 import { useRecordPostView } from "@/features/view-post";
 import type { ReplyTarget } from "../model/reply-target";
+import { usePostBlock } from "../model/use-post-block";
 import { usePostDeletion } from "../model/use-post-deletion";
 import { CommentBar } from "./comment-bar";
 import { CommentSection } from "./comment-section";
 
 export function PostDetailView({ postId }: { postId: number }) {
   const router = useRouter();
-  const { data: post, isPending, error, refetch } = usePostQuery(postId);
+  const { data: post, isPending, isFetching: isFetchingPost, error, refetch } = usePostQuery(postId);
   const user = useSessionStore((s) => s.user);
   const sessionStatus = useSessionStore((s) => s.status);
+  const pathname = usePathname();
   const deletion = usePostDeletion(postId);
+  // ⚠ 훅은 조건 없이 부른다 — 아래에 로딩·에러 조기 반환이 있어 post가 아직 없을 수 있다.
+  //   인자는 `block()`을 부를 수 있게 된 뒤(=글이 그려진 뒤)에만 쓰이므로 폴백이 무해하다.
+  const blocking = usePostBlock(post?.authorId ?? "", post?.authorNickname ?? "");
   // ⚠ 키가 userId로 스코프된다 — `myOptionId`는 "나"에 종속된 값이라, 상세를 연 채 계정이
   //   바뀌면 이전 사용자의 선택이 남는다(`identityKeys`와 같은 이유).
   //   집계 조회는 뮤테이션과 같은 자리(`PollVote`)에 있다 — 사유는 그 파일 주석.
@@ -57,7 +62,18 @@ export function PostDetailView({ postId }: { postId: number }) {
     sessionStatus !== "loading",
   );
 
+  /**
+   * 오버플로 시트의 **열림 여부와 단계를 따로 둔다.** 한 오버레이의 children만 바꾸는 이유는
+   * 시트 위에 시트를 겹치면 useFocusTrap이 이중이 되고 aria-modal 노드도 둘이 되기 때문이다
+   * (ReportReasonList 주석).
+   *
+   * ⚠ 닫을 때 **단계를 되돌리지 않는다.** 시트는 퇴장 애니메이션(140ms) 동안 DOM에 남으므로,
+   *   닫으면서 단계를 "menu"로 되돌리면 사유 목록이 오버플로 메뉴로 갈아끼워진 채 내려간다
+   *   — 사용자가 마지막으로 보는 프레임이 방금 떠난 화면이 아니다. 단계는 **다시 열 때** 정한다.
+   */
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetStage, setSheetStage] = useState<"menu" | "report">("menu");
+  const [askBlock, setAskBlock] = useState(false);
   const [askDelete, setAskDelete] = useState(false);
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
   // HOT 판정용 — 렌더 중 Date.now()는 순수하지 않다(use-now.ts 주석 참고)
@@ -124,6 +140,8 @@ export function PostDetailView({ postId }: { postId: number }) {
   }
 
   const isMine = post.authorId === user?.id;
+  // 내 글이면 삭제, 남의 글이면 차단 — 두 분기가 배타적이라 한쪽이 다른 쪽을 가릴 일이 없다
+  const actionError = (isMine ? deletion.error : blocking.error)?.message ?? null;
   const hot = nowMs !== null && isHotPost(post, nowMs);
 
   return (
@@ -131,7 +149,10 @@ export function PostDetailView({ postId }: { postId: number }) {
       {header(
         <button
           type="button"
-          onClick={() => setSheetOpen(true)}
+          onClick={() => {
+            setSheetStage("menu");
+            setSheetOpen(true);
+          }}
           aria-label="더보기"
           aria-haspopup="dialog"
           className="flex size-11 items-center justify-center rounded-full text-ink transition-colors duration-150 ease-otb active:bg-canvas-soft"
@@ -258,6 +279,7 @@ export function PostDetailView({ postId }: { postId: number }) {
         <CommentSection
           postId={post.id}
           commentCount={post.commentCount}
+          commentCountFetching={isFetchingPost}
           postAuthorId={post.authorId}
           onReply={setReplyTo}
         />
@@ -274,9 +296,11 @@ export function PostDetailView({ postId }: { postId: number }) {
       <Sheet
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
-        label="글 메뉴"
+        label={sheetStage === "report" ? "신고 사유" : "글 메뉴"}
       >
-        {isMine ? (
+        {sheetStage === "report" ? (
+          <ReportReasonList postId={post.id} onDone={() => setSheetOpen(false)} />
+        ) : isMine ? (
           <>
             <SheetItem
               icon={Pencil}
@@ -299,20 +323,64 @@ export function PostDetailView({ postId }: { postId: number }) {
             </SheetItem>
           </>
         ) : (
-          // 아래 3개는 핸드오프 7장의 미구현 목록 — 자리만 둔다
+          /*
+           * ⚠ 세션을 **3분기**한다 — `loading`을 비로그인과 같이 다루면 콜드 로드 직후
+           *   로그인한 사용자가 로그인 화면으로 튄다. 같은 화면의 `LikeButton`·`CommentBar`·
+           *   `PollVote`가 이미 그렇게 판정하므로 여기만 2분기면 한 화면 안에서 판정이 갈린다.
+           * ⚠ `SheetItem`은 `button`이라 `Link`를 쓸 수 없다 → 비로그인은 항목을 **활성**으로
+           *   두고 눌렀을 때 로그인 화면으로 보낸다(목적지는 `signInWithNext`로 같게 맞춘다).
+           */
           <>
-            <SheetItem icon={Bell} disabled>
-              이 글 알림 끄기
-            </SheetItem>
-            <SheetItem icon={UserX} disabled>
+            <SheetItem
+              icon={UserX}
+              disabled={sessionStatus === "loading"}
+              onClick={() => {
+                setSheetOpen(false);
+                if (sessionStatus === "guest") {
+                  router.push(signInWithNext(pathname));
+                  return;
+                }
+                setAskBlock(true);
+              }}
+            >
               {post.authorNickname} 차단하기
             </SheetItem>
-            <SheetItem icon={Flag} danger disabled>
+            <SheetItem
+              icon={Flag}
+              danger
+              disabled={sessionStatus === "loading"}
+              onClick={() => {
+                if (sessionStatus === "guest") {
+                  setSheetOpen(false);
+                  router.push(signInWithNext(pathname));
+                  return;
+                }
+                // 시트를 닫지 않는다 — 같은 오버레이의 단계만 바꾼다(위 상태 주석)
+                setSheetStage("report");
+              }}
+            >
               신고하기
             </SheetItem>
           </>
         )}
       </Sheet>
+
+      <Dialog
+        open={askBlock}
+        onCancel={() => setAskBlock(false)}
+        onConfirm={() => {
+          setAskBlock(false);
+          blocking.block();
+        }}
+        title={`${post.authorNickname}님을 차단할까요?`}
+        description={
+          "이 사람의 글과 댓글이 내 화면에서 보이지 않아요. " +
+          "상대에게는 알리지 않고, 프로필의 “차단한 사용자”에서 언제든 해제할 수 있어요."
+        }
+        cancelLabel="취소"
+        confirmLabel="차단"
+        destructive
+      />
 
       <Dialog
         open={askDelete}
@@ -328,12 +396,12 @@ export function PostDetailView({ postId }: { postId: number }) {
         destructive
       />
 
-      {deletion.error && (
+      {actionError && (
         // 하단 고정 댓글 입력(z-60) 위, 오버레이(80~95) 아래 — 시트가 열린 동안은 가려도 된다
         <p
           className="absolute inset-x-0 bottom-24 z-[66] px-5 text-center text-[12px] text-crimson"
         >
-          {deletion.error.message}
+          {actionError}
         </p>
       )}
     </>

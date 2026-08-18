@@ -93,6 +93,25 @@
 - `PollVote` — `PollBlock`에 세션과 뮤테이션을 붙인 컴포넌트. ⚠ 세션 `status`를 **3분기**한다(`loading`을 비로그인과 같이 다루면 콜드 로드 직후 로그인 사용자가 로그인 화면으로 튄다 — `LikeButton`·`CommentBar`와 판정을 맞춘다).
 - ⚠ 투표하기에는 **RPC가 없다.** 집계 컬럼이 없어 지킬 불변조건이 행 하나뿐이라 잠금이 필요 없다. 다만 **PostgREST upsert도 쓰지 않는다** — payload 전 컬럼에 UPDATE 권한을 요구해서 `post_id`를 열게 되고, 그러면 표를 다른 글로 옮겨 "취소 불가"가 뚫린다.
 
+## `@/entities/block`
+- `useBlockedUsersQuery(userId)` / `blockKeys` / `BlockedUser` — 내가 차단한 사람 목록. (select 문자열과 매퍼는 슬라이스 내부다 — 배럴에 올리면 호출부가 0인 export가 되어 `check:conventions`가 막는다.)
+- ⚠ **`entities/profile`에 얹지 않고 별도 슬라이스다.** 얹으면 그 슬라이스가 "프로필 + 차단" 두 도메인을 떠안는다(`entities/poll`을 `entities/post`에서 뗀 것과 같은 판단). entities끼리 import할 수 없는 것은 걸림돌이 아니다 — 행 타입은 각 슬라이스가 `@/types/database.types`에서 직접 뽑는 것이 이미 관례다.
+- ⚠ 키를 **userId로 스코프**한다(`identityKeys`·`pollKeys`와 같은 이유). 차단 목록은 통째로 "나"에 종속된 값이라, 키에 유저가 없으면 계정 전환 시 이전 사용자의 목록이 노출된다.
+- ⚠ `BLOCKED_SELECT`는 **`blocked:profiles!blocked_id(...)`** 형태다. `user_block → profiles` 경로가 둘이라 그냥 `profiles(...)`는 PGRST201이고, `blocked:blocked_id(...)`는 런타임엔 통하지만 **생성 타입의 추론이 모호성을 풀지 못한다**(캐스트로 덮으면 스키마 어긋남을 컴파일러가 못 잡는다). `post`가 컬럼명 형태로 되는 것은 그쪽 경로가 하나뿐이라서다.
+
+## `@/features/block-user`
+- `useBlockUser()` / `useUnblockUser()` — 차단·해제. 조회는 `@/entities/block`이다(`entities/post` ↔ `features/toggle-post-like`와 같은 분업).
+- ⚠ **숨김은 이 훅들이 하지 않는다.** `post_select_visible`·`comment_select_visible` 정책이 한다 — 여기가 하는 일은 행 하나를 만들거나 지우고 **가시성이 달라진 캐시를 되돌리는 것**뿐이다.
+- ⚠ **중복 실행 가드가 여기 없다.** 성공의 부수효과(이동 목적지·스크롤 저장분 폐기·문구)가 화면의 결정이라 뮤테이션을 조립하는 쪽이 갖는다 — 차단은 `views/post-detail`의 `use-post-block`, 해제는 `views/profile`의 `use-block-removal`(항목별 Set 가드).
+- ⚠ 무효화 Promise를 **차단은 반환하지 않고 해제는 반환한다.** 차단은 성공 직후 목록으로 떠나므로(리페치를 기다리면 "글을 찾을 수 없어요"가 깜빡인다), 해제는 화면에 머무르므로. 표는 `data-and-state.md`.
+- ⚠ 이미 차단한 사람을 다시 차단하면 **23505를 성공으로 흡수한다**(멱등). 신고는 반대다 — 사유를 설명해야 한다(`api-and-db.md`의 "설명과 흡수" 표).
+
+## `@/features/report-post`
+- `ReportReasonList` — 글 상세 오버플로 시트의 **children으로 꽂는** 사유 목록. 사유 상수·훅은 내부 구현이라 노출하지 않는다(`cast-poll-vote`가 `PollVote` 하나만 내보내는 것과 같은 형태).
+- ⚠ **오버레이를 스스로 만들지 않는다.** 시트 위에 시트를 겹치면 `useFocusTrap`이 이중이 되어 Escape·Tab 가둠이 둘이 되고 `aria-modal` 노드도 둘이 된다. "삭제하기 → Dialog"가 되는 건 먼저 닫고 나서 열기 때문이다(`inert={closing}`이 140ms 겹침을 덮는다) — 시트→시트는 그 사이 두 장이 교차한다. → 호출부가 `sheet: "none" | "menu" | "report"` 한 상태로 **children만 바꾼다.**
+- ⚠ 사유 항목에 `danger`를 쓰지 않는다 — 다섯 개를 전부 붉게 칠하면 "한 뷰포트당 컬러 이벤트 1개"가 깨진다. 파괴성은 목록을 여는 `신고하기` 항목이 이미 표시했다.
+- ⚠ 신고 뮤테이션은 **`.select()`를 붙이지 않는다** — `post_report`에 SELECT 권한이 없어 붙이면 42501이다.
+
 ## `@/entities/profile`
 - `useProfileQuery(userId)` / `profileKeys` / `PROFILE_SELECT` / `buildProfile` — 닉네임·아바타 조회.
 - `MyProfile` / `ProfileRow` — 도메인 타입 / DB 행 타입. `MyProfile.avatarPath`는 **경로**다(전체 URL이 아니다).

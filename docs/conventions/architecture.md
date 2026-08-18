@@ -13,8 +13,8 @@
 - `features` — 사용자 액션 1개 = 슬라이스 1개
   sign-in(소셜 OAuth) / sign-out / link-identity / update-profile /
   write-post / delete-post / write-comment / delete-comment / toggle-post-like / view-post /
-  cast-poll-vote
-- `entities` — session / post / comment / profile / poll (도메인 타입·쿼리 훅·도메인 UI)
+  cast-poll-vote / block-user / report-post
+- `entities` — session / post / comment / profile / poll / block (도메인 타입·쿼리 훅·도메인 UI)
 - `shared` — ui / api / lib / config
 
 `app/`(루트)의 페이지는 라우팅 전용이며 view만 마운트한다.

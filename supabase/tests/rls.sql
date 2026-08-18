@@ -67,7 +67,7 @@ update public.post set updated_at = now() where id = :pid;
 rollback to s;
 
 savepoint s; :login_alice
--- 컬럼 권한이 먼저 막는다. 설령 권한을 줬더라도 새 행이 post_select_alive를
+-- 컬럼 권한이 먼저 막는다. 설령 권한을 줬더라도 새 행이 post_select_visible를
 -- 통과하지 못해 RLS가 다시 막는다(2중) — 그래서 소프트 삭제는 RPC로만 가능하다.
 \echo '[❌차단] deleted_at 직접 UPDATE'
 update public.post set deleted_at = now() where id = :pid;
@@ -440,11 +440,15 @@ select p.proname
 \echo '        increment_post_view(조회수 — 이 시스템의 유일한 비로그인 쓰기 경로, 의도된 예외.'
 \echo '        조회는 비로그인이 대부분이라 authenticated 전용이면 숫자가 의미를 잃는다.'
 \echo '        대가로 부풀리기를 막을 수 없어 view_count는 "대략치"로 취급한다 — 컬럼 주석 참고)'
+\echo '        is_blocked(차단 숨김 판정 — post의 SELECT 정책에 `to` 절이 없어 비로그인 조회도'
+\echo '        이 함수를 지난다. 닫으면 목록·상세가 통째로 42501로 죽는다. anon은 auth.uid()가'
+\echo '        null이라 항상 false를 받아 아무것도 감춰지지 않는다)'
 select p.proname
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
  where n.nspname = 'public'
    and has_function_privilege('anon', p.oid, 'EXECUTE')
-   and p.proname not in ('post_is_alive', 'has_visible_char', 'normalize_nickname', 'increment_post_view');
+   and p.proname not in ('post_is_alive', 'has_visible_char', 'normalize_nickname',
+                         'increment_post_view', 'is_blocked');
 
 -- ---------------------------------------------------------------------
 \echo ''
@@ -629,7 +633,7 @@ insert into public.comment (post_id, user_id, content) values (:pid, :'alice', '
 insert into public.comment (post_id, user_id, content, parent_id) values (:pid, :'alice', '답글', :rootid);
 select public.soft_delete_post(:pid);
 reset role; :login_anon
-\echo '[0 기대] 글이 소프트 삭제되면 답글도 함께 감춰진다 (comment_select_alive_post)'
+\echo '[0 기대] 글이 소프트 삭제되면 답글도 함께 감춰진다 (comment_select_visible)'
 select count(*) from public.comment where post_id = :pid;
 rollback to s;
 
@@ -1225,6 +1229,258 @@ select (select count(*) from public.poll_results(:pid))                         
 rollback to s;
 
 rollback to s27;
+
+\echo ''
+\echo '=== 28. 차단 (20260818000001) ==='
+\echo '    설계 요약: 숨김을 조회 훅이 아니라 **정책**이 한다(post_select_visible ·'
+\echo '    comment_select_visible). 단방향이라 차단당한 쪽은 제약도 없고 사실도 알 수 없다.'
+\echo '    자기차단 금지 CHECK는 취향이 아니라 **정책의 전제**다 — 아래 "내 글 수정" 검사 참고.'
+
+savepoint s28;
+
+savepoint s; :login_bob
+\echo '[❌차단] 남(alice) 명의로 차단 행을 만든다'
+insert into public.user_block (blocker_id, blocked_id) values (:'alice', :'bob');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 자기 자신 차단 — user_block_not_self'
+insert into public.user_block (blocker_id, blocked_id) values (:'alice', :'alice');
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[❌차단] 비로그인 차단'
+insert into public.user_block (blocker_id, blocked_id) values (:'alice', :'bob');
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.user_block (blocker_id, blocked_id) values (:'alice', :'bob');
+\echo '[❌차단] 차단 행 UPDATE — 정책도 컬럼 권한도 없다(행은 불변, 해제는 delete)'
+update public.user_block set blocked_id = :'alice' where blocker_id = :'alice';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] created_at을 실어 시각 위조 — insert grant 목록 밖이다'
+insert into public.user_block (blocker_id, blocked_id, created_at)
+values (:'alice', :'bob', now() - interval '1 year');
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.user_block (blocker_id, blocked_id) values (:'alice', :'bob');
+:login_bob
+\echo '    ⚠ DELETE의 using 절은 필터로 동작한다 — 권한이 없으면 에러가 아니라 0행이다.'
+\echo '[DELETE 0 기대] 남의 차단 행은 지워지지 않는다'
+delete from public.user_block where blocker_id = :'alice';
+rollback to s;
+
+-- ---- 숨김이 실제로 걸리는가 ----
+savepoint s; :login_alice
+insert into public.user_block (blocker_id, blocked_id) values (:'alice', :'bob');
+\echo '[0 / 0 기대] 차단하면 그 사람의 글도 댓글도 보이지 않는다'
+select (select count(*) from public.post    where author_id = :'bob') as posts,
+       (select count(*) from public.comment where user_id   = :'bob') as comments;
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.user_block (blocker_id, blocked_id) values (:'alice', :'bob');
+:login_bob
+\echo '    ⚠ 단방향이다 — 차단당한 쪽에는 아무 제약이 없고 사실도 드러나지 않는다.'
+\echo '[1 / 0 기대] bob에게는 자기 글이 그대로 보이고, 자기가 차단당했는지는 알 수 없다'
+select (select count(*) from public.post where id = :bpid)              as my_post,
+       (select count(*) from public.user_block where blocked_id = :'bob') as knows;
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.user_block (blocker_id, blocked_id) values (:'alice', :'bob');
+-- ⚠ **`:login_anon`은 role만 바꾸고 `request.jwt.claims`는 그대로 둔다.** 그래서 앞선
+--   `:login_alice`의 sub가 남아 auth.uid()가 여전히 alice를 가리킨다 — 실제로 이 검사가
+--   그것 때문에 0을 돌려줬다(비로그인인데 차단이 걸렸다). 판정이 auth.uid()에 걸린 검사는
+--   claims까지 비워야 진짜 비로그인이 된다. 정책이 `to authenticated`인 검사들(섹션 27 등)은
+--   role만으로 갈리므로 이 함정에 걸리지 않는다.
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[1 기대] 비로그인에게는 그대로 보인다 (auth.uid()가 null → is_blocked는 항상 false)'
+select count(*) from public.post where id = :bpid;
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.user_block (blocker_id, blocked_id) values (:'alice', :'bob');
+\echo '    ⚠ 이 검사가 지키는 것은 **"남을 차단해도 내 쓰기가 멀쩡하다"** 이지 자기차단 CHECK가'
+\echo '      아니다 — CHECK를 지워도 alice는 bob만 차단하므로 여기는 그대로 UPDATE 1로 통과한다'
+\echo '      (실측). CHECK 회귀는 위의 [❌차단] 자기 자신 차단 검사가 잡는다: CHECK가 없으면'
+\echo '      그 insert가 성공해 run-rls.sh의 ②(차단 기대인데 통과)에 걸린다.'
+\echo '[UPDATE 1 기대] 차단 중에도 내 글 수정은 된다'
+update public.post set title = '수정됨' where id = :pid;
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.user_block (blocker_id, blocked_id) values (:'alice', :'bob');
+delete from public.user_block where blocker_id = :'alice' and blocked_id = :'bob';
+\echo '[1 기대] 해제하면 다시 보인다'
+select count(*) from public.post where id = :bpid;
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.user_block (blocker_id, blocked_id) values (:'alice', :'bob');
+\echo '    ⚠ **의도된 경계다.** definer 함수는 RLS를 우회하므로 차단이 닿지 않는다.'
+\echo '      넷 다 "내게 보이지 않아 도달 경로가 없는 글"에만 남으므로 수용한다 —'
+\echo '      여기에 차단을 넣으면 뷰어 종속성이 definer 전반으로 번진다.'
+\echo '[성공] definer RPC는 차단을 보지 않는다'
+select public.toggle_post_like(:bpid) as liked;
+rollback to s;
+
+rollback to s28;
+
+\echo ''
+\echo '=== 29. 신고 (20260818000002) ==='
+\echo '    설계 요약: SELECT 정책이 없어 **아무도 읽을 수 없다**(관리 화면이 없다).'
+\echo '    중복·자기 글 거부는 정책이 아니라 트리거가 P0001 한국어로 설명한다 —'
+\echo '    23505를 그냥 흘리면 toDbErrorMessage가 닉네임 문구로 접어 뜻이 어긋난다.'
+
+savepoint s29;
+
+savepoint s; :login_alice
+\echo '[성공] 남의 글 신고'
+insert into public.post_report (post_id, reporter_id, reason) values (:bpid, :'alice', 'spam');
+rollback to s;
+
+savepoint s;
+reset role;
+create temp table dup_probe (code text);
+grant insert, select on dup_probe to authenticated;
+:login_alice
+insert into public.post_report (post_id, reporter_id, reason) values (:bpid, :'alice', 'spam');
+select set_config('rls.bpid', :'bpid', true);
+select set_config('rls.alice', :'alice', true);
+\echo '    ⚠ **코드까지 본다.** 라벨만으로는 23505와 P0001을 구분하지 못하는데(러너는 ERROR'
+\echo '      유무만 본다), 23505로 새면 toDbErrorMessage가 닉네임 문구 "이미 사용 중인 값이에요"로'
+\echo '      접어 **트리거를 둔 이유 자체가 무너진다.** 그게 이 기능이 유니크 제약에만 기대지'
+\echo '      않는 이유다.'
+\echo '[P0001 기대] 같은 글 두 번 — 트리거가 한국어 사유를 말한다'
+do $$
+declare
+  v_bpid  bigint := current_setting('rls.bpid')::bigint;
+  v_alice uuid   := current_setting('rls.alice')::uuid;
+begin
+  insert into public.post_report (post_id, reporter_id, reason) values (v_bpid, v_alice, 'abuse');
+  insert into dup_probe values ('통과!');
+exception when others then insert into dup_probe values (sqlstate);
+end $$;
+select code from dup_probe;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 내가 쓴 글 신고 (P0001)'
+insert into public.post_report (post_id, reporter_id, reason) values (:pid, :'alice', 'spam');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '    ⚠ 대상 글을 **:pid(alice의 글)** 로 둔다. :bpid는 bob 자신의 글이라 트리거의'
+\echo '      "내가 쓴 글" 분기가 먼저 걸려 P0001로 죽고, 정작 검사하려던'
+\echo '      post_report_insert_own의 `reporter_id = auth.uid()` 절을 한 번도 타지 않는다.'
+\echo '[❌차단] 남(bob) 명의로 신고 — RLS 신원 절이 막는다'
+insert into public.post_report (post_id, reporter_id, reason) values (:pid, :'bob', 'spam');
+rollback to s;
+
+/*
+ * 남의 명의 insert는 **42501 하나로 수렴해야 한다.**
+ *
+ * ⚠ BEFORE ROW 트리거는 RLS `with check`보다 **먼저** 돈다. 그래서 트리거가 정책이 어차피
+ *   거부할 행에까지 사유를 말하면 **에러 코드가 오라클이 된다** — 실제로 그랬다:
+ *   남의 uuid를 `reporter_id`에 실어 보내는 것만으로 P0001("이미 신고한 글이에요" /
+ *   "내가 쓴 글은 신고할 수 없어요") vs 42501이 갈려 **"그 사람이 이 글을 신고했는가"와
+ *   "이 글의 작성자가 누구인가"** 가 읽혔다. 트리거가 definer라 소프트 삭제된 글까지 읽혔다.
+ *
+ * ⚠ **run-rls.sh는 어떤 코드로 차단됐는지 보지 않는다**(차단 기대인데 통과했는지만 본다).
+ *   그래서 이 회귀는 라벨만으로는 영영 안 잡힌다 → sqlstate를 직접 찍어 대조한다.
+ * ⚠ psql은 `$$ … $$` 안을 치환하지 않고 NOTICE는 stdout으로도 가지 않는다 →
+ *   값은 GUC로 넣고 결과는 임시 테이블에 담아 **select로** 내보낸다.
+ */
+savepoint s;
+reset role;
+create temp table oracle_probe (step text primary key, code text);
+grant insert, select on oracle_probe to authenticated;
+:login_bob
+insert into public.post_report (post_id, reporter_id, reason) values (:pid, :'bob', 'spam');
+:login_alice
+select set_config('rls.pid', :'pid', true);
+select set_config('rls.bpid', :'bpid', true);
+select set_config('rls.bob', :'bob', true);
+\echo '[42501 / 42501 기대] 남의 명의 insert는 사유를 말하지 않는다 (오라클 회귀)'
+do $$
+declare
+  v_pid  bigint := current_setting('rls.pid')::bigint;
+  v_bpid bigint := current_setting('rls.bpid')::bigint;
+  v_bob  uuid   := current_setting('rls.bob')::uuid;
+begin
+  -- ① bob이 **이미 신고한** 글 — 트리거의 중복 분기가 말하면 P0001로 샌다
+  begin
+    insert into public.post_report (post_id, reporter_id, reason) values (v_pid, v_bob, 'spam');
+    insert into oracle_probe values ('1', '통과!');
+  exception when others then insert into oracle_probe values ('1', sqlstate);
+  end;
+  -- ② bob이 **작성자인** 글 — 트리거의 자기글 분기가 말하면 P0001로 샌다
+  begin
+    insert into public.post_report (post_id, reporter_id, reason) values (v_bpid, v_bob, 'spam');
+    insert into oracle_probe values ('2', '통과!');
+  exception when others then insert into oracle_probe values ('2', sqlstate);
+  end;
+end $$;
+select string_agg(code, ' / ' order by step) as codes from oracle_probe;
+rollback to s;
+
+savepoint s;
+reset role;
+create temp table oracle_probe2 (code text);
+grant insert, select on oracle_probe2 to authenticated;
+:login_bob
+select public.soft_delete_post(:bpid);
+:login_alice
+select set_config('rls.bpid', :'bpid', true);
+select set_config('rls.bob', :'bob', true);
+\echo '    ⚠ 트리거가 definer라 삭제되어 **아무에게도 안 보이는** 글의 작성자까지 읽혔다.'
+\echo '[42501 기대] 소프트 삭제된 글에도 사유를 말하지 않는다 (오라클 회귀)'
+do $$
+declare
+  v_bpid bigint := current_setting('rls.bpid')::bigint;
+  v_bob  uuid   := current_setting('rls.bob')::uuid;
+begin
+  insert into public.post_report (post_id, reporter_id, reason) values (v_bpid, v_bob, 'spam');
+  insert into oracle_probe2 values ('통과!');
+exception when others then insert into oracle_probe2 values (sqlstate);
+end $$;
+select code from oracle_probe2;
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[❌차단] 비로그인 신고 — anon에는 INSERT 권한도 정책도 없다'
+insert into public.post_report (post_id, reporter_id, reason) values (:bpid, :'alice', 'spam');
+rollback to s;
+
+savepoint s;
+:login_alice
+select public.soft_delete_post(:pid);
+:login_bob
+\echo '[❌차단] 삭제된 글 신고 — post_is_alive가 막는다'
+insert into public.post_report (post_id, reporter_id, reason) values (:pid, :'bob', 'spam');
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.post_report (post_id, reporter_id, reason) values (:bpid, :'alice', 'spam');
+\echo '    ⚠ 42501을 내는 것은 **grant 부재**다(정책이 없다는 사실은 여기서 증명되지 않는다).'
+\echo '      SELECT 정책을 실수로 열어도 grant가 없으면 여전히 42501이라 이 검사는 통과한다 —'
+\echo '      정책 유무는 섹션 17b(RLS는 켜졌는데 정책이 0개인 테이블)가 반대편에서 지킨다.'
+\echo '[❌차단] 본인이 넣은 신고도 다시 읽을 수 없다 (SELECT grant가 없다)'
+select count(*) from public.post_report;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] created_at을 실어 시각 위조 — grant 목록 밖이다'
+insert into public.post_report (post_id, reporter_id, reason, created_at)
+values (:bpid, :'alice', 'spam', now() - interval '1 year');
+rollback to s;
+
+rollback to s29;
 
 rollback;
 \echo ''

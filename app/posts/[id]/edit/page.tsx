@@ -28,7 +28,8 @@ async function findPost(postId: number): Promise<"found" | "missing" | "unknown"
     const supabase = await createSupabaseServerClient();
     if (!supabase) return "unknown";
 
-    // 삭제된 글은 RLS(post_select_alive)가 걸러내므로 자동으로 "없음"이 된다
+    // 삭제된 글은 RLS(post_select_visible)가 걸러내므로 자동으로 "없음"이 된다
+    // (차단한 작성자의 글도 같은 정책이 감춘다 — 남의 글은 어차피 수정할 수 없다)
     const { data, error } = await supabase
       .from("post")
       .select("id")

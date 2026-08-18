@@ -38,6 +38,13 @@ values
    'authenticated', 'authenticated', 'bob@test.com',
    extensions.crypt('test1234', extensions.gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+   now() - interval '30 days', now() - interval '30 days', '', '', '', ''),
+  -- ⚠ carol은 **차단 시드 전용 제3자**다. alice↔bob을 차단시키면 rls.sql이 두 계정 사이의
+  --   가시성을 전제로 짠 검사들(섹션 5·8·22·27 등)이 조용히 무의미해진다.
+  ('33333333-3333-4333-8333-333333333333', '00000000-0000-0000-0000-000000000000',
+   'authenticated', 'authenticated', 'carol@test.com',
+   extensions.crypt('test1234', extensions.gen_salt('bf')), now(),
+   '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
    now() - interval '30 days', now() - interval '30 days', '', '', '', '')
 on conflict (id) do nothing;
 
@@ -49,12 +56,16 @@ values
    'email', now(), now(), now()),
   ('22222222-2222-4222-8222-222222222222', '22222222-2222-4222-8222-222222222222',
    '{"sub":"22222222-2222-4222-8222-222222222222","email":"bob@test.com","email_verified":true}'::jsonb,
+   'email', now(), now(), now()),
+  ('33333333-3333-4333-8333-333333333333', '33333333-3333-4333-8333-333333333333',
+   '{"sub":"33333333-3333-4333-8333-333333333333","email":"carol@test.com","email_verified":true}'::jsonb,
    'email', now(), now(), now())
 on conflict (provider, provider_id) do nothing;
 
 -- 가입 트리거(handle_new_user)가 랜덤 닉네임을 넣어 두었다 → 검사가 기대하는 값으로 고정
 update public.profiles set nickname = 'alice' where id = '11111111-1111-4111-8111-111111111111';
 update public.profiles set nickname = 'bob'   where id = '22222222-2222-4222-8222-222222222222';
+update public.profiles set nickname = 'carol' where id = '33333333-3333-4333-8333-333333333333';
 
 -- ---------------------------------------------------------------------
 -- 2. 글 — 말머리 5종(이적설·경기·선수·유니폼·잡담)을 모두 덮는다
@@ -102,7 +113,14 @@ values
    '작년 이맘때 그 경기 다시 봤습니다',
    E'유튜브에 풀경기가 올라와 있길래 정주행했는데, 그때 우리 압박 강도가 지금보다 훨씬 높았네요.\n\n' ||
    E'선수 구성은 거의 그대론데 왜 이렇게 달라졌을까요.',
-   now() - interval '400 days', now() - interval '400 days', 156);
+   now() - interval '400 days', now() - interval '400 days', 156),
+
+  -- ⚠ carol의 글은 **alice에게만 보이지 않아야 한다**(아래 6절의 차단 시드).
+  --   차단이 걸린 화면과 안 걸린 화면을 같은 DB에서 비교하려면 제3자의 글이 하나 있어야 한다.
+  ('33333333-3333-4333-8333-333333333333', '잡담',
+   '여기 처음 와봅니다, 다들 어느 팀 좋아하세요',
+   E'가입한 지 얼마 안 됐는데 분위기가 좋네요.\n\n다들 어느 팀 응원하시는지 궁금합니다.',
+   now() - interval '6 hours', now() - interval '6 hours', 87);
 
 -- ---------------------------------------------------------------------
 -- 3. 댓글 — 루트와 깊이 1 답글을 섞는다(깊이 2는 트리거가 막는다)
@@ -123,7 +141,12 @@ join (values
   ('올해 서드 유니폼 실물 후기', '11111111-1111-4111-8111-111111111111',
    '사이즈 정보 감사합니다. 고민하고 있었는데 도움이 됐어요.', interval '2 days'),
   ('축구 보다가 새벽에 소리 질러서 혼난 사람 있나요', '22222222-2222-4222-8222-222222222222',
-   '저는 이어폰 끼고 봅니다. 그래도 발은 구르게 되더라고요.', interval '7 days')
+   '저는 이어폰 끼고 봅니다. 그래도 발은 구르게 되더라고요.', interval '7 days'),
+  -- ⚠ carol이 **alice의 글에** 단 댓글이다. alice가 carol을 차단한 상태(6절)라 이 댓글은
+  --   alice에게만 보이지 않는다 — 상세 화면의 "표시되지 않은 댓글" 안내를 로컬에서 확인하려면
+  --   차단된 사람의 댓글이 살아 있는 글에 하나 있어야 한다.
+  ('겨울 이적시장, 이번엔 진짜 움직일까', '33333333-3333-4333-8333-333333333333',
+   '저도 그 자리가 제일 급해 보여요. 처음 글 남깁니다!', interval '50 minutes')
 ) as v(title, user_id, content, ago) on v.title = p.title;
 
 -- 답글(깊이 1) — 첫 글의 첫 댓글에 단다
@@ -171,4 +194,32 @@ insert into public.poll_vote (post_id, user_id, option_id)
 select o.post_id, '22222222-2222-4222-8222-222222222222'::uuid, o.id
   from public.poll_option o
  where o.sort_order = 1 and o.label = '수비형 미드필더'
+on conflict do nothing;
+
+-- ---------------------------------------------------------------------
+-- 6. 차단 — alice가 carol을 차단한 상태
+--
+-- ⚠ **alice↔bob을 차단시키지 않는다.** rls.sql의 여러 섹션이 두 계정 사이의 가시성을
+--   전제로 짜여 있어(섹션 5·8·22·27 등), 서로 차단시키면 그 검사들이 조용히 무의미해진다.
+--   그래서 제3자(carol)를 두고 한 방향만 건다 — 투표 시드가 bob만 투표시켜 alice를
+--   미투표 상태로 남겨 둔 것과 같은 판단이다(게이팅이 걸린 화면을 볼 수 있어야 한다).
+--
+-- 이 시드 덕분에 로컬에서 alice로 로그인하면 목록에 carol의 글이 **없고**
+-- /profile의 "차단한 사용자"에 carol이 한 명 떠 있다.
+-- ---------------------------------------------------------------------
+insert into public.user_block (blocker_id, blocked_id)
+values ('11111111-1111-4111-8111-111111111111', '33333333-3333-4333-8333-333333333333')
+on conflict do nothing;
+
+-- ---------------------------------------------------------------------
+-- 7. 신고 — alice가 bob의 글을 신고한 상태
+--
+-- 화면에는 아무 데도 보이지 않는다(관리 화면이 없고 SELECT 정책도 없다). 그럼에도 넣는
+-- 이유는 **"이미 신고한 글이에요." 경로를 로컬에서 밟아 볼 수 있어야** 해서다 —
+-- alice로 그 글을 다시 신고하면 트리거의 P0001이 그대로 뜬다.
+-- ---------------------------------------------------------------------
+insert into public.post_report (post_id, reporter_id, reason)
+select id, '11111111-1111-4111-8111-111111111111'::uuid, 'etc'
+  from public.post
+ where title = '어제 후반 교체 타이밍은 좀 아쉬웠다'
 on conflict do nothing;

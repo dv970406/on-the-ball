@@ -18,6 +18,12 @@ interface CommentSectionProps {
   postId: number;
   /** 글의 comment_count (DB 트리거가 관리하는 진실값 — 답글 포함 총합) */
   commentCount: number;
+  /**
+   * 위 카운트를 담은 **글 쿼리가 갱신 중인가.**
+   * ⚠ 아래 `hiddenCount`가 서로 다른 두 캐시(글·댓글)의 뺄셈이라, 한쪽만 먼저 도착한 순간
+   *   거짓 값이 나온다. 그 창을 닫으려면 **양쪽이 다 멎었는지**를 알아야 한다.
+   */
+  commentCountFetching: boolean;
   /** 글 작성자 — `작성자` 배지 판정용 */
   postAuthorId: string;
   onReply: (target: ReplyTarget) => void;
@@ -26,10 +32,11 @@ interface CommentSectionProps {
 export function CommentSection({
   postId,
   commentCount,
+  commentCountFetching,
   postAuthorId,
   onReply,
 }: CommentSectionProps) {
-  const { data: comments, isPending, error, refetch } = useCommentListQuery(postId);
+  const { data: comments, isPending, isFetching, error, refetch } = useCommentListQuery(postId);
   const user = useSessionStore((s) => s.user);
   const deletion = useCommentDeletion(postId);
   /** 답글이 달린 루트 댓글은 cascade로 남의 답글까지 지우므로 확인을 받는다 */
@@ -45,6 +52,26 @@ export function CommentSection({
   const truncated =
     (comments?.length ?? 0) >= COMMENT_LIST_LIMIT && commentCount > (comments?.length ?? 0);
   const threads = comments ? buildCommentThreads(comments) : undefined;
+
+  /**
+   * 헤딩 카운트와 실제로 보이는 댓글 수의 차이.
+   *
+   * ⚠ **차단한 사용자의 댓글은 RLS(`comment_select_visible`)가 걸러 오는데
+   *   `comment_count`는 트리거가 관리하는 값이라 그들을 계속 포함한다.** 카운터를 뷰어별로
+   *   다르게 만들 수는 없으므로(트리거가 단독 관리한다) 차이를 문구로 갚는다.
+   *
+   * ⚠ 잘림(`truncated`)일 때는 그리지 않는다 — 그때는 위 문구가 이미 차이를 설명하고 있고,
+   *   두 원인이 겹치면 어느 쪽인지 말할 수 없다.
+   *
+   * ⚠ **한쪽 캐시만 먼저 도착한 순간에는 그리지 않는다.** 이 값은 글 캐시와 댓글 캐시의
+   *   뺄셈인데 둘은 따로 무효화되고 따로 도착한다 — 댓글을 하나 쓰면 1행짜리 글 응답이
+   *   200행짜리 댓글 응답보다 먼저 와서 `commentCount = N+1`, `comments.length = N`이 되고,
+   *   차단한 사람이 **하나도 없는** 사용자에게 "차단한 사용자의 댓글은 보이지 않습니다"가
+   *   뜬다(삭제하면 반대 방향으로 어긋난다). 문구가 원인을 단정하므로 그 거짓말이 비싸다.
+   *   → 양쪽이 **모두 멎었을 때만** 판정한다. 어긋남은 영구적인 성질이라 조금 늦게 떠도 된다.
+   */
+  const hiddenCount = commentCount - (comments?.length ?? 0);
+  const showHidden = !isFetching && !commentCountFetching && !truncated && hiddenCount > 0;
 
   /** 삭제 버튼 — 답글이 달린 루트면 확인 다이얼로그를 거친다 */
   const deleteAction = (comment: Comment, replyCount: number) => {
@@ -113,13 +140,22 @@ export function CommentSection({
         </p>
       )}
 
-      {threads && threads.length === 0 && (
+      {/* ⚠ 숨은 댓글 안내와 **동시에 뜨지 않게** 한다 — 차단한 사람의 댓글만 달린 글에서
+          "첫 댓글을 남겨보세요"와 "표시되지 않은 댓글이 1개 있어요"가 함께 나와 모순이었다 */}
+      {threads && threads.length === 0 && !showHidden && (
         <p className="py-8 text-center text-[13px] text-ink-mute-2">첫 댓글을 남겨보세요.</p>
       )}
 
       {threads && threads.length > 0 && truncated && (
         <p className="px-5 py-2 text-center text-[12px] text-ink-mute-2">
           최근 {formatCount(COMMENT_LIST_LIMIT)}개만 표시하고 있어요.
+        </p>
+      )}
+
+      {threads && showHidden && (
+        <p className="px-5 py-2 text-center text-[12px] text-ink-mute-2">
+          표시되지 않은 댓글이 {formatCount(hiddenCount)}개 있어요. 차단한 사용자의 댓글은 보이지
+          않습니다.
         </p>
       )}
 

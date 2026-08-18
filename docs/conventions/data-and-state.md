@@ -47,6 +47,12 @@ auth-js 2.110의 시그니처가 `signOut(options = { scope: 'global' })`이라,
 그래서 로그아웃 후 다른 계정으로 로그인하면 이전 사용자의 `isLiked`가 한 프레임 노출됐다.
 유저가 바뀌는 이벤트에서는 `removeQueries({ type: "inactive" })`를 **함께** 부른다.
 
+⚠ **차단·해제도 같은 급의 변화다.** 어떤 행이 보이는지가 통째로 달라지므로, 언마운트된
+상세·댓글 캐시가 차단된 내용을 들고 있다가 다시 열릴 때 한 프레임 노출된다. 다만 전역이
+아니라 **키로 좁힌다**(`postKeys.all`·`commentKeys.all` — poll·profile 캐시는 차단과 무관하다).
+⚠ 그리고 차단과 해제가 **반드시 같은 집합을 건드려야 한다.** 한쪽에만 키를 더하면
+"차단하면 사라지는데 해제해도 안 돌아오는" 캐시가 생긴다 → 판정을 함수 하나가 소유한다.
+
 ### ⚠ `mutate(..., { onSuccess })`는 훅의 `onSuccess`가 끝난 뒤에 실행된다
 
 query-core는 훅 레벨 `onSuccess`(무효화 Promise)를 **await한 뒤** success를 dispatch하고,

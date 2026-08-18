@@ -57,7 +57,9 @@ const fetchPostHead = cache(async (postId: number): Promise<PostHead> => {
     const supabase = await createSupabaseServerClient();
     if (!supabase) return { state: "unknown" };
 
-    // 삭제된 글은 RLS(post_select_alive)가 걸러내므로 여기서도 자동으로 "없음"이 된다
+    // 삭제된 글은 RLS(post_select_visible)가 걸러내므로 여기서도 자동으로 "없음"이 된다.
+    // ⚠ **차단한 작성자의 글도 같은 정책이 감춘다** — 쿠키 기반 서버 클라이언트라
+    //   auth.uid()가 잡혀 서버·클라 판정이 갈리지 않는다(차단한 글은 그 사용자에게 404다).
     const { data, error } = await supabase
       .from("post")
       .select("title, content")

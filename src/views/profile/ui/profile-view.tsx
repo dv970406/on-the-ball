@@ -12,6 +12,7 @@ import { NICKNAME_LIMIT } from "@/features/update-profile";
 import { useAvatarUpload } from "../model/use-avatar-upload";
 import { useLinkReturn } from "../model/use-link-return";
 import { useNicknameForm } from "../model/use-nickname-form";
+import { BlockedUsers } from "./blocked-users";
 import { LinkedAccounts } from "./linked-accounts";
 
 interface ProfileViewProps {
@@ -174,6 +175,8 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
 
         {/* 로그인 수단 */}
         <LinkedAccounts userId={user?.id} />
+
+        <BlockedUsers userId={user?.id} />
 
         {user?.email && (
           <p className="px-5 pt-7 text-[12px] leading-[1.6] text-ink-faint">

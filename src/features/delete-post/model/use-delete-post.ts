@@ -10,7 +10,8 @@ import { postKeys } from "@/entities/post";
  *
  * ⚠ 클라이언트가 직접 `update({ deleted_at })`을 할 수 없다.
  *   Postgres가 UPDATE의 새 행에도 SELECT 정책을 적용하는데, deleted_at을 채운 행은
- *   post_select_alive("deleted_at is null")를 통과하지 못해 거부된다.
+ *   post_select_visible("deleted_at is null and not is_blocked(author_id)")를 통과하지
+ *   못해 거부된다.
  *   그래서 SECURITY DEFINER RPC로 내렸고, 덕분에 권한 없음이 0행 침묵이 아니라
  *   예외(P0001 + 한국어 메시지)로 올라온다.
  *   (42501은 Postgres 자신의 영어 권한 거부용이다 — api-and-db.md의 에러 코드 규약 참고)

@@ -242,6 +242,42 @@ export type Database = {
           },
         ]
       }
+      post_report: {
+        Row: {
+          created_at: string
+          post_id: number
+          reason: Database["public"]["Enums"]["report_reason"]
+          reporter_id: string
+        }
+        Insert: {
+          created_at?: string
+          post_id: number
+          reason: Database["public"]["Enums"]["report_reason"]
+          reporter_id: string
+        }
+        Update: {
+          created_at?: string
+          post_id?: number
+          reason?: Database["public"]["Enums"]["report_reason"]
+          reporter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_report_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "post"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_report_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_path: string | null
@@ -263,6 +299,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_block: {
+        Row: {
+          blocked_id: string
+          blocker_id: string
+          created_at: string
+        }
+        Insert: {
+          blocked_id: string
+          blocker_id: string
+          created_at?: string
+        }
+        Update: {
+          blocked_id?: string
+          blocker_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_block_blocked_id_fkey"
+            columns: ["blocked_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_block_blocker_id_fkey"
+            columns: ["blocker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -280,6 +349,7 @@ export type Database = {
       }
       has_visible_char: { Args: { p_text: string }; Returns: boolean }
       increment_post_view: { Args: { p_post_id: number }; Returns: undefined }
+      is_blocked: { Args: { p_user_id: string }; Returns: boolean }
       normalize_nickname: { Args: { p_text: string }; Returns: string }
       poll_results: {
         Args: { p_post_id: number }
@@ -295,6 +365,7 @@ export type Database = {
     }
     Enums: {
       post_category: "이적설" | "경기" | "선수" | "유니폼" | "잡담"
+      report_reason: "spam" | "abuse" | "sexual" | "false_info" | "etc"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -423,6 +494,7 @@ export const Constants = {
   public: {
     Enums: {
       post_category: ["이적설", "경기", "선수", "유니폼", "잡담"],
+      report_reason: ["spam", "abuse", "sexual", "false_info", "etc"],
     },
   },
 } as const

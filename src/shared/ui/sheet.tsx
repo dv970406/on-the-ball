@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import type { LucideIcon } from "lucide-react";
 import { cn, useFocusTrap } from "@/shared/lib";
 import { Icon } from "./icon";
@@ -113,9 +113,9 @@ export function Sheet({ open, onClose, label, children }: SheetProps) {
             그래버 밴드 — 드래그 핸들이자 **닫기 버튼**이다.
             ⚠ `div`로 두면 안 된다. 이 시트의 닫기 수단(스크림 탭·Escape·스와이프)은 셋 다
               포인터이거나 물리 키보드라, 스크린리더 사용자에게 닿는 것이 하나도 없다
-              (스크림·그래버는 aria-hidden이고 aria-modal이 바깥을 가린다). 실제로 오버플로
-              메뉴는 남의 글이면 항목 3개가 전부 disabled여서 **시트 안에 활성 컨트롤이 0개**가 되고,
-              포커스가 outline-none인 컨테이너에 놓여 Tab도 죽는다. 이 버튼이 그 탈출구다.
+              (스크림·그래버는 aria-hidden이고 aria-modal이 바깥을 가린다).
+              **항목이 전부 disabled면 시트 안에 활성 컨트롤이 0개**가 되어 포커스가
+              outline-none인 컨테이너에 놓이고 Tab도 죽는다. 이 버튼이 그때의 탈출구다.
             ⚠ touch-action은 여기에만 건다(시트 전체에 걸면 목록 스크롤이 죽는다).
             높이 44px(py-5 + 바 4px) — 짚어야 끌 수 있는 띠라 히트 영역 기준을 지킨다.
           */}
@@ -136,10 +136,16 @@ export function Sheet({ open, onClose, label, children }: SheetProps) {
 }
 
 interface SheetItemProps {
+  /**
+   * 이 항목에 포커스를 옮겨야 할 때만 쓴다(React 19는 ref가 일반 prop이다).
+   * 선례: 시트가 단계를 바꾸면 포커스를 쥔 항목이 언마운트되어 `activeElement`가 `<body>`로
+   * 떨어지고 — 트랩은 유지되지만 — 화면이 바뀐 사실이 스크린리더에 전달되지 않는다.
+   */
+  ref?: Ref<HTMLButtonElement>;
   icon?: LucideIcon;
   /** 파괴적 액션 — crimson */
   danger?: boolean;
-  /** 아직 구현하지 않은 항목(알림 끄기·차단·신고) — 자리는 두되 누를 수 없다 */
+  /** 지금은 누를 수 없는 항목 — 세션 복원 중처럼 **판단을 미뤄야 할 때** 쓴다 */
   disabled?: boolean;
   onClick?: () => void;
   children: ReactNode;
@@ -156,11 +162,12 @@ interface SheetItemProps {
  *
  * ⚠ 대신 항목이 전부 `disabled`면 시트에 포커스 가능한 것이 하나도 남지 않는다.
  *   그 상태를 떠받치는 것이 그래버 닫기 버튼이다 — 없애면 초기 포커스가 갈 곳을 잃고
- *   Tab이 죽는다(오버플로 메뉴의 "남의 글" 분기가 실제로 그 경우다).
+ *   Tab이 죽는다. 항목을 한꺼번에 `disabled`로 만드는 화면이 있으면 그 버튼을 지우지 말 것.
  */
-export function SheetItem({ icon, danger, disabled, onClick, children }: SheetItemProps) {
+export function SheetItem({ ref, icon, danger, disabled, onClick, children }: SheetItemProps) {
   return (
     <button
+      ref={ref}
       type="button"
       disabled={disabled}
       onClick={onClick}

@@ -69,6 +69,44 @@ RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 
 - 선례: 답글 깊이 제한(`check_comment_depth`)은 `comment`의 insert 정책이 아니라 **before insert 트리거**다.
 - 부수 효과로 **에러 메시지가 좋아진다.** 정책 위반은 Postgres의 영어 42501뿐이라 "왜 거부됐는지"를 설명하지 못하는데, 트리거는 `P0001`로 한국어 사유를 그대로 노출한다(`toDbErrorMessage`가 P0001을 통과시킨다).
 - 판단 기준: **거부 사유를 사용자에게 설명해야 하면 트리거**, 단순 접근 차단이면 정책.
+- 두 번째 선례가 신고 거부(`check_post_report`)다. 자기 글 신고·중복 신고를 막는데, 유니크 제약에 맡기면 **23505가 `toDbErrorMessage`에서 닉네임 문구인 "이미 사용 중인 값이에요."로 접혀** 뜻이 어긋난다(`create_post_with_poll`이 선택지 중복에서 P0001을 직접 던진 것과 같은 사유).
+
+#### ⚠ 트리거는 **정책이 통과시킬 행에 대해서만** 말한다
+
+**BEFORE ROW 트리거는 RLS `with check`보다 먼저 돈다**(`ExecInsert`: BR 트리거 → WCO).
+그래서 트리거가 정책이 어차피 거부할 행에까지 사유를 말하면 **에러 코드가 오라클이 된다** —
+`P0001`(조건 성립) vs `42501`(불성립)로 갈리기 때문이다.
+
+실제로 `post_report`가 그랬다. 컬럼 grant에 `reporter_id`가 있어 payload에 실을 수 있고
+`profiles_select_all`이라 uuid는 전부 공개이므로, **남의 uuid를 실어 insert를 시도하는 것만으로**
+"그 사람이 이 글을 신고했는가"와 "이 글의 작성자가 누구인가"가 읽혔다(실측 — HTTP 400/403으로 갈렸다).
+트리거가 `security definer`라 두 `exists`가 RLS를 넘어 읽으므로 **소프트 삭제되어 아무에게도
+보이지 않는 글의 작성자까지** 특정됐다. SELECT 정책을 일부러 두지 않아 감춘 테이블이
+에러 채널로 통째로 새어 나간 셈이다.
+
+→ **트리거의 첫 줄은 "이 행이 정책을 통과할 명의인가"를 확인하고, 아니면 판정을 정책에 넘긴다.**
+
+```sql
+if new.<owner_column> is distinct from (select auth.uid()) then
+  return new;   -- 아무 말도 하지 않는다 → 42501 하나로 수렴
+end if;
+```
+
+⚠ AFTER INSERT로 옮겨 해결하지 않는다 — 그러면 유니크 제약이 먼저 발화해 중복이 `23505`로 나가고,
+`toDbErrorMessage`가 닉네임 문구로 접어 **트리거를 택한 이유 자체가 무너진다.**
+⚠ 이 회귀는 라벨만으로는 안 잡힌다 — `run-rls.sh`는 "차단 기대인데 통과했는가"만 보고
+**어떤 코드로 차단됐는지는 보지 않는다.** `rls.sql` 섹션 29처럼 sqlstate를 직접 찍어 대조한다.
+
+#### ⚠ 같은 23505라도 "설명"과 "흡수"로 갈린다
+
+판정 기준은 **재시도가 목표 상태에 이미 도달했는가**다.
+
+| 자리 | 처리 | 왜 |
+|---|---|---|
+| 차단(`user_block`) | 훅이 23505를 **성공으로 흡수** | 이미 차단한 사람을 또 차단하면 목표 상태 그대로다 — 멱등이 맞다 |
+| 신고(`post_report`) | 트리거가 **P0001로 설명** | "접수했어요"를 두 번 말하면 거짓말이다 |
+
+⚠ 트리거는 BEFORE라 **동시 요청 두 건이 둘 다 통과하는 창**이 남는다. 그 창은 복합 PK가 막고(23505), 훅이 그 코드를 같은 한국어 문구로 접는다. **트리거는 "설명", 제약은 "보장"**이라 둘 다 필요하다.
 
 ## 닉네임은 **랜덤 배정 후 사용자가 바꾼다**
 
@@ -250,8 +288,10 @@ RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 
 |---|---|---|
 | RPC(클라이언트가 직접 호출) | `toggle_post_like` · `soft_delete_post` · `increment_post_view` · `create_post_with_poll` | `increment_post_view`만 anon에 열려 있다(아래 예외 항목) |
 | 트리거 | `sync_post_like_count` · `sync_post_comment_count` · `check_comment_depth` | `post_like`·`comment` |
+| 트리거 | `check_post_report` (`post_report_guard`, `before insert on post_report`) | 자기 글 신고·중복 신고를 P0001 한국어로 거부. **호출자 권한으로 돌면 두 `exists`가 모두 0행을 보아 검사가 조용히 통과한다** — 신고자에게 `post_report` SELECT 권한이 없고 `post` 쪽도 차단 필터가 걸린 RLS를 넘어야 한다 |
 | 트리거 | **`handle_new_user`** (`on_auth_user_created`, `after insert on auth.users`) | 가입 시 `profiles` 행 생성. **호출자 권한으로 돌면 `profiles` insert 권한이 없어 가입 자체가 실패한다** |
 | 정책 헬퍼 | `post_is_alive` (`stable`) | `comment`·`poll_vote`의 정책과 `poll_results`가 공유 — 인라인 서브쿼리를 쓰지 않는 이유는 아래 참고 |
+| 정책 헬퍼 | `is_blocked` (`stable`) | `post`·`comment`의 SELECT 정책이 공유하는 **차단 숨김 판정**. anon에도 EXECUTE가 열려 있다(아래 화이트리스트) |
 | **집계 읽기** | `poll_results` (`stable`) | 이 목록에서 유일하게 **쓰기가 아닌** definer다. 개별 표는 RLS로 "내 행만"인데 집계는 그 경계를 넘어야 한다 — 그리고 **투표한 사람에게만** 돌려준다(결과 게이팅을 UI가 아니라 여기서 건다). ⚠ definer라 정책이 닿지 않으므로 **`post_is_alive`를 함수 안에서 직접 확인**한다 |
 
 ⚠ **RLS를 우회하는 definer는 "그 함수가 유일한 경로"일 때 가장 강하다.**
@@ -277,13 +317,14 @@ RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 
 - **유저 id를 인자로 받지 않는다.** `security definer`는 RLS를 우회하므로 유저를 클라이언트가 넘기면 남의 명의로 조작할 수 있다. 함수 안에서 `auth.uid()`로 확정한다 — PostgREST가 access token을 검증해 `request.jwt.claims`에 심어둔 값이라 위조가 불가능하다. `security definer`가 바꾸는 것은 "무엇을 할 수 있는가"(권한)이지 "누가 호출했는가"(세션 컨텍스트)가 아니다.
 - **`set search_path = ''` + `public.` 접두사.** 호출자가 search_path를 조작해 다른 스키마의 동명 테이블을 붙잡게 만드는 권한 상승을 막는다.
 - **`revoke execute from public, anon`.** 함수는 기본적으로 PUBLIC에 EXECUTE가 부여된다 — 그대로 두면 비로그인도 호출한다.
-  - ⚠ **anon에 EXECUTE가 열린 함수는 전부 4개**이고, 그게 `rls.sql` 섹션 17d의 화이트리스트다.
-    definer는 그중 둘뿐이니 "definer 2개"로만 세면 안 된다.
+  - ⚠ **anon에 EXECUTE가 열린 함수는 전부 5개**이고, 그게 `rls.sql` 섹션 17d의 화이트리스트다.
+    definer는 그중 셋뿐이니 "definer 3개"로만 세면 안 된다.
 
     | 함수 | definer? | 왜 열려 있나 |
     |---|:---:|---|
     | `increment_post_view` | ✅ | **유일한 비로그인 쓰기 경로**(아래) |
     | `post_is_alive` | ✅ | 비로그인 select 정책이 부르는 **정책 평가 함수** — 읽기 판정만 한다 |
+    | `is_blocked` | ✅ | 〃 — `post`의 select 정책에 `to` 절이 없어 비로그인 조회도 이 함수를 지난다. **닫으면 목록·상세가 통째로 42501로 죽는다.** anon은 `auth.uid()`가 null이라 항상 false를 받아 아무것도 감춰지지 않는다 |
     | `has_visible_char` | — | **CHECK 제약 평가** — 닫으면 그 테이블의 쓰기가 전부 42501로 죽는다 |
     | `normalize_nickname` | — | 〃 (CHECK + before-write 트리거) |
 
@@ -324,14 +365,14 @@ RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 
 
 ## ⚠ 부모의 소프트 삭제는 자식 정책까지 함께 묶어야 한다
 
-`post`에 `deleted_at`을 넣고 `post_select_alive`로 글을 감췄지만 `comment` 정책에는
+`post`에 `deleted_at`을 넣고 `post_select_visible`로 글을 감췄지만 `comment` 정책에는
 post와의 연결이 없었다. 그래서 **삭제된 글의 댓글이 비로그인에게 그대로 공개**됐고
 (id가 연번이라 삭제된 글의 id는 목록의 구멍으로 추정된다), **삭제된 글에 댓글을 더 달 수도** 있었다.
 
 자식 테이블의 select·insert 정책에 부모 생존을 `exists`로 건다:
 
 ```sql
-create policy "comment_select_alive_post" on public.comment
+create policy "comment_select_visible" on public.comment
   for select using (
     exists (select 1 from public.post p
              where p.id = comment.post_id and p.deleted_at is null)
@@ -372,9 +413,57 @@ create trigger post_touch_updated_at
 
 `post`는 `deleted_at`을 찍는 소프트 삭제뿐이다(DELETE 정책 없음). `comment`는 hard delete다.
 
-⚠ **클라이언트가 `deleted_at`을 직접 UPDATE할 수 없다.** Postgres는 UPDATE의 **새 행**에도 SELECT 정책을 적용하므로, `deleted_at`을 채운 행이 `post_select_alive`("deleted_at is null")를 통과하지 못해 거부된다(실측 확인). → `soft_delete_post` RPC가 담당한다.
+⚠ **클라이언트가 `deleted_at`을 직접 UPDATE할 수 없다.** Postgres는 UPDATE의 **새 행**에도 SELECT 정책을 적용하므로, `deleted_at`을 채운 행이 `post_select_visible`의 `deleted_at is null`을 통과하지 못해 거부된다(실측 확인). → `soft_delete_post` RPC가 담당한다.
 
 정책을 `deleted_at is null or author_id = auth.uid()`로 푸는 선택지도 있었지만, 그러면 `deleted_at` 필터가 모든 조회 쿼리로 흩어져 한 곳만 빠뜨려도 삭제된 글이 샌다. **정책은 엄격하게 두고 쓰기만 RPC로 내린다.** 덕분에 조회 훅에 `.is("deleted_at", null)`을 붙일 필요가 없다.
+
+## 차단은 **정책이 감춘다** — 조회 훅이 아니라
+
+차단한 사용자의 글·댓글을 숨기는 일은 `post_select_visible`·`comment_select_visible`가 한다.
+소프트 삭제와 같은 자리·같은 이유다 — 필터를 조회마다 반복하면 한 곳만 빠뜨려도 샌다.
+차단은 **목록·상세·댓글·`generateMetadata`의 서버 조회·수정 페이지의 존재 확인**에
+동시에 걸려 그 위험이 더 크다.
+
+정책이라 얻는 것이 둘 더 있다.
+
+- **`.limit()` 이전에 걸러진다.** 클라이언트에서 걷어내면 30건 중 차단분이 빠져 페이지가
+  쪼그라들고, 페이지네이션이 없어 그 자리를 채울 방법이 없다.
+- **서버·클라 판정이 갈리지 않는다.** 서버 조회는 쿠키 기반 클라이언트라 `auth.uid()`가 잡힌다
+  → 차단한 작성자의 글은 그 사용자에게 SSR·CSR 모두 404다. anon 키였다면 어긋났을 자리다.
+
+### ⚠ 자기차단 금지 CHECK는 취향이 아니라 정책의 전제다
+
+Postgres는 UPDATE의 **새 행**에도 SELECT 정책을 적용한다. 자기 자신을 차단할 수 있으면
+수정한 행이 `post_select_visible`을 통과하지 못해 **자기 글 수정이 통째로 막힌다**(실측: `UPDATE 0`에 내 글이 전부 사라진다).
+→ `check (blocker_id <> blocked_id)`가 이것을 없앤다. 회귀를 잡는 것은 `rls.sql` 섹션 28의
+**"자기 자신 차단"** 검사다 — CHECK가 없으면 그 insert가 성공해 러너의 ②에 걸린다.
+⚠ 같은 섹션의 "차단 중에도 내 글 수정이 된다"는 **다른 성질**(남을 차단해도 내 쓰기가 멀쩡하다)을
+지킨다. CHECK를 지워도 그 검사는 통과하므로 회귀 감시를 그쪽에 맡기지 말 것.
+
+### ⚠ 차단 조건을 넣으면 안 되는 곳
+
+| 대상 | 넣으면 |
+|---|---|
+| `post_is_alive` | `comment`·`poll`·`poll_vote`의 **쓰기** 정책과 `poll_results`가 공유한다 → "이 글에 댓글을 달 수 있는가"가 보는 사람마다 달라진다 |
+| `profiles_select_all` | 차단한 사람의 닉네임까지 감춰져 `/profile`의 차단 목록이 통째로 "알 수 없음"이 된다 → **해제할 대상을 알아볼 수 없다** |
+
+### ⚠ 차단이 닿지 않는 곳 — 의도된 경계
+
+| 대상 | 왜 두는가 |
+|---|---|
+| definer 함수(`toggle_post_like`·`increment_post_view`·`create_post_with_poll`·`poll_results`) | RLS를 우회한다. 전부 "내게 보이지 않아 도달 경로가 없는 글"에만 남고, 여기에 차단을 넣으면 뷰어 종속성이 definer 전반으로 번진다. `rls.sql` 섹션 28이 이 경계를 검사로 못박는다 |
+| `poll`·`poll_option`의 SELECT 정책 | 차단한 사람의 투표 질문·선택지가 REST로는 읽힌다. 화면 경로는 없다(그 글의 상세가 404다). 두 테이블에는 작성자 컬럼이 없어 `post`를 한 번 더 타야 하는데, **보안이 아니라 개인 취향 필터**에 그 비용을 들이지 않는다 |
+| `like_count`·`comment_count` | 트리거가 단독 관리하므로 뷰어별로 다를 수 없다(아래 항목) |
+
+⚠ 차단은 **보안 경계가 아니다.** 차단한 사람의 글은 여전히 공개 게시물이고, 감추는 것은
+그 사용자의 화면뿐이다. 이 표를 "구멍 목록"으로 읽지 말 것 — 어디까지가 계약인지의 선이다.
+
+### ⚠ 카운터는 뷰어별로 달라질 수 없다
+
+`comment_count`·`like_count`는 트리거가 단독 관리하므로 차단된 사용자의 행을 계속 포함한다.
+그래서 **헤딩 숫자와 실제로 보이는 댓글 수가 어긋난다.** 잘림 판정 자체는 여전히 옳지만
+(정책이 `.limit()` 이전에 거르므로 목록은 "보이는 댓글"로 채워진다), 차이는 화면 문구로 갚는다
+— 상세의 "표시되지 않은 댓글 N개"가 그 자리다.
 
 ## PostgREST 임베딩
 
@@ -414,6 +503,9 @@ RLS 술어가 security-barrier 서브쿼리 안으로 들어가 바깥의 `fk = 
 |---|---|
 | `supabase/tests/rls.sql` | RLS·컬럼 권한·RPC 전량 검사 (전체 rollback이라 DB에 흔적 없음). ⚠ 여기에 **마지막 섹션 번호를 적지 않는다** — 섹션을 더하는 순간 거짓이 된다 |
 | — 섹션 25는 **길이 한도**를 검사 | 제목·댓글·닉네임의 새 CHECK 경계 ±1, 가족 이모지 120개 제목(코드포인트 840)이 통과하는지, 닉네임 200자가 `lower(nickname)` btree 인덱스에도 들어가는지, 그리고 **본문은 20,000 그대로**인지. ⚠ 여기 숫자는 abuse bound다 — 화면 한도(그래핌)는 클라이언트만 강제하므로 이 검사로 증명되지 않는다 |
+| — 섹션 29는 **신고**를 검사 | 성공 경로 / 같은 글 두 번(**23505가 아니라 트리거의 P0001 한국어**) / 내 글 신고 / 남의 명의 / 비로그인 / 삭제된 글(`post_is_alive`) / **본인이 넣은 신고도 다시 읽을 수 없는지**(SELECT 정책도 권한도 없다) / `created_at` 위조 |
+| — 섹션 28은 **차단**을 검사 | 남의 명의·자기차단(CHECK)·비로그인·차단 행 UPDATE·남의 차단 행 삭제(0행)가 막히는지, 차단하면 그 사람의 글과 댓글이 함께 사라지는지, **단방향인지**(상대에게는 그대로 보이고 차단당한 사실도 알 수 없다), 비로그인에게는 그대로 보이는지, **차단 중에도 내 글 수정이 되는지**(자기차단 CHECK가 사라지는 회귀를 여기서 잡는다), 해제하면 되돌아오는지, 그리고 **definer RPC는 차단을 보지 않는다**는 의도된 경계 |
+| — ⚠ `:login_anon`은 role만 바꾸고 `request.jwt.claims`를 그대로 둔다 | 앞선 `:login_alice`의 `sub`가 남아 `auth.uid()`가 계속 그 사람을 가리킨다(실제로 차단 검사가 그것 때문에 틀린 값을 냈다). **판정이 `auth.uid()`에 걸린 검사는 claims까지 비워야** 진짜 비로그인이 된다 — 정책이 `to authenticated`인 검사들은 role만으로 갈려 이 함정에 걸리지 않는다 |
 | — 섹션 27은 **투표**를 검사 | 남의 글에 투표 붙이기·질문/선택지 수정·투표 취소·표를 다른 글로 옮기기(취소 우회)·남의 명의 투표·한 사람 두 표·다른 글의 선택지로 투표(복합 FK)·삭제된 글에 투표가 전부 막히는지, **미투표자에게 `poll_results`가 0행**인지, 갈아타면 집계가 따라 움직이는지, 그리고 **27b** `create_post_with_poll`이 실패할 때 글도 남기지 않는지, **작성자·카운터·시각을 실을 자리가 없는지**(definer라 컬럼 권한을 우회하므로 삽입 컬럼 목록이 넓어지는 회귀를 여기서 잡는다), 선택지가 정규형으로 접혀 저장되는지 |
 | — 섹션 26은 **excerpt**를 검사 | 사진으로 시작하는 글도 발췌에 본문이 남고 URL은 빠지는지(20260817000002) |
 | — 섹션 24는 **프로필 편집**을 검사 | 본인만 수정·남의 닉네임 0행·아바타 경로가 자기 폴더인지·`created_at` 위조 차단·랜덤 닉네임 배정, 그리고 **24b 스토리지 정책**(남의 폴더에 업로드 불가)과 **24c 본문 이미지 버킷**(남의 폴더·비로그인 업로드 불가 — 여기엔 CHECK 대응물이 없어 이 정책이 유일한 방어선이다). ⚠ 24c는 **버킷 설정값도** 검사한다(`public`·`file_size_limit`·`allowed_mime_types`) — 크기·타입의 실제 방어선이 거기라, 정책만 보면 이 값이 조용히 넓어져도 아무도 모른다 |
