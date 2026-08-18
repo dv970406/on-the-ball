@@ -101,6 +101,7 @@ const STYLE_ALLOWED = {
   "shadow-": [
     "src/shared/ui/sheet.tsx",
     "src/shared/ui/dialog.tsx",
+    "src/features/write-post/ui/link-insert-dialog.tsx",
     "src/views/post-list/ui/post-list-view.tsx",
     "src/widgets/bottom-tab-bar/ui/bottom-tab-bar.tsx",
   ],

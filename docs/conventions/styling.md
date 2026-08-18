@@ -161,6 +161,7 @@ resting 상태의 카드·목록·헤더는 **여전히 flat + 1px 헤어라인*
 | 자리 | 값 |
 |---|---|
 | `Dialog` | `shadow-[0_16px_48px_rgba(0,0,0,0.12)]` |
+| `LinkInsertDialog` (`features/write-post/ui/link-insert-dialog.tsx`) | 〃 — `Dialog`와 같은 층이라 같은 값 |
 | `Sheet` | `shadow-[0_-8px_32px_rgba(0,0,0,0.12)]` — **위로** 던진다(아래는 화면 밖이라 그림자가 갈 곳이 없다) |
 | 글쓰기 FAB | `shadow-[0_8px_24px_rgba(0,0,0,0.18)]` |
 | `BottomTabBar` | `shadow-[0_12px_32px_rgba(0,0,0,0.18),inset_...]` (blur도 여기만 허용) |

@@ -4,9 +4,12 @@ import { useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { BarChart2, Image as ImageIcon, Link2 } from "lucide-react";
 import { Chip, Dialog, Icon, buttonClassName } from "@/shared/ui";
 import { POST_CATEGORIES } from "@/entities/post";
+import { linkInsertion } from "../lib/markdown-snippet";
 import { CONTENT_MAX, type PostInput } from "../model/post-schema";
 import { usePostDraft } from "../model/use-post-draft";
+import { LinkInsertDialog } from "./link-insert-dialog";
 import { useAutoGrowTextarea } from "./use-auto-grow-textarea";
+import { useCursorInsert } from "./use-cursor-insert";
 
 interface PostFormProps {
   /** 수정 모드면 헤더 문구와 이탈 방어 동작이 달라진다 */
@@ -62,6 +65,12 @@ export function PostForm({
   const editing = mode === "edit";
   const { draft, errors, change, validate, status } = usePostDraft(initial);
   const [askLeave, setAskLeave] = useState(false);
+  /**
+   * 링크 다이얼로그의 열림 상태 겸 초기 라벨.
+   * ⚠ `null`이 닫힘이다. 선택 텍스트를 **여는 순간 뽑아 여기 담는다** — 렌더 중에
+   *   `cursor.capture()` 같은 것을 부르면 ref·DOM을 렌더 중에 읽게 된다.
+   */
+  const [linkLabel, setLinkLabel] = useState<string | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   /**
    * 에러 문구를 필드에 묶을 id. `aria-invalid`만으로는 "잘못됐다"만 알리고
@@ -71,6 +80,9 @@ export function PostForm({
   const contentErrorId = useId();
 
   useAutoGrowTextarea(bodyRef, draft.content);
+  // ⚠ 자동 높이 **뒤에** 둔다 — 두 effect가 같은 deps로 도는데, 높이가 확정된 뒤에
+  //   캐럿을 잡아야 한다(사유는 use-cursor-insert 주석).
+  const cursor = useCursorInsert(bodyRef, draft.content, (next) => change("content", next));
 
   // ⚠ 프로토타입에는 "임시저장됨 · 방금" 캡션이 있었지만 **저장 기능이 없어서 걷어냈다.**
   //   저장 로직·임시저장함 화면·복원 경로가 전부 없는데 캡션만 띄우면, 사용자가 그 말을 믿고
@@ -233,7 +245,13 @@ export function PostForm({
         <button type="button" aria-label="투표 첨부" disabled className={TOOL_BUTTON}>
           <Icon as={BarChart2} size={20} />
         </button>
-        <button type="button" aria-label="링크 첨부" disabled className={TOOL_BUTTON}>
+        {/* ⚠ 오버레이가 열리면 textarea가 blur되므로 **누르는 순간** 선택 영역을 떠 둔다 */}
+        <button
+          type="button"
+          aria-label="링크 첨부"
+          onClick={() => setLinkLabel(cursor.capture())}
+          className={TOOL_BUTTON}
+        >
           <Icon as={Link2} size={20} />
         </button>
         {/* ⚠ 코드포인트로 센다 — .length(UTF-16)로 세면 이모지가 2로 잡혀 DB 한도와 어긋난다.
@@ -242,6 +260,18 @@ export function PostForm({
           {status.contentLength.toLocaleString("ko-KR")} / {CONTENT_MAX.toLocaleString("ko-KR")}
         </span>
       </footer>
+
+      {/* 열릴 때만 마운트한다 — 언마운트가 곧 입력값 초기화다(사유는 컴포넌트 주석) */}
+      {linkLabel !== null && (
+        <LinkInsertDialog
+          initialLabel={linkLabel}
+          onCancel={() => setLinkLabel(null)}
+          onConfirm={(label, href) => {
+            setLinkLabel(null);
+            cursor.insert(linkInsertion(label, href));
+          }}
+        />
+      )}
 
       <Dialog
         open={askLeave}
