@@ -1,8 +1,7 @@
 "use client";
 
 import { useId, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { BarChart2, Hash, Image as ImageIcon, Link2 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { BarChart2, Image as ImageIcon, Link2 } from "lucide-react";
 import { Chip, Dialog, Icon, buttonClassName } from "@/shared/ui";
 import { POST_CATEGORIES } from "@/entities/post";
 import { CONTENT_MAX, type PostInput } from "../model/post-schema";
@@ -35,13 +34,14 @@ interface PostFormProps {
   onSubmit: (input: PostInput) => void;
 }
 
-/** 하단 툴바의 첨부 아이콘 — 핸드오프 7장이 "아직 구현하지 않은 것"으로 못박은 기능들 */
-const TOOLS: { icon: LucideIcon; label: string }[] = [
-  { icon: ImageIcon, label: "사진 첨부" },
-  { icon: BarChart2, label: "투표 첨부" },
-  { icon: Link2, label: "링크 첨부" },
-  { icon: Hash, label: "해시태그" },
-];
+/**
+ * 하단 툴바 버튼의 공통 외형.
+ *
+ * ⚠ 배열 + map으로 만들지 않는다. 버튼마다 핸들러·비활성 조건·진행 상태가 달라서
+ *   데이터로 접으면 그 차이가 전부 조건식으로 되돌아온다.
+ */
+const TOOL_BUTTON =
+  "flex size-11 items-center justify-center rounded-sm text-ink-secondary disabled:opacity-40";
 
 /**
  * 작성·수정 공용 에디터 화면 (프로토타입 `screen-community-editor`).
@@ -221,23 +221,21 @@ export function PostForm({
         </form>
       </main>
 
-      {/* 하단 고정 툴바 — 첨부 4종은 자리만, 우측은 글자 수 카운터 */}
+      {/* 하단 고정 툴바 — 첨부 버튼과 글자 수 카운터 */}
       <footer
         className="absolute inset-x-0 bottom-0 z-[60] flex items-center gap-1 border-t border-hairline-cool bg-canvas px-3.5 pb-[max(12px,env(safe-area-inset-bottom))] pt-2.5"
       >
-        {TOOLS.map((tool) => (
-          // ⚠ aria-disabled + pointer-events-none이 아니라 disabled — 전자는 키보드 포커스를
-          //   막지 못해 툴바에서 무반응 요소를 연속 4번 지나게 된다
-          <button
-            key={tool.label}
-            type="button"
-            aria-label={tool.label}
-            disabled
-            className="flex size-11 items-center justify-center rounded-sm text-ink-secondary disabled:opacity-40"
-          >
-            <Icon as={tool.icon} size={20} />
-          </button>
-        ))}
+        {/* ⚠ aria-disabled + pointer-events-none이 아니라 disabled — 전자는 키보드 포커스를
+            막지 못해 툴바에서 무반응 요소를 연속으로 지나게 된다 */}
+        <button type="button" aria-label="사진 첨부" disabled className={TOOL_BUTTON}>
+          <Icon as={ImageIcon} size={20} />
+        </button>
+        <button type="button" aria-label="투표 첨부" disabled className={TOOL_BUTTON}>
+          <Icon as={BarChart2} size={20} />
+        </button>
+        <button type="button" aria-label="링크 첨부" disabled className={TOOL_BUTTON}>
+          <Icon as={Link2} size={20} />
+        </button>
         {/* ⚠ 코드포인트로 센다 — .length(UTF-16)로 세면 이모지가 2로 잡혀 DB 한도와 어긋난다.
             위에서 이미 센 값을 재사용한다(렌더당 1회). */}
         <span className="ml-auto font-mono text-[11px] tabular-nums text-ink-faint">
