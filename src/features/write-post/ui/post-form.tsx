@@ -2,10 +2,12 @@
 
 import { useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { BarChart2, Image as ImageIcon, Link2 } from "lucide-react";
+import { cn } from "@/shared/lib";
 import { Chip, Dialog, Icon, buttonClassName } from "@/shared/ui";
 import { POST_CATEGORIES } from "@/entities/post";
-import { linkInsertion } from "../lib/markdown-snippet";
+import { imageInsertion, linkInsertion } from "../lib/markdown-snippet";
 import { CONTENT_MAX, type PostInput } from "../model/post-schema";
+import { useImagePicker } from "../model/use-image-picker";
 import { usePostDraft } from "../model/use-post-draft";
 import { LinkInsertDialog } from "./link-insert-dialog";
 import { useAutoGrowTextarea } from "./use-auto-grow-textarea";
@@ -83,6 +85,11 @@ export function PostForm({
   // ⚠ 자동 높이 **뒤에** 둔다 — 두 effect가 같은 deps로 도는데, 높이가 확정된 뒤에
   //   캐럿을 잡아야 한다(사유는 use-cursor-insert 주석).
   const cursor = useCursorInsert(bodyRef, draft.content, (next) => change("content", next));
+  const image = useImagePicker((url) =>
+    // alt는 비워 둔다 — 파일명("IMG_4821.HEIC")은 설명이 아니라 소음이고,
+    // 스크린리더에 그대로 읽히면 없느니만 못하다.
+    cursor.insert(imageInsertion("", url, cursor.textBefore())),
+  );
 
   // ⚠ 프로토타입에는 "임시저장됨 · 방금" 캡션이 있었지만 **저장 기능이 없어서 걷어냈다.**
   //   저장 로직·임시저장함 화면·복원 경로가 전부 없는데 캡션만 띄우면, 사용자가 그 말을 믿고
@@ -99,7 +106,13 @@ export function PostForm({
   /** 이탈 방어는 **생성 모드에서만** — 수정은 원본이 남아 있으므로 바로 돌아간다 */
   const handleCancel = () => {
     if (!editing && status.dirty) setAskLeave(true);
-    else onCancel();
+    else leave();
+  };
+
+  /** 실제로 화면을 떠난다 — 이 화면에서 올린 사진은 쓰이지 않았으므로 함께 정리한다 */
+  const leave = () => {
+    image.discardUploads();
+    onCancel();
   };
 
   return (
@@ -115,10 +128,12 @@ export function PostForm({
                 나가면 **화면만 돌아가고 INSERT/UPDATE는 그대로 커밋된다**(사용자는 취소했다고
                 믿는다). 작성 모드는 언마운트로 호출부 콜백까지 죽어 토스트도 안 뜬다.
             */}
+            {/* ⚠ 업로드 중에도 막는다. 그 사이 나가면 `discardUploads`가 **빈 목록**을 보고
+                지나간 뒤 업로드가 성공해, 정리할 수 있었던 파일이 반드시 고아로 남는다. */}
             <button
               type="button"
               onClick={handleCancel}
-              disabled={isPending}
+              disabled={isPending || image.isPending}
               className="px-2.5 py-2 text-sm font-medium text-ink-mute disabled:opacity-40"
             >
               취소
@@ -224,6 +239,13 @@ export function PostForm({
               </p>
             )}
 
+            {/* 사진 업로드 실패 — 토스트는 1.8초 뒤 사라지므로 지속 표시를 함께 남긴다 */}
+            {image.error && (
+              <p className="mt-4 text-[13px] leading-[1.5] text-crimson">
+                {image.error.message}
+              </p>
+            )}
+
             {error && (
               <p className="mt-4 text-[13px] leading-[1.5] text-crimson">
                 {error.message}
@@ -239,9 +261,21 @@ export function PostForm({
       >
         {/* ⚠ aria-disabled + pointer-events-none이 아니라 disabled — 전자는 키보드 포커스를
             막지 못해 툴바에서 무반응 요소를 연속으로 지나게 된다 */}
-        <button type="button" aria-label="사진 첨부" disabled className={TOOL_BUTTON}>
+        {/* ⚠ 파일 대화상자도 오버레이라 textarea가 blur된다 — 누르는 순간 선택 영역을 떠 둔다 */}
+        <button
+          type="button"
+          aria-label="사진 첨부"
+          disabled={image.isPending}
+          onClick={() => {
+            cursor.capture();
+            image.open();
+          }}
+          className={TOOL_BUTTON}
+        >
           <Icon as={ImageIcon} size={20} />
         </button>
+        {/* ⚠ form 바깥이다 — 안에 두면 제출에 파일이 딸려간다 */}
+        <input type="file" {...image.inputProps} className="sr-only" />
         <button type="button" aria-label="투표 첨부" disabled className={TOOL_BUTTON}>
           <Icon as={BarChart2} size={20} />
         </button>
@@ -256,7 +290,16 @@ export function PostForm({
         </button>
         {/* ⚠ 코드포인트로 센다 — .length(UTF-16)로 세면 이모지가 2로 잡혀 DB 한도와 어긋난다.
             위에서 이미 센 값을 재사용한다(렌더당 1회). */}
-        <span className="ml-auto font-mono text-[11px] tabular-nums text-ink-faint">
+        {/* 업로드 진행 표시 — 스피너를 만들지 않는다(선례가 없고 이징·시간 규칙과 충돌한다) */}
+        {image.isPending && (
+          <span className="ml-auto text-[11px] text-ink-faint">사진 올리는 중…</span>
+        )}
+        <span
+          className={cn(
+            "font-mono text-[11px] tabular-nums text-ink-faint",
+            image.isPending ? "ml-2" : "ml-auto",
+          )}
+        >
           {status.contentLength.toLocaleString("ko-KR")} / {CONTENT_MAX.toLocaleString("ko-KR")}
         </span>
       </footer>
@@ -276,7 +319,7 @@ export function PostForm({
       <Dialog
         open={askLeave}
         onCancel={() => setAskLeave(false)}
-        onConfirm={onCancel}
+        onConfirm={leave}
         title="작성을 그만둘까요?"
         description="지금 나가면 작성 중인 내용이 사라져요."
         cancelLabel="계속 쓰기"

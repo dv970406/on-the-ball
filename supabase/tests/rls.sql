@@ -805,6 +805,62 @@ values ('avatars', :'alice' || '/me.webp', :'alice');
 rollback to s;
 
 \echo ''
+\echo '--- 24c. 본문 이미지 스토리지 정책 (post-images)'
+\echo '    ⚠ 아바타와 달리 DB CHECK 대응물이 없다 — 본문은 자유 텍스트라 경로를 제약할'
+\echo '      자리가 없다. 이 정책이 **유일한** 방어선이므로 검사를 빠뜨리면 안 된다.'
+\echo '    ⚠ **버킷 설정 자체가 방어선이다.** 클라이언트 압축(500KB webp)은 UX일 뿐이라'
+\echo '      우회 가능하고, 실제로 크기·타입을 막는 것은 file_size_limit·allowed_mime_types다.'
+\echo '      정책만 검사하면 이 값이 조용히 넓어져도 아무도 모른다.'
+\echo '[t/1048576/t 기대] public · 1MiB 상한 · webp/jpeg/png만'
+select public                                                   as is_public,
+       file_size_limit,
+       allowed_mime_types @> array['image/webp','image/jpeg','image/png']
+         and array_length(allowed_mime_types, 1) = 3             as mime_exact
+  from storage.buckets where id = 'post-images';
+
+savepoint s; :login_alice
+\echo '[❌차단] bob 폴더에 업로드'
+insert into storage.objects (bucket_id, name, owner)
+values ('post-images', :'bob' || '/hack.webp', :'alice');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[성공] 본인 폴더에 업로드'
+insert into storage.objects (bucket_id, name, owner)
+values ('post-images', :'alice' || '/shot.webp', :'alice');
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[❌차단] 비로그인 업로드'
+insert into storage.objects (bucket_id, name, owner)
+values ('post-images', :'alice' || '/anon.webp', :'alice');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 하위 폴더 — 경로는 {uid}/{파일} 두 세그먼트여야 한다'
+insert into storage.objects (bucket_id, name, owner)
+values ('post-images', :'alice' || '/sub/deep.webp', :'alice');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 경로 탈출 — foldername[1] 비교만으로는 통과한다(정규식이 막는다)'
+insert into storage.objects (bucket_id, name, owner)
+values ('post-images', :'alice' || '/../' || :'bob' || '/x.webp', :'alice');
+rollback to s;
+
+\echo '    ⚠ 열거(list)를 열어 두면 "URL을 알면 본다"가 "uuid만 알면 전수 조회된다"로 바뀐다.'
+\echo '      이 앱은 업로드를 먼저 하고 본문에 넣으므로 **게시하지 않은 사진**이 버킷에 남는다.'
+\echo '      공개 URL 서빙은 정책을 타지 않아 본문 이미지는 그대로 보인다(실측).'
+savepoint s;
+insert into storage.objects (bucket_id, name, owner)
+values ('post-images', :'bob' || '/victim.webp', :'bob');
+:login_alice
+\echo '[0행 기대] 남의 본문 이미지는 열거되지 않는다'
+select count(*) as others_files from storage.objects
+ where bucket_id = 'post-images' and name like :'bob' || '/%';
+rollback to s;
+
+\echo ''
 \echo '=== 25. 길이 한도 (20260810000001 — abuse bound) ==='
 \echo '    화면 한도는 **그래핌**(제목 120·댓글 1000·닉네임 20)이고 클라이언트만 강제한다.'
 \echo '    DB는 그래핌을 셀 수 없어(PG에 분절 기능 없음) 코드포인트 K=10배를 상한으로 둔다.'
@@ -874,6 +930,22 @@ savepoint s; :login_alice
 \echo '[❌차단] 본문 20,001 코드포인트'
 insert into public.post (author_id, title, content, category)
 values (:'alice', '제목', repeat('가', 20001), '잡담');
+rollback to s;
+
+\echo ''
+\echo '=== 26. excerpt가 이미지 마크다운을 먹지 않는다 (20260817000002) ==='
+\echo '    공개 URL 한 줄이 150자 안팎이라, 지우지 않으면 사진으로 시작하는 글의'
+\echo '    발췌 300자가 통째로 URL이 되어 목록 카드가 빈다.'
+savepoint s; :login_alice
+\echo '[t 기대] 사진으로 시작하는 글도 본문이 발췌에 남는다'
+insert into public.post (author_id, title, content, category)
+values (:'alice', '사진 글',
+        '![](http://127.0.0.1:64321/storage/v1/object/public/post-images/'
+        || :'alice' || '/00000000-0000-4000-8000-000000000000.webp)' || E'\n' || '본문 첫 문장입니다.',
+        '잡담');
+select excerpt like '%본문 첫 문장입니다.%' as body_survived,
+       excerpt not like '%post-images%'    as url_stripped
+  from public.post where title = '사진 글';
 rollback to s;
 
 rollback;

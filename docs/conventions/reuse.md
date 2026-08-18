@@ -92,6 +92,9 @@
 - `COLOR` — JS 인라인 style용 색 상수. **토큰 hex 하드코딩 금지**. (`shared/ui/live-status-pill.tsx`가 `COLOR.ink`를 쓴다)
 - **`OAUTH_PROVIDERS` / `OAUTH_PROVIDER_LABEL`** — 지원 소셜 프로바이더의 단일 소스. `supabase/config.toml`의 `[auth.external.*]`와 갈리면 안 된다. ⚠ `shared`에 있는 이유는 로그인(`features/sign-in`)과 계정 연결(`features/link-identity`)이 같은 목록을 써야 하는데 features끼리는 import할 수 없어서다.
 - **`avatarUrl(path)` / `AVATAR_BUCKET`** — 아바타 **경로** → 공개 URL. ⚠ DB에는 전체 URL이 아니라 경로만 저장한다(호스트가 환경마다 다르다: 로컬 `127.0.0.1:64321` ↔ 원격 `*.supabase.co`). 조립은 이 함수 한 곳에서만. `shared`에 있는 이유는 `OAUTH_PROVIDERS`와 같다 — entities 셋이 함께 쓴다. 버킷명 문자열도 여기서 가져다 쓴다(`features/update-profile`이 선례).
+- **`postImageUrl(path)` / `POST_IMAGE_BUCKET`** — 본문 이미지 경로 → 공개 URL.
+  ⚠ **아바타와 달리 결과(전체 URL)가 그대로 `post.content`에 들어간다.** 본문은 사용자가 외부 주소도 적을 수 있는 자유 텍스트라 경로 규약을 강제할 자리가 없다 — 사유는 `api-and-db.md`의 "본문 이미지는 URL을 본문에 담는다" 절에 있다.
+  ⚠ `avatarUrl`과 조립 한 줄이 겹치지만 **일반화하지 않았다**(중복 2회 · 버킷 상수도 따로다). 세 번째 버킷이 생기면 `publicStorageUrl(bucket, path)`로 묶는다.
 - **`env`** — `NEXT_PUBLIC_*` 환경변수의 단일 소스(`supabaseUrl`·`supabaseAnonKey`·`siteUrl`). **`process.env`를 호출부에서 다시 읽지 말 것** — `proxy.ts`가 화면·훅과 같은 값을 봐야 판정이 갈리지 않는다.
   - `siteUrl`은 `og:image`를 절대 URL로 만드는 `metadataBase`(루트 layout)용이다. `NEXT_PUBLIC_SITE_URL` → `VERCEL_URL` → `localhost:3000` 순으로 폴백한다.
 - **`isSupabaseConfigured()`** — env가 채워졌는지. 값이 비어도 빌드는 성공해야 하므로 `env`는 throw하지 않는다 → **가드는 호출부의 책임**이고, 그 가드를 각자 짜지 말고 이걸 쓴다(`proxy.ts`가 선례).

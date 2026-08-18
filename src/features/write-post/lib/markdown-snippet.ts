@@ -49,3 +49,20 @@ export function linkInsertion(label: string, href: string): Insertion {
     caret: [1, 1 + safeLabel.length],
   };
 }
+
+/**
+ * `![alt](url)`을 **블록으로** 넣는다. `before`는 삽입 지점 **직전까지의 본문**이다.
+ *
+ * ⚠ **빈 줄(`\n\n`)이라야 문단이 끊긴다.** 개행 하나로는 부족하다 — 마크다운이 같은 문단으로
+ *   이어 붙여 이미지가 인라인으로 렌더되고, 뒤에 이어 쓴 글도 그 문단에 딸려 들어간다.
+ *   실제 렌더러로 실측한 결과다:
+ *     `"앞 문장\n![](u)\n"`   → `<p>앞 문장 <img></p>`      (인라인 — 의도와 다름)
+ *     `"앞 문장\n\n![](u)\n\n"` → `<p>앞 문장</p><p><img></p>` (블록 — 의도한 모양)
+ *   `Markdown`의 `img`에 걸어 둔 `my-3`도 인라인일 때는 줄 높이를 만들지 못한다.
+ */
+export function imageInsertion(alt: string, href: string, before: string): Insertion {
+  // 이미 빈 줄로 끝났으면 더 넣지 않는다(개행이 무한히 쌓이는 것을 막는다)
+  const leading = before.length === 0 || /\n[ \t]*\n$/.test(before) ? "" : before.endsWith("\n") ? "\n" : "\n\n";
+  const text = `${leading}![${escapeLinkLabel(alt)}](${encodeMarkdownUrl(href)})\n\n`;
+  return { text };
+}
