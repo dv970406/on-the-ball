@@ -32,6 +32,66 @@ pnpm db:types   # supabase gen types --local --schema public > src/types/databas
 - select 결과 형태도 마찬가지다(`mappers.ts`의 `PostSelectRow`) — `Pick<PostRow, ...>` + 임베딩만 직접 적는다.
 - 마이그레이션으로 컬럼이 바뀌면 `pnpm db:types` → **매퍼·화면에서 컴파일 에러로 드러난다**. 이게 이 구조의 목적이다.
 
+## 열거값은 **enum**으로 둔다 — lookup 테이블이 아니라
+
+말머리·신고 사유처럼 값의 목록이 정해진 컬럼은 `create type ... as enum`으로 만든다.
+`text + check`도, 코드 테이블 + FK도 아니다. 바로 위 절이 말한 **생성 타입**을 그대로 얻기 때문이다.
+
+- 생성 파일이 **유니온 타입과 런타임 배열을 둘 다** 내려준다
+  (`Database["public"]["Enums"]["post_category"]` · `Constants.public.Enums.post_category`).
+  FK로 두면 그 자리가 `number`가 되어 도메인이 통째로 사라진다.
+- 슬라이스가 **노출 순서 배열 + 라벨맵**을 얹으면 값 추가 시 누락이 **양방향 컴파일 에러**가 된다:
+  `as const satisfies readonly T[]`(없는 값 금지) + `Exclude<T, (typeof ARR)[number]> extends never`
+  (빠뜨린 값 금지) + `Record<T, string>`(라벨 누락 금지). 선례는 `entities/post`의 `POST_CATEGORIES`와
+  `features/report-post`의 `REPORT_REASONS`.
+  ⚠ 망라성 가드는 **타입 별칭만 선언하면 아무것도 검사하지 못한다** — 실제 값에 할당해야 컴파일러가 대조한다.
+- `z.enum(POST_CATEGORIES)`가 성립한다(`features/write-post`의 `post-schema.ts`). 값이 런타임 행이면
+  `z.string()` + 멤버십 검사로 후퇴한다.
+- 화면이 **동기**로 끝난다(`.map()`). 조회 훅이면 목록에 Skeleton·EmptyState가 붙는데,
+  칩 레일처럼 첫 화면 최상단에 있는 요소에서는 "로딩 중 레이아웃이 튀지 않게 한다"와 정면으로 부딪힌다.
+
+### 값이 곧 라벨이면 한국어, 문장으로 보여야 하면 영문 키 + 라벨맵
+
+| | enum 값 | 라벨맵 |
+|---|---|---|
+| `post_category` | 한국어(`'이적설'`) | **없다** — 칩에 값을 그대로 렌더한다 |
+| `report_reason` | 영문 키(`'spam'`) | `REPORT_REASON_LABEL` |
+
+사유는 "스팸이거나 광고예요"처럼 **문장**으로 보여야 하는데, 저장값을 문장으로 두면 문구를 다듬을
+때마다 `alter type`이 필요하다. 그래서 저장값과 표시값을 가른다. 반대로 말머리는 화면에 그 단어가
+그대로 나가므로 라벨맵을 두면 같은 문자열을 두 곳에 적는 셈이 된다.
+
+### ⚠ enum 값은 **지울 수 없다**
+
+`add value`와 `rename value`만 된다 — `drop value`는 PostgreSQL에 구현되어 있지 않다(실측).
+값을 폐기하면 노출 배열에서만 빠지고 타입에는 영구히 남는다. **되돌릴 수 없는 결정이므로 값을
+추가하기 전에 "이걸 나중에 없앨 일이 있는가"를 먼저 답한다.**
+
+⚠ `add value`한 값은 **같은 트랜잭션 안에서 쓸 수 없다** — 추가와 백필을 한 마이그레이션에 담지 않는다.
+
+### lookup 테이블로 옮겨야 하는 조건
+
+아래 중 **하나라도** 성립하면 enum을 고집하지 않는다.
+
+- 값을 **운영자가 런타임에 추가·폐기**해야 한다.
+- 문구를 **배포 없이** 바꿔야 한다.
+- 정렬 순서·심각도 같은 **부가 정보를 데이터로** 들어야 한다.
+
+⚠ **관리 화면이 없는 동안은 셋 다 성립하지 않는다.** 운영자가 DB를 직접 만져야 하므로
+"마이그레이션 대신 psql"일 뿐 절차가 줄지 않고, 위의 컴파일 타임 보증만 잃는다.
+→ 관리 화면을 만드는 작업과 **같은 시점에** 옮긴다.
+
+옮길 때의 형태:
+
+- **정수 id가 아니라 `code text primary key`.** 저장값이 `spam` 그대로 읽혀야 참조 테이블을
+  열었을 때 뜻을 알 수 있다. 숫자 FK는 조인 없이는 아무 말도 하지 않는다.
+- 이름은 `report_reason`처럼 **무엇의 목록인지** 드러낸다. `report`는 "신고 접수 건"으로 읽혀
+  `post_report`와 헷갈린다.
+- 따라오는 것을 미리 세어 둔다: RLS enable + 정책 최소 하나(`rls.sql` 17b) +
+  `revoke all` / `grant select`(17a) + 시퀀스 revoke + `rls.sql` 새 섹션 + `supabase/seed.sql` 초기 행 +
+  `entities`의 조회 훅(queryKey·staleTime·Skeleton·EmptyState) + 배럴 노출.
+  ⚠ 그 테이블은 **비로그인에게도 열린 새 조회 표면**이 된다(칩·시트는 로그인 전에도 보인다).
+
 ## ⚠ RLS + 컬럼 권한이 유일한 방어선
 
 중간 검증층(Route Handler)이 없다. **정책 하나만 빠뜨려도 즉시 프로덕션 구멍**이다.
