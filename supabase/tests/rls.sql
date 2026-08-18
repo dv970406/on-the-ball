@@ -948,6 +948,284 @@ select excerpt like '%본문 첫 문장입니다.%' as body_survived,
   from public.post where title = '사진 글';
 rollback to s;
 
+\echo ''
+\echo '=== 27. 투표 (20260817000003) ==='
+\echo '    설계 요약: 득표수 컬럼도 트리거도 없다(poll_results가 그때그때 센다).'
+\echo '    개별 표는 "내 행만" SELECT라 남의 표가 구조적으로 새지 않고,'
+\echo '    집계는 **투표한 사람에게만** 열린다(v1은 UI에서만 가려 게이팅이 아니었다).'
+
+-- alice의 글에 투표를 붙인다. ⚠ 시드는 **superuser로** 넣는다 — authenticated에는
+-- poll·poll_option INSERT 권한이 아예 없다(그게 아래 검사들이 지키는 성질이다).
+savepoint s27;
+insert into public.poll (post_id, question) values (:pid, '누구를 데려와야 할까?');
+insert into public.poll_option (post_id, label, sort_order)
+values (:pid, '윙어', 1), (:pid, '수비형 미드필더', 2);
+select id as opt1 from public.poll_option where post_id = :pid and sort_order = 1 \gset
+select id as opt2 from public.poll_option where post_id = :pid and sort_order = 2 \gset
+
+savepoint s; :login_bob
+\echo '[❌차단] 남의 글에 투표를 붙인다'
+insert into public.poll (post_id, question) values (:pid, '가로채기');
+rollback to s;
+
+savepoint s; :login_bob
+\echo '[❌차단] 남의 글에 선택지를 끼워 넣는다'
+insert into public.poll_option (post_id, label, sort_order) values (:pid, '몰래', 4);
+rollback to s;
+
+-- ⚠ 아래 둘이 이 절의 핵심이다. 한때 "작성자면 넣을 수 있다"로 INSERT를 열어 두고
+--   UPDATE/DELETE만 막은 채 "생성 시 고정"이라고 적었는데, 정책에 시점 개념이 없어
+--   **진행 중인 투표에 선택지를 끼워 넣는 것**이 통과했다(실측). 검사가 남의 글만 보고
+--   작성자 본인의 사후 삽입을 보지 않아 그대로 살아남았다.
+savepoint s; :login_alice
+\echo '[❌차단] **작성자도** 진행 중인 투표에 선택지를 추가할 수 없다'
+insert into public.poll_option (post_id, label, sort_order) values (:pid, '뒤늦게', 4);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] **작성자도** 옛 글에 투표를 나중에 붙일 수 없다'
+insert into public.poll (post_id, question) values (:bpid, '사후 투표');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 질문 수정 — 생성 시 고정이라 UPDATE 정책이 없다'
+update public.poll set question = '바꿔치기' where post_id = :pid;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 선택지 수정 — 던져진 표의 뜻이 바뀌면 안 된다'
+update public.poll_option set label = '바꿔치기' where id = :opt1;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 투표 통째로 삭제'
+delete from public.poll where post_id = :pid;
+rollback to s;
+
+savepoint s; :login_bob
+\echo '[성공] 첫 투표'
+insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
+\echo '[성공] 갈아타기 — option_id만 바꾼다'
+update public.poll_vote set option_id = :opt2 where post_id = :pid and user_id = :'bob';
+\echo '[1행 기대] 갈아타도 표는 하나다'
+select count(*) as my_votes from public.poll_vote where post_id = :pid and user_id = :'bob';
+rollback to s;
+
+savepoint s; :login_bob
+insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
+\echo '[❌차단] 표를 다른 글로 옮겨 "취소 불가"를 우회 — 컬럼 권한이 막는다'
+update public.poll_vote set post_id = :bpid where post_id = :pid and user_id = :'bob';
+rollback to s;
+
+savepoint s; :login_bob
+insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
+\echo '[❌차단] 투표 취소 — DELETE 정책이 없다'
+delete from public.poll_vote where post_id = :pid and user_id = :'bob';
+rollback to s;
+
+savepoint s; :login_bob
+\echo '[❌차단] 남의 명의로 투표'
+insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'alice', :opt1);
+rollback to s;
+
+savepoint s; :login_bob
+\echo '[❌차단] 한 사람 두 표 (기본키)'
+insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
+insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt2);
+rollback to s;
+
+savepoint s; :login_bob
+\echo '[❌차단] 다른 글의 선택지로 투표 — 복합 FK가 막는다'
+insert into public.poll_vote (post_id, user_id, option_id) values (:bpid, :'bob', :opt1);
+rollback to s;
+
+savepoint s;
+:login_alice
+select public.soft_delete_post(:pid);
+:login_bob
+\echo '[❌차단] 삭제된 글에 투표'
+insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
+rollback to s;
+
+-- ⚠ 위 검사와 savepoint를 나눈다. 에러가 트랜잭션을 abort시켜 뒤따르는 select까지
+--   함께 죽는다(이 파일 머리의 "실패를 기대하는 검사마다 savepoint" 규약).
+savepoint s;
+:login_alice
+select public.soft_delete_post(:pid);
+:login_bob
+\echo '[0 / 0 기대] 삭제된 글의 투표·선택지는 보이지 않는다'
+select (select count(*) from public.poll where post_id = :pid) as polls,
+       (select count(*) from public.poll_option where post_id = :pid) as opts;
+rollback to s;
+
+savepoint s; :login_bob
+insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
+:login_alice
+\echo '[0행 기대] 남의 표는 조회되지 않는다'
+select * from public.poll_vote where post_id = :pid;
+\echo '[0행 기대] 투표하지 않은 사람에게 집계는 닫혀 있다'
+select * from public.poll_results(:pid);
+insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'alice', :opt1);
+\echo '[opt1=2 기대] 투표하면 집계가 열린다 (bob·alice 둘 다 opt1)'
+select option_id = :opt1 as is_opt1, vote_count from public.poll_results(:pid);
+update public.poll_vote set option_id = :opt2 where post_id = :pid and user_id = :'alice';
+\echo '[opt1=1 / opt2=1 기대] 갈아타면 집계가 따라 움직인다'
+select (select vote_count from public.poll_results(:pid) where option_id = :opt1) as opt1,
+       (select vote_count from public.poll_results(:pid) where option_id = :opt2) as opt2;
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[❌차단] 비로그인은 집계 함수를 못 부른다'
+select * from public.poll_results(:pid);
+rollback to s;
+
+savepoint s; :login_bob
+insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
+:login_anon
+-- ⚠ 설명은 **라벨보다 앞**에 둔다. 러너가 라벨 뒤 3줄만 값으로 뽑아서, 사이에 끼우면
+--   정작 확인해야 할 숫자가 잘려 나간다.
+\echo '    ⚠ poll_vote SELECT를 **에러 없이 0행**으로 받아야 한다. grant를 빼면 임베딩이'
+\echo '      42501로 죽어 비로그인에게 투표가 통째로 사라진다(실측). post_like와 같은 형태로,'
+\echo '      행을 막는 것은 grant가 아니라 정책(to authenticated)이다.'
+\echo '[1 / 2 / 0 기대] 비로그인도 투표·선택지는 보고 표만 못 본다'
+select (select count(*) from public.poll where post_id = :pid)        as polls,
+       (select count(*) from public.poll_option where post_id = :pid) as opts,
+       (select count(*) from public.poll_vote where post_id = :pid)   as votes;
+rollback to s;
+
+\echo ''
+\echo '--- 27b. create_post_with_poll — 글과 투표는 함께 생기거나 함께 없다'
+savepoint s; :login_alice
+\echo '[❌차단] 선택지 1개'
+select public.create_post_with_poll('잡담', '제목', '본문', '질문', array['하나']);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 선택지 5개'
+select public.create_post_with_poll('잡담', '제목', '본문', '질문', array['1','2','3','4','5']);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 2차원 배열로 개수 검사 우회 — array_ndims가 막는다'
+select public.create_post_with_poll('잡담', '제목', '본문', '질문', array[array['a','b'],array['c','d']]);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 같은 라벨 두 번 — unique(post_id, label)'
+select public.create_post_with_poll('잡담', '제목', '본문', '질문', array['같은거','같은거']);
+rollback to s;
+
+/*
+ * 원자성 — 글 insert는 성공하고 **그 뒤 poll에서** 실패하는 입력으로 확인한다.
+ *
+ * ⚠ 한때 실패 호출과 누수 확인을 **다른 savepoint**에 두었는데, 실패를 롤백한 뒤에 세고
+ *   있어서 함수가 원자적이든 아니든 결과가 항상 0이었다 — 증명하려던 것을 증명하지 못하는
+ *   죽은 검사였다.
+ * ⚠ 그렇다고 그냥 붙여 놓으면 안 된다. 함수 밖으로 나온 예외는 **트랜잭션을 abort시켜**
+ *   뒤따르는 select까지 죽는다(실측). `begin … exception` 블록이 암묵 서브트랜잭션을
+ *   만들어 주므로 그 안에서 삼켜야 바깥이 살아남는다.
+ * ⚠ 성공해 버리면(=원자성이 깨지면) 아래 `raise`가 P0001로 새어나와 러너의 "기대하지 않은
+ *   ERROR"에 걸린다 — 조용히 통과할 수 없게 만든 장치다.
+ */
+savepoint s; :login_alice
+\echo '[0 기대] 투표에서 실패하면 이미 insert된 글도 함께 롤백된다 (원자성)'
+do $$
+begin
+  -- ⚠ 실패 지점이 **post insert보다 뒤**여야 원자성을 증명한다. 함수 머리의 사전 검사
+  --   (선택지 개수·NULL·중복·질문 공백)는 전부 insert 앞에서 걸리므로 여기 쓸 수 없다 —
+  --   한때 "질문이 제로폭 공백뿐"으로 썼다가, 그 검사가 앞으로 옮겨지자 이 검사가
+  --   증명하려던 것을 증명하지 못하게 됐다. 길이 CHECK는 poll insert 시점이라 뒤에 있다.
+  perform public.create_post_with_poll('잡담', '원자성 확인', '본문', repeat('가', 1001), array['a','b']);
+  raise exception '원자성 검사가 통과해 버렸다 — 함수가 실패하지 않았다';
+exception
+  when check_violation then null;   -- 기대한 실패
+end $$;
+select count(*) as leaked from public.post where title = '원자성 확인';
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[❌차단] 비로그인은 글+투표 생성 함수를 못 부른다'
+select public.create_post_with_poll('잡담', '제목', '본문', '질문', array['a','b']);
+rollback to s;
+
+savepoint s; :login_alice
+select public.create_post_with_poll('잡담', '투표 글', '본문', '누가 MVP?', array['가','나','다']) as new_id \gset
+\echo '[1 / 3 기대] 글·투표·선택지가 함께 생긴다'
+select (select count(*) from public.poll where post_id = :new_id) as polls,
+       (select count(*) from public.poll_option where post_id = :new_id) as opts;
+rollback to s;
+
+\echo ''
+\echo '    ⚠ definer라 **컬럼 권한도 RLS도 우회한다** — 삽입 컬럼을 함수 본문이 못박고 있다는'
+\echo '      사실이 유일한 방어다. 그 목록이 넓어지는 회귀를 여기서 잡는다(섹션 18과 같은 취지).'
+savepoint s; :login_bob
+select public.create_post_with_poll('잡담', '위조 시도', '본문', '질문', array['a','b']) as fid \gset
+\echo '[bob / 0 / 0 / t 기대] 작성자는 호출자로 확정되고 카운터·시각을 실을 자리가 없다'
+select author_id = :'bob' as author_is_caller, like_count, comment_count,
+       created_at = updated_at as not_edited
+  from public.post where id = :fid;
+rollback to s;
+
+\echo ''
+\echo '    ⚠ 라벨을 정규형으로 접지 않으면 unique (post_id, label)이 **그냥 우회된다** —'
+\echo '      '\''찬성'\'' · '\''찬성 '\'' · '\''찬'\''+제로폭공백+'\''성'\''이 서로 다른 값이라 통과하고'
+\echo '      화면에는 똑같이 생긴 선택지가 여럿 뜬다(표를 쪼개는 도구가 된다).'
+savepoint s; :login_alice
+\echo '[❌차단] 제로폭·NBSP·꼬리 공백으로 위장한 같은 라벨'
+select public.create_post_with_poll('잡담', '제목', '본문', '질문',
+  array['찬성', '찬성 ', U&'\CE2C'||U&'\200B'||U&'\C131']);
+rollback to s;
+
+savepoint s; :login_alice
+select public.create_post_with_poll('잡담', '제목', '본문', '질문',
+  array[' 찬성 ', U&'\BC18'||U&'\00A0'||U&'\B300']) as nid \gset
+\echo '[찬성 / 반대 기대] 저장되는 값이 정규형이라 화면 문구와 갈리지 않는다'
+select label from public.poll_option where post_id = :nid order by sort_order;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] NULL 선택지 — 영어 23502가 아니라 P0001로 사유가 나가야 한다'
+select public.create_post_with_poll('잡담', '제목', '본문', '질문', array['a', null]);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 보이는 글자가 없는 선택지(제로폭 공백 한 자)'
+select public.create_post_with_poll('잡담', '제목', '본문', '질문', array['a', U&'\200B']);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 질문이 NULL'
+select public.create_post_with_poll('잡담', '제목', '본문', null, array['a','b']);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 질문 1,001 코드포인트 (화면 한도 100그래핌의 K=10배)'
+select public.create_post_with_poll('잡담', '제목', '본문', repeat('가', 1001), array['a','b']);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 선택지 401 코드포인트 (화면 한도 40그래핌의 K=10배)'
+select public.create_post_with_poll('잡담', '제목', '본문', '질문', array[repeat('나', 401), 'b']);
+rollback to s;
+
+\echo ''
+\echo '--- 27c. 소프트 삭제된 글의 투표는 어느 경로로도 새지 않는다'
+\echo '    ⚠ poll_results는 security definer라 **RLS를 우회한다** — 정책에 건 post_is_alive가'
+\echo '      닿지 않아, 빠뜨렸더니 삭제된 글의 집계가 투표자에게 영구히 열려 있었다.'
+\echo '      id가 연번이라 poll_results(N)을 훑으면 "삭제됐지만 투표가 있던 글"이 식별됐다.'
+savepoint s;
+:login_bob
+insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
+:login_alice
+select public.soft_delete_post(:pid);
+:login_bob
+\echo '[0행 / 0행 기대] 삭제 후 집계도, 내 표도 보이지 않는다'
+select (select count(*) from public.poll_results(:pid))                            as results,
+       (select count(*) from public.poll_vote where post_id = :pid)                as my_votes;
+rollback to s;
+
+rollback to s27;
+
 rollback;
 \echo ''
 \echo '=== 끝 (전체 rollback — DB에 흔적을 남기지 않는다) ==='

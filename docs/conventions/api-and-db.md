@@ -95,6 +95,12 @@ RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 
   `lower(nickname)` 유일성이 **실제 유일성**이 된다(제로폭으로 우회 불가).
 - `profiles_normalize_nickname` **트리거**가 쓰기 직전에 정규화하므로, 사용자가 공백을 붙여
   보내도 CHECK 위반(23514)이 아니라 조용히 다듬어진다.
+- ⚠ **`normalize_nickname`은 닉네임 전용이 아니다.** 이름이 첫 호출자를 기록할 뿐 하는 일은
+  "보이는 텍스트의 정규형"이라, **화면에서 구분되어야 하는 값**은 전부 이걸로 접는다 —
+  투표 선택지가 두 번째 호출자다(`create_post_with_poll`). 접지 않으면 `unique`가
+  제로폭 문자·NBSP·꼬리 공백으로 **그냥 우회되어** 똑같이 생긴 값이 여럿 저장된다.
+  ⚠ 클라이언트 짝(`normalizeNickname`)도 **같은 자리에서 함께** 걸어야 한다. 한쪽만 접으면
+  화면이 보여준 문구와 저장값이 갈린다.
 - ⚠ CHECK 안의 함수는 **호출자 권한으로 평가**되므로 `normalize_nickname`은
   `anon`·`authenticated`에 EXECUTE가 열려 있어야 한다(`has_visible_char`와 같은 함정).
 
@@ -207,6 +213,8 @@ RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 
 | 제목 | 120 | 1,200 | `TITLE_LIMIT` | `validatePost` |
 | 댓글 | 1,000 | 10,000 | `COMMENT_LIMIT` | `validateComment` |
 | 닉네임 | 20 | 200 | `NICKNAME_LIMIT` | `validateNickname` (정규형 기준) |
+| 투표 질문 | 100 | 1,000 | `POLL_QUESTION_LIMIT` | `validatePoll` |
+| 투표 선택지 | 40 | 400 | `POLL_OPTION_LIMIT` | `validatePoll` |
 | 본문 | — (도입 안 함) | 20,000 | `CONTENT_MAX` (단일) | `validatePost` |
 
 ⚠ **검증은 features 슬라이스가 소유하고 뷰는 문구만 받는다.** 세 슬라이스가 같은 형태를
@@ -240,10 +248,18 @@ RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 
 
 | 종류 | 함수 | 비고 |
 |---|---|---|
-| RPC(클라이언트가 직접 호출) | `toggle_post_like` · `soft_delete_post` · `increment_post_view` | `increment_post_view`만 anon에 열려 있다(아래 예외 항목) |
+| RPC(클라이언트가 직접 호출) | `toggle_post_like` · `soft_delete_post` · `increment_post_view` · `create_post_with_poll` | `increment_post_view`만 anon에 열려 있다(아래 예외 항목) |
 | 트리거 | `sync_post_like_count` · `sync_post_comment_count` · `check_comment_depth` | `post_like`·`comment` |
 | 트리거 | **`handle_new_user`** (`on_auth_user_created`, `after insert on auth.users`) | 가입 시 `profiles` 행 생성. **호출자 권한으로 돌면 `profiles` insert 권한이 없어 가입 자체가 실패한다** |
-| 정책 헬퍼 | `post_is_alive` (`stable`) | `comment`의 select·insert 정책이 공유 — 인라인 서브쿼리를 쓰지 않는 이유는 아래 참고 |
+| 정책 헬퍼 | `post_is_alive` (`stable`) | `comment`·`poll_vote`의 정책과 `poll_results`가 공유 — 인라인 서브쿼리를 쓰지 않는 이유는 아래 참고 |
+| **집계 읽기** | `poll_results` (`stable`) | 이 목록에서 유일하게 **쓰기가 아닌** definer다. 개별 표는 RLS로 "내 행만"인데 집계는 그 경계를 넘어야 한다 — 그리고 **투표한 사람에게만** 돌려준다(결과 게이팅을 UI가 아니라 여기서 건다). ⚠ definer라 정책이 닿지 않으므로 **`post_is_alive`를 함수 안에서 직접 확인**한다 |
+
+⚠ **RLS를 우회하는 definer는 "그 함수가 유일한 경로"일 때 가장 강하다.**
+`create_post_with_poll`이 그 예다. 처음엔 원자성만 노리고 invoker로 두고 `poll`·`poll_option`에
+"작성자면 insert 가능" 정책을 열었는데, **정책에 시점 개념이 없어** 작성자가 이미 표가 던져진
+투표에 선택지를 끼워 넣을 수 있었다(실측). 두 테이블의 정책과 grant를 걷어내고 함수를 definer로
+올리자, "생성 시 고정"과 "선택지 2~4개"를 **함수 하나가 단독으로 소유**하게 됐다 —
+정책으로 표현할 수 없는 규약은 유일 경로로 만들어야 지켜진다.
 
 ⚠ **아래 셋은 definer로 오해하기 쉽지만 아니다.**
 권한 없이도 도는 함수를 "RLS를 우회하는 함수"로 세어두면 보안 검토가 헛돈다.
@@ -274,6 +290,19 @@ RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 
   - ⚠ **쓰기 예외는 `increment_post_view` 하나뿐이다.** "anon은 어디에도 쓸 수 없다"는 전제가 여기서만 깨진다. 조회는 비로그인이 대부분이라 authenticated 전용으로 두면 숫자가 의미를 잃기 때문이다.
   - 대가로 **`view_count`는 curl 루프로 부풀릴 수 있는 대략치**다 — 트리거가 단독 관리하는 `like_count`·`comment_count`와 **신뢰 수준이 다르다.** 이 차이는 컬럼 주석에도 적혀 있다. 정확도가 필요해지면 `(post_id, viewer_hash, viewed_on)` 로그 테이블이 필요하다.
 - **에러 코드 규약**: 우리가 의도적으로 띄우는 한국어 메시지는 **`P0001`** 로 던진다(`toDbErrorMessage`가 그대로 노출한다). `42501`은 Postgres 자신의 영어 권한 거부용으로 남겨둔다.
+
+### 투표에는 왜 쓰기 RPC도, 카운터 트리거도 없는가
+
+좋아요와 나란히 두면 판단 기준이 보인다.
+
+- **좋아요가 RPC인 이유는 카운터 때문이다** — "존재 확인 → 분기 → insert/delete"가 한 원자 단위여야 했다. 투표는 집계 컬럼이 없어(아래) 지킬 불변조건이 행 하나뿐이고, 그 행은 `(post_id, user_id)` 기본키가 이미 하나로 묶는다. 같은 유저의 동시 요청은 "마지막에 고른 것이 남는다"로 끝나는데 그건 이 기능의 정의 그대로다.
+- **득표수 컬럼을 두지 않는다.** `like_count`가 탈퇴 cascade 경로에서 어긋나 영구히 과대로 남았던 사고의 클래스를 통째로 없앤다 — 어긋날 값 자체가 없다. 선택지가 4개 이하라 `count(*) group by`가 사실상 공짜이고, 어차피 결과 게이팅 때문에 함수를 거쳐야 한다.
+
+⚠ **PostgREST의 upsert(`Prefer: resolution=merge-duplicates`)를 쓰지 않는다.**
+`ON CONFLICT DO UPDATE SET`에 **payload의 모든 컬럼**을 실어서 `post_id`·`user_id`에도 UPDATE
+권한을 요구한다(실측 42501). 그 권한을 열면 자기 표의 `post_id`를 살아 있는 다른 글로 옮겨
+**DELETE 정책을 두지 않은 "취소 불가"를 우회**할 수 있다 → 클라이언트가 "내 표가 있는가"로
+갈라 insert 또는 `option_id`만 바꾸는 UPDATE를 보낸다. 컬럼 grant는 `option_id` 하나뿐이다.
 
 ### 왜 좋아요는 RPC이고 댓글 수는 트리거인가
 
@@ -385,6 +414,7 @@ RLS 술어가 security-barrier 서브쿼리 안으로 들어가 바깥의 `fk = 
 |---|---|
 | `supabase/tests/rls.sql` | RLS·컬럼 권한·RPC 전량 검사 (전체 rollback이라 DB에 흔적 없음). ⚠ 여기에 **마지막 섹션 번호를 적지 않는다** — 섹션을 더하는 순간 거짓이 된다 |
 | — 섹션 25는 **길이 한도**를 검사 | 제목·댓글·닉네임의 새 CHECK 경계 ±1, 가족 이모지 120개 제목(코드포인트 840)이 통과하는지, 닉네임 200자가 `lower(nickname)` btree 인덱스에도 들어가는지, 그리고 **본문은 20,000 그대로**인지. ⚠ 여기 숫자는 abuse bound다 — 화면 한도(그래핌)는 클라이언트만 강제하므로 이 검사로 증명되지 않는다 |
+| — 섹션 27은 **투표**를 검사 | 남의 글에 투표 붙이기·질문/선택지 수정·투표 취소·표를 다른 글로 옮기기(취소 우회)·남의 명의 투표·한 사람 두 표·다른 글의 선택지로 투표(복합 FK)·삭제된 글에 투표가 전부 막히는지, **미투표자에게 `poll_results`가 0행**인지, 갈아타면 집계가 따라 움직이는지, 그리고 **27b** `create_post_with_poll`이 실패할 때 글도 남기지 않는지, **작성자·카운터·시각을 실을 자리가 없는지**(definer라 컬럼 권한을 우회하므로 삽입 컬럼 목록이 넓어지는 회귀를 여기서 잡는다), 선택지가 정규형으로 접혀 저장되는지 |
 | — 섹션 26은 **excerpt**를 검사 | 사진으로 시작하는 글도 발췌에 본문이 남고 URL은 빠지는지(20260817000002) |
 | — 섹션 24는 **프로필 편집**을 검사 | 본인만 수정·남의 닉네임 0행·아바타 경로가 자기 폴더인지·`created_at` 위조 차단·랜덤 닉네임 배정, 그리고 **24b 스토리지 정책**(남의 폴더에 업로드 불가)과 **24c 본문 이미지 버킷**(남의 폴더·비로그인 업로드 불가 — 여기엔 CHECK 대응물이 없어 이 정책이 유일한 방어선이다). ⚠ 24c는 **버킷 설정값도** 검사한다(`public`·`file_size_limit`·`allowed_mime_types`) — 크기·타입의 실제 방어선이 거기라, 정책만 보면 이 값이 조용히 넓어져도 아무도 모른다 |
 | — 섹션 23은 **닉네임 정규형**을 검사 | 제로폭·NBSP·soft hyphen을 끼운 닉네임이 정규형으로 접혀 기존 닉네임과 충돌하는지(사칭 차단) |

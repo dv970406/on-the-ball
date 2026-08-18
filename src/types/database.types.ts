@@ -58,6 +58,104 @@ export type Database = {
           },
         ]
       }
+      poll: {
+        Row: {
+          created_at: string
+          post_id: number
+          question: string
+        }
+        Insert: {
+          created_at?: string
+          post_id: number
+          question: string
+        }
+        Update: {
+          created_at?: string
+          post_id?: number
+          question?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poll_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: true
+            referencedRelation: "post"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      poll_option: {
+        Row: {
+          id: number
+          label: string
+          post_id: number
+          sort_order: number
+        }
+        Insert: {
+          id?: never
+          label: string
+          post_id: number
+          sort_order: number
+        }
+        Update: {
+          id?: never
+          label?: string
+          post_id?: number
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poll_option_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "poll"
+            referencedColumns: ["post_id"]
+          },
+        ]
+      }
+      poll_vote: {
+        Row: {
+          created_at: string
+          option_id: number
+          post_id: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          option_id: number
+          post_id: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          option_id?: number
+          post_id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poll_vote_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "poll"
+            referencedColumns: ["post_id"]
+          },
+          {
+            foreignKeyName: "poll_vote_post_id_option_id_fkey"
+            columns: ["post_id", "option_id"]
+            isOneToOne: false
+            referencedRelation: "poll_option"
+            referencedColumns: ["post_id", "id"]
+          },
+          {
+            foreignKeyName: "poll_vote_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post: {
         Row: {
           author_id: string
@@ -170,9 +268,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_post_with_poll: {
+        Args: {
+          p_category: Database["public"]["Enums"]["post_category"]
+          p_content: string
+          p_options: string[]
+          p_question: string
+          p_title: string
+        }
+        Returns: number
+      }
       has_visible_char: { Args: { p_text: string }; Returns: boolean }
       increment_post_view: { Args: { p_post_id: number }; Returns: undefined }
       normalize_nickname: { Args: { p_text: string }; Returns: string }
+      poll_results: {
+        Args: { p_post_id: number }
+        Returns: {
+          option_id: number
+          vote_count: number
+        }[]
+      }
       post_is_alive: { Args: { p_id: number }; Returns: boolean }
       random_nickname: { Args: never; Returns: string }
       soft_delete_post: { Args: { p_post_id: number }; Returns: undefined }

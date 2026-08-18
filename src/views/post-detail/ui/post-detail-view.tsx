@@ -29,8 +29,10 @@ import {
   buttonClassName,
 } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
+import { usePollQuery } from "@/entities/poll";
 import { isEdited, isHotPost, usePostQuery } from "@/entities/post";
 import { useSessionStore } from "@/entities/session";
+import { PollVote } from "@/features/cast-poll-vote";
 import { LikeButton } from "@/features/toggle-post-like";
 import { useRecordPostView } from "@/features/view-post";
 import type { ReplyTarget } from "../model/reply-target";
@@ -42,7 +44,18 @@ export function PostDetailView({ postId }: { postId: number }) {
   const router = useRouter();
   const { data: post, isPending, error, refetch } = usePostQuery(postId);
   const user = useSessionStore((s) => s.user);
+  const sessionStatus = useSessionStore((s) => s.status);
   const deletion = usePostDeletion(postId);
+  // ⚠ 키가 userId로 스코프된다 — `myOptionId`는 "나"에 종속된 값이라, 상세를 연 채 계정이
+  //   바뀌면 이전 사용자의 선택이 남는다(`identityKeys`와 같은 이유).
+  //   집계 조회는 뮤테이션과 같은 자리(`PollVote`)에 있다 — 사유는 그 파일 주석.
+  // ⚠ 세션이 확정된 뒤에만 조회한다 — 키가 userId로 스코프돼 있어 복원 중에 부르면
+  //   블록이 언마운트→리마운트되며 레이아웃이 두 번 튄다(사유는 usePollQuery 주석).
+  const { data: poll, error: pollError } = usePollQuery(
+    postId,
+    user?.id,
+    sessionStatus !== "loading",
+  );
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [askDelete, setAskDelete] = useState(false);
@@ -198,10 +211,18 @@ export function PostDetailView({ postId }: { postId: number }) {
             </div>
           </header>
 
-          {/* 본문은 마크다운 원문이다 — 태그·본문 이미지는 데이터가 없어 렌더하지 않는다 */}
+          {/* 본문은 마크다운 원문이다 — 이미지는 에디터가 넣은 `![](…)`를 Markdown이 렌더한다 */}
           <div className="mt-5">
             <Markdown>{post.content}</Markdown>
           </div>
+
+          {/* 투표는 본문 아래·액션 바 위 — 이 글의 일부이므로 <article> 안이다 */}
+          {poll && <PollVote poll={poll} />}
+          {/* ⚠ 조회 실패를 삼키면 **투표 없는 글과 구분되지 않는다.** 같은 화면의 본문 쿼리가
+              배너로 알리는 것과 형태를 맞춘다(data-and-state.md). */}
+          {pollError && !poll && (
+            <p className="mt-5 text-[12px] text-ink-mute">투표를 불러오지 못했어요.</p>
+          )}
 
           {/*
             액션 바 — 위아래 헤어라인.

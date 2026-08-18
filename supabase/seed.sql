@@ -144,3 +144,31 @@ union all
 select id, '11111111-1111-4111-8111-111111111111'::uuid from public.post
  where author_id = '22222222-2222-4222-8222-222222222222'
 on conflict do nothing;
+
+-- ---------------------------------------------------------------------
+-- 5. 투표 — 이적설 글에 하나 붙인다
+--
+-- ⚠ 득표수 컬럼이 없다(집계는 poll_results가 그때그때 센다) → 시드할 값도 없다.
+-- ⚠ bob의 표만 넣는다. alice(글쓴이)를 미투표로 남겨야 **"투표해야 결과가 보인다"** 를
+--   화면에서 확인할 수 있다 — 둘 다 투표시키면 게이팅이 걸린 화면을 볼 수 없다.
+-- ---------------------------------------------------------------------
+insert into public.poll (post_id, question)
+select id, '겨울에 어느 자리를 먼저 보강해야 할까요?'
+  from public.post
+ where title = '겨울 이적시장, 이번엔 진짜 움직일까'
+on conflict do nothing;
+
+-- ⚠ poll을 이름으로 특정한다. `from public.poll p cross join (…)`로 두면 시드에 투표가
+--   하나 더 생기는 순간 **모든 투표에 같은 선택지가 붙는다**(지금은 하나라 무해할 뿐이다).
+insert into public.poll_option (post_id, label, sort_order)
+select p.post_id, x.label, x.ord::smallint
+  from public.poll p
+  cross join (values ('수비형 미드필더', 1), ('센터백', 2), ('윙어', 3)) as x(label, ord)
+ where p.question = '겨울에 어느 자리를 먼저 보강해야 할까요?'
+on conflict do nothing;
+
+insert into public.poll_vote (post_id, user_id, option_id)
+select o.post_id, '22222222-2222-4222-8222-222222222222'::uuid, o.id
+  from public.poll_option o
+ where o.sort_order = 1 and o.label = '수비형 미드필더'
+on conflict do nothing;

@@ -54,7 +54,6 @@ const DOCUMENTED_UNUSED = new Map([
   ["TabHeader", "v1 자산 (reuse.md 미사용 목록)"],
   ["Flag", "v1 자산 (reuse.md 미사용 목록)"],
   ["Shirt", "v1 자산 (reuse.md 미사용 목록)"],
-  ["RatioBar", "v1 자산 (reuse.md 미사용 목록)"],
   ["SectionHead", "v1 자산 (reuse.md 미사용 목록)"],
   ["LiveDot", "v1 자산 (reuse.md 미사용 목록)"],
   ["LiveStatusPill", "v1 자산 (reuse.md 미사용 목록)"],

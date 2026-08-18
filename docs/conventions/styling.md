@@ -110,6 +110,15 @@ function cardClassName(peek: boolean) {
   스크롤**시키고, 프레임이 `overflow-hidden`이라 사용자가 되돌릴 수 없다(실측 190px 밀림).
   `useFocusTrap`이 `preventScroll: true`로 막고 있다 — 새 오버레이가 직접 `focus()`를 부른다면 같이 붙인다.
 
+### 파선 테두리는 "아직 없는 것을 더하는 자리"에만
+
+`border-dashed`는 헤어라인 규칙의 예외가 아니라 **의미가 다른 선**이다 — 실선 헤어라인이
+"여기까지가 이 구조"를 그린다면, 파선은 **비어 있고 채울 수 있는 자리**를 그린다.
+그래서 "선택지 추가"처럼 **누르면 항목이 하나 생기는 컨트롤**에만 쓴다
+(선례: `features/write-post/ui/poll-composer.tsx`).
+
+⚠ 카드·입력창·구분선을 파선으로 바꾸지 않는다. 그 자리에서 파선은 "미완성"으로 읽힌다.
+
 ### 알약(`rounded-full`) 예외
 
 프로토타입 치수를 그대로 옮긴 자리다. **이 목록에 없으면 `rounded-sm`이다.**

@@ -26,10 +26,10 @@ export function PostWriteView() {
       isPending={createPost.isPending}
       error={createPost.error}
       onCancel={() => router.replace(ROUTES.postList)}
-      onSubmit={(input) => {
+      onSubmit={(input, poll) => {
         if (guard.isLocked()) return;
         guard.lock();
-        createPost.mutate(input, {
+        createPost.mutate({ input, poll }, {
           onSuccess: () => {
             // 새 글은 목록 맨 위에 붙는다 — 저장된 스크롤을 복원하면 화면 밖이라 안 보인다
             clearScrollRestore(ROUTES.postList);

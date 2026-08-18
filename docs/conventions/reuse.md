@@ -13,14 +13,14 @@
 - `cn` — Tailwind 클래스 병합
 - **`parsePostId`** — URL의 `[id]` → 게시글 id. **새로 정규식을 만들지 말 것** — proxy(서버 가드)와 페이지가 같은 파서를 써야 판정이 갈리지 않는다(전에 `\d+` vs `Number()`로 갈려 가드가 뚫렸다). 서버에서는 `@/shared/lib/post-id` 직접 경로로.
 - **`hasVisibleChar`** — 보이는 글자가 하나라도 있는지. **`.trim()` 대신 이걸 쓴다** — `.trim()`도 Postgres `[:space:]`도 제로폭 문자·BOM을 못 걸러서 "제목이 완전히 비어 보이는 글"이 실제로 만들어졌다. DB의 `public.has_visible_char`와 **문자 집합이 같아야 한다**(한쪽만 고치지 말 것).
-- **`normalizeNickname`** — 닉네임 정규형(보이지 않는 문자 제거 · NBSP·전각공백을 보통 공백으로 · 연속 공백 접기). **DB의 `public.normalize_nickname`과 같은 결과를 내야 한다** — 두 문자 집합(`INVISIBLE`/`BLANK`)의 합집합이 `hasVisibleChar`의 클래스와 같아야 한다는 제약까지 한 쌍이다(한쪽만 고치지 말 것).
+- **`normalizeNickname`** — **보이는 텍스트의 정규형**(보이지 않는 문자 제거 · NBSP·전각공백을 보통 공백으로 · 연속 공백 접기). 이름은 첫 호출자를 기록할 뿐이고 닉네임 전용이 아니다 — **화면에서 구분되어야 하는 값**은 이걸로 접는다(투표 선택지 `validatePoll`이 두 번째 호출자다). 접지 않으면 `.trim()`을 통과한 '찬성'·'찬성 '·'찬'+제로폭공백+'성'이 서로 다른 값으로 저장되어 똑같이 생긴 항목이 여럿 뜬다. **DB의 `public.normalize_nickname`과 같은 결과를 내야 한다** — 두 문자 집합(`INVISIBLE`/`BLANK`)의 합집합이 `hasVisibleChar`의 클래스와 같아야 한다는 제약까지 한 쌍이다(한쪽만 고치지 말 것).
   ⚠ **닉네임 길이는 원본이 아니라 정규형으로 잰다.** DB 트리거가 쓰기 직전에 정규화하므로 원본으로 재면 화면과 저장값이 갈린다 — ZWJ를 지우는 탓에 가족 이모지(👨‍👩‍👧‍👦)는 저장 시점에 👨👩👧👦 4자로 분해된다.
 - **`codePointLength`** — DB `char_length`와 같은 단위의 길이. **`.length`나 `<input maxLength>`로 길이를 제한하지 말 것** — UTF-16 코드유닛이라 이모지가 2로 세어져 한도의 절반에서 막힌다.
 - **`graphemeLength`** — 사용자가 세는 "한 글자"(UAX #29 확장 그래핌 클러스터) 기준 길이. **어떤 이모지도 1로 센다** — 가족 ZWJ·피부톤·국기·키캡·태그 시퀀스 전부. `Intl.Segmenter`가 없으면 `codePointLength`로 폴백하는데, 그래핌 ≤ 코드포인트라 폴백은 항상 **더 엄격한** 쪽이어서 DB 거부를 만들지 않는다.
   - ⚠ **본문(20,000자)에는 쓰지 않는다** — 20,000자 기준 1.5ms로 `codePointLength`(0.1ms)의 14배다(실측). 제목 120자는 0.011ms라 렌더 중에도 무해하다.
 - **`TextLimit` / `lengthOverflow`** — 길이 한도 **한 쌍**(그래핌=화면 · 코드포인트=DB 정합)과 그 판정. **길이 제한은 이걸로만 건다.**
   - ⚠ **`graphemeLength(v) > MAX`를 직접 짜지 말 것.** 1그래핌의 코드포인트 수에 상한이 없어(`a`+결합악센트 50개 = 그래핌 1 / 코드포인트 51) 그래핌 한도가 DB `char_length` 한도를 함의하지 못한다. 코드포인트 검사를 빠뜨려도 **컴파일·린트·rls 검사 어느 것도 안 잡아주고**, 그 순간 사용자는 한국어 안내 대신 DB의 23514(또는 btree 인덱스의 영어 에러)를 본다. `parsePostId`·`safeNextPath`와 같은 이유로 규약을 함수 하나가 소유한다.
-  - 짝이 되는 상수는 features가 갖는다 — `TITLE_LIMIT`(`write-post`)·`COMMENT_LIMIT`(`write-comment`)·`NICKNAME_LIMIT`(`update-profile`). 값 표와 K=10 근거는 `api-and-db.md`.
+  - 짝이 되는 상수는 features가 갖는다 — `TITLE_LIMIT`(`write-post`)·`COMMENT_LIMIT`(`write-comment`)·`NICKNAME_LIMIT`(`update-profile`)·`POLL_QUESTION_LIMIT`/`POLL_OPTION_LIMIT`(`write-post`). 값 표와 K=10 근거는 `api-and-db.md`.
   - ⚠ **본문만 `TextLimit`이 아니다** — `CONTENT_MAX`(`write-post`, 20,000)는 코드포인트 **단일 값**이고 `lengthOverflow`가 아니라 `codePointLength`로 직접 검사한다. 그래핌을 도입하지 않은 이유(20,000자 계산이 1.5ms)는 `api-and-db.md`에 있다. 본문 길이를 건드릴 때 `TextLimit` 셋만 보고 지나치지 말 것.
 - **`useNextParam`** — 현재 URL의 `?next=`. `useSearchParams` 대신 쓴다(그걸 쓰면 화면 프리렌더가 CSR로 떨어진다).
   - ⚠ **읽은 값을 렌더에 쓰는 화면**용이다(로그인 화면의 `redirectTo` 조립). 값이 필요한 시점이 **effect 안뿐**이라면 이걸 쓰지 말고 거기서 직접 읽는다 — 이 훅은 `useSyncExternalStore`로 렌더 중에 읽으므로 렌더타임 의존이 새로 생긴다. 라우트 가드(`useRedirectAfterSignIn`)가 그 경우이고, 사유는 그 훅 주석에 있다.
@@ -78,6 +78,21 @@
 - `PostCard` / `CommentItem` — 목록 아이템 UI.
 - 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/keys`·`lib/plain-summary`·`lib/hot`을 직접 import.
 
+## `@/entities/poll`
+- `usePollQuery(postId, userId)` — 글에 딸린 투표. 없으면 `null`(투표 없는 글이 대부분이라 정상값이다).
+- `usePollResultsQuery(postId, userId, enabled)` — 선택지별 득표수.
+  ⚠ **투표한 사람에게만 열린다.** 게이팅이 화면이 아니라 `poll_results` 함수 안에 있어, 미투표자에게는 0행이 오고 비로그인은 EXECUTE 권한 자체가 없다. `enabled`는 요청을 아끼는 것일 뿐 방어가 아니다.
+- `pollKeys` — ⚠ **`postId`와 `userId`를 함께** 받는다. `myOptionId`도 집계도 "나"에 종속된 값이라, 상세를 연 채 계정이 바뀌면 이전 사용자의 것이 남는다(`identityKeys`와 같은 이유).
+- `POLL_SELECT` / `buildPoll` / `buildPollResult` — PostgREST select 문자열의 단일 소스와 매퍼.
+  ⚠ **득표수가 select에 없다.** 컬럼이 아니라 함수가 세기 때문이다 — 여기에 넣으려고 컬럼을 만들면 게이팅이 무너진다.
+- `Poll` / `PollResult` — 도메인 타입. `Poll.myOptionId`는 `poll_vote` 임베딩이 "내 행만"이라 **배열 길이가 곧 그 값**이다(`post_like` 트릭과 같다).
+- `PollBlock` — 투표 UI. **프레젠테이션 전용이라 세션도 뮤테이션도 모른다.** 세션 3분기와 실제 투표는 `features/cast-poll-vote`의 `PollVote`가 갖는다(`PostCard` ↔ `LikeButton`과 같은 분업).
+- ⚠ **`entities/post`가 아니라 별도 슬라이스다.** 임베딩하면 poll 타입과 낙관적 스냅샷이 `PostDetail` 안에 중첩되어 post가 투표 도메인을 떠안는다. 대가로 상세 화면에 요청이 하나 는다.
+
+## `@/features/cast-poll-vote`
+- `PollVote` — `PollBlock`에 세션과 뮤테이션을 붙인 컴포넌트. ⚠ 세션 `status`를 **3분기**한다(`loading`을 비로그인과 같이 다루면 콜드 로드 직후 로그인 사용자가 로그인 화면으로 튄다 — `LikeButton`·`CommentBar`와 판정을 맞춘다).
+- ⚠ 투표하기에는 **RPC가 없다.** 집계 컬럼이 없어 지킬 불변조건이 행 하나뿐이라 잠금이 필요 없다. 다만 **PostgREST upsert도 쓰지 않는다** — payload 전 컬럼에 UPDATE 권한을 요구해서 `post_id`를 열게 되고, 그러면 표를 다른 글로 옮겨 "취소 불가"가 뚫린다.
+
 ## `@/entities/profile`
 - `useProfileQuery(userId)` / `profileKeys` / `PROFILE_SELECT` / `buildProfile` — 닉네임·아바타 조회.
 - `MyProfile` / `ProfileRow` — 도메인 타입 / DB 행 타입. `MyProfile.avatarPath`는 **경로**다(전체 URL이 아니다).
@@ -102,10 +117,10 @@
 ## `@/shared/ui`
 **현역(게시판 v2가 실제로 쓰는 것)** — 새로 만들기 전 여기부터 확인:
 `Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·`Markdown`·
-`Chip`·`ActionChip`·`actionChipClassName`·`Dialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`
+`Chip`·`ActionChip`·`actionChipClassName`·`Dialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`·`RatioBar`
 
 **현재 미사용** — **"검증된 현역"으로 오인하지 말 것**:
-`TabHeader`·`Flag`·`Shirt`·`RatioBar`·`SectionHead`·`LiveDot`·`LiveStatusPill`·`NightCard`·`PlayerSilhouette`
+`TabHeader`·`Flag`·`Shirt`·`SectionHead`·`LiveDot`·`LiveStatusPill`·`NightCard`·`PlayerSilhouette`
 (전부 `docs/legacy/v1-inventory.md`가 보존 대상으로 명시한 v1 자산이다. `MarkdownEditor`는 v2에서 만들었다가 쓰이지 않아 **배럴에서 뺐다** — 파일은 남아 있다)
 
 ⚠ 위 v1 자산은 **실측상 번들에 실리지 않는다**(프로덕션 청크에서 9종 전량 0건). 다만 그건 각 모듈이 순수해서이지 "배럴이라 공짜"여서가 아니다 — 서드파티 의존을 끌고 오는 무거운 모듈은 `sideEffects` 선언이 없으면 그대로 실린다(`architecture.md`의 트리셰이킹 절).

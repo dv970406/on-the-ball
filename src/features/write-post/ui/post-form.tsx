@@ -6,10 +6,13 @@ import { cn } from "@/shared/lib";
 import { Chip, Dialog, Icon, buttonClassName } from "@/shared/ui";
 import { POST_CATEGORIES } from "@/entities/post";
 import { imageInsertion, linkInsertion } from "../lib/markdown-snippet";
+import type { PollInput } from "../model/poll-schema";
 import { CONTENT_MAX, type PostInput } from "../model/post-schema";
 import { useImagePicker } from "../model/use-image-picker";
+import { usePollDraft } from "../model/use-poll-draft";
 import { usePostDraft } from "../model/use-post-draft";
 import { LinkInsertDialog } from "./link-insert-dialog";
+import { PollComposer } from "./poll-composer";
 import { useAutoGrowTextarea } from "./use-auto-grow-textarea";
 import { useCursorInsert } from "./use-cursor-insert";
 
@@ -35,8 +38,11 @@ interface PostFormProps {
    *   부모가 리렌더되기 전까지는 낡은 값을 다시 읽을 뿐이라 여기서 가드를 들면
    *   **해제 신호가 오지 않아 영구 잠금**이 된다(실측: 실패 후 등록 3연타 → 요청 1건).
    *   가드는 뮤테이션을 조립하는 쪽에 둔다 — `use-duplicate-guard.ts` 참고.
+   *
+   * ⚠ `poll`을 `PostInput`에 섞지 않는다 — 그러면 `useUpdatePost`가 평생 무시해야 할 필드를
+   *   들고 다니게 된다. 투표는 **작성 시에만** 붙고 수정 화면에서는 항상 `null`이다.
    */
-  onSubmit: (input: PostInput) => void;
+  onSubmit: (input: PostInput, poll: PollInput | null) => void;
 }
 
 /**
@@ -70,7 +76,7 @@ export function PostForm({
   /**
    * 링크 다이얼로그의 열림 상태 겸 초기 라벨.
    * ⚠ `null`이 닫힘이다. 선택 텍스트를 **여는 순간 뽑아 여기 담는다** — 렌더 중에
-   *   `cursor.capture()` 같은 것을 부르면 ref·DOM을 렌더 중에 읽게 된다.
+   *   `cursor.selectedText()` 같은 것을 부르면 ref·DOM을 렌더 중에 읽게 된다.
    */
   const [linkLabel, setLinkLabel] = useState<string | null>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
@@ -85,6 +91,7 @@ export function PostForm({
   // ⚠ 자동 높이 **뒤에** 둔다 — 두 effect가 같은 deps로 도는데, 높이가 확정된 뒤에
   //   캐럿을 잡아야 한다(사유는 use-cursor-insert 주석).
   const cursor = useCursorInsert(bodyRef, draft.content, (next) => change("content", next));
+  const pollDraft = usePollDraft();
   const image = useImagePicker((url) =>
     // alt는 비워 둔다 — 파일명("IMG_4821.HEIC")은 설명이 아니라 소음이고,
     // 스크린리더에 그대로 읽히면 없느니만 못하다.
@@ -99,8 +106,12 @@ export function PostForm({
     e.preventDefault();
     // 검증에 실패하면 호출부까지 가지 않는다 → 그쪽 가드도 잠기지 않아 고쳐서 다시 누를 수 있다
     const input = validate();
-    if (!input) return;
-    onSubmit(input);
+    // ⚠ 두 검증을 **모두** 돌린 뒤 판정한다. `if (!input) return`으로 먼저 빠져나가면
+    //   제목과 투표가 함께 잘못됐을 때 투표 쪽 문구가 뜨지 않아, 고치고 다시 눌러야
+    //   그제서야 나타난다(안내가 두 번에 나뉘어 온다).
+    const poll = pollDraft.validate();
+    if (!input || poll === undefined) return;
+    onSubmit(input, poll);
   };
 
   /** 이탈 방어는 **생성 모드에서만** — 수정은 원본이 남아 있으므로 바로 돌아간다 */
@@ -239,6 +250,18 @@ export function PostForm({
               </p>
             )}
 
+            {pollDraft.enabled && (
+              <PollComposer
+                draft={pollDraft.draft}
+                errors={pollDraft.errors}
+                onChangeQuestion={pollDraft.change.changeQuestion}
+                onChangeOption={pollDraft.change.changeOption}
+                onAddOption={pollDraft.change.addOption}
+                onRemoveOption={pollDraft.change.removeOption}
+                onRemove={pollDraft.toggle}
+              />
+            )}
+
             {/* 사진 업로드 실패 — 토스트는 1.8초 뒤 사라지므로 지속 표시를 함께 남긴다 */}
             {image.error && (
               <p className="mt-4 text-[13px] leading-[1.5] text-crimson">
@@ -276,7 +299,15 @@ export function PostForm({
         </button>
         {/* ⚠ form 바깥이다 — 안에 두면 제출에 파일이 딸려간다 */}
         <input type="file" {...image.inputProps} className="sr-only" />
-        <button type="button" aria-label="투표 첨부" disabled className={TOOL_BUTTON}>
+        {/* ⚠ 수정 화면에서는 막는다 — 투표는 생성 시 고정이고, 정책에도 UPDATE가 없다 */}
+        <button
+          type="button"
+          aria-label="투표 첨부"
+          aria-pressed={editing ? undefined : pollDraft.enabled}
+          disabled={editing}
+          onClick={pollDraft.toggle}
+          className={cn(TOOL_BUTTON, pollDraft.enabled && "bg-canvas-soft text-ink")}
+        >
           <Icon as={BarChart2} size={20} />
         </button>
         {/* ⚠ 오버레이가 열리면 textarea가 blur되므로 **누르는 순간** 선택 영역을 떠 둔다 */}
