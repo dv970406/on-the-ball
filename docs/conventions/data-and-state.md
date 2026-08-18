@@ -135,7 +135,18 @@ const handleSubmit = (e) => {
 
 ⚠ **소셜 로그인·계정 연결은 예외적으로 가드가 필요하다.** 화면이 사라지니 불필요해 보이지만, `signInWithOAuth`·`linkIdentity`는 호출마다 **새 PKCE code_verifier를 저장소에 덮어쓴** 뒤 그 challenge를 담은 URL로 이동한다 — 두 호출이 겹치면 저장된 verifier와 커밋된 내비게이션이 어긋나 돌아온 code를 교환할 수 없다(로그인 실패). `useOAuthSignIn`·`useLinkIdentity`가 `start()` 안에서 가드를 갖고, `disabled`는 시각 표시로만 남긴다.
 
-⚠ **목록의 항목별 삭제는 boolean 하나로 부족하다.** 뮤테이션 훅이 하나뿐이라 다른 항목을 누르는 순간 `variables`가 갈아타 처리 중이던 항목의 버튼이 되살아난다 → 보낸 id의 **집합**을 기억하고, 동기 판정용 ref와 렌더 표시용 상태를 **따로** 둔다(선례 `useCommentDeletion`). 해제는 **보낸 항목별 per-call 콜백**에서 두 값을 함께 지운다 — 한쪽만 지우면 실패해서 남은 id가 **다른 항목을 지우는 동안 엉뚱한 버튼을 잠근다.**
+⚠ **목록의 항목별 삭제는 boolean 하나로 부족하다.** 뮤테이션 훅이 하나뿐이라 다른 항목을 누르는 순간 `variables`가 갈아타 처리 중이던 항목의 버튼이 되살아난다 → 보낸 id의 **집합**을 기억하고, 동기 판정용 ref와 렌더 표시용 상태를 **따로** 둔다(선례 `useCommentDeletion`). 해제는 항목별로 두 값을 함께 지운다 — 한쪽만 지우면 실패해서 남은 id가 **다른 항목을 지우는 동안 엉뚱한 버튼을 잠근다.**
+
+⚠⚠ **그 해제를 `mutate`의 per-call 콜백에 걸면 안 된다.** `MutationObserver.mutate`는 호출마다 옵션을 덮어쓰고 **이전 mutation에서 옵저버를 떼어낸다**(query-core 5.101: `removeObserver` → `addObserver`). 그래서 A가 처리 중일 때 B를 누르면 **A의 `onSuccess`·`onSettled`가 영영 실행되지 않는다.** A가 실패해 목록에 그대로 남아 있으면 집합에서 A가 지워지지 않아 **버튼은 활성인데 눌러도 아무 일이 없는 무증상 잠금**이 된다. → `mutateAsync`가 돌려주는 promise는 **그 호출의 mutation에 묶여 있어** 통지와 무관하게 끝나므로 거기에 `.finally()`로 건다. 훅 레벨 콜백(무효화·실패 토스트)은 Mutation이 직접 부르므로 옵저버 분리와 무관하게 그대로 돈다.
+
+```ts
+void mutation.mutateAsync(id)
+  .then(() => toast("…"))
+  .catch(() => {})            // 문구는 훅의 onError가 이미 보냈다
+  .finally(() => release(id));
+```
+
+⚠ 그러면 렌더 표시도 `isPending && set.has(id)`가 아니라 **집합만으로** 판정한다. `isPending`은 마지막 호출 하나만 반영해서, A가 날아가는 중에 B가 끝나면 A의 "…중" 표시가 먼저 꺼진다.
 
 ⚠ **다만 "항목 수 자체가 불변조건인 목록"은 반대다 — boolean 전역 잠금이 맞다.** 로그인 수단 해제(`useUnlinkIdentity`)가 그 자리다. 지켜야 하는 것이 "이 항목이 두 번 지워지지 않는다"가 아니라 **"목록이 0개가 되지 않는다"** 인데, 항목별 가드는 다른 항목을 열어 두므로 그 불변조건을 지키지 못한다(화면의 `canUnlink`는 리페치 전 stale 값이라 같은 tick에 둘을 누르면 둘 다 통과한다). 위 규칙에 맞춘다며 Set 가드로 바꾸지 말 것.
 

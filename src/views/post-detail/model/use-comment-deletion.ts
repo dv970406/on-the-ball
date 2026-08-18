@@ -61,12 +61,23 @@ export function useCommentDeletion(postId: number) {
     if (sentRef.current.has(commentId)) return;
     sentRef.current.add(commentId);
     setSentIds((prev) => new Set(prev).add(commentId));
-    deleteComment.mutate(commentId, {
-      onSuccess: () => toast("댓글을 삭제했어요"),
-      // 성공하면 그 댓글은 목록에서 사라지지만, 그래도 지운다 —
-      // "보낸 것만 담는다"는 집합의 뜻을 성공·실패 어느 쪽에서도 흐리지 않는다.
-      onSettled: () => release(commentId),
-    });
+    /**
+     * ⚠ **해제를 per-call 콜백(`mutate`의 두 번째 인자)에 걸지 않는다.**
+     *   `MutationObserver.mutate`는 호출마다 `#mutateOptions`를 덮어쓰고 **이전 mutation에서
+     *   옵저버를 떼어낸다**(query-core 5.101). 그래서 A가 처리 중일 때 B를 누르면 **A의
+     *   per-call 콜백이 영영 실행되지 않아** `sentRef`에 A가 남고, A가 실패해 목록에 그대로
+     *   있으면 **버튼은 활성인데 눌러도 아무 일이 없는 무증상 잠금**이 된다.
+     *   `mutateAsync`의 promise는 그 호출의 mutation에 묶여 있어 통지와 무관하게 끝난다.
+     *   훅 레벨 콜백(무효화·실패 토스트)은 Mutation이 직접 부르므로 그대로 돈다.
+     *
+     * 성공하면 그 댓글은 목록에서 사라지지만 그래도 지운다 —
+     * "보낸 것만 담는다"는 집합의 뜻을 성공·실패 어느 쪽에서도 흐리지 않는다.
+     */
+    void deleteComment
+      .mutateAsync(commentId)
+      .then(() => toast("댓글을 삭제했어요"))
+      .catch(() => {})
+      .finally(() => release(commentId));
   };
 
   /**
@@ -75,11 +86,11 @@ export function useCommentDeletion(postId: number) {
    *
    * ⚠ `variables === commentId`로 판정하면 안 된다 — 훅이 하나라 다른 댓글을 누르는 순간
    *   갈아타서, 아직 처리 중인 댓글의 버튼이 다시 활성화된다(위 sentRef 주석 참고).
-   * ⚠ `isPending`을 함께 보는 것은 **집합이 정확할 때만** 옳다. 위 `release`가 항목별로
-   *   비우는 것이 이 판정의 전제다 — 남은 id가 있으면 엉뚱한 버튼이 잠긴다.
+   * ⚠ `isPending`을 **함께 보지 않는다.** 그 값은 마지막 호출 하나만 반영하므로, A가 아직
+   *   날아가는 중에 B가 끝나면 A의 표시가 먼저 꺼진다. 위 `finally`가 항목별로 확실히
+   *   비워 주므로 집합만으로 정확하다.
    */
-  const isDeleting = (commentId: number) =>
-    deleteComment.isPending && sentIds.has(commentId);
+  const isDeleting = (commentId: number) => sentIds.has(commentId);
 
   return { remove, isDeleting, error: deleteComment.error };
 }
