@@ -7,7 +7,6 @@ import { Icon } from "./icon";
 
 interface ActionChipProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type"> {
   icon: LucideIcon;
-  iconSize?: number;
   /** 눌린 상태 — 에메랄드로 채워진다. 상세 화면에서는 좋아요 하나만 이 상태를 가질 수 있다 */
   active?: boolean;
 }
@@ -24,7 +23,6 @@ interface ActionChipProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
  */
 export function ActionChip({
   icon,
-  iconSize = 15,
   active,
   className,
   children,
@@ -49,7 +47,7 @@ export function ActionChip({
       })}
       {...props}
     >
-      <Icon as={icon} size={iconSize} />
+      <Icon as={icon} size={15} />
       {children}
     </button>
   );

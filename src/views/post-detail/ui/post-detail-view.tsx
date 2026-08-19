@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Bookmark,
   Flag,
   Flame,
   MessageCircle,
@@ -25,7 +24,6 @@ import {
   Sheet,
   SheetItem,
   Skeleton,
-  buttonClassName,
 } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
 import { usePollQuery } from "@/entities/poll";
@@ -213,22 +211,6 @@ export function PostDetailView({ postId }: { postId: number }) {
                   {formatCount(post.viewCount)}
                 </div>
               </div>
-              {/*
-                팔로우는 핸드오프 7장의 미구현 목록 — 자리만 두고 동작을 발명하지 않는다.
-                ⚠ span + aria-disabled였는데, span의 암묵 role(generic)은 aria-* 상태를
-                  지원하지 않아 그냥 본문 중간의 단어로 읽혔다. 진짜 disabled 버튼으로 둔다.
-              */}
-              <button
-                type="button"
-                disabled
-                className={buttonClassName({
-                  variant: "secondary",
-                  size: "sm",
-                  className: "ml-auto disabled:opacity-40",
-                })}
-              >
-                팔로우
-              </button>
             </div>
           </header>
 
@@ -258,21 +240,13 @@ export function PostDetailView({ postId }: { postId: number }) {
               isLiked={post.isLiked}
             />
             {/* ⚠ 표시 전용이다 — 누를 수 있는데 아무 일도 안 일어나면 고장으로 읽힌다.
-                  옆의 저장 칩과 같이 disabled로 둔다(댓글은 바로 아래에 이어진다). */}
+                  댓글은 바로 아래에 이어지므로 보낼 곳도 없다 → disabled로 둔다. */}
             {/* ⚠ 라벨을 `aria-label`로 붙이지 않는다 — 그러면 버튼 **콘텐츠를 덮어써서**
                   정작 개수가 읽히지 않는다("댓글 수, 버튼"). sr-only 텍스트는 덮지 않는다. */}
             <ActionChip icon={MessageCircle} disabled>
               <span className="sr-only">댓글 </span>
               {formatCount(post.commentCount)}
             </ActionChip>
-            {/* 저장(북마크)은 DB에 테이블이 없다 — 자리만 두고 토스트를 발명하지 않는다 */}
-            <ActionChip
-              icon={Bookmark}
-              iconSize={17}
-              aria-label="저장"
-              disabled
-              className="ml-auto border-0 px-1.5"
-            />
           </footer>
         </article>
 
