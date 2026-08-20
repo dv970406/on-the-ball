@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Flag,
   Flame,
-  MessageCircle,
   MoreHorizontal,
   Pencil,
   Trash2,
@@ -14,7 +13,6 @@ import {
 import { ROUTES, avatarUrl, signInWithNext } from "@/shared/config";
 import { formatCount, formatRelativeTime, useNowMs } from "@/shared/lib";
 import {
-  ActionChip,
   Avatar,
   Dialog,
   EmptyState,
@@ -229,7 +227,7 @@ export function PostDetailView({ postId }: { postId: number }) {
 
           {/*
             액션 바 — 위아래 헤어라인.
-            ⚠ 반드시 <article> **안**이다. 좋아요·댓글 수는 이 글의 메타데이터라,
+            ⚠ 반드시 <article> **안**이다. 좋아요 수는 이 글의 메타데이터라,
               밖에 두면 보조기술이 글을 한 단위로 읽을 때 딸려오지 않는다.
           */}
           {/* -mx-5 px-5: article의 좌우 패딩 안에 있으면서 헤어라인만 화면 끝까지 긋는다 */}
@@ -239,14 +237,6 @@ export function PostDetailView({ postId }: { postId: number }) {
               likeCount={post.likeCount}
               isLiked={post.isLiked}
             />
-            {/* ⚠ 표시 전용이다 — 누를 수 있는데 아무 일도 안 일어나면 고장으로 읽힌다.
-                  댓글은 바로 아래에 이어지므로 보낼 곳도 없다 → disabled로 둔다. */}
-            {/* ⚠ 라벨을 `aria-label`로 붙이지 않는다 — 그러면 버튼 **콘텐츠를 덮어써서**
-                  정작 개수가 읽히지 않는다("댓글 수, 버튼"). sr-only 텍스트는 덮지 않는다. */}
-            <ActionChip icon={MessageCircle} disabled>
-              <span className="sr-only">댓글 </span>
-              {formatCount(post.commentCount)}
-            </ActionChip>
           </footer>
         </article>
 
