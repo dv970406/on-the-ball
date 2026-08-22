@@ -8,7 +8,13 @@ import { useBackOrFallback } from "../model/use-back-or-fallback";
 import { useShareLink } from "../model/use-share-link";
 
 interface SubHeaderProps {
+  /** 헤더 크롬 라벨 겸 공유 시트에 실리는 이름 */
   title: string;
+  /**
+   * 라벨을 그리지 않는다(공유에는 그대로 쓴다).
+   * 바로 아래에 같은 문구가 이미 있는 화면용 — 상세는 말머리 칩이 그 자리다.
+   */
+  titleHidden?: boolean;
   /** 딥링크 진입 등 history가 없을 때 돌아갈 경로 */
   fallbackHref?: string;
   /** 공유 버튼 오른쪽에 덧붙일 액션(상세의 오버플로 ··· 버튼) */
@@ -21,7 +27,12 @@ interface SubHeaderProps {
  * ⚠ 여기 타이틀은 **크롬**이지 페이지 heading이 아니다. 화면의 h1은 각 뷰가 따로 둔다
  *   (상세는 글 제목, 작성·수정은 sr-only h1).
  */
-export function SubHeader({ title, fallbackHref = ROUTES.home, actions }: SubHeaderProps) {
+export function SubHeader({
+  title,
+  titleHidden = false,
+  fallbackHref = ROUTES.home,
+  actions,
+}: SubHeaderProps) {
   const handleBack = useBackOrFallback(fallbackHref);
   const handleShare = useShareLink(title);
 
@@ -39,7 +50,9 @@ export function SubHeader({ title, fallbackHref = ROUTES.home, actions }: SubHea
         <Icon as={ChevronLeft} size={22} />
       </button>
 
-      <div className="text-[15px] font-semibold tracking-[-0.3px] text-ink">{title}</div>
+      {!titleHidden && (
+        <div className="text-[15px] font-semibold tracking-[-0.3px] text-ink">{title}</div>
+      )}
 
       <div className="ml-auto flex items-center">
         <button

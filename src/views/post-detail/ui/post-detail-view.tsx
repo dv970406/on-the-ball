@@ -81,6 +81,8 @@ export function PostDetailView({ postId }: { postId: number }) {
   const header = (extra?: React.ReactNode) => (
     <SubHeader
       title={post?.category ?? "게시글"}
+      // 말머리는 바로 아래 칩이 이미 보여준다 — 헤더 라벨은 공유 시트에만 쓴다
+      titleHidden
       fallbackHref={ROUTES.postList}
       actions={extra}
     />
