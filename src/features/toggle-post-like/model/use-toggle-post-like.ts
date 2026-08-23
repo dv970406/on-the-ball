@@ -95,7 +95,14 @@ export function useTogglePostLike(postId: number) {
       // ⚠ 여기서 Promise를 반환하지 않는다. 반환하면 리페치가 끝날 때까지 isPending이
       //   유지되는데, 낙관적 업데이트는 이미 화면에 정답을 그려놨으므로 연타만 막혀
       //   오히려 반응이 둔해진다. (댓글 작성처럼 낙관적 갱신이 없는 뮤테이션은 반대로 반환한다)
-      void queryClient.invalidateQueries({ queryKey: postKeys.lists() });
+      //
+      // ⚠ **목록은 `refetchType: "none"`이다 — stale로만 찍고 지금 다시 받지 않는다.**
+      //   위 onMutate가 `setQueriesData`로 목록의 정답(카운트 ±1·isLiked)을 이미 그려 놨는데,
+      //   목록 화면에서 하트를 누를 때마다 30행 조회가 한 번씩 나갔다. 그 조회는
+      //   `post_select_visible`의 행별 `is_blocked()`까지 함께 태운다.
+      //   다음 마운트(뒤로가기·탭 전환)에 최신화되므로 남의 좋아요도 그때 따라온다.
+      //   상세는 그대로 즉시 리페치한다 — 한 건이라 싸고, 지금 보고 있는 화면이다.
+      void queryClient.invalidateQueries({ queryKey: postKeys.lists(), refetchType: "none" });
       void queryClient.invalidateQueries({ queryKey: postKeys.detail(postId) });
     },
   });

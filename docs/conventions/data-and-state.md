@@ -180,4 +180,10 @@ void mutation.mutateAsync(id)
 - **`setQueryData`가 아니라 `setQueriesData`(복수형)** — 목록 캐시가 정렬·필터별로 여러 키에 존재할 수 있다. `cancelQueries`·`getQueriesData`도 `postKeys.lists()` prefix로 일괄 처리한다.
 - 목록·상세 두 캐시를 함께 갱신하고 스냅샷도 둘 다 캡처한다.
 - **`onSettled`에서 응답값으로 직접 덮지 않고 무효화한다** — 연타로 뮤테이션이 겹치면 마지막 응답이 최신이라는 보장이 없다.
+- ⚠ **그 무효화는 지금 보고 있는 캐시만 리페치한다 — 목록은 `refetchType: "none"`이다.**
+  `onMutate`가 이미 목록의 정답(카운트 ±1·플래그)을 그려 놨는데 무효화가 기본값(`"active"`)이면
+  **목록 화면에서 버튼을 누를 때마다 목록 상한만큼(30행) 조회가 한 번씩 나간다.** 그 조회는
+  `post_select_visible`의 행별 `is_blocked()`까지 함께 태운다. stale로만 찍어 두면 다음
+  마운트(뒤로가기·탭 전환)에 최신화되고, 남이 누른 좋아요도 그때 따라온다.
+  → **낙관적 갱신이 정답을 그린 캐시는 stale 표시, 그렇지 않은 캐시는 즉시 리페치**가 기준이다.
 - 버튼을 `disabled`로 만들지 않는다. 낙관적 UI의 목적이 즉시 반응이고, 최종 정답은 `onSettled`가 확정한다.
