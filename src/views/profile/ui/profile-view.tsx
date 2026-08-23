@@ -2,7 +2,6 @@
 
 import { Camera } from "lucide-react";
 import { ROUTES, avatarUrl } from "@/shared/config";
-import { cn } from "@/shared/lib";
 import { Avatar, Button, EmptyState, Icon, Skeleton, TextField } from "@/shared/ui";
 import { BottomTabBar } from "@/widgets/bottom-tab-bar";
 import { SubHeader } from "@/widgets/sub-header";
@@ -55,18 +54,14 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
   const mainClassName =
     "relative min-h-0 flex-1 overflow-y-auto pb-[calc(122px+env(safe-area-inset-bottom))]";
 
-  if (profile.isPending) {
-    return (
-      <>
-        {header}
-        <main className={cn(mainClassName, "flex flex-col gap-4 px-5 pt-8")}>
-          <Skeleton className="size-24 rounded-full" />
-          <Skeleton className="h-[50px] w-full" />
-        </main>
-        {tabBar}
-      </>
-    );
-  }
+  /*
+   * ⚠ **로딩을 화면 전체의 조기 반환으로 두지 않는다.**
+   *   전에는 `if (profile.isPending) return <스켈레톤>`이라 아래 `LinkedAccounts`·`BlockedUsers`가
+   *   **마운트조차 되지 않았다** — 세 쿼리는 서로 의존이 없는데 프로필이 끝난 뒤에야 나머지 둘이
+   *   출발하는 직렬 워터폴이 됐다(이 화면은 서버 프리페치도 없어 전부 클라이언트 왕복이다).
+   *   지금은 프로필 자리만 스켈레톤으로 두고 나머지는 그대로 그려 셋이 동시에 출발한다.
+   * ⚠ 아래 두 분기는 그대로 조기 반환이다 — 프로필이 아예 없으면 이 화면에 그릴 것이 없다.
+   */
 
   // 캐시가 있으면 화면을 유지하고 배너로만 알린다(목록·상세와 같은 규약)
   if (profile.error && !profile.data) {
@@ -85,7 +80,8 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
     );
   }
 
-  if (!profile.data) {
+  // ⚠ `isPending`을 함께 본다 — 위 조기 반환이 사라져 로딩 중에도 여기 걸리던 자리다.
+  if (!profile.isPending && !profile.data) {
     return (
       <>
         {header}
@@ -127,51 +123,72 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
           </p>
         )}
 
-        {/* 아바타 */}
-        <section aria-labelledby="avatar-heading" className="flex flex-col items-center px-5 pt-8">
-          <h2 id="avatar-heading" className="sr-only">
-            프로필 사진
-          </h2>
-          <div className="relative">
-            <Avatar
-              label={profile.data.nickname}
-              src={avatarUrl(profile.data.avatarPath)}
-              size={96}
-              className="text-[32px]"
-            />
-            <button
-              type="button"
-              onClick={avatar.open}
-              disabled={avatar.isPending}
-              aria-label="프로필 사진 바꾸기"
-              className="absolute -bottom-1 -right-1 flex size-9 items-center justify-center rounded-full border border-hairline-cool bg-canvas text-ink transition-colors duration-150 ease-otb active:bg-canvas-soft disabled:opacity-40"
-            >
-              <Icon as={Camera} size={16} />
-            </button>
-          </div>
-          <input type="file" {...avatar.inputProps} className="sr-only" />
-          <p className="mt-3 text-[12px] text-ink-faint">
-            {avatar.isPending ? "올리는 중…" : "JPG · PNG · WebP"}
-          </p>
-          {avatar.error && (
-            <p className="mt-2 text-center text-[13px] text-crimson">{avatar.error.message}</p>
-          )}
-        </section>
+        {/*
+          프로필만 아직 안 왔다 — 실물과 같은 골격의 스켈레톤을 둔다(치수가 다르면 도착 순간 시프트).
+          아래 두 섹션은 자기 쿼리를 갖고 이미 출발해 있다.
+        */}
+        {!profile.data && (
+          <>
+              <div className="flex flex-col items-center px-5 pt-8">
+                <Skeleton className="size-24 rounded-full" />
+                <Skeleton className="mt-3 h-[18px] w-24" />
+              </div>
+              <div className="flex flex-col gap-3 px-5 pt-8">
+                <Skeleton className="h-[70px] w-full" />
+                <Skeleton className="h-[50px] w-full" />
+              </div>
+          </>
+        )}
 
-        {/* 닉네임 */}
-        <form onSubmit={nickname.onSubmit} className="flex flex-col gap-3 px-5 pt-8">
-          <TextField
-            label="닉네임"
-            name="nickname"
-            value={nickname.value}
-            error={nickname.error}
-            hint={`${NICKNAME_LIMIT.grapheme}자까지 · 다른 사람과 같을 수 없어요`}
-            onChange={nickname.onChange}
-          />
-          <Button type="submit" block disabled={!nickname.canSave}>
-            {nickname.isPending ? "저장 중…" : "닉네임 저장"}
-          </Button>
-        </form>
+        {profile.data && (
+          <>
+            {/* 아바타 */}
+            <section aria-labelledby="avatar-heading" className="flex flex-col items-center px-5 pt-8">
+              <h2 id="avatar-heading" className="sr-only">
+                프로필 사진
+              </h2>
+              <div className="relative">
+                <Avatar
+                  label={profile.data.nickname}
+                  src={avatarUrl(profile.data.avatarPath)}
+                  size={96}
+                  className="text-[32px]"
+                />
+                <button
+                  type="button"
+                  onClick={avatar.open}
+                  disabled={avatar.isPending}
+                  aria-label="프로필 사진 바꾸기"
+                  className="absolute -bottom-1 -right-1 flex size-9 items-center justify-center rounded-full border border-hairline-cool bg-canvas text-ink transition-colors duration-150 ease-otb active:bg-canvas-soft disabled:opacity-40"
+                >
+                  <Icon as={Camera} size={16} />
+                </button>
+              </div>
+              <input type="file" {...avatar.inputProps} className="sr-only" />
+              <p className="mt-3 text-[12px] text-ink-faint">
+                {avatar.isPending ? "올리는 중…" : "JPG · PNG · WebP"}
+              </p>
+              {avatar.error && (
+                <p className="mt-2 text-center text-[13px] text-crimson">{avatar.error.message}</p>
+              )}
+            </section>
+
+            {/* 닉네임 */}
+            <form onSubmit={nickname.onSubmit} className="flex flex-col gap-3 px-5 pt-8">
+              <TextField
+                label="닉네임"
+                name="nickname"
+                value={nickname.value}
+                error={nickname.error}
+                hint={`${NICKNAME_LIMIT.grapheme}자까지 · 다른 사람과 같을 수 없어요`}
+                onChange={nickname.onChange}
+              />
+              <Button type="submit" block disabled={!nickname.canSave}>
+                {nickname.isPending ? "저장 중…" : "닉네임 저장"}
+              </Button>
+            </form>
+          </>
+        )}
 
         {/* 로그인 수단 */}
         <LinkedAccounts userId={user?.id} />
