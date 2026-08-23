@@ -91,7 +91,7 @@ const fetchPostHead = cache(async (postId: number): Promise<PostHead> => {
     //   auth.uid()가 잡혀 서버·클라 판정이 갈리지 않는다(차단한 글은 그 사용자에게 404다).
     // ⚠ 쿠키 기반 클라이언트라 `auth.uid()`가 잡힌다 → `post_like`·`poll_vote` 임베딩
     //   ("내 행만")이 그 사용자 기준으로 채워져 `isLiked`·`myOptionId`가 갈리지 않는다.
-    // ⚠ **넷은 서로의 결과를 쓰지 않는다** → 병렬로 보낸다. 직렬로 두면 왕복 네 번이
+    // ⚠ **다섯은 서로의 결과를 쓰지 않는다** → 병렬로 보낸다. 직렬로 두면 왕복 다섯 번이
     //   그대로 쌓여 TTFB가 된다(색인 대상 화면이라 특히 비싸다).
     // ⚠ 댓글 조회가 실패해도 **글은 그대로 내보낸다.** 프리페치는 최적화라, 여기서
     //   "unknown"으로 떨어뜨리면 멀쩡한 본문까지 클라이언트 조회로 미루게 된다.
@@ -99,27 +99,30 @@ const fetchPostHead = cache(async (postId: number): Promise<PostHead> => {
     //   `buildCommentListQuery`가 단독으로 소유해 어긋날 자리를 없앤다.
     // ⚠ 투표 질문·선택지도 **그 글의 콘텐츠**라 초기 HTML에 담긴다. 투표가 없는 글이
     //   대부분이라 0행으로 끝나는 경우가 많은데, 그건 정상값(`null`)이다.
-    const [{ data: auth }, { data, error }, { data: rows }, { data: pollRow }] = await Promise.all([
-      supabase.auth.getUser(),
-      supabase.from("post").select(POST_DETAIL_SELECT).eq("id", postId).maybeSingle(),
-      buildCommentListQuery(supabase, postId),
-      supabase.from("poll").select(POLL_SELECT).eq("post_id", postId).maybeSingle(),
-    ]);
+    // ⚠ **집계(`poll_results`)도 여기서 함께 쏜다.** 전에는 poll 응답을 받은 뒤 `myOptionId`를
+    //   보고 직렬로 매달았는데, 그러면 **투표에 참여한 사용자만 왕복이 한 번 더** 쌓였다.
+    //   게이팅은 UI가 아니라 definer 함수 안에 있어(미참여자·투표 없는 글 모두 0행) 무조건
+    //   쏴도 뜻이 달라지지 않는다 — 쓸지 말지의 판정은 아래에서 `myOptionId`가 그대로 갖는다.
+    //   대가는 투표 없는 글에도 RPC가 1건 나가는 것인데, 병렬이라 TTFB에는 더해지지 않는다.
+    const [{ data: auth }, { data, error }, { data: rows }, { data: pollRow }, { data: resultRows }] =
+      await Promise.all([
+        supabase.auth.getUser(),
+        supabase.from("post").select(POST_DETAIL_SELECT).eq("id", postId).maybeSingle(),
+        buildCommentListQuery(supabase, postId),
+        supabase.from("poll").select(POLL_SELECT).eq("post_id", postId).maybeSingle(),
+        supabase.rpc("poll_results", { p_post_id: postId }),
+      ]);
 
     if (error) return { state: "unknown" };
     if (!data) return { state: "missing" };
 
     const poll = pollRow ? buildPoll(pollRow) : null;
 
-    // ⚠ **참여했을 때만 부른다.** definer 함수라 서버도 게이팅을 그대로 받지만(쿠키 세션),
-    //   미참여자에게 오는 0행을 `[]`로 넘기면 "열렸는데 0표"가 되어 결과 패널이 열린다.
+    // ⚠ **참여했을 때만 넘긴다.** `undefined`(조회 안 함)와 `[]`(열렸는데 0표)는 **다른 뜻**이라,
+    //   미참여자에게 오는 0행을 `[]`로 접으면 결과 패널이 열려 버린다.
     //   ⚠ 이걸 서버가 그리지 않으면 참여한 사용자의 막대가 스켈레톤에서 늘어나며 시프트한다.
     const pollResults =
-      poll && poll.myOptionId !== null
-        ? ((await supabase.rpc("poll_results", { p_post_id: postId })).data ?? []).map(
-            buildPollResult,
-          )
-        : undefined;
+      poll && poll.myOptionId !== null ? (resultRows ?? []).map(buildPollResult) : undefined;
 
     return {
       state: "found",

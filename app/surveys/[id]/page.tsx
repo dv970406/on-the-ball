@@ -63,11 +63,16 @@ const fetchSurveyHead = cache(async (surveyId: number): Promise<SurveyHead> => {
 
     // ⚠ 쿠키 기반 클라이언트라 `auth.uid()`가 잡힌다 → `survey_vote` 임베딩("내 행만")이
     //   그 사용자 기준으로 채워져 `myOptionId`가 서버·클라에서 갈리지 않는다.
-    // ⚠ 두 요청은 서로의 결과를 쓰지 않는다(RLS가 쿠키 세션으로 걸린다) → **병렬로** 보낸다.
-    //   직렬로 두면 왕복 두 번이 그대로 쌓여 TTFB에 더해진다.
-    const [{ data: auth }, { data, error }] = await Promise.all([
+    // ⚠ 셋은 서로의 결과를 쓰지 않는다(RLS가 쿠키 세션으로 걸린다) → **병렬로** 보낸다.
+    //   직렬로 두면 왕복 세 번이 그대로 쌓여 TTFB에 더해진다.
+    // ⚠ **집계(`survey_results`)도 여기서 함께 쏜다.** 전에는 서베이 응답을 받은 뒤
+    //   `myOptionId`를 보고 직렬로 매달았는데, 게이팅이 UI가 아니라 definer 함수 안에 있어
+    //   (미참여자는 0행) 무조건 쏴도 뜻이 달라지지 않는다. 목록에서 바로 투표하고 들어오는
+    //   화면이라 **참여자 비율이 높아** 그 한 왕복이 그대로 체감되던 자리다.
+    const [{ data: auth }, { data, error }, { data: resultRows }] = await Promise.all([
       supabase.auth.getUser(),
       supabase.from("survey").select(SURVEY_SELECT).eq("id", surveyId).maybeSingle(),
+      supabase.rpc("survey_results", { p_survey_id: surveyId }),
     ]);
 
     if (error) return { state: "unknown" };
@@ -75,15 +80,11 @@ const fetchSurveyHead = cache(async (surveyId: number): Promise<SurveyHead> => {
 
     const survey = buildSurvey(data);
 
-    // ⚠ **참여했을 때만 부른다.** 서버도 게이팅을 그대로 받지만(쿠키 세션), 미참여자에게
-    //   오는 0행을 `[]`로 넘기면 "열렸는데 0표"가 되어 결과 패널이 열린다.
+    // ⚠ **참여했을 때만 넘긴다.** `undefined`(조회 안 함)와 `[]`(열렸는데 0표)는 **다른 뜻**이라,
+    //   미참여자에게 오는 0행을 `[]`로 접으면 결과 패널이 열려 버린다.
     //   ⚠ 이걸 서버가 그리지 않으면 참여자의 막대가 스켈레톤에서 늘어나며 시프트한다.
     const results =
-      survey.myOptionId !== null
-        ? ((await supabase.rpc("survey_results", { p_survey_id: surveyId })).data ?? []).map(
-            buildSurveyResult,
-          )
-        : undefined;
+      survey.myOptionId !== null ? (resultRows ?? []).map(buildSurveyResult) : undefined;
 
     return { state: "found", survey, userId: auth.user?.id, results, nowMs: Date.now() };
   } catch (e) {
