@@ -194,7 +194,7 @@ export function PostForm({
               </div>
             </fieldset>
             {/*
-              말머리 미선택 안내. 별도의 zod 에러 표시는 두지 않는다 —
+              말머리 미선택 안내. 필드 아래 별도 에러 표시는 두지 않는다 —
               `status.ready`가 미선택 상태의 제출을 막으므로 errors.category가 채워질 경로가 없다
               (전에 있던 분기는 도달 불가였다).
             */}

@@ -45,8 +45,9 @@ pnpm db:types   # supabase gen types --local --schema public > src/types/databas
   (빠뜨린 값 금지) + `Record<T, string>`(라벨 누락 금지). 선례는 `entities/post`의 `POST_CATEGORIES`와
   `features/report-post`의 `REPORT_REASONS`.
   ⚠ 망라성 가드는 **타입 별칭만 선언하면 아무것도 검사하지 못한다** — 실제 값에 할당해야 컴파일러가 대조한다.
-- `z.enum(POST_CATEGORIES)`가 성립한다(`features/write-post`의 `post-schema.ts`). 값이 런타임 행이면
-  `z.string()` + 멤버십 검사로 후퇴한다.
+- **런타임 배열이 그대로 입력 검증이 된다** — `POST_CATEGORIES`를 `readonly string[]`로 넓혀
+  `includes`로 좁히는 타입 가드 하나면 끝난다(`features/write-post`의 `post-schema.ts`의
+  `isPostCategory`). 값이 lookup 테이블 행이면 배열이 조회 결과가 되어 이 검사가 **비동기**가 된다.
 - 화면이 **동기**로 끝난다(`.map()`). 조회 훅이면 목록에 Skeleton·EmptyState가 붙는데,
   칩 레일처럼 첫 화면 최상단에 있는 요소에서는 "로딩 중 레이아웃이 튀지 않게 한다"와 정면으로 부딪힌다.
 
@@ -98,7 +99,7 @@ pnpm db:types   # supabase gen types --local --schema public > src/types/databas
 
 - **컬럼 권한은 선택이 아니라 필수다.** `post_update_own` 정책만 두면 작성자가 자기 글의 `like_count`를 9999로 UPDATE하는 게 통과한다. 카운터·타임스탬프는 `revoke` 후 필요한 컬럼만 `grant`한다.
 - **UPDATE 정책에는 `with check`를 반드시 함께 둔다.** 없으면 `author_id`를 남의 uuid로 바꾸는 소유권 이전이 가능하다.
-- **zod는 UX이지 방어가 아니다.** 길이 제한은 DB `check` 제약으로도 반드시 건다. ⚠ 단 **화면 한도와 DB 한도는 단위도 값도 다르다**(그래핌 vs 코드포인트, K=10배) — 아래 "길이 한도는 두 단위로 겹쳐 건다"를 먼저 읽는다. 어긋남을 없애는 건 **클라이언트가 두 한도를 함께 검사하는 것**이지 두 값을 같게 두는 게 아니다.
+- **클라이언트 검증은 UX이지 방어가 아니다.** 길이 제한은 DB `check` 제약으로도 반드시 건다. ⚠ 단 **화면 한도와 DB 한도는 단위도 값도 다르다**(그래핌 vs 코드포인트, K=10배) — 아래 "길이 한도는 두 단위로 겹쳐 건다"를 먼저 읽는다. 어긋남을 없애는 건 **클라이언트가 두 한도를 함께 검사하는 것**이지 두 값을 같게 두는 게 아니다.
 - `(select auth.uid())`로 감싼다 — 행마다 재평가되지 않고 InitPlan으로 승격되어 쿼리당 1회 평가된다(Supabase 공식 성능 권고).
 - 정책을 고치면 **`bash supabase/tests/run-rls.sh`를 돌린다**(`rls.sql`을 직접 `psql`로 돌리지 말 것 — 래퍼가 결과를 양방향으로 대조해 준다). 실패를 기대하는 검사마다 savepoint를 쓴다(없으면 첫 에러가 트랜잭션을 abort시켜 뒤쪽 검사가 전부 무의미해진다).
 
@@ -448,7 +449,7 @@ RLS를 지나지 않는다). `poll`·`poll_option`이 `create_post_with_poll` �
     함께 들이는 시점이다(열거값을 lookup 테이블로 옮기는 판단과 같은 형태다).
 - **기간은 `survey.closes_at`이 갖는다**(기본값 생성 + 7일). 마감 뒤의 차단은 화면이 아니라
   `survey_is_open` 정책이 한다 — 클라이언트 판정(`isSurveyOpen`)은 `useNowMs`가 마운트 시각에
-  고정돼 경계를 놓칠 수 있어 **안내일 뿐이다**(zod가 UX이지 방어가 아닌 것과 같은 층위).
+  고정돼 경계를 놓칠 수 있어 **안내일 뿐이다**(클라이언트 검증이 UX이지 방어가 아닌 것과 같은 층위).
 - ⚠ **표현 형태를 enum으로 두지 않았다.** 서베이를 분할 카드로 그릴지는 `survey_option.bg_color`의
   유무가 정한다 — enum 값은 PostgreSQL에서 **지울 수 없어**(add/rename만 있다) 형태를 하나
   늘리는 결정이 영구적이 되는데, 색은 `update ... set bg_color = null` 한 줄로 되돌아온다.

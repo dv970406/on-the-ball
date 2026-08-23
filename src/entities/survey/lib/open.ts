@@ -13,7 +13,7 @@ import type { Survey } from "../model/types";
  *
  * ⚠ **이 판정은 안내일 뿐 방어가 아니다.** `useNowMs`가 마운트 시각에 고정되므로 탭을
  *   오래 열어 두면 경계를 넘는 순간을 놓치는데, 그때 투표하면 `survey_is_open` 정책이
- *   막고 훅이 한국어 에러로 바꾼다(zod가 UX이지 방어가 아닌 것과 같은 층위다).
+ *   막고 훅이 한국어 에러로 바꾼다(클라이언트 검증이 UX이지 방어가 아닌 것과 같은 층위다).
  */
 export function isSurveyOpen(survey: Pick<Survey, "closesAt">, nowMs: number): boolean {
   return new Date(survey.closesAt).getTime() > nowMs;

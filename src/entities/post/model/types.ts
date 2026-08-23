@@ -34,7 +34,7 @@ export const POST_CATEGORIES = [
  * ⚠ **반대 방향을 막는 검사다.** `satisfies`는 "없는 값을 적으면" 잡지만
  *   "enum에 있는 값을 빠뜨리면" 못 잡는다. 그대로 두면 `alter type ... add value`로
  *   말머리를 추가하고 위 배열에 안 넣었을 때 **칩 레일과 작성 폼에서 조용히 빠지고**,
- *   `z.enum(POST_CATEGORIES)`가 그 값을 거부해 수정도 막힌다.
+ *   `validatePost`의 `isPostCategory`가 그 값을 거부해 수정도 막힌다.
  *   `POST_SORT_LABEL`은 `Record<PostSort, …>`라 망라성이 보장되는데 여기만 비대칭이었다.
  *
  * ⚠ **타입 별칭만 선언하면 아무것도 검사하지 못한다**(`type X = never`는 그냥 선언일 뿐이다).
