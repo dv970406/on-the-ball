@@ -4,6 +4,7 @@ import { Fragment, useState } from "react";
 import { formatCount } from "@/shared/lib";
 import { Dialog, EmptyState, Skeleton } from "@/shared/ui";
 import {
+  // 잘림 판정은 훅이 갖지만 **문구의 숫자**는 뷰가 쓴다("최근 200개만 표시하고 있어요")
   COMMENT_LIST_LIMIT,
   CommentItem,
   buildCommentThreads,
@@ -12,6 +13,7 @@ import {
 } from "@/entities/comment";
 import { useSessionStore } from "@/entities/session";
 import { useCommentDeletion } from "../model/use-comment-deletion";
+import { useCommentVisibility } from "../model/use-comment-visibility";
 import type { ReplyTarget } from "../model/reply-target";
 
 interface CommentSectionProps {
@@ -55,32 +57,14 @@ export function CommentSection({
 
   // 목록은 최근 COMMENT_LIST_LIMIT개만 가져오므로 헤딩 카운트는 글의 값(트리거가 관리)을 쓴다 —
   // comments.length를 쓰면 잘린 뒤부터 목록 카드의 댓글 수와 어긋난다.
-  //
-  // ⚠ 잘림 판정은 **두 조건을 **함께** 본다. 목록 길이만 보면 정확히 200개일 때(잘린 게 없는데)도 뜨고,
-  //   카운트만 보면 위 레이스에서 잘못 뜬다. 상한에 닿았고 **동시에** 실제 총합이 더 클 때만 참이다.
-  const truncated =
-    (comments?.length ?? 0) >= COMMENT_LIST_LIMIT && commentCount > (comments?.length ?? 0);
+  // 잘림·숨김 판정은 두 캐시의 뺄셈이라 훅이 소유한다(실패 모드는 그 파일 주석에 모여 있다).
+  const { truncated, hiddenCount, showHidden } = useCommentVisibility({
+    commentCount,
+    loadedCount: comments?.length,
+    isFetching,
+    commentCountFetching,
+  });
   const threads = comments ? buildCommentThreads(comments) : undefined;
-
-  /**
-   * 헤딩 카운트와 실제로 보이는 댓글 수의 차이.
-   *
-   * ⚠ **차단한 사용자의 댓글은 RLS(`comment_select_visible`)가 걸러 오는데
-   *   `comment_count`는 트리거가 관리하는 값이라 그들을 계속 포함한다.** 카운터를 뷰어별로
-   *   다르게 만들 수는 없으므로(트리거가 단독 관리한다) 차이를 문구로 갚는다.
-   *
-   * ⚠ 잘림(`truncated`)일 때는 그리지 않는다 — 그때는 위 문구가 이미 차이를 설명하고 있고,
-   *   두 원인이 겹치면 어느 쪽인지 말할 수 없다.
-   *
-   * ⚠ **한쪽 캐시만 먼저 도착한 순간에는 그리지 않는다.** 이 값은 글 캐시와 댓글 캐시의
-   *   뺄셈인데 둘은 따로 무효화되고 따로 도착한다 — 댓글을 하나 쓰면 1행짜리 글 응답이
-   *   200행짜리 댓글 응답보다 먼저 와서 `commentCount = N+1`, `comments.length = N`이 되고,
-   *   차단한 사람이 **하나도 없는** 사용자에게 "차단한 사용자의 댓글은 보이지 않습니다"가
-   *   뜬다(삭제하면 반대 방향으로 어긋난다). 문구가 원인을 단정하므로 그 거짓말이 비싸다.
-   *   → 양쪽이 **모두 멎었을 때만** 판정한다. 어긋남은 영구적인 성질이라 조금 늦게 떠도 된다.
-   */
-  const hiddenCount = commentCount - (comments?.length ?? 0);
-  const showHidden = !isFetching && !commentCountFetching && !truncated && hiddenCount > 0;
 
   /** 삭제 버튼 — 답글이 달린 루트면 확인 다이얼로그를 거친다 */
   const deleteAction = (comment: Comment, replyCount: number) => {
