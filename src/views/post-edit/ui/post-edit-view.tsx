@@ -1,24 +1,19 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import { ROUTES } from "@/shared/config";
-import { useDuplicateGuard, useToast } from "@/shared/lib";
 import { EmptyState, Skeleton } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
 import { usePostQuery } from "@/entities/post";
 import { useSessionStore } from "@/entities/session";
-import { PostForm, useUpdatePost } from "@/features/write-post";
+import { PostForm } from "@/features/write-post";
+import { usePostUpdate } from "../model/use-post-update";
 
 export function PostEditView({ postId }: { postId: number }) {
-  const router = useRouter();
   const { data: post, isPending, error } = usePostQuery(postId);
-  const updatePost = useUpdatePost(postId);
-  // ⚠ 가드가 폼이 아니라 여기 있는 이유는 PostWriteView와 같다 — 폼은 isPending을 prop으로
-  //   받아 낡은 값을 읽으므로 거기서 잠그면 풀리지 않는다(use-duplicate-guard.ts).
-  const guard = useDuplicateGuard(updatePost);
   const user = useSessionStore((s) => s.user);
-  const toast = useToast();
+  // 뮤테이션 조립·중복 제출 가드·성공 후 이동은 이 훅이 갖는다(사유는 그 파일 주석)
+  const update = usePostUpdate(postId);
 
   /**
    * 폼을 그리지 못하는 분기(로딩·에러·권한)의 껍데기.
@@ -84,20 +79,10 @@ export function PostEditView({ postId }: { postId: number }) {
           </p>
         ) : null
       }
-      isPending={updatePost.isPending}
-      error={updatePost.error}
-      // 수정 모드는 이탈 확인 없이 바로 상세로 복귀한다(원본이 남아 있다)
-      onCancel={() => router.replace(ROUTES.post(postId))}
-      onSubmit={(input) => {
-        if (guard.isLocked()) return;
-        guard.lock();
-        updatePost.mutate(input, {
-          onSuccess: () => {
-            router.replace(ROUTES.post(postId));
-            toast("수정했어요");
-          },
-        });
-      }}
+      isPending={update.isPending}
+      error={update.error}
+      onCancel={update.cancel}
+      onSubmit={update.submit}
     />
   );
 }
