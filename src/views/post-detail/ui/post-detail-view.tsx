@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Flag,
@@ -38,6 +38,21 @@ import { usePostPoll } from "../model/use-post-poll";
 import { usePostDeletion } from "../model/use-post-deletion";
 import { CommentBar } from "./comment-bar";
 import { CommentSection } from "./comment-section";
+
+/**
+ * 본문 렌더는 **메모한다.**
+ *
+ * react-markdown v10의 `Markdown`은 평범한 함수라 내부에 `memo`도 `useMemo`도 없다 —
+ * 호출될 때마다 unified 파이프라인(micromark → mdast → hast)을 처음부터 다시 돈다.
+ * 이 뷰는 시트 열기·답글 대상 지정·좋아요 무효화로 자주 리렌더되는데, 그때마다 최대
+ * `CONTENT_MAX`(20,000자) 본문이 통째로 재파싱됐다.
+ *
+ * ⚠ **메모는 `shared/ui/markdown.tsx`가 아니라 소비하는 이 뷰가 갖는다.** 그 파일은
+ *   `"use client"`를 일부러 붙이지 않아 서버 렌더 여지를 남긴 모듈이라(architecture.md),
+ *   거기에 `memo()`를 넣으면 그 성질이 깨진다.
+ * ⚠ props가 `{ children: string, className? }` 뿐이라 얕은 비교가 정확히 맞는다.
+ */
+const MemoMarkdown = memo(Markdown);
 
 interface PostDetailViewProps {
   postId: number;
@@ -267,7 +282,7 @@ export function PostDetailView({
 
           {/* 본문은 마크다운 원문이다 — 이미지는 에디터가 넣은 `![](…)`를 Markdown이 렌더한다 */}
           <div className="mt-5">
-            <Markdown>{post.content}</Markdown>
+            <MemoMarkdown>{post.content}</MemoMarkdown>
           </div>
 
           {/* 투표는 본문 아래·액션 바 위 — 이 글의 일부이므로 <article> 안이다 */}
