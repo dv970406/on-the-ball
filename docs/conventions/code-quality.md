@@ -99,7 +99,8 @@ per-call 콜백이 **상위 레이어의 결정**(이동 목적지, 입력창 �
 
 ### 롤은 키보드 모델을 약속한다
 
-`role="radiogroup"`·`tablist`·`toolbar`는 화살표 키 이동(roving tabindex)을 선언하는 것이다. 구현이 없으면 붙이지 않는다 — 말머리·정렬 레일이 `group` + `aria-pressed`에 머무는 이유다.
+`role="radiogroup"`·`tablist`·`toolbar`는 화살표 키 이동(roving tabindex)을 선언하는 것이다. 구현이 없으면 붙이지 않는다 — 말머리·정렬 레일이 `<nav aria-label>` + `aria-current="page"`에
+머무는 이유다(선택 토글이 아니라 **이동**이라 `aria-pressed`도 아니다).
 
 ## FSD와의 관계
 

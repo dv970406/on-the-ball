@@ -1,6 +1,17 @@
 import type { Database } from "@/types/database.types";
 import type { Comment, CommentRow } from "../model/types";
 
+/**
+ * 한 글에 한 번에 가져올 댓글 수.
+ * 없으면 댓글이 몰린 글에서 응답이 무한히 커진다(글 목록은 30개로 끊고 있다).
+ * 페이지네이션이 필요해지면 여기서부터 확장한다.
+ *
+ * ⚠ **`api/queries.ts`가 아니라 여기 있다.** 그 파일은 `"use client"`라 서버가 import할 수
+ *   없는데, 상세 페이지의 SSR 프리페치가 같은 상한을 써야 한다 — 두 곳에 숫자를 적으면
+ *   서버가 200개를 보내고 클라이언트가 다른 수로 리페치하는 순간 목록이 흔들린다.
+ */
+export const COMMENT_LIST_LIMIT = 200;
+
 // post와 달리 comment → profiles 경로는 하나뿐이라 모호하지 않지만,
 // 같은 이유(임베딩 별칭을 뜻이 드러나게)로 FK 컬럼명을 명시한다.
 // ⚠ **profiles 컬럼을 여기에 추가하면 `features/update-profile`의 무효화 대상도 늘려야 한다.**

@@ -47,6 +47,37 @@ const _CATEGORIES_EXHAUSTIVE: Exclude<PostCategory, (typeof POST_CATEGORIES)[num
   : never = true;
 void _CATEGORIES_EXHAUSTIVE;
 
+/**
+ * URL 슬러그 ↔ 말머리.
+ *
+ * ⚠ **URL은 영구 계약이다.** 값을 바꾸면 이미 공유된 링크와 색인이 통째로 깨진다 —
+ *   표시 문구(`이적설`)는 언제든 바꿀 수 있지만 이 값은 그렇지 않다.
+ * ⚠ `satisfies Record<PostCategory, string>`이라 enum에 값이 늘면 **컴파일 에러로 드러난다**
+ *   (위 `_CATEGORIES_EXHAUSTIVE`와 같은 방식의 가드).
+ * ⚠ 슬러그를 로마자로 둔 이유: canonical 태그·사이트맵·로그에 그대로 실리는 값이라
+ *   퍼센트 인코딩(`%EC%9D%B4…`)을 피한다.
+ */
+export const POST_CATEGORY_SLUG = {
+  이적설: "transfer",
+  경기: "match",
+  선수: "player",
+  유니폼: "kit",
+  잡담: "talk",
+} as const satisfies Record<PostCategory, string>;
+
+/**
+ * 슬러그 → 말머리. 모르는 값은 `null`(호출부가 404를 낸다).
+ *
+ * ⚠ **역방향 판정을 호출부가 직접 짜지 않는다** — `parsePostId`·`safeNextPath`와 같은 이유다.
+ *   링크를 만드는 곳과 URL을 해석하는 곳이 갈리면 멀쩡한 페이지가 조용히 404가 된다.
+ */
+export function categoryFromSlug(slug: string): PostCategory | null {
+  for (const category of POST_CATEGORIES) {
+    if (POST_CATEGORY_SLUG[category] === slug) return category;
+  }
+  return null;
+}
+
 /** 목록 정렬 — 화면의 "최신 / 인기 / 댓글순"에 1:1 대응 */
 export const POST_SORTS = ["latest", "popular", "comments"] as const;
 export type PostSort = (typeof POST_SORTS)[number];
@@ -65,6 +96,17 @@ export const POST_SORT_LABEL: Record<PostSort, string> = {
  *   `{category: undefined, sort}`와 `{sort}`가 같은 해시가 된다. 두 호출부가 다른 객체를
  *   넘겨도 먼저 등록된 queryFn이 이기므로, "전체"는 null 하나로 고정한다.
  */
+/**
+ * 쿼리스트링의 `?sort=` → 정렬.
+ *
+ * ⚠ **모르는 값은 404가 아니라 기본값(`latest`)이다.** 파라미터는 외부에서 임의로 붙을 수
+ *   있어(추적 파라미터·오타) 404를 양산하면 크롤 예산만 태운다. canonical이 정렬 없는 URL을
+ *   가리키므로 색인 문제도 생기지 않는다.
+ */
+export function parsePostSort(value: string | undefined): PostSort {
+  return POST_SORTS.includes(value as PostSort) ? (value as PostSort) : "latest";
+}
+
 export interface PostListFilters {
   /** null = 전체 */
   category: PostCategory | null;

@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { CornerDownRight } from "lucide-react";
 // ⚠ avatarUrl은 shared에 있다 — entities끼리 import할 수 없어서다(shared/config/avatar.ts 주석)
 import { avatarUrl } from "@/shared/config";
-import { cn, formatRelativeTime } from "@/shared/lib";
+import { cn, formatRelativeTime, useNowMs } from "@/shared/lib";
 import { Avatar, Icon } from "@/shared/ui";
 import type { Comment } from "../model/types";
 
@@ -20,6 +20,15 @@ interface CommentItemProps {
   onReply?: () => void;
   /** 삭제 — 내 댓글에만 전달한다 */
   deleteAction?: ReactNode;
+  /**
+   * 서버가 렌더한 시점의 시각(SSR 화면에서만 내려온다).
+   *
+   * ⚠ **없으면 첫 렌더가 절대시각이 되어 마운트 직후 상대시각으로 바뀐다** — 글자 폭이
+   *   달라 눈에 띄는 시프트가 된다. 서버 시각을 받아 첫 렌더부터 상대시각을 그리면
+   *   서버 HTML과 하이드레이션이 **같은 문자열**이라 시프트도 불일치도 없다.
+   *   (목록처럼 SSR하지 않는 화면은 마운트 후에 그려지므로 이 값이 필요 없다.)
+   */
+  serverNowMs?: number;
 }
 
 /**
@@ -29,6 +38,7 @@ interface CommentItemProps {
  * 댓글 좋아요는 DB에 데이터가 없어 렌더하지 않는다 — 동작을 발명하지 않는다.
  */
 export function CommentItem({
+  serverNowMs,
   comment,
   reply,
   isAuthor,
@@ -36,6 +46,9 @@ export function CommentItem({
   onReply,
   deleteAction,
 }: CommentItemProps) {
+  // ⚠ 렌더 중 시계를 읽지 않는다 — SSR HTML과 하이드레이션이 갈린다(format.ts 주석).
+  //   마운트 전에는 서버가 준 시각을 쓴다(위 serverNowMs 주석).
+  const nowMs = useNowMs() ?? serverNowMs ?? null;
   return (
     <li>
       <article
@@ -70,7 +83,7 @@ export function CommentItem({
                 dateTime={comment.createdAt}
                 className="ml-auto shrink-0 font-mono text-[10px] text-ink-faint"
               >
-                {formatRelativeTime(comment.createdAt)}
+                {formatRelativeTime(comment.createdAt, nowMs)}
               </time>
             </header>
 

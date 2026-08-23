@@ -23,14 +23,20 @@ function MetaDot() {
  * 링크로 감싼 리스트 행이므로 article 래퍼 없이 li만 쓴다.
  * 제목은 페이지 h1(커뮤니티) 바로 아래 계층이라 h2.
  *
- * ⚠ HOT 판정은 useNowMs(마운트 후 값)로 한다 — 렌더 중 Date.now()는 순수하지 않다.
- *   첫 프레임에는 배지가 없다가 마운트 직후 나타난다(하이드레이션 안전).
- * ⚠ formatRelativeTime은 아직 내부에서 시계를 읽는다. 목록이 클라이언트 쿼리로만 그려져
- *   SSR HTML이 항상 스켈레톤이라 안전할 뿐이다 — 서버 프리페치를 붙이면 이것도
- *   서버 기준 시각을 받아 HOT 판정과 **한 곳에서 함께** 전환해야 한다.
+ * ⚠ 렌더 중에 시계를 읽지 않는다 — HOT 판정도 상대시각도 `nowMs`를 받아 계산한다.
+ * ⚠ **`serverNowMs`가 없으면 SSR에서 두 곳이 시프트한다**: HOT 배지가 서버 HTML에 아예
+ *   없다가 마운트 직후 나타나고, 상대시각이 절대시각으로 그려졌다가 바뀐다.
+ *   목록이 SSR되므로 서버 시각을 받아 **첫 프레임부터 최종 모습**을 그린다.
  */
-export function PostCard({ post }: { post: PostListItem }) {
-  const nowMs = useNowMs();
+export function PostCard({
+  post,
+  serverNowMs,
+}: {
+  post: PostListItem;
+  /** 서버가 렌더한 시점의 시각 — 마운트 전 판정의 기준(PostDetailView와 같은 형태) */
+  serverNowMs?: number;
+}) {
+  const nowMs = useNowMs() ?? serverNowMs ?? null;
   const hot = nowMs !== null && isHotPost(post, nowMs);
 
   return (
@@ -69,7 +75,7 @@ export function PostCard({ post }: { post: PostListItem }) {
             <span className="min-w-0 truncate">{post.authorNickname}</span>
             <MetaDot />
             <time dateTime={post.createdAt} className="shrink-0">
-              {formatRelativeTime(post.createdAt)}
+              {formatRelativeTime(post.createdAt, nowMs)}
             </time>
             {isEdited(post) && (
               <>

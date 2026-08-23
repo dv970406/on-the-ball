@@ -14,9 +14,18 @@ export type {
   PostInsert,
   PostUpdate,
 } from "./model/types";
-export { POST_CATEGORIES, POST_SORTS, POST_SORT_LABEL } from "./model/types";
+export {
+  POST_CATEGORIES,
+  POST_SORTS,
+  POST_SORT_LABEL,
+  // ⚠ URL은 영구 계약이다 — 슬러그 판정은 categoryFromSlug가 단독으로 소유한다
+  POST_CATEGORY_SLUG,
+  categoryFromSlug,
+  parsePostSort,
+} from "./model/types";
 export { postKeys } from "./api/keys";
 export {
+  POST_LIST_LIMIT,
   POST_LIST_SELECT,
   POST_DETAIL_SELECT,
   buildPostListItem,
@@ -25,5 +34,5 @@ export {
 } from "./api/mappers";
 export { toPlainSummary, clamp } from "./lib/plain-summary";
 export { isHotPost, HOT_LIKE_THRESHOLD, HOT_WINDOW_MS } from "./lib/hot";
-export { usePostListQuery, usePostQuery, POST_LIST_LIMIT } from "./api/queries";
+export { usePostListQuery, usePostQuery } from "./api/queries";
 export { PostCard } from "./ui/post-card";

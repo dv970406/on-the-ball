@@ -4,10 +4,11 @@
 
 ## `@/shared/lib/format` (순수 함수 — 서버·클라 공용)
 - `formatCount` — 숫자 → `"28,412"`
-- `formatRelativeTime` — 과거 시각 → `"방금 전"`/`"3분 전"`/`"2시간 전"`/`"5일 전"`, 7일↑은 `"7월 30일"`, **해가 다르면 `"2025년 7월 30일"`**.
+- `formatRelativeTime(iso, nowMs)` — 과거 시각 → `"방금 전"`/`"3분 전"`/`"2시간 전"`/`"5일 전"`, 7일↑은 `"7월 30일"`, **해가 다르면 `"2025년 7월 30일"`**.
   - 연도를 붙이는 이유: 전에는 무조건 `"7월 30일"`이라 **작년 글이 올해 글과 구분되지 않았다**(`<time dateTime>`은 정확한데 화면 텍스트만 거짓말).
-  - ⚠ **내부에서 `Date.now()`·`new Date()`를 쓴다.** 그런데 실제 호출부(`post-card.tsx`·`post-detail-view.tsx`·`comment-item.tsx`)는 이 함수를 **렌더 중에** 부른다 — 목록·상세가 전부 클라이언트 쿼리라 **SSR HTML이 항상 스켈레톤이어서** 지금은 안전할 뿐이다. 서버 프리페치를 붙이는 순간 깨진다(`data-and-state.md` 하이드레이션 절).
-  - ⚠ HOT 판정은 이미 `useNowMs`(마운트 후 값)로 옮겨졌는데 이 함수만 아직 직접 시계를 읽는 **비대칭 상태**다. 프리페치를 붙일 때는 `entities/post/lib/hot.ts` 주석대로 **두 곳을 함께** "서버 기준 시각 주입"으로 바꾼다. 한쪽만 고치면 같은 카드 안에서 기준 시각이 갈린다.
+  - ⚠ **`nowMs`를 인자로 받는다**(`isHotPost`와 같은 형태·같은 이유). 렌더 중에 시계를 읽으면 서버 렌더와 하이드레이션이 다른 값을 만든다 — 상세·목록이 모두 SSR이라 실제로 깨진다. 호출부는 `useNowMs()`를 그대로 넘긴다.
+  - ⚠ **SSR 화면에서는 서버 시각을 흘려보낸다** — `useNowMs() ?? serverNowMs`. 안 그러면 첫 렌더가 절대시각이었다가 바뀌며 **시프트**한다(글 상세가 실제로 그랬다).
+  - ⚠ **`nowMs`가 `null`이면 절대시각을 돌려준다**(연도 포함). 기준 시각 없이 상대시각을 추측하면 그 순간이 불일치다. 연도를 빼는 쪽이 거짓이 될 수 있어, 모를 때는 붙이는 쪽으로 기운다.
 
 ## `@/shared/lib` (배럴 — 클라이언트 훅 포함)
 - `cn` — Tailwind 클래스 병합
@@ -65,18 +66,22 @@
 ## `@/entities/post` · `@/entities/comment`
 - `postKeys` / `commentKeys` — 쿼리 키. 낙관적 업데이트가 prefix 매칭에 의존하므로 계층을 지킨다.
 - `usePostListQuery` / `usePostQuery` / `useCommentListQuery`
+- **`buildCommentListQuery(supabase, postId)`** — 댓글 목록 조립의 단일 소스(`entities/comment/api/list-query.ts` — 서버 안전). ⚠ 상수만 공유하고 `order`를 서버·훅이 각자 적으면 어긋날 자리가 남는다 — **정렬까지 이 함수가 소유한다.**
 - `POST_LIST_LIMIT` / `COMMENT_LIST_LIMIT` — 목록 상한. **화면이 잘림을 안내해야 한다** — 조용히 자르면 그 뒤 항목은 URL을 아는 사람 말고는 도달할 방법이 없다.
 - `POST_LIST_SELECT` / `POST_DETAIL_SELECT` / `COMMENT_SELECT` — PostgREST select 문자열의 단일 소스.
   - ⚠ **아바타(`avatar_path`)는 상세·댓글에만 있고 목록에는 일부러 없다** — 목록 카드에 아바타 자리가 없어서다(프로토타입). 누락이 아니니 되넣지 말 것. 그래서 임베딩도 `AUTHOR_EMBED`(목록)와 `AUTHOR_EMBED_DETAIL`(상세)로 갈라져 있다.
   - ⚠ **여기에 profiles 컬럼을 추가하면 `features/update-profile`의 무효화 대상도 함께 늘려야 한다.** 프로필을 바꿔도 이 캐시는 저절로 갱신되지 않아 옛 값이 남는다.
 - `buildPostListItem` / `buildPostDetail` / `buildComment` — row(snake) → 도메인(camel).
 - `isEdited` — `created_at !== updated_at` 판정("수정됨" 표시).
+- **`POST_CATEGORY_SLUG` / `categoryFromSlug(slug)` / `parsePostSort(value)`** — 말머리 ↔ URL 슬러그, 정렬 문자열 해석. **역방향 판정을 호출부가 직접 짜지 말 것** — 링크를 만드는 곳과 URL을 해석하는 곳이 갈리면 조용히 404가 난다(`parsePostId`·`safeNextPath`와 같은 이유). ⚠ **슬러그 값은 영구 계약이다** — 바꾸면 기존 링크와 색인이 깨진다. ⚠ 모르는 슬러그는 `null`(호출부가 404), 모르는 정렬은 **기본값 폴백**이다(파라미터 오염이 404를 양산하면 안 된다).
+- **`buildPostListQuery(supabase, { category, sort })`** — 목록 쿼리 조립의 단일 소스(`api/list-query.ts` — 서버 안전). 훅과 SSR 페이지가 **같은 함수**를 부른다. ⚠ 서버가 정렬·상한·select를 다시 짜면 하이드레이션 직후 목록이 재배열된다. ⚠ 필터 객체는 **훅과 키가 하나도 더도 덜도 아니어야** 한다 — `postKeys.list`가 그대로 해시하므로 하나만 달라도 `initialData`가 캐시에 닿지 못한다.
+- **`POST_LIST_LIMIT`은 `api/mappers.ts`에 있다**(`api/queries.ts`는 `"use client"`라 서버가 못 읽는다). `COMMENT_LIST_LIMIT`·`SURVEY_LIST_LIMIT`도 같은 이유로 같은 자리다.
 - **`POST_CATEGORIES` / `POST_SORTS` / `POST_SORT_LABEL`** — 말머리·정렬의 단일 소스. 말머리는 **DB의 `post_category` enum에서 생성된 타입**이라 목록을 손으로 다시 적지 않는다(`Record<PostCategory, ...>` 맵이 값 추가 시 누락을 컴파일 에러로 잡아준다).
 - **`isHotPost(post, nowMs)` / `HOT_LIKE_THRESHOLD` / `HOT_WINDOW_MS`** — HOT 배지 판정. **`nowMs`를 인자로 받는 이유**가 규약이다 — 매퍼에 넣으면 순수·서버 안전이 깨지고 같은 행이 호출 시점마다 달라진다. 호출부는 `useNowMs`를 넘긴다.
 - **`toPlainSummary` / `clamp`** — 마크다운 원문 → 기호를 걷어낸 요약. 목록 카드의 `excerpt`와 `og:description`이 **같은 변환기**를 쓴다.
 - **`buildCommentThreads`** — 평면 댓글 배열 → 깊이 1 스레드(`CommentThread`). 답글 정렬·부모 매칭을 화면에서 다시 짜지 않는다.
 - `PostCard` / `CommentItem` — 목록 아이템 UI.
-- 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/keys`·`lib/plain-summary`·`lib/hot`을 직접 import.
+- 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/keys`·`api/list-query`·`lib/plain-summary`·`lib/hot`을 직접 import.
 
 ## `@/entities/poll`
 - `usePollQuery(postId, userId)` — 글에 딸린 투표. 없으면 `null`(투표 없는 글이 대부분이라 정상값이다).
@@ -92,6 +97,33 @@
 ## `@/features/cast-poll-vote`
 - `PollVote` — `PollBlock`에 세션과 뮤테이션을 붙인 컴포넌트. ⚠ 세션 `status`를 **3분기**한다(`loading`을 비로그인과 같이 다루면 콜드 로드 직후 로그인 사용자가 로그인 화면으로 튄다 — `LikeButton`·`CommentBar`와 판정을 맞춘다).
 - ⚠ 투표하기에는 **RPC가 없다.** 집계 컬럼이 없어 지킬 불변조건이 행 하나뿐이라 잠금이 필요 없다. 다만 **PostgREST upsert도 쓰지 않는다** — payload 전 컬럼에 UPDATE 권한을 요구해서 `post_id`를 열게 되고, 그러면 표를 다른 글로 옮겨 "취소 불가"가 뚫린다.
+
+## `@/entities/survey`
+- `useSurveyListQuery(userId, enabled, initialData)` / `useSurveyQuery(id, userId, enabled, initialData)` / `useSurveyResultsQuery(id, userId, enabled, initialData)` — 목록 · 단건 · 집계.
+  - ⚠ `initialData`는 **서버 프리페치의 결과**다. 넘길 때는 **키의 `userId`도 서버가 준 값**이어야 하고 `enabled`도 함께 열어야 한다 — 하나라도 어긋나면 서버가 그린 HTML을 첫 프레임에 스켈레톤이 덮는다(실측). 사유는 `nextjs.md`.
+- `surveyKeys` / `SURVEY_LIST_LIMIT` / `Survey` · `SurveyListItem` · `SurveyResult` / `SurveyCard` · `SurveyBlock`.
+- **`buildSurveyListQuery(supabase)`** — 목록 쿼리 조립의 단일 소스(`api/list-query.ts` — 서버 안전). 훅과 SSR 페이지가 **같은 함수**를 부른다(`buildPostListQuery`와 같은 규약·같은 이유).
+- ⚠ **`entities/poll`과 합치지 않았다.** 부모가 다르고(글에 딸림 ↔ 독립) 목록 계층 유무도 다르다. 무엇보다 entities끼리는 import할 수 없어 `PollBlock`을 재사용하는 길 자체가 없다 — 3번째 소비자가 생기면 그때 `shared/ui`로 올린다(`code-quality.md`의 공용화 기준).
+- ⚠ **키를 `userId`로 스코프한다 — 목록까지 그렇다.** 카드의 "참여 완료"가 `survey_vote` 임베딩("내 행만")에서 오므로 목록 응답 자체가 "나"에 종속된다. `pollKeys`·`blockKeys`와 같은 이유.
+- ⚠ **참여자 수를 목록에서 그리지 않는다.** 득표수 컬럼이 없어 집계는 `survey_results`를 거쳐야 하는데 그건 참여자에게만 열린다 — 목록에서 부르면 미참여자에게 0이 나가 화면이 거짓말을 한다.
+- **`isSurveyOpen(survey, nowMs)`** — 마감 판정. ⚠ `nowMs`를 인자로 받는 이유가 규약이다(`isHotPost`와 같다). 호출부는 `useNowMs()`를 넘기고 **`null`은 "아직 판정 전"** 으로 다룬다 — `false`로 접으면 첫 프레임에 멀쩡한 서베이가 마감으로 보인다. ⚠ 이 판정은 안내일 뿐이고 실제 차단은 `survey_is_open` 정책이 한다.
+- ⚠ `SurveyBlock`은 **제목을 렌더하지 않는다**(`PollBlock`과 갈리는 유일한 지점). 서베이는 `title`이 곧 화면의 `h1`이라 뷰가 소유한다.
+- **`SplitCard` / `splitCount(options)`** — 선택지를 **면적으로 등분한** 분할 카드와 그 판정.
+  - ⚠ **`splitCount`가 "분할 카드로 그릴 문항인가"를 단독으로 소유한다.** 목록과 상세가 같은 `SurveyVote`를 공유하므로 판정 지점이 하나뿐인데, 그 하나를 함수로 둬야 새 소비자가 생겨도 답이 갈리지 않는다. 판별자는 `bg_color`의 유무이고, layout enum을 두지 않은 이유는 `api-and-db.md`에.
+  - ⚠ 도형(clip-path·텍스트 앵커·이름 크기)은 `lib/split-layout`이 **한 곳에서** 내려준다. 흩어지면 선택지 수를 늘렸을 때 조용히 어긋난다.
+  - ⚠ **3분할은 아래 두 팔이 좌우 변(83.33%)에 닿는다.** 바닥 모서리로 보내면 하단이 큰 삼각형이 되어 면적은 1/3인데도 화면을 지배한다. 접합점 y와 팔 높이는 **합이 4/3이면** 등분되는데 (50%, 83.33%)가 하단을 얕은 띠로 만든다.
+  - ⚠ **세 도형의 접합점은 전부 카드 정중앙이다** — `VsBadge`가 그 불변식에 기대어 위치를 고정한다. 폴리곤을 고칠 때 깨면 배지가 시임에서 떨어진다.
+  - ⚠ clip-path는 **완성된 클래스 문자열**이라야 한다(Tailwind 스캐너). 사유는 `styling.md`.
+  - ⚠ **면 배경은 `image_path` > `bg_color` 순이다.** 이미지가 있어도 색을 지우지 않고 아래에 깔아 둔다 — 이미지가 아직 안 왔거나 실패하면 면이 투명해져 카드가 깨진다. 사진 위에는 `text_color`에 맞춘 스크림을 덮어 최소 대비를 남긴다.
+- 서버에서는 배럴 대신 `model/types`·`api/keys`·`api/mappers`를 직접 import.
+
+## `@/features/cast-survey-vote`
+- `SurveyVote` — `SurveyBlock`에 세션과 뮤테이션을 붙인 컴포넌트. 조회는 `@/entities/survey`다(`PollVote`와 같은 분업).
+- ⚠ 세션 `status`를 **3분기**한다(`loading`을 비로그인과 같이 다루면 콜드 로드 직후 로그인 사용자가 로그인 화면으로 튄다).
+- ⚠ **비로그인에게도 선택지를 연결한다** — 눌러야 로그인 팝업이 뜬다. 읽기 전용으로 두면 "왜 안 눌리지"가 되고 별도 안내 링크를 다시 붙여야 한다. 읽기 전용은 마감된 서베이뿐이다.
+- ⚠ **팝업(`Dialog`)은 이 컴포넌트가 아니라 뷰가 소유한다**(`onSignInRequired` 콜백으로 올린다). `Dialog`는 `absolute`라 `TabScrollArea`의 relative 스크롤 영역 안에 두면 스크롤한 만큼 화면 밖에 뜨고, 목록에는 카드 수만큼 생긴다 — `ToastViewport`를 루트에 하나만 두는 것과 같은 이유다.
+- ⚠ **무효화 대상이 `cast-poll-vote`보다 하나 많다** — 목록 카드가 "참여 완료"를 표시하므로 `surveyKeys.lists()`도 함께 지운다. 빼면 참여하고 목록으로 돌아왔을 때 배지가 갱신되지 않는다.
+- ⚠ 참여하기에는 **RPC가 없고 PostgREST upsert도 쓰지 않는다** — 사유는 `cast-poll-vote`와 같다(집계 컬럼이 없어 잠금이 불필요하고, upsert는 `survey_id` UPDATE 권한을 요구해 "취소 불가"를 뚫는다).
 
 ## `@/entities/block`
 - `useBlockedUsersQuery(userId)` / `blockKeys` / `BlockedUser` — 내가 차단한 사람 목록. (select 문자열과 매퍼는 슬라이스 내부다 — 배럴에 올리면 호출부가 0인 export가 되어 `check:conventions`가 막는다.)
@@ -121,14 +153,17 @@
 
 ## `@/shared/config`
 - `ROUTES` — 경로 헬퍼. **경로 문자열 하드코딩 금지**(`"/posts"` ❌ → `ROUTES.postList`).
+- **`isTabBarRoute(pathname)` / `activeTabHref(pathname)`** — 하단 탭바를 그리는 화면인지와 그때 활성인 탭. **정확 일치 배열로 되돌리지 말 것** — 말머리 목록(`/posts/category/…`)이 생기면서 값이 유한하지 않게 됐고, 빠뜨리면 그 화면에서 **탭바가 사라지고 토스트가 탭바 자리로 내려간다.** 탭바(`widgets`)와 토스트(`shared/ui`)가 이 둘만 본다.
 - `signInWithNext(pathname)` / `withNext(path, next)` — 복귀 경로를 붙인 URL. proxy(서버 가드)와 클라 가드가 **같은 형태**를 만들어야 하므로 여기로 모았다.
 - **`safeNextPath(next, origin)`** — `?next=` 값을 앱 내부 경로로만 통과시킨다. **직접 문자열 검사를 짜지 말 것** — `startsWith("/") && !startsWith("//")`로는 `/\evil.com`도 `/..//evil.com`도 못 막는다(둘 다 실제로 뚫렸다).
-- `COLOR` — JS 인라인 style용 색 상수. **토큰 hex 하드코딩 금지**. (`shared/ui/live-status-pill.tsx`가 `COLOR.ink`를 쓴다)
+- `COLOR` — JS 인라인 style용 색 상수. **토큰 hex 하드코딩 금지**. 클래스로 확정할 수 없는 자리(런타임 색과의 비교·인라인 세그먼트 색)에서 쓴다 — 현역 선례는 `shared/ui/ratio-bar.tsx`·`entities/survey/ui/split-card.tsx`.
 - **`OAUTH_PROVIDERS` / `OAUTH_PROVIDER_LABEL`** — 지원 소셜 프로바이더의 단일 소스. `supabase/config.toml`의 `[auth.external.*]`와 갈리면 안 된다. ⚠ `shared`에 있는 이유는 로그인(`features/sign-in`)과 계정 연결(`features/link-identity`)이 같은 목록을 써야 하는데 features끼리는 import할 수 없어서다.
 - **`avatarUrl(path)` / `AVATAR_BUCKET`** — 아바타 **경로** → 공개 URL. ⚠ DB에는 전체 URL이 아니라 경로만 저장한다(호스트가 환경마다 다르다: 로컬 `127.0.0.1:64321` ↔ 원격 `*.supabase.co`). 조립은 이 함수 한 곳에서만. `shared`에 있는 이유는 `OAUTH_PROVIDERS`와 같다 — entities 셋이 함께 쓴다. 버킷명 문자열도 여기서 가져다 쓴다(`features/update-profile`이 선례).
+- **`publicStorageUrl(bucket, path)`** — 공개 버킷 경로 → URL 조립의 **단일 소스**. 새 공개 버킷이 생기면 여기에 붙인다(버킷별 함수는 이 함수를 감싸기만 한다).
+- **`surveyImageUrl(path)`** — 서베이 면 배경 경로 → URL. ⚠ 버킷명 상수는 **배럴에 없다**(TS 호출부가 0이라 올리지 않았다) — 필요하면 `@/shared/config/survey-image` 직접 경로. ⚠ 이 버킷은 **쓰기 정책이 없다**(운영진 문항과 같은 취급) — 파일은 `scripts/upload-survey-images.mjs`가 service_role로 올린다.
 - **`postImageUrl(path)` / `POST_IMAGE_BUCKET`** — 본문 이미지 경로 → 공개 URL.
   ⚠ **아바타와 달리 결과(전체 URL)가 그대로 `post.content`에 들어간다.** 본문은 사용자가 외부 주소도 적을 수 있는 자유 텍스트라 경로 규약을 강제할 자리가 없다 — 사유는 `api-and-db.md`의 "본문 이미지는 URL을 본문에 담는다" 절에 있다.
-  ⚠ `avatarUrl`과 조립 한 줄이 겹치지만 **일반화하지 않았다**(중복 2회 · 버킷 상수도 따로다). 세 번째 버킷이 생기면 `publicStorageUrl(bucket, path)`로 묶는다.
+  ⚠ 조립 자체는 `publicStorageUrl`이 한다. **이 함수만 결과(전체 URL)가 DB에 들어간다** — 본문은 자유 텍스트라 경로 규약을 강제할 자리가 없다.
 - **`env`** — `NEXT_PUBLIC_*` 환경변수의 단일 소스(`supabaseUrl`·`supabaseAnonKey`·`siteUrl`). **`process.env`를 호출부에서 다시 읽지 말 것** — `proxy.ts`가 화면·훅과 같은 값을 봐야 판정이 갈리지 않는다.
   - `siteUrl`은 `og:image`를 절대 URL로 만드는 `metadataBase`(루트 layout)용이다. `NEXT_PUBLIC_SITE_URL` → `VERCEL_URL` → `localhost:3000` 순으로 폴백한다.
 - **`isSupabaseConfigured()`** — env가 채워졌는지. 값이 비어도 빌드는 성공해야 하므로 `env`는 throw하지 않는다 → **가드는 호출부의 책임**이고, 그 가드를 각자 짜지 말고 이걸 쓴다(`proxy.ts`가 선례).
@@ -136,19 +171,20 @@
 ## `@/shared/ui`
 **현역(게시판 v2가 실제로 쓰는 것)** — 새로 만들기 전 여기부터 확인:
 `Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·`Markdown`·
-`Chip`·`ActionChip`·`actionChipClassName`·`Dialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`·`RatioBar`
+`Chip`·`chipClassName`·`ActionChip`·`actionChipClassName`·`Dialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`·`RatioBar`
 
 **현재 미사용** — **"검증된 현역"으로 오인하지 말 것**:
 `TabHeader`·`Flag`·`Shirt`·`SectionHead`·`LiveDot`·`LiveStatusPill`·`NightCard`·`PlayerSilhouette`
 (전부 `docs/legacy/v1-inventory.md`가 보존 대상으로 명시한 v1 자산이다. `MarkdownEditor`는 v2에서 만들었다가 쓰이지 않아 **배럴에서 뺐다** — 파일은 남아 있다)
 
-⚠ 위 v1 자산은 **실측상 번들에 실리지 않는다**(프로덕션 청크에서 9종 전량 0건). 다만 그건 각 모듈이 순수해서이지 "배럴이라 공짜"여서가 아니다 — 서드파티 의존을 끌고 오는 무거운 모듈은 `sideEffects` 선언이 없으면 그대로 실린다(`architecture.md`의 트리셰이킹 절).
+⚠ 위 v1 자산은 **실측상 번들에 실리지 않는다**(위 미사용 목록 전량이 프로덕션 청크에서 0건). 다만 그건 각 모듈이 순수해서이지 "배럴이라 공짜"여서가 아니다 — 서드파티 의존을 끌고 오는 무거운 모듈은 `sideEffects` 선언이 없으면 그대로 실린다(`architecture.md`의 트리셰이킹 절).
 
 > ⚠ 이 두 목록은 **실사용 여부로만 판정한다** — 손으로 세지 말고 **`pnpm check:conventions`** 를 돌린다(호출부 0인 export를 전수로 뽑아 준다).
 > **이 문서의 존재 이유가 "새로 만들기 전 확인"이라 목록이 틀리면 문서가 없느니만 못하다.** UI를 추가·제거하면 여기부터 고친다.
 
 - `Markdown` — 마크다운 렌더(GFM). `"use client"` **없음** — 서버 렌더 가능.
 - `Chip` — 말머리 칩. **`rounded-sm`(6px)** 이다 — 칩이라고 알약이 아니다(`styling.md` 예외 목록 참고).
+- `chipClassName(selected)` — 위 칩의 클래스만. 목록의 말머리 레일은 **이동**이라 `<Link>`에 이 클래스를 입히고(`Link` 안에 `button`을 넣지 않는다), 작성 폼은 **선택**이라 `Chip`(`button`)을 그대로 쓴다. 분리 사유는 `Button`↔`buttonClassName`과 같다.
 - `ActionChip` / `actionChipClassName` — 좋아요·댓글 카운터 칩. 클래스 함수가 분리된 이유는 `Button`↔`buttonClassName`과 같다 — 비로그인 좋아요는 `Link`로 렌더해야 하는데 `Link` 안에 `button`을 넣을 수 없어 **클래스만** 필요하다.
 - `Dialog` / `Sheet`(+`SheetItem`) — 확인 대화상자 / 하단 시트. 포커스 가둠은 `@/shared/lib`의 `useFocusTrap`.
   - `Sheet`는 화면 하단에 붙는 **edge-to-edge** 시트다(`styling.md`). "닫기" 행을 두지 않는다.

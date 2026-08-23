@@ -33,6 +33,9 @@ const DEEP_IMPORT_ALLOWED = new Set([
   "@/shared/lib/format",
   "@/shared/lib/post-id",
   "@/shared/lib/text",
+  "@/entities/post/api/list-query",
+  "@/entities/survey/api/list-query",
+  "@/entities/comment/api/list-query",
   "@/entities/post/lib/plain-summary",
   "@/entities/post/lib/hot",
   "@/entities/session/lib/auth-error-message",
@@ -49,7 +52,7 @@ const DEEP_IMPORT_ALLOWED_ENTITY_SUFFIX = ["model/types", "api/mappers", "api/ke
  */
 const DOCUMENTED_UNUSED = new Map([
   // reuse.md `@/shared/ui`의 "현재 미사용" 목록. 실측상 번들에 실리지 않는다
-  // (미사용 컴포넌트 9종 전량이 프로덕션 청크에서 0건) — 다만 그건 각 모듈이
+  // (아래 목록 전량이 프로덕션 청크에서 0건) — 다만 그건 각 모듈이
   // 순수해서이지 "배럴이라 공짜"여서가 아니다. 근거는 architecture.md의 트리셰이킹 절.
   ["TabHeader", "v1 자산 (reuse.md 미사용 목록)"],
   ["Flag", "v1 자산 (reuse.md 미사용 목록)"],
@@ -76,7 +79,7 @@ const DOCUMENTED_UNUSED = new Map([
 /** styling.md가 못박은 예외 위치. 여기 없는 파일에 나타나면 실패한다. */
 const STYLE_ALLOWED = {
   "rounded-full": [
-    // 알약 예외 4곳
+    // 알약 예외 — 아래 목록이 전부다
     "src/shared/ui/action-chip-class.ts",
     "src/views/post-detail/ui/comment-bar.tsx",
     "src/views/post-list/ui/post-list-view.tsx",
@@ -95,6 +98,8 @@ const STYLE_ALLOWED = {
     "src/entities/post/ui/post-card.tsx",
     // "대상이 아닌 것" — 바텀시트 그래버(드래그 어포던스, 클릭 대상이 아니다)
     "src/shared/ui/sheet.tsx",
+    // "대상이 아닌 것" — 분할 카드의 VS 배지(aria-hidden 장식, 컨트롤이 아니다)
+    "src/entities/survey/ui/vs-badge.tsx",
   ],
   // 그림자는 "떠 있는 레이어"만 — resting 카드·목록·헤더는 flat + 1px 헤어라인
   "shadow-": [

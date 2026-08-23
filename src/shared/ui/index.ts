@@ -19,6 +19,8 @@ export { EmptyState } from "./empty-state";
 export { TextField } from "./text-field";
 // 커뮤니티 화면 — 말머리 칩 / 카운터 액션 칩 / 오버레이 3종
 export { Chip } from "./chip";
+// 순수 함수라 Link 등 button이 아닌 요소에서도 같은 외형을 재사용한다 (buttonClassName과 같은 이유)
+export { chipClassName } from "./chip-class";
 export { ActionChip } from "./action-chip";
 // 순수 함수라 Link 등 button이 아닌 요소에서도 같은 외형을 재사용할 수 있다 (buttonClassName과 같은 이유)
 export { actionChipClassName } from "./action-chip-class";

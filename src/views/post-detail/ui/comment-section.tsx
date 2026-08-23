@@ -15,6 +15,10 @@ import { useCommentDeletion } from "../model/use-comment-deletion";
 import type { ReplyTarget } from "../model/reply-target";
 
 interface CommentSectionProps {
+  /** 서버가 렌더한 시점의 시각 — 상대시각 시프트를 막는다(CommentItem 주석) */
+  serverNowMs?: number;
+  /** 서버 프리페치 결과 — 없으면 클라이언트가 조회한다(사유는 PostDetailView 주석) */
+  initialComments?: Comment[];
   postId: number;
   /** 글의 comment_count (DB 트리거가 관리하는 진실값 — 답글 포함 총합) */
   commentCount: number;
@@ -30,13 +34,18 @@ interface CommentSectionProps {
 }
 
 export function CommentSection({
+  serverNowMs,
+  initialComments,
   postId,
   commentCount,
   commentCountFetching,
   postAuthorId,
   onReply,
 }: CommentSectionProps) {
-  const { data: comments, isPending, isFetching, error, refetch } = useCommentListQuery(postId);
+  const { data: comments, isPending, isFetching, error, refetch } = useCommentListQuery(
+    postId,
+    initialComments,
+  );
   const user = useSessionStore((s) => s.user);
   const deletion = useCommentDeletion(postId);
   /** 답글이 달린 루트 댓글은 cascade로 남의 답글까지 지우므로 확인을 받는다 */
@@ -168,6 +177,7 @@ export function CommentSection({
             //   프로토타입(44px 고정)과 어긋나고, 깊이가 1뿐이라 계층을 표현할 이유가 적어서다.
             <Fragment key={comment.id}>
               <CommentItem
+                serverNowMs={serverNowMs}
                 comment={comment}
                 isAuthor={comment.userId === postAuthorId}
                 isMine={comment.userId === user?.id}
@@ -178,6 +188,7 @@ export function CommentSection({
               />
               {replies.map((reply) => (
                 <CommentItem
+                  serverNowMs={serverNowMs}
                   key={reply.id}
                   comment={reply}
                   reply

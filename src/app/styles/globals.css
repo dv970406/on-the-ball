@@ -54,7 +54,7 @@
   /* 애니메이션 */
   --animate-fade-up: fade-up 0.35s cubic-bezier(0.2, 0, 0, 1) both;
   --animate-otb-pulse: otb-pulse 1.6s ease-in-out infinite;
-  --animate-vs-pop: vs-pop 0.5s cubic-bezier(0.2, 0, 0, 1) both;
+  --animate-vs-pop: vs-pop 0.3s cubic-bezier(0.2, 0, 0, 1) both;
 
   @keyframes fade-up {
     from {
@@ -77,18 +77,17 @@
     }
   }
 
-  /* vs-pop: 중앙 absolute(translate -50%,-50%) 배치 요소 전용 */
+  /* vs-pop: 중앙 absolute(translate -50%,-50%) 배치 요소 전용.
+     ⚠ 목표값을 지나쳤다 되돌아오는 중간 키프레임을 두지 않는다 — 스케일이든 회전이든
+        오버슛은 바운스이고, 디자인 규약이 바운스·스프링을 금지한다(styling.md). */
   @keyframes vs-pop {
     0% {
       transform: translate(-50%, -50%) rotate(-12deg) scale(0.8);
       opacity: 0;
     }
-    60% {
-      transform: translate(-50%, -50%) rotate(-8deg) scale(1.1);
-      opacity: 1;
-    }
     100% {
       transform: translate(-50%, -50%) rotate(-12deg) scale(1);
+      opacity: 1;
     }
   }
 }

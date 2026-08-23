@@ -1482,6 +1482,319 @@ rollback to s;
 
 rollback to s29;
 
+-- ---------------------------------------------------------------------
+\echo ''
+\echo '=== 30. 서베이 (20260823000001) ==='
+\echo '    설계 요약: 운영진 문항이라 **앱에서 만들 수 있는 경로가 없다**(정책도 grant도 없다).'
+\echo '    유일한 생성 경로가 마이그레이션이므로 아래 insert 차단들이 그 성질을 지킨다.'
+\echo '    글에 딸린 투표(섹션 27)와 갈리는 점은 부모가 없다는 것뿐 — 나머지 규약은 같다.'
+
+-- 시드는 **superuser로** 넣는다. authenticated에는 survey·survey_option 권한이 아예 없다
+-- (그게 아래 검사들이 지키는 성질이다).
+savepoint s30;
+insert into public.survey (title) values ('가장 좋아하는 포지션은?') returning id as sid \gset
+insert into public.survey (title) values ('두 번째 서베이')         returning id as sid2 \gset
+insert into public.survey_option (survey_id, label, sort_order)
+values (:sid, '공격수', 1), (:sid, '미드필더', 2), (:sid, '수비수', 3);
+insert into public.survey_option (survey_id, label, sort_order)
+values (:sid2, '예', 1), (:sid2, '아니오', 2);
+select id as sopt1 from public.survey_option where survey_id = :sid  and sort_order = 1 \gset
+select id as sopt2 from public.survey_option where survey_id = :sid  and sort_order = 2 \gset
+select id as sopt_other from public.survey_option where survey_id = :sid2 and sort_order = 1 \gset
+
+\echo ''
+\echo '-- 30a. 문항은 앱에서 만들 수도 고칠 수도 없다 --'
+
+savepoint s; :login_alice
+\echo '[❌차단] 서베이를 직접 만든다 — 쓰기 정책도 grant도 없다'
+insert into public.survey (title) values ('내가 만든 서베이');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 진행 중인 서베이에 선택지를 끼워 넣는다 (섹션 27과 같은 성질)'
+insert into public.survey_option (survey_id, label, sort_order) values (:sid, '골키퍼', 4);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 질문 수정 — 던져진 표의 뜻이 바뀌면 안 된다'
+update public.survey set title = '바꿔치기' where id = :sid;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 선택지 수정'
+update public.survey_option set label = '바꿔치기' where id = :sopt1;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 서베이 통째로 삭제'
+delete from public.survey where id = :sid;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] sort_order 5 — 선택지 상한 4는 CHECK가 강제한다 (superuser도 못 넘는다)'
+insert into public.survey_option (survey_id, label, sort_order) values (:sid, '다섯째', 5);
+rollback to s;
+
+\echo ''
+\echo '-- 30a-2. 분할 카드 표현 컬럼 (subtitle · bg_color · text_color) --'
+
+savepoint s;
+\echo '[❌차단] bg_color만 지정 — 대비를 보장할 수 없으니 쌍이어야 한다'
+insert into public.survey_option (survey_id, label, sort_order, bg_color)
+values (:sid2, '반쪽 색', 3, '#171717');
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] text_color만 지정 — 반대 방향도 같다'
+insert into public.survey_option (survey_id, label, sort_order, text_color)
+values (:sid2, '반쪽 색', 3, '#ffffff');
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] hex가 아닌 색 이름'
+insert into public.survey_option (survey_id, label, sort_order, bg_color, text_color)
+values (:sid2, '색 이름', 3, 'red', '#ffffff');
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 3자리 축약 hex — 6자리만 받는다(클라이언트가 길이를 가정하지 않게)'
+insert into public.survey_option (survey_id, label, sort_order, bg_color, text_color)
+values (:sid2, '축약 hex', 3, '#fff', '#000000');
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 부제가 보이지 않는 문자뿐 (has_visible_char)'
+insert into public.survey_option (survey_id, label, sort_order, subtitle)
+values (:sid2, '빈 부제', 3, U&'\200B');
+rollback to s;
+
+savepoint s;
+\echo '[성공] 색 쌍 + 부제를 갖춘 정상 선택지'
+insert into public.survey_option (survey_id, label, sort_order, subtitle, bg_color, text_color)
+values (:sid2, '정상', 3, '부제입니다', '#171717', '#ffffff');
+rollback to s;
+
+\echo '[0 기대] **색이 일부 선택지에만 있는 서베이** — 분할 카드가 깨지는 유일한 경로다'
+\echo '         (한 서베이 안에서 전부 갖거나 전부 없거나는 행 간 제약이라 CHECK로 못 쓴다)'
+select count(*) from public.survey s
+ where exists (select 1 from public.survey_option o
+                where o.survey_id = s.id and o.bg_color is not null)
+   and exists (select 1 from public.survey_option o
+                where o.survey_id = s.id and o.bg_color is null);
+
+\echo '[0 기대] **선택지가 2개 미만인 서베이** — 하한 2의 유일한 보증이다'
+\echo '         (행 수는 CHECK로 셀 수 없어 이 검사가 마이그레이션 실수를 대신 잡는다)'
+select count(*) from public.survey s
+ where (select count(*) from public.survey_option o where o.survey_id = s.id) < 2;
+
+\echo ''
+\echo '-- 30b. 참여 --'
+
+savepoint s; :login_bob
+\echo '[성공] 첫 참여'
+insert into public.survey_vote (survey_id, user_id, option_id) values (:sid, :'bob', :sopt1);
+\echo '[1 기대] 내 표가 보인다'
+select count(*) from public.survey_vote where survey_id = :sid;
+\echo '[성공] 갈아타기 — option_id만 바꾼다'
+update public.survey_vote set option_id = :sopt2 where survey_id = :sid and user_id = :'bob';
+\echo '[t 기대] 갈아탄 선택지가 반영됐는가'
+select option_id = :sopt2 from public.survey_vote where survey_id = :sid and user_id = :'bob';
+rollback to s;
+
+savepoint s; :login_bob
+\echo '[❌차단] 남(alice) 명의로 참여'
+insert into public.survey_vote (survey_id, user_id, option_id) values (:sid, :'alice', :sopt1);
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[❌차단] 비로그인 참여 (정책이 to authenticated다)'
+insert into public.survey_vote (survey_id, user_id, option_id) values (:sid, :'bob', :sopt1);
+rollback to s;
+
+savepoint s; :login_bob
+insert into public.survey_vote (survey_id, user_id, option_id) values (:sid, :'bob', :sopt1);
+\echo '[❌차단] 한 사람 두 표 (복합 PK)'
+insert into public.survey_vote (survey_id, user_id, option_id) values (:sid, :'bob', :sopt2);
+rollback to s;
+
+savepoint s; :login_bob
+\echo '[❌차단] **다른 서베이의 선택지**로 참여 — 복합 FK가 막는다'
+insert into public.survey_vote (survey_id, user_id, option_id) values (:sid, :'bob', :sopt_other);
+rollback to s;
+
+savepoint s; :login_bob
+insert into public.survey_vote (survey_id, user_id, option_id) values (:sid, :'bob', :sopt1);
+\echo '[❌차단] 내 표를 **다른 서베이로 옮긴다** — "취소 불가"를 우회하는 경로다'
+\echo '         (컬럼 UPDATE 권한이 option_id 하나뿐이라 막힌다)'
+update public.survey_vote set survey_id = :sid2, option_id = :sopt_other
+ where survey_id = :sid and user_id = :'bob';
+rollback to s;
+
+savepoint s; :login_bob
+\echo '[❌차단] created_at을 실어 시각 위조 — insert grant 목록 밖이다'
+insert into public.survey_vote (survey_id, user_id, option_id, created_at)
+values (:sid, :'bob', :sopt1, now() - interval '1 year');
+rollback to s;
+
+savepoint s; :login_bob
+insert into public.survey_vote (survey_id, user_id, option_id) values (:sid, :'bob', :sopt1);
+\echo '[❌차단] 참여 취소 — DELETE 정책도 grant도 없다 (갈아타기만 된다)'
+delete from public.survey_vote where survey_id = :sid and user_id = :'bob';
+rollback to s;
+
+\echo ''
+\echo '-- 30c. 결과 게이팅 — 참여한 사람만 집계를 본다 --'
+
+savepoint s;
+:login_bob
+insert into public.survey_vote (survey_id, user_id, option_id) values (:sid, :'bob', :sopt1);
+
+\echo '[1 / 1 기대] 참여자(bob)에게는 집계가 열린다 (행 1개 · 1표)'
+select count(*) as rows, coalesce(sum(vote_count), 0) as votes from public.survey_results(:sid);
+
+:login_alice
+\echo '[0 기대] **미참여자(alice)에게는 0행** — 게이팅이 화면이 아니라 함수 안에 있다'
+select count(*) from public.survey_results(:sid);
+\echo '[0 기대] 남의 표는 애초에 보이지 않는다 (SELECT 정책이 "내 행만")'
+select count(*) from public.survey_vote;
+
+\echo '[성공] alice도 참여하면'
+insert into public.survey_vote (survey_id, user_id, option_id) values (:sid, :'alice', :sopt2);
+\echo '[2 / 2 기대] 집계가 열리고 두 사람의 표가 각각 잡힌다'
+select count(*) as rows, coalesce(sum(vote_count), 0) as votes from public.survey_results(:sid);
+
+\echo '[성공] alice가 bob과 같은 선택지로 갈아탄다'
+update public.survey_vote set option_id = :sopt1 where survey_id = :sid and user_id = :'alice';
+\echo '[1 / 2 기대] 집계가 따라 움직인다 — 행이 하나로 합쳐지고 총합은 그대로다'
+select count(*) as rows, coalesce(sum(vote_count), 0) as votes from public.survey_results(:sid);
+rollback to s;
+
+savepoint s;
+:login_anon
+\echo '[❌차단] 비로그인은 survey_results EXECUTE 권한 자체가 없다'
+select count(*) from public.survey_results(:sid);
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[3 기대] 다만 서베이와 선택지는 비로그인에게도 보인다 (참여만 로그인이 필요하다)'
+\echo '         ⚠ 시드에도 서베이가 있어 전체 개수는 세지 않는다 — 이 섹션이 만든 것만 본다'
+select (select count(*) from public.survey where id = :sid)
+     + (select count(*) from public.survey where id = :sid2)
+     + (select count(*) from public.survey_option where survey_id = :sid and sort_order = 1) as visible;
+\echo '[0 기대] survey_vote는 grant는 있지만 정책이 to authenticated라 0행이다'
+\echo '         (grant를 빼면 임베딩이 42501로 죽어 비로그인에게 서베이가 통째로 안 보인다)'
+select count(*) from public.survey_vote;
+rollback to s;
+
+\echo ''
+\echo '-- 30c-2. 면 배경 이미지 (image_path · survey-images 버킷) --'
+
+savepoint s;
+\echo '[❌차단] 경로 탈출 — `..`가 낀 경로는 URL 정규화로 남의 폴더를 가리킨다(아바타 실측 사례)'
+insert into public.survey_option (survey_id, label, sort_order, image_path)
+values (:sid2, '탈출', 3, '4/../9/x.png');
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 세그먼트 하나짜리 경로 (폴더가 survey id여야 한다)'
+insert into public.survey_option (survey_id, label, sort_order, image_path)
+values (:sid2, '한칸', 3, 'x.png');
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 전체 URL을 넣는다 — 컬럼은 **경로**만 담는다(호스트가 환경마다 다르다)'
+insert into public.survey_option (survey_id, label, sort_order, image_path)
+values (:sid2, 'URL', 3, 'http://127.0.0.1:64321/storage/v1/object/public/survey-images/4/x.png');
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 허용하지 않는 확장자'
+insert into public.survey_option (survey_id, label, sort_order, image_path)
+values (:sid2, 'svg', 3, '4/x.svg');
+rollback to s;
+
+savepoint s;
+\echo '[성공] 정상 경로'
+insert into public.survey_option (survey_id, label, sort_order, image_path)
+values (:sid2, '정상', 3, '4/messi.png');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 로그인 유저가 survey-images에 업로드 — 쓰기 정책이 없다'
+insert into storage.objects (bucket_id, name, owner) values ('survey-images', '4/hack.png', :'alice');
+rollback to s;
+
+\echo '    ⚠ **버킷 설정 자체가 방어선이다.** 이 버킷에는 쓰기 정책이 없어 앱에서 올릴 수'
+\echo '      없지만, service_role로 도는 배포 스크립트는 이 값만 통과하면 무엇이든 올린다.'
+\echo '      정책만 검사하면 크기·타입이 조용히 넓어져도 아무도 모른다(24c와 같은 이유).'
+\echo '[t/1048576/t 기대] 공개 · 1MiB 상한 · webp/jpeg/png만'
+select public                                                   as is_public,
+       file_size_limit,
+       allowed_mime_types @> array['image/webp','image/jpeg','image/png']
+         and array_length(allowed_mime_types, 1) = 3             as mime_exact
+  from storage.buckets where id = 'survey-images';
+
+\echo ''
+\echo '-- 30d. 기간(마감) — 쓰기만 막고 읽기는 열어 둔다 --'
+
+-- 마감된 서베이를 하나 만든다. ⚠ superuser라 created_at·closes_at을 직접 넣을 수 있다
+--   (authenticated에는 survey 쓰기 권한이 아예 없다).
+savepoint s;
+insert into public.survey (title, created_at, closes_at)
+values ('마감된 서베이', now() - interval '30 days', now() - interval '23 days')
+returning id as csid \gset
+insert into public.survey_option (survey_id, label, sort_order)
+values (:csid, '예', 1), (:csid, '아니오', 2);
+select id as copt1 from public.survey_option where survey_id = :csid and sort_order = 1 \gset
+select id as copt2 from public.survey_option where survey_id = :csid and sort_order = 2 \gset
+
+savepoint s2; :login_bob
+\echo '[❌차단] **마감된 서베이에 투표** — 이번 기능의 실제 방어선이다'
+insert into public.survey_vote (survey_id, user_id, option_id) values (:csid, :'bob', :copt1);
+rollback to s2;
+
+-- 마감 전에 던진 표가 있는 상황을 만든다(소유자로 넣어 정책을 지나지 않는다)
+insert into public.survey_vote (survey_id, user_id, option_id) values (:csid, :'bob', :copt1);
+
+savepoint s2; :login_bob
+\echo '[UPDATE 0 기대] 마감된 서베이에서 갈아타기 — using이 후보에서 빼 조용히 0행이 된다'
+update public.survey_vote set option_id = :copt2
+ where survey_id = :csid and user_id = :'bob';
+rollback to s2;
+
+savepoint s2; :login_bob
+\echo '[1 기대] 마감돼도 **내 표는 조회된다** (SELECT 정책에 만료를 걸지 않았다)'
+select count(*) from public.survey_vote where survey_id = :csid;
+\echo '[1 / 1 기대] 마감돼도 **참여자는 결과를 본다** (survey_results에도 걸지 않았다)'
+select count(*) as rows, coalesce(sum(vote_count), 0) as votes from public.survey_results(:csid);
+rollback to s2;
+
+savepoint s2; :login_alice
+\echo '[0 기대] 마감됐어도 미참여자에게는 여전히 0행 — 게이팅은 그대로다'
+select count(*) from public.survey_results(:csid);
+rollback to s2;
+
+savepoint s2; :login_bob
+\echo '[성공] 진행 중인 서베이에는 여전히 투표된다 (만료 조건이 과잉 차단하지 않는다)'
+insert into public.survey_vote (survey_id, user_id, option_id) values (:sid2, :'bob', :sopt_other);
+rollback to s2;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] closes_at이 created_at보다 앞선다 (CHECK)'
+insert into public.survey (title, created_at, closes_at)
+values ('거꾸로', now(), now() - interval '1 day');
+rollback to s;
+
+savepoint s;
+insert into public.survey (title) values ('기본 기간') returning id as dsid \gset
+\echo '[t 기대] 기본값이 created_at + 7일인가'
+select closes_at = created_at + interval '7 days' as seven_days
+  from public.survey where id = :dsid;
+rollback to s;
+
+rollback to s30;
+
 rollback;
 \echo ''
 \echo '=== 끝 (전체 rollback — DB에 흔적을 남기지 않는다) ==='

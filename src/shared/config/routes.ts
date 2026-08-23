@@ -9,6 +9,16 @@ export const ROUTES = {
   postNew: "/posts/new",
   post: (id: number | string) => `/posts/${id}`,
   postEdit: (id: number | string) => `/posts/${id}/edit`,
+  /**
+   * 말머리별 목록.
+   * ⚠ `/posts/[말머리]`로 둘 수 없다 — 그 자리는 이미 `/posts/[id]`(상세)가 쓴다.
+   *   `category` 정적 세그먼트가 충돌을 없앤다(Next가 정적 세그먼트를 먼저 맞춘다).
+   */
+  postCategory: (slug: string) => `/posts/category/${slug}`,
+
+  // 서베이 — 운영진이 등록하는 전 유저 대상 문항. 사용자가 만드는 화면이 없어 new/edit가 없다
+  surveyList: "/surveys",
+  survey: (id: number | string) => `/surveys/${id}`,
 
   // 인증 — 소셜 로그인은 로그인과 가입이 같은 동작이라 화면이 하나다
   signIn: "/sign-in",
@@ -17,15 +27,35 @@ export const ROUTES = {
 } as const;
 
 /**
- * **하단 탭바를 렌더하는 화면.** 탭바(`widgets/bottom-tab-bar`)와 토스트(`shared/ui/toast`)가
- * 이 목록을 함께 본다.
+ * **하단 탭바를 렌더하는 화면인가.** 탭바(`widgets/bottom-tab-bar`)와 토스트(`shared/ui/toast`)가
+ * 이 판정을 함께 본다.
  *
  * ⚠ 두 곳이 갈리면 조용히 어긋난다 — 전에는 토스트가 `pathname === ROUTES.postList`만 보고
  *   위치를 올렸는데 프로필에도 탭바가 생기면서 **토스트가 탭바를 덮었다.**
- *   탭을 추가·제거하면 여기만 고친다.
+ * ⚠ **배열 멤버십(정확 일치)이 아니라 함수다.** 말머리 목록(`/posts/category/…`)이 생기면서
+ *   값이 유한하지 않게 됐다 — 배열로 두면 새 말머리마다 행을 더해야 하고, 빠뜨리면
+ *   그 화면에서 탭바가 사라진다.
  * ⚠ `shared`에 있는 이유는 `OAUTH_PROVIDERS`와 같다 — `shared/ui`가 `widgets`를 import할 수 없다.
  */
-export const TAB_BAR_ROUTES: readonly string[] = [ROUTES.postList, ROUTES.profile];
+export function isTabBarRoute(pathname: string): boolean {
+  return activeTabHref(pathname) !== null;
+}
+
+/**
+ * 이 경로에서 **활성인 탭의 href** — 탭바가 없는 화면이면 `null`.
+ *
+ * ⚠ `pathname === tab.href` 정확 일치로 두면 말머리 목록에서 "커뮤니티" 탭이 비활성이 되고
+ *   `aria-current`까지 사라진다. 그렇다고 `/posts` 접두사로 넓히면 **글 상세(`/posts/1`)까지
+ *   딸려 들어온다** — 거기엔 탭바가 없다. 그래서 목록 경로만 명시적으로 센다.
+ */
+export function activeTabHref(pathname: string): string | null {
+  if (pathname === ROUTES.postList || pathname.startsWith("/posts/category/")) {
+    return ROUTES.postList;
+  }
+  if (pathname === ROUTES.surveyList) return ROUTES.surveyList;
+  if (pathname === ROUTES.profile) return ROUTES.profile;
+  return null;
+}
 
 /**
  * 로그인 후 원래 목적지로 돌려보내기 위한 `next` 파라미터를 붙인 로그인 경로.

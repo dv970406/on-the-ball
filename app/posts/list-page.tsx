@@ -1,0 +1,115 @@
+import { cache } from "react";
+import type { Metadata } from "next";
+import { unstable_rethrow } from "next/navigation";
+import { createSupabaseServerClient } from "@/shared/api/supabase-server";
+// ⚠ 배럴(@/entities/post)이 아니라 직접 경로 — 배럴은 "use client" 모듈을 포함한다.
+//   쿼리 조립과 매퍼를 클라이언트 훅과 **공유해야** 프리페치가 같은 목록을 만든다.
+import { buildPostListQuery } from "@/entities/post/api/list-query";
+import { buildPostListItem } from "@/entities/post/api/mappers";
+import type { PostCategory, PostListFilters, PostListPage, PostSort } from "@/entities/post/model/types";
+import { POST_CATEGORY_SLUG, parsePostSort } from "@/entities/post/model/types";
+import { ROUTES, env } from "@/shared/config";
+import { PostListView } from "@/views/post-list";
+
+/**
+ * 목록 두 라우트(`/posts`·`/posts/category/[slug]`)가 공유하는 서버 조립.
+ *
+ * ⚠ **두 라우트가 같은 화면이다.** 조회·메타데이터·canonical 규칙을 각자 짜면 한쪽만
+ *   고쳐지는 순간 색인 신호가 갈린다.
+ */
+
+interface ListPage {
+  /** 프리페치 결과 — 실패하면 undefined를 넘겨 클라이언트 조회로 폴백한다(nextjs.md) */
+  data?: PostListPage;
+  /**
+   * 이 목록을 읽은 시각.
+   * ⚠ 렌더 본문이 아니라 여기서 찍는다 — `react-hooks/purity`가 서버 컴포넌트에서도
+   *   렌더 중 `Date.now()`를 막고, 데이터를 읽은 순간과 같은 시각이라 뜻도 맞다.
+   */
+  nowMs: number;
+}
+
+/**
+ * ⚠ `cache()`로 감싼다 — 지금은 소비자가 `renderPostList` 하나라 필수는 아니지만,
+ *   **메타데이터를 동적으로 바꾸는 순간 요청당 2회가 된다.** 그때 잊지 않도록 미리 감싼다.
+ *   ⚠ 인자가 **원시값 둘**이어야 요청 안에서 같은 호출로 묶인다(객체를 넘기면 매번 새 키다).
+ */
+export const fetchPostList = cache(
+  async (category: PostCategory | null, sort: PostSort): Promise<ListPage> => {
+    // ⚠ 클라이언트 훅과 **정확히 같은 두 키**여야 `postKeys.list`의 해시가 맞는다.
+    //   키가 하나라도 다르면 initialData가 캐시에 닿지 못하고 스켈레톤으로 되돌아간다.
+    const filters: PostListFilters = { category, sort };
+    try {
+      const supabase = await createSupabaseServerClient();
+      if (!supabase) return { nowMs: Date.now() };
+
+      const { data, error } = await buildPostListQuery(supabase, filters);
+      if (error) return { nowMs: Date.now() };
+
+      return { data: { items: (data ?? []).map(buildPostListItem) }, nowMs: Date.now() };
+    } catch (e) {
+      // cookies()는 "이 라우트를 동적 렌더로 전환하라"는 Next 내부 에러를 throw해서 동작한다.
+      // 삼키면 페이지가 스켈레톤 상태로 정적 프리렌더되어 조용히 망가지므로 반드시 되던진다.
+      unstable_rethrow(e);
+      console.error("[posts] 목록 조회 실패:", e);
+      return { nowMs: Date.now() };
+    }
+  },
+);
+
+/**
+ * 말머리 페이지의 경로 — 전체는 `/posts`.
+ * ⚠ **경로 문자열을 여기서 짓지 않는다.** 화면의 말머리 레일(`PostListView`)이 링크를
+ *   만드는 곳과 canonical을 만드는 여기가 갈리면 조용히 어긋난다 → `ROUTES`가 단일 소스다.
+ */
+export function listPath(category: PostCategory | null): string {
+  return category === null
+    ? ROUTES.postList
+    : ROUTES.postCategory(POST_CATEGORY_SLUG[category]);
+}
+
+/**
+ * 목록 메타데이터.
+ *
+ * ⚠ **canonical에서 정렬을 항상 떨어뜨린다.** 정렬 변형은 같은 집합의 순서만 다른 중복이라
+ *   색인 대상이 아니다(구글 *Consolidate duplicate URLs*).
+ *   ⚠ `noindex`를 함께 걸지 않는다 — 상충 신호라 canonical 대상까지 색인에서 빠질 수 있다.
+ * ⚠ `openGraph`를 채우면 **`images`를 명시**한다 — 세그먼트가 openGraph를 직접 반환하면
+ *   루트 `opengraph-image.png` 자동 상속이 통째로 사라진다(글 상세에서 실측).
+ */
+export function listMetadata(category: PostCategory | null): Metadata {
+  const title = category === null ? "커뮤니티" : category;
+  const description =
+    category === null
+      ? undefined // 루트 layout의 소개 문구를 상속한다
+      : `온더볼 커뮤니티의 '${category}' 말머리 글 모음이에요.`;
+  const image = {
+    url: "/opengraph-image.png",
+    type: "image/png",
+    width: 1200,
+    height: 630,
+    alt: "온더볼 — 모든 축구팬들을 위한 커뮤니티",
+  };
+
+  return {
+    title,
+    description,
+    alternates: { canonical: listPath(category) },
+    openGraph: {
+      type: "website",
+      title,
+      description,
+      siteName: "온더볼",
+      url: new URL(listPath(category), env.siteUrl).toString(),
+      images: image,
+    },
+    twitter: { card: "summary_large_image", title, description, images: image },
+  };
+}
+
+/** 두 라우트가 같은 화면을 그린다 */
+export async function renderPostList(category: PostCategory | null, rawSort: string | undefined) {
+  const sort = parsePostSort(rawSort);
+  const { data, nowMs } = await fetchPostList(category, sort);
+  return <PostListView category={category} sort={sort} initialData={data} serverNowMs={nowMs} />;
+}

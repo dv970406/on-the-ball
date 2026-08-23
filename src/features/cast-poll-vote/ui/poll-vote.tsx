@@ -3,12 +3,22 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signInWithNext } from "@/shared/config";
-import { type Poll, PollBlock, usePollResultsQuery } from "@/entities/poll";
+import { type Poll, PollBlock, type PollResult, usePollResultsQuery } from "@/entities/poll";
 import { useSessionStore } from "@/entities/session";
 import { useCastPollVote } from "../model/use-cast-poll-vote";
 
 interface PollVoteProps {
   poll: Poll;
+  /**
+   * 서버가 본 로그인 사용자(상세가 SSR이라 함께 내려온다).
+   *
+   * ⚠ **집계 쿼리 키도 userId로 스코프된다.** 이미 투표한 사용자의 글이 SSR되면 첫 렌더에
+   *   `enabled`가 켜지는데, 그때 `undefined` 키로 쏘면 세션이 서고 나서 **같은 집계를 다시**
+   *   받는다(첫 응답은 아무도 안 읽는 키에 남는다). 복원 전까지 이 값을 쓰면 한 번으로 끝난다.
+   */
+  initialUserId?: string;
+  /** 서버가 미리 조회한 집계 — 참여했을 때만 온다(막대 시프트를 막는다) */
+  initialResults?: PollResult[];
 }
 
 /**
@@ -22,9 +32,11 @@ interface PollVoteProps {
  * ⚠ `!== "authenticated"`가 아니라 **`=== "guest"`로 판정한다** — 상태가 하나 늘면
  *   부정형만 그 새 상태를 조용히 게스트로 취급한다(`LikeButton`과 같은 형태).
  */
-export function PollVote({ poll }: PollVoteProps) {
+export function PollVote({ poll, initialUserId, initialResults }: PollVoteProps) {
   const status = useSessionStore((s) => s.status);
-  const userId = useSessionStore((s) => s.user?.id);
+  const storeUserId = useSessionStore((s) => s.user?.id);
+  // 세션 복원 전에는 서버가 알려준 사용자를 키로 쓴다(위 initialUserId 주석)
+  const userId = status === "loading" ? initialUserId : storeUserId;
   const pathname = usePathname();
   const castVote = useCastPollVote(poll.postId);
 
@@ -43,6 +55,7 @@ export function PollVote({ poll }: PollVoteProps) {
     poll.postId,
     userId,
     poll.myOptionId !== null && !castVote.isPending,
+    initialResults,
   );
   const results = resultsQuery.data ?? null;
   /**

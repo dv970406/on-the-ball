@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { cn, useToastStore } from "@/shared/lib";
-import { TAB_BAR_ROUTES } from "@/shared/config";
+import { isTabBarRoute } from "@/shared/config";
 
 /** 자동 소멸까지 — 프로토타입과 동일 */
 const TOAST_DURATION_MS = 1800;
@@ -19,7 +19,7 @@ const TOAST_DURATION_MS = 1800;
  *   전에는 목록 화면이 전역 스토어에 present를 올리는 방식이었는데, 경로로 판정하는 편이
  *   shared가 "탭바"라는 상위 도메인 개념을 모르게 되고 boolean 스토어가 화면 둘에서 서로
  *   덮어쓰는 문제도 없다.
- * ⚠ **판정 목록은 `TAB_BAR_ROUTES`가 단독으로 소유한다.** 여기서 `pathname === ROUTES.postList`로
+ * ⚠ **판정은 `isTabBarRoute`가 단독으로 소유한다.** 여기서 `pathname === ROUTES.postList`로
  *   직접 비교하던 시절, 프로필에도 탭바가 생기면서 **토스트가 탭바를 덮었다** — 두 곳이 같아야
  *   하는 규약은 상수 하나가 갖는다.
  */
@@ -27,7 +27,7 @@ export function ToastViewport() {
   const message = useToastStore((s) => s.message);
   const seq = useToastStore((s) => s.seq);
   const dismiss = useToastStore((s) => s.dismiss);
-  const aboveTabBar = TAB_BAR_ROUTES.includes(usePathname());
+  const aboveTabBar = isTabBarRoute(usePathname());
 
   useEffect(() => {
     if (!message) return;

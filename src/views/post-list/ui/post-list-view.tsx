@@ -2,39 +2,60 @@
 
 import { PenLine } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 import {
 	POST_CATEGORIES,
+	POST_CATEGORY_SLUG,
 	POST_LIST_LIMIT,
 	POST_SORT_LABEL,
 	POST_SORTS,
 	PostCard,
 	type PostCategory,
+	type PostListPage,
 	type PostSort,
 	usePostListQuery,
 } from "@/entities/post";
 import { ROUTES } from "@/shared/config";
 import { cn, formatCount } from "@/shared/lib";
-import { Chip, EmptyState, Icon } from "@/shared/ui";
+import { EmptyState, Icon, chipClassName } from "@/shared/ui";
 import { AppBar } from "@/widgets/app-bar";
 import { AuthStatus } from "@/widgets/auth-status";
 import { BottomTabBar } from "@/widgets/bottom-tab-bar";
 import { TabScrollArea } from "@/widgets/tab-scroll-area";
 import { PostListSkeleton } from "./post-list-skeleton";
 
-export function PostListView() {
-	// 필터·정렬은 **로컬 state**다. URL 쿼리로 두면 useSearchParams가 이 화면의 프리렌더를
-	// CSR로 떨어뜨린다(nextjs.md). 프로토타입도 화면 안 상태로 다룬다.
-	const [category, setCategory] = useState<PostCategory | null>(null);
-	const [sort, setSort] = useState<PostSort>("latest");
+interface PostListViewProps {
+	/** null = 전체. **URL이 소유한다** — 로컬 state가 아니다 */
+	category: PostCategory | null;
+	sort: PostSort;
+	/** 서버 프리페치 결과. 실패하면 undefined가 오고 클라이언트가 조회한다 */
+	initialData?: PostListPage;
+	/** 서버가 렌더한 시점의 시각 — HOT 배지·상대시각이 첫 프레임부터 그려지게 한다 */
+	serverNowMs?: number;
+}
 
-	const { data, isPending, isPlaceholderData, error, refetch } =
-		usePostListQuery({
-			category,
-			sort,
-		});
+/**
+ * 말머리·정렬을 **URL이 소유한다**(로컬 state였다).
+ *
+ * ⚠ 이유는 SEO다 — 칩이 `<button>`이면 크롤러가 따라갈 링크가 없어 **말머리별 페이지가
+ *   존재하지 않는 것과 같다**(구글 *Faceted navigation*: 필터 URL은 앵커로 링크돼야 한다).
+ * ⚠ 생 `<a>`가 아니라 `next/link`의 `<Link>`다 — 렌더 결과물이 `<a href>`라 크롤 요건을
+ *   충족하면서 프리페치·클라이언트 내비게이션을 함께 얻는다. 생 `<a>`면 매번 전체 리로드다.
+ * ⚠ 선택 표시는 `aria-pressed`가 아니라 **`aria-current="page"`** 다 — 토글 버튼의 상태가
+ *   아니라 "지금 이 링크의 페이지에 있다"이기 때문이다.
+ */
+export function PostListView({ category, sort, initialData, serverNowMs }: PostListViewProps) {
+	const { data, isPending, isPlaceholderData, error, refetch } = usePostListQuery(
+		{ category, sort },
+		initialData,
+	);
 
 	const posts = data?.items;
+
+	/** 기본 정렬에는 파라미터를 붙이지 않는다 — `?sort=latest`라는 중복 URL을 만들지 않는다 */
+	const hrefFor = (target: PostCategory | null, targetSort: PostSort) => {
+		const path = target === null ? ROUTES.postList : ROUTES.postCategory(POST_CATEGORY_SLUG[target]);
+		return targetSort === "latest" ? path : `${path}?sort=${targetSort}`;
+	};
 
 	return (
 		<>
@@ -43,65 +64,61 @@ export function PostListView() {
 				<AppBar leading={<AuthStatus />} />
 
 				{/*
-          ⚠ 화면 제목은 **sr-only**다. 첫 화면의 가장 값진 세로 공간(약 90px)을 "커뮤니티"
-            큰 제목과 "오늘 N개의 글이 올라왔어요"가 쓰고 있었는데, 둘 다 새 정보가 아니다 —
-            현재 탭은 하단 탭바가 이미 알리고, 오늘 글 수는 바로 아래 목록이 보여준다.
-            대신 문서 개요는 남겨야 하므로 제목 자체를 지우지는 않는다(글 작성·수정·프로필이
-            같은 처리를 한다).
+          ⚠ 화면 제목은 **sr-only**다. 첫 화면의 가장 값진 세로 공간(약 90px)을 큰 제목이
+            쓰고 있었는데 새 정보가 아니다 — 현재 탭은 하단 탭바가 이미 알린다.
+          ⚠ 다만 **말머리별 페이지에서는 이 제목이 그 페이지의 주제**라 SEO상 의미가 있다.
         */}
-				<h1 className="sr-only">커뮤니티</h1>
+				<h1 className="sr-only">{category === null ? "커뮤니티" : `${category} 글`}</h1>
 
 				{/*
           말머리 레일 — 가로 스크롤, 스크롤바 숨김.
           ⚠ 그룹 경계와 접근 가능한 이름이 필요하다. 없으면 스크린리더에 문맥 없는
-            토글 버튼 6개가 흩어져 들린다.
-          ⚠ role="radiogroup"이 의미상 더 정확하지만(단일 선택), 그러면 화살표 키 이동 +
-            roving tabindex까지 구현해야 규격에 맞는다. 그걸 갖추기 전까지는 키보드 모델을
-            거짓으로 알리지 않도록 group + aria-pressed를 유지한다.
-          ⚠ 상하 패딩이 비대칭이다(위 18px · 아래 12px). 헤더를 걷어내면서 이 레일이 스크롤
-            영역의 첫 요소가 됐는데, 12px 대칭으로 두면 스티키 앱바의 헤어라인에 칩이 붙어
-            두 영역이 한 덩어리로 읽힌다. 걷어낸 헤더의 pt와 같은 값이다.
+            링크 6개가 흩어져 들린다.
+          ⚠ 상하 패딩이 비대칭이다(위 18px · 아래 12px). 12px 대칭으로 두면 스티키 앱바의
+            헤어라인에 칩이 붙어 두 영역이 한 덩어리로 읽힌다.
         */}
-				<div
-					role="group"
+				<nav
 					aria-label="말머리"
 					className="no-scrollbar flex gap-1.5 overflow-x-auto px-5 pb-3 pt-4.5"
 				>
-					<Chip selected={category === null} onClick={() => setCategory(null)}>
+					<Link
+						href={hrefFor(null, sort)}
+						aria-current={category === null ? "page" : undefined}
+						className={chipClassName(category === null)}
+					>
 						전체
-					</Chip>
+					</Link>
 					{POST_CATEGORIES.map((item) => (
-						<Chip
+						<Link
 							key={item}
-							selected={category === item}
-							onClick={() => setCategory(item)}
+							href={hrefFor(item, sort)}
+							aria-current={category === item ? "page" : undefined}
+							className={chipClassName(category === item)}
 						>
 							{item}
-						</Chip>
+						</Link>
 					))}
-				</div>
+				</nav>
 
 				{/* 정렬 행 (그룹 경계·이름은 말머리 레일과 같은 이유) */}
-				<div
-					role="group"
+				<nav
 					aria-label="정렬"
 					className="flex items-center gap-3.5 border-b border-hairline-cool px-5 pb-2.5 pt-0.5"
 				>
 					{POST_SORTS.map((item) => (
-						<button
+						<Link
 							key={item}
-							type="button"
-							aria-pressed={sort === item}
-							onClick={() => setSort(item)}
+							href={hrefFor(category, item)}
+							aria-current={sort === item ? "page" : undefined}
 							className={cn(
 								"py-1.5 text-[12px] transition-colors duration-150 ease-otb",
 								sort === item ? "font-medium text-ink" : "text-ink-mute-2",
 							)}
 						>
 							{POST_SORT_LABEL[item]}
-						</button>
+						</Link>
 					))}
-				</div>
+				</nav>
 
 				{isPending && <PostListSkeleton />}
 
@@ -109,7 +126,6 @@ export function PostListView() {
           ⚠ 에러 화면은 **보여줄 데이터가 없을 때만** 띄운다.
             TanStack Query는 성공 후 리페치가 실패해도 data를 유지하므로, 조건을 나누지 않으면
             "글을 불러오지 못했어요" 박스와 정상 목록이 한 화면에 공존한다(모순된 화면).
-            앱의 다른 목록·상세도 같은 규약을 쓴다.
         */}
 				{error && !posts && (
 					<EmptyState
@@ -138,16 +154,15 @@ export function PostListView() {
 						icon={PenLine}
 						title="아직 글이 없어요"
 						description={
-							category === null
-								? "첫 글을 남겨보세요."
-								: `'${category}' 말머리의 글이 아직 없어요.`
+							category === null ? "첫 글을 남겨보세요." : `'${category}' 말머리의 글이 아직 없어요.`
 						}
 					/>
 				)}
 
 				{posts && posts.length > 0 && (
 					// 필터를 바꾸는 동안(placeholderData) 이전 목록이 남아 있다는 걸 은은하게 알린다.
-					// 스켈레톤으로 갈아치우면 레이아웃이 튄다.
+					// ⚠ 서버 프리페치가 있으면 isPlaceholderData는 false다 — 이 분기는 클라이언트
+					//   전환(리페치)에서만 돈다.
 					<ul
 						className={cn(
 							"transition-opacity duration-150 ease-otb",
@@ -155,7 +170,7 @@ export function PostListView() {
 						)}
 					>
 						{posts.map((post) => (
-							<PostCard key={post.id} post={post} />
+							<PostCard key={post.id} post={post} serverNowMs={serverNowMs} />
 						))}
 					</ul>
 				)}
@@ -177,7 +192,7 @@ export function PostListView() {
 
 			{/*
         플로팅 글쓰기 버튼 — **잉크 블랙**이다. 목록 화면의 컬러 이벤트는 0개다.
-        알약 형태는 "버튼 6px 라운드" 규칙의 명시적 예외 4곳 중 하나.
+        알약 형태는 "버튼 6px 라운드" 규칙의 명시적 예외 중 하나.
         Link 안에 Button을 넣지 않는다(<a> 안의 <button>) — 클래스만 재현한다.
       */}
 			<Link

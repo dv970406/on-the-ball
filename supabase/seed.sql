@@ -223,3 +223,117 @@ select id, '11111111-1111-4111-8111-111111111111'::uuid, 'etc'
   from public.post
  where title = '어제 후반 교체 타이밍은 좀 아쉬웠다'
 on conflict do nothing;
+
+-- ---------------------------------------------------------------------
+-- 8. 서베이 — 분할 3형태 × 색 유무 × 기간
+--
+-- ⚠ 실제 운영 문항은 여기가 아니라 **마이그레이션**에 넣는다(쓰기 정책·grant가 없어
+--   앱에서는 만들 수 없다). 이 시드는 로컬에서 화면을 밟아 보기 위한 것이다.
+--
+-- ⚠ **면 색은 실제 클럽·국가 컬러다.** styling.md의 "강한 컬러는 크롬에 금지"에 걸리지
+--   않는다 — 이 색은 선택지 자체를 가리키는 **콘텐츠**이고, 그 뷰포트의 에메랄드 이벤트는
+--   VS 배지 하나뿐이다(styling.md의 분할 카드 예외 절).
+-- ⚠ 대비를 눈으로 확인하고 짝을 정했다. 어두운 면에는 흰 글씨, 밝은 면에는 잉크다 —
+--   `bg_color`만 바꾸고 `text_color`를 그대로 두면 읽히지 않는 면이 생긴다.
+--
+-- ⚠ **`image_path`가 있으면 이미지가 색을 덮는다**(색은 그 아래 깔려 로딩 전·실패 시를 받는다).
+--   경로는 `{survey_id}/{파일명}`이고 실제 파일은 `scripts/upload-survey-images.mjs`가
+--   `survey-images` 버킷에 올린다 — **이 시드만으로는 이미지가 뜨지 않는다.**
+--   ⚠ 사진은 위키미디어 커먼즈의 자유 라이선스 자산이고 **CC BY/BY-SA라 저작자 표시가
+--     의무다** — 출처 표는 `supabase/seed-images/README.md`에 있다.
+--   "이번 시즌 최고의 영입은?"과 "올해 EPL 우승팀"은 일부러 이미지를 두지 않았다:
+--   각각 "색도 이미지도 없음 → 바 UI"와 "색만 있음 → 색 배경"의 폴백 경로다.
+--
+-- ⚠ alice는 **전부 미참여**로 남긴다 — 게이팅이 걸린 화면을 밟을 수 있어야 한다.
+-- ---------------------------------------------------------------------
+
+-- ⚠ `on conflict do nothing`을 쓰지 않는다 — title에 유니크 제약이 없어(같은 질문을
+--   시즌마다 다시 물을 수 있다) 충돌할 상대가 없다. 멱등은 `not exists`가 만든다.
+-- ⚠ `order by`가 없으면 id 배정 순서가 정해지지 않아 목록 순서가 실행마다 바뀐다.
+-- ⚠ 마감분은 `created_at`·`closes_at`을 직접 과거로 넣는다 — 시드는 테이블 소유자로 돌아
+--   컬럼 권한을 지나지 않는다(앱에서는 두 컬럼 다 실을 수 없다).
+insert into public.survey (title, created_at, closes_at)
+select x.title, x.created_at, x.closes_at
+  from (values
+         (1, '이번 시즌 최고의 영입은?',        now() - interval '3 days',  now() + interval '4 days'),
+         (2, '올해 EPL 우승팀은 어디일까요?',   now() - interval '30 days', now() - interval '23 days'),
+         (3, '발롱도르, 누가 받아야 할까요?',   now() - interval '2 days',  now() + interval '5 days'),
+         (4, '최고의 리그는 어디일까요?',       now() - interval '1 day',   now() + interval '6 days'),
+         (5, '메시 vs 호날두, 당신의 GOAT는?',  now(),                      now() + interval '7 days')
+       ) as x(ord, title, created_at, closes_at)
+ where not exists (select 1 from public.survey s where s.title = x.title)
+ order by x.ord;
+
+-- ⚠ 서베이를 제목으로 특정한다. `cross join`만 걸면 문항이 하나 더 생기는 순간
+--   **모든 서베이에 같은 선택지가 붙는다**(poll_option 시드와 같은 함정이다).
+
+-- (1) 색 없음 · 진행 중 → 분할 카드가 아니라 바 UI로 폴백되는지
+insert into public.survey_option (survey_id, label, sort_order)
+select s.id, x.label, x.ord::smallint
+  from public.survey s
+  cross join (values ('공격수', 1), ('미드필더', 2), ('수비수', 3)) as x(label, ord)
+ where s.title = '이번 시즌 최고의 영입은?'
+on conflict do nothing;
+
+-- (2) 4지선다 · **마감** → 클럽 컬러. 마감이라 목록에서는 한 줄 카드로 내려간다
+insert into public.survey_option (survey_id, label, sort_order, subtitle, bg_color, text_color)
+select s.id, x.label, x.ord::smallint, x.subtitle, x.bg, x.fg
+  from public.survey s
+  cross join (values ('맨시티', 1, '3연패 도전',  '#6cabdd', '#171717'),   -- 스카이블루
+                     ('아스널', 2, '무관 탈출',   '#ef0107', '#ffffff'),   -- 건너스 레드
+                     ('리버풀', 3, '전방 압박',   '#c8102e', '#ffffff'),   -- 리버풀 레드
+                     ('그 외',  4, '이변을 기대', '#ffffff', '#171717'))
+       as x(label, ord, subtitle, bg, fg)
+ where s.title = '올해 EPL 우승팀은 어디일까요?'
+on conflict do nothing;
+
+-- (3) 3지선다 · 진행 중 → 삼각별(Y). 국가대표 컬러라 셋이 뚜렷하게 갈린다
+insert into public.survey_option (survey_id, label, sort_order, subtitle, image_path, bg_color, text_color)
+select s.id, x.label, x.ord::smallint, x.subtitle,
+       s.id || '/' || x.img, x.bg, x.fg
+  from public.survey s
+  cross join (values ('음바페', 1, '프랑스 · 스피드',         'mbappe.jpg',     '#002395', '#ffffff'),
+                     ('벨링엄', 2, '잉글랜드 · 박스 투 박스', 'bellingham.jpg', '#ffffff', '#171717'),
+                     ('홀란드', 3, '노르웨이 · 결정력',       'haaland.jpg',    '#ef2b2d', '#ffffff'))
+       as x(label, ord, subtitle, img, bg, fg)
+ where s.title = '발롱도르, 누가 받아야 할까요?'
+on conflict do nothing;
+
+-- (4) 4지선다 · **진행 중** → X자를 목록에서 바로 눌러 볼 수 있는 자리
+-- ⚠ **세리에 A만 일부러 이미지를 비워 둔다.** 한 카드 안에서 "사진 면"과 "색 면"이
+--   나란히 서야 폴백이 눈으로 증명된다(다른 문항으로 나누면 카드를 오가며 비교해야 한다).
+insert into public.survey_option (survey_id, label, sort_order, subtitle, image_path, bg_color, text_color)
+select s.id, x.label, x.ord::smallint, x.subtitle,
+       case when x.img = '' then null else s.id || '/' || x.img end, x.bg, x.fg
+  from public.survey s
+  cross join (values ('프리미어리그', 1, '잉글랜드', 'epl.jpg',        '#3d195b', '#ffffff'),
+                     ('라리가',       2, '스페인',   'laliga.jpg',     '#ee8707', '#171717'),
+                     ('분데스리가',   3, '독일',     'bundesliga.jpg', '#d20515', '#ffffff'),
+                     ('세리에 A',     4, '이탈리아', '',               '#008fd7', '#ffffff'))
+       as x(label, ord, subtitle, img, bg, fg)
+ where s.title = '최고의 리그는 어디일까요?'
+on conflict do nothing;
+
+-- (5) 2지선다 · 진행 중 → 비스듬한 대각선. 목록 맨 위에 온다
+insert into public.survey_option (survey_id, label, sort_order, subtitle, image_path, bg_color, text_color)
+select s.id, x.label, x.ord::smallint, x.subtitle,
+       s.id || '/' || x.img, x.bg, x.fg
+  from public.survey s
+  cross join (values ('메시',   1, '아르헨티나 · 좌발', 'messi.jpg',   '#75aadb', '#171717'),
+                     ('호날두', 2, '포르투갈 · 우발',   'ronaldo.jpg', '#c8102e', '#ffffff'))
+       as x(label, ord, subtitle, img, bg, fg)
+ where s.title = '메시 vs 호날두, 당신의 GOAT는?'
+on conflict do nothing;
+
+-- bob은 **마감된 문항**과 **진행 중 문항**에 하나씩 참여한 상태로 둔다
+--   → "마감 + 참여 = 결과만 보이고 갈아타기는 죽어 있다"와
+--     "진행 중 + 참여 = 결과 + 갈아타기 가능"을 둘 다 밟을 수 있다.
+-- ⚠ **정책을 우회한다** — 마감된 문항에는 authenticated로 insert할 수 없다(그게 이 기능이다).
+--   시드는 소유자로 돌아 RLS를 지나지 않으므로 이 행을 넣을 수 있다.
+insert into public.survey_vote (survey_id, user_id, option_id)
+select o.survey_id, '22222222-2222-4222-8222-222222222222'::uuid, o.id
+  from public.survey_option o
+  join public.survey s on s.id = o.survey_id
+ where (s.title = '올해 EPL 우승팀은 어디일까요?' and o.sort_order = 2)
+    or (s.title = '발롱도르, 누가 받아야 할까요?' and o.sort_order = 1)
+on conflict do nothing;

@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { MessagesSquare, User } from "lucide-react";
+import { ClipboardList, MessagesSquare, User } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/shared/lib";
-import { ROUTES } from "@/shared/config";
+import { ROUTES, activeTabHref } from "@/shared/config";
 import { Icon } from "@/shared/ui";
 
 interface TabItem {
@@ -21,6 +21,7 @@ interface TabItem {
  */
 const TABS: TabItem[] = [
   { label: "커뮤니티", icon: MessagesSquare, href: ROUTES.postList },
+  { label: "서베이", icon: ClipboardList, href: ROUTES.surveyList },
   { label: "프로필", icon: User, href: ROUTES.profile },
 ];
 
@@ -39,6 +40,8 @@ export function BottomTabBar() {
    *   (타입이 `string`이라 컴파일도 통과했다).
    */
   const pathname = usePathname();
+  // ⚠ 정확 일치로 두면 말머리 목록에서 커뮤니티 탭이 비활성이 된다 — 판정은 routes.ts가 갖는다
+  const active = activeTabHref(pathname);
 
   return (
     <nav
@@ -54,7 +57,7 @@ export function BottomTabBar() {
       )}
     >
       {TABS.map((tab) => {
-        const isActive = pathname === tab.href;
+        const isActive = active === tab.href;
         // 아이콘 20px + 라벨 10px, 높이 56px — 44px 최소 히트 영역을 넉넉히 넘는다
         const content = (
           <>

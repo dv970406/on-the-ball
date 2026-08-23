@@ -38,7 +38,7 @@ interface PollBlockProps {
  *   **내가 고른 선택지만 진하게** 해서 "내 표"를 색이 아닌 명도로 전달한다.
  *
  * ⚠ `role="radiogroup"`을 쓰지 않는다 — 화살표 키 이동(roving tabindex)을 약속하는 롤인데
- *   구현하지 않기 때문이다(말머리 칩 레일과 같은 판단). `aria-pressed`로 상태만 알린다.
+ *   구현하지 않기 때문이다(선택 토글이라 이동이 아니다 — 레일의 `aria-current`와 갈리는 지점). `aria-pressed`로 상태만 알린다.
  */
 export function PollBlock({ poll, results, resultsPending, onVote, footer }: PollBlockProps) {
   const total = results?.reduce((sum, r) => sum + r.voteCount, 0) ?? 0;

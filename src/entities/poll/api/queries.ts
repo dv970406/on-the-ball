@@ -17,8 +17,21 @@ import { POLL_SELECT, buildPoll, buildPollResult } from "./mappers";
  *   복원 중에 `undefined`로 한 번 조회하면 세션이 선 뒤 키가 바뀌며 **투표 블록이
  *   언마운트됐다 다시 마운트된다** — 로그인 사용자의 매 상세 진입에서 레이아웃이 두 번 튄다.
  */
-export function usePollQuery(postId: number, userId: string | undefined, enabled = true) {
+/**
+ * ⚠ `initialData`는 **서버 프리페치의 결과**다(SEO — 투표 질문·선택지도 그 글의 콘텐츠다).
+ *   ⚠ **`null`과 `undefined`가 다른 뜻이다** — `null`은 "프리페치했고 투표가 없다",
+ *     `undefined`는 "프리페치하지 않았다"(클라이언트가 조회한다).
+ *   ⚠ **키의 `userId`도 서버가 준 값이어야 한다** — 세션 복원 전 `undefined`로 찾으면
+ *     캐시에 닿지 못해 블록이 스켈레톤으로 되돌아간다(호출부가 그 값을 넘긴다).
+ */
+export function usePollQuery(
+  postId: number,
+  userId: string | undefined,
+  enabled = true,
+  initialData?: Poll | null,
+) {
   return useQuery<Poll | null, Error>({
+    initialData,
     queryKey: pollKeys.detail(postId, userId),
     queryFn: async () => {
       const supabase = requireBrowserSupabase();
@@ -47,8 +60,21 @@ export function usePollQuery(postId: number, userId: string | undefined, enabled
  * ⚠ `enabled`는 최적화일 뿐 방어가 아니다 — 꺼도 `poll_results`가 0행을 돌려준다.
  *   비로그인은 EXECUTE 권한 자체가 없다.
  */
-export function usePollResultsQuery(postId: number, userId: string | undefined, enabled: boolean) {
+/**
+ * ⚠ `initialData`는 **서버 프리페치의 결과**다. 없으면 참여한 사용자의 화면에서 막대가
+ *   스켈레톤으로 그려졌다가 집계가 도착하며 늘어나 **눈에 띄는 시프트**가 된다.
+ *   ⚠ 서버도 게이팅을 그대로 받는다 — 쿠키 세션으로 부르므로 미참여자에게는 0행이다.
+ *     그래서 **참여했을 때만** 프리페치하고, 아니면 `undefined`를 넘겨 쿼리를 꺼 둔다
+ *     (0행을 `[]`로 넘기면 "열렸는데 0표"라는 다른 뜻이 된다).
+ */
+export function usePollResultsQuery(
+  postId: number,
+  userId: string | undefined,
+  enabled: boolean,
+  initialData?: PollResult[],
+) {
   return useQuery<PollResult[], Error>({
+    initialData,
     queryKey: pollKeys.results(postId, userId),
     queryFn: async () => {
       const supabase = requireBrowserSupabase();

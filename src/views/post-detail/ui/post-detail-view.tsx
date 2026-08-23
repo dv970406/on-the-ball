@@ -24,8 +24,9 @@ import {
   Skeleton,
 } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
-import { usePollQuery } from "@/entities/poll";
-import { isEdited, isHotPost, usePostQuery } from "@/entities/post";
+import { type Poll, type PollResult, usePollQuery } from "@/entities/poll";
+import { type PostDetail, isEdited, isHotPost, usePostQuery } from "@/entities/post";
+import { type Comment } from "@/entities/comment";
 import { useSessionStore } from "@/entities/session";
 import { PollVote } from "@/features/cast-poll-vote";
 import { ReportReasonList } from "@/features/report-post";
@@ -37,9 +38,62 @@ import { usePostDeletion } from "../model/use-post-deletion";
 import { CommentBar } from "./comment-bar";
 import { CommentSection } from "./comment-section";
 
-export function PostDetailView({ postId }: { postId: number }) {
+interface PostDetailViewProps {
+  postId: number;
+  /**
+   * 서버가 미리 조회한 글·댓글. **SEO를 위해 초기 HTML에 본문이 담기게 하는 장치다** —
+   * 없으면 크롤러가 받는 것은 스켈레톤뿐이다.
+   *
+   * ⚠ **프리페치는 최적화일 뿐이다.** 서버 조회가 실패하면 `undefined`가 오고 화면은
+   *   지금까지처럼 클라이언트 쿼리로 그린다(nextjs.md). 그래서 아래 로딩·에러 분기를
+   *   그대로 둔다 — `initialData`가 있으면 애초에 그 분기에 들어가지 않는다.
+   */
+  initialPost?: PostDetail;
+  initialComments?: Comment[];
+  /**
+   * 서버가 미리 조회한 투표. **질문·선택지도 그 글의 콘텐츠라 초기 HTML에 담는다.**
+   * ⚠ **`null`과 `undefined`가 다른 뜻이다** — `null`은 "투표가 없는 글",
+   *   `undefined`는 "프리페치하지 않았다"(클라이언트가 조회한다).
+   */
+  initialPoll?: Poll | null;
+  /**
+   * 서버가 미리 조회한 투표 집계 — **참여했을 때만 온다.**
+   * ⚠ 없으면 참여한 사용자의 막대가 스켈레톤으로 그려졌다가 늘어나 시프트한다.
+   */
+  initialPollResults?: PollResult[];
+  /**
+   * 서버가 본 로그인 사용자.
+   *
+   * ⚠ **이게 없으면 투표 프리페치가 무의미해진다.** `pollKeys.detail`이 userId로 스코프돼
+   *   있어서, 세션 복원 전 `undefined` 키로 찾으면 서버가 채운 캐시에 닿지 못하고 다시
+   *   조회한다 — 블록이 한 번 스켈레톤으로 되돌아간다(`SurveyDetailView`와 같은 함정).
+   */
+  initialUserId?: string;
+  /**
+   * 서버가 렌더한 시점의 시각.
+   *
+   * ⚠ **없으면 "2시간 전"이 첫 렌더에 절대시각으로 나왔다가 마운트 직후 바뀐다** —
+   *   글자 폭이 달라 눈에 띄는 시프트가 된다(FOUC처럼 보인다). 서버 시각을 받아 첫 렌더부터
+   *   상대시각을 그리면 서버 HTML과 하이드레이션이 같은 문자열이라 시프트가 없다.
+   *   `data-and-state.md`가 말한 "응답에 서버 기준 시각을 실어 초기 렌더에 쓴다"가 이것이다.
+   */
+  serverNowMs?: number;
+}
+
+export function PostDetailView({
+  postId,
+  initialPost,
+  initialComments,
+  initialPoll,
+  initialPollResults,
+  initialUserId,
+  serverNowMs,
+}: PostDetailViewProps) {
   const router = useRouter();
-  const { data: post, isPending, isFetching: isFetchingPost, error, refetch } = usePostQuery(postId);
+  const { data: post, isPending, isFetching: isFetchingPost, error, refetch } = usePostQuery(
+    postId,
+    initialPost,
+  );
   const user = useSessionStore((s) => s.user);
   const sessionStatus = useSessionStore((s) => s.status);
   const pathname = usePathname();
@@ -52,10 +106,15 @@ export function PostDetailView({ postId }: { postId: number }) {
   //   집계 조회는 뮤테이션과 같은 자리(`PollVote`)에 있다 — 사유는 그 파일 주석.
   // ⚠ 세션이 확정된 뒤에만 조회한다 — 키가 userId로 스코프돼 있어 복원 중에 부르면
   //   블록이 언마운트→리마운트되며 레이아웃이 두 번 튄다(사유는 usePollQuery 주석).
+  // 세션 복원 전에는 **서버가 알려준 사용자**를 키로 쓴다(위 initialUserId 주석)
+  const pollUserId = sessionStatus === "loading" ? initialUserId : user?.id;
   const { data: poll, error: pollError } = usePollQuery(
     postId,
-    user?.id,
-    sessionStatus !== "loading",
+    pollUserId,
+    // ⚠ 프리페치가 있으면 복원을 기다리지 않는다 — 서버가 이미 정답(같은 userId 기준)을
+    //   채워 놨고, 기다리면 그 HTML을 스켈레톤으로 덮어 SSR이 헛일이 된다.
+    initialPoll !== undefined || sessionStatus !== "loading",
+    initialPoll,
   );
 
   /**
@@ -73,7 +132,8 @@ export function PostDetailView({ postId }: { postId: number }) {
   const [askDelete, setAskDelete] = useState(false);
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
   // HOT 판정용 — 렌더 중 Date.now()는 순수하지 않다(use-now.ts 주석 참고)
-  const nowMs = useNowMs();
+  // 마운트 전에는 서버가 준 시각을 쓴다 — 상대시각이 첫 렌더부터 그려진다
+  const nowMs = useNowMs() ?? serverNowMs ?? null;
 
   // 상세 진입 시 조회수 +1 (세션당 1회, 실패는 삼킨다)
   useRecordPostView(postId);
@@ -205,7 +265,7 @@ export function PostDetailView({ postId }: { postId: number }) {
                 </div>
                 <div className="mt-0.5 font-mono text-[10px] tabular-nums tracking-[0.2px] text-ink-mute-2">
                   <time dateTime={post.createdAt}>
-                    {formatRelativeTime(post.createdAt)}
+                    {formatRelativeTime(post.createdAt, nowMs)}
                   </time>
                   {isEdited(post) && " · 수정됨"} · 조회{" "}
                   {formatCount(post.viewCount)}
@@ -220,7 +280,13 @@ export function PostDetailView({ postId }: { postId: number }) {
           </div>
 
           {/* 투표는 본문 아래·액션 바 위 — 이 글의 일부이므로 <article> 안이다 */}
-          {poll && <PollVote poll={poll} />}
+          {poll && (
+            <PollVote
+              poll={poll}
+              initialUserId={initialUserId}
+              initialResults={initialPollResults}
+            />
+          )}
           {/* ⚠ 조회 실패를 삼키면 **투표 없는 글과 구분되지 않는다.** 같은 화면의 본문 쿼리가
               배너로 알리는 것과 형태를 맞춘다(data-and-state.md). */}
           {pollError && !poll && (
@@ -243,6 +309,8 @@ export function PostDetailView({ postId }: { postId: number }) {
         </article>
 
         <CommentSection
+          serverNowMs={serverNowMs}
+          initialComments={initialComments}
           postId={post.id}
           commentCount={post.commentCount}
           commentCountFetching={isFetchingPost}

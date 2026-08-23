@@ -299,6 +299,111 @@ export type Database = {
         }
         Relationships: []
       }
+      survey: {
+        Row: {
+          closes_at: string
+          created_at: string
+          id: number
+          title: string
+        }
+        Insert: {
+          closes_at?: string
+          created_at?: string
+          id?: never
+          title: string
+        }
+        Update: {
+          closes_at?: string
+          created_at?: string
+          id?: never
+          title?: string
+        }
+        Relationships: []
+      }
+      survey_option: {
+        Row: {
+          bg_color: string | null
+          id: number
+          image_path: string | null
+          label: string
+          sort_order: number
+          subtitle: string | null
+          survey_id: number
+          text_color: string | null
+        }
+        Insert: {
+          bg_color?: string | null
+          id?: never
+          image_path?: string | null
+          label: string
+          sort_order: number
+          subtitle?: string | null
+          survey_id: number
+          text_color?: string | null
+        }
+        Update: {
+          bg_color?: string | null
+          id?: never
+          image_path?: string | null
+          label?: string
+          sort_order?: number
+          subtitle?: string | null
+          survey_id?: number
+          text_color?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "survey_option_survey_id_fkey"
+            columns: ["survey_id"]
+            isOneToOne: false
+            referencedRelation: "survey"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      survey_vote: {
+        Row: {
+          created_at: string
+          option_id: number
+          survey_id: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          option_id: number
+          survey_id: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          option_id?: number
+          survey_id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "survey_vote_survey_id_fkey"
+            columns: ["survey_id"]
+            isOneToOne: false
+            referencedRelation: "survey"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "survey_vote_survey_id_option_id_fkey"
+            columns: ["survey_id", "option_id"]
+            isOneToOne: false
+            referencedRelation: "survey_option"
+            referencedColumns: ["survey_id", "id"]
+          },
+          {
+            foreignKeyName: "survey_vote_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_block: {
         Row: {
           blocked_id: string
@@ -361,6 +466,14 @@ export type Database = {
       post_is_alive: { Args: { p_id: number }; Returns: boolean }
       random_nickname: { Args: never; Returns: string }
       soft_delete_post: { Args: { p_post_id: number }; Returns: undefined }
+      survey_is_open: { Args: { p_survey_id: number }; Returns: boolean }
+      survey_results: {
+        Args: { p_survey_id: number }
+        Returns: {
+          option_id: number
+          vote_count: number
+        }[]
+      }
       toggle_post_like: { Args: { p_post_id: number }; Returns: boolean }
     }
     Enums: {

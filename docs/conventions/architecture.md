@@ -8,13 +8,13 @@
 
 - `app` — FSD app 레이어: `providers`(QueryClient + AuthProvider), `fonts`, `styles/globals.css`
 - `views` — 화면 조립. ⚠ **`pages` 금지** (Next Pages Router로 오감지됨 → 반드시 `views`)
-  post-list / post-detail / post-write / post-edit / sign-in / profile
+  post-list / post-detail / post-write / post-edit / survey-list / survey-detail / sign-in / profile
 - `widgets` — app-bar / bottom-tab-bar / sub-header / tab-scroll-area / auth-shell / auth-status
 - `features` — 사용자 액션 1개 = 슬라이스 1개
   sign-in(소셜 OAuth) / sign-out / link-identity / update-profile /
   write-post / delete-post / write-comment / delete-comment / toggle-post-like / view-post /
-  cast-poll-vote / block-user / report-post
-- `entities` — session / post / comment / profile / poll / block (도메인 타입·쿼리 훅·도메인 UI)
+  cast-poll-vote / cast-survey-vote / block-user / report-post
+- `entities` — session / post / comment / profile / poll / survey / block (도메인 타입·쿼리 훅·도메인 UI)
 - `shared` — ui / api / lib / config
 
 `app/`(루트)의 페이지는 라우팅 전용이며 view만 마운트한다.
@@ -45,7 +45,7 @@ shared ← entities ← features ← widgets ← views
 
 실제로 그런 일이 있었다 — react-markdown이 목록·로그인·404에까지 실려 초기 JS가 **43.6KB(gzip) 부풀어 있었다.** 원인은 배럴이 아니라 **`package.json`에 `sideEffects` 선언이 없던 것**이었다(반사실 빌드로 실측: 배럴을 그대로 둔 채 선언만 추가하니 `/sign-in`이 332.5KB → 290KB로 떨어지고 마크다운은 글 상세 한 라우트에만 남았다).
 
-- **순수한 모듈은 선언이 없어도 털린다.** 미사용 v1 컴포넌트 9종은 선언 전에도 프로덕션 청크에 0건이었다. 문제가 된 것은 **서드파티 의존을 끌고 있어 번들러가 순수성을 증명하지 못한** 모듈 하나뿐이었다.
+- **순수한 모듈은 선언이 없어도 털린다.** 미사용 v1 컴포넌트는 선언 전에도 프로덕션 청크에 0건이었다. 문제가 된 것은 **서드파티 의존을 끌고 있어 번들러가 순수성을 증명하지 못한** 모듈 하나뿐이었다.
 - 그러므로 **무거운 모듈이 생겼다고 배럴에서 빼지 않는다.** 먼저 `sideEffects`가 선언돼 있는지 보고, 그래도 남으면 그때 FSD가 권하는 형태(`shared/ui`·`shared/lib`를 컴포넌트별 index로 쪼개기)를 검토한다 — deep import를 여는 것은 **공개 API 규칙 위반**이다(FSD: "Modules outside of this slice/segment can only reference the public API").
 
 ⚠ **`sideEffects`는 번들러에 대한 약속이다.** 지금 이 프로젝트에서 import 시점 부작용은 `globals.css` 두 곳뿐이라 `["*.css"]`로 선언했다. 앞으로 **import만으로 무언가를 등록하는 모듈**(폴리필·전역 초기화·analytics 부트스트랩)을 추가하면, 아무도 그 export를 쓰지 않을 때 **조용히 통째로 삭제된다.** 그런 모듈이 생기면 목록에 함께 적는다.
@@ -57,12 +57,12 @@ shared ← entities ← features ← widgets ← views
 **서버 소비자는 `generateMetadata`와 서버 컴포넌트(page·layout)다.**
 
 - `@/shared/api` — 클라이언트 안전 모듈만 노출. 서버 전용(`supabase-server` = `next/headers` 의존)은 **직접 경로**로 import: `@/shared/api/supabase-server`.
-- `@/shared/lib` — `"use client"` 훅(`useScrollRestore`·`useNowMs`·`useToast`·`useFocusTrap`·`useNextParam`) 포함. **서버에서는 순수 함수를 직접 경로로 import**: `@/shared/lib/cn`·`format`·`post-id`·`text`. 이 네 경로가 곧 화이트리스트이고 **단일 소스는 `src/shared/lib/index.ts` 말미의 주석**이다.
-  - ⚠ **`"use client"`를 붙이지 않은 `shared/ui` 컴포넌트도 서버 소비자다.** 배럴을 거치면 서버 렌더 여지를 잃는다 — `markdown`·`empty-state`·`avatar`·`pill`·`skeleton`과 클래스 함수 둘(`button-class`·`action-chip-class`)이 `@/shared/lib/cn` 직접 경로를 쓰는 이유다(사유는 `empty-state.tsx` 주석에).
-- `@/entities/post`·`@/entities/comment`·`@/entities/profile` — `"use client"` 쿼리 훅·UI 포함. **서버는 `model/types`·`api/mappers`·`api/keys`를 직접 import**. post의 순수 헬퍼도 마찬가지다 — `app/posts/[id]/page.tsx`가 `@/entities/post/lib/plain-summary`를 직접 경로로 가져와 `og:description`을 만든다.
+- `@/shared/lib` — `"use client"` 훅(`useScrollRestore`·`useNowMs`·`useToast`·`useFocusTrap`·`useNextParam`) 포함. **서버에서는 순수 함수를 직접 경로로 import**: `@/shared/lib/cn`·`format`·`post-id`·`text`. 위 나열이 곧 `shared/lib`의 화이트리스트이고 **단일 소스는 `src/shared/lib/index.ts` 말미의 주석**이다.
+  - ⚠ **`"use client"`를 붙이지 않은 `shared/ui` 컴포넌트도 서버 소비자다.** 배럴을 거치면 서버 렌더 여지를 잃는다 — `markdown`·`empty-state`·`avatar`·`pill`·`skeleton`과 클래스 함수들(`button-class`·`action-chip-class`·`chip-class`)이 `@/shared/lib/cn` 직접 경로를 쓰는 이유다(사유는 `empty-state.tsx` 주석에).
+- `@/entities/post`·`@/entities/comment`·`@/entities/profile`·`@/entities/survey` — `"use client"` 쿼리 훅·UI 포함. **서버는 `model/types`·`api/mappers`·`api/keys`·`api/list-query`를 직접 import**. post의 순수 헬퍼도 마찬가지다 — `app/posts/[id]/page.tsx`가 `@/entities/post/lib/plain-summary`를 직접 경로로 가져와 `og:description`을 만든다.
 - `@/entities/session` — 배럴이 zustand 스토어·Provider·가드를 재export(전부 클라이언트). 순수 함수 `toAuthErrorMessage`는 `lib/auth-error-message`에, 쿼리 키는 `api/keys`에 따로 있다.
 - `@/features/sign-in` — 배럴이 `"use client"` 훅(`useOAuthSignIn`)을 포함한다. **서버가 쓰는 순수 함수 `hasPkceVerifier`는 `@/features/sign-in/lib/pkce-verifier` 직접 경로**로 가져간다(`app/(auth)/sign-in/page.tsx`가 선례). features 레이어에도 같은 예외가 성립한다는 뜻이다 — 배럴이 클라이언트 훅을 담고 있으면 서버 소비자는 직접 경로를 쓴다.
-- 선례: `app/posts/[id]/page.tsx`는 직접 경로를 **셋** 쓴다 — `@/shared/lib/post-id` · `@/shared/api/supabase-server` · `@/entities/post/lib/plain-summary`. 핵심은 개수가 아니라 **배럴을 하나도 거치지 않는다**는 것이다(`@/views/post-detail`만 배럴인데, 그건 서버가 **렌더**하는 클라이언트 컴포넌트라 합법이다 — 아래 절 참고).
+- 선례: `app/posts/[id]/page.tsx`는 **`"use client"`를 담은 배럴을 하나도 거치지 않는다.** 서버 안전 모듈은 전부 직접 경로로 가져오고, 배럴을 쓰는 곳은 순수 상수만 담은 `@/shared/config`와 서버가 **렌더**하는 뷰(`@/views/post-detail`)뿐이다(렌더는 합법 — 아래 절 참고).
 
 ### 요청당 1회 — 서버 조회는 React `cache()`로 감싼다
 

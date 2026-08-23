@@ -4,7 +4,13 @@ import { SignInView } from "@/views/sign-in";
 // ⚠ 배럴(@/features/sign-in)이 아니라 직접 경로 — 배럴은 "use client" 훅을 포함한다
 import { hasPkceVerifier } from "@/features/sign-in/lib/pkce-verifier";
 
-export const metadata: Metadata = { title: "로그인" };
+export const metadata: Metadata = {
+  title: "로그인",
+  // ⚠ 색인 대상이 아니다. 모든 화면의 `AuthStatus`가 여기로 링크하는 데다 `?next=`가 붙어
+  //   같은 화면이 URL만 다른 변형으로 무한히 생긴다 — 그걸 막는 것은 robots.txt가 아니라
+  //   이 선언이다(막으면 크롤러가 이 선언을 못 읽는다. 사유는 `app/robots.ts`).
+  robots: { index: false, follow: false },
+};
 
 /**
  * 로그인 후 목적지(?next=)는 SignInView가 아니라 (auth)/layout의 GuestOnly가 정한다.
