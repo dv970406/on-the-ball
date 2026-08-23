@@ -8,7 +8,7 @@ import { buildPostListQuery } from "@/entities/post/api/list-query";
 import { buildPostListItem } from "@/entities/post/api/mappers";
 import type { PostCategory, PostListFilters, PostListPage, PostSort } from "@/entities/post/model/types";
 import { POST_CATEGORY_SLUG, parsePostSort } from "@/entities/post/model/types";
-import { ROUTES, env } from "@/shared/config";
+import { OG_IMAGE, ROUTES, env } from "@/shared/config";
 import { PostListView } from "@/views/post-list";
 
 /**
@@ -83,14 +83,6 @@ export function listMetadata(category: PostCategory | null): Metadata {
     category === null
       ? undefined // 루트 layout의 소개 문구를 상속한다
       : `온더볼 커뮤니티의 '${category}' 말머리 글 모음이에요.`;
-  const image = {
-    url: "/opengraph-image.png",
-    type: "image/png",
-    width: 1200,
-    height: 630,
-    alt: "온더볼 — 모든 축구팬들을 위한 커뮤니티",
-  };
-
   return {
     title,
     description,
@@ -101,9 +93,9 @@ export function listMetadata(category: PostCategory | null): Metadata {
       description,
       siteName: "온더볼",
       url: new URL(listPath(category), env.siteUrl).toString(),
-      images: image,
+      images: OG_IMAGE,
     },
-    twitter: { card: "summary_large_image", title, description, images: image },
+    twitter: { card: "summary_large_image", title, description, images: OG_IMAGE },
   };
 }
 

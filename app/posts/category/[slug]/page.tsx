@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { NOT_FOUND_TITLE } from "@/shared/config";
 // ⚠ 배럴이 아니라 직접 경로 — model/types는 "use client"가 없어 서버에서 쓸 수 있다.
 import { categoryFromSlug } from "@/entities/post/model/types";
 import { listMetadata, renderPostList } from "../../list-page";
 
 /** 없는 말머리 — `Page`가 `notFound()`를 부르므로 **404 화면과 같은 제목**이어야 한다 */
-const NOT_FOUND_METADATA: Metadata = { title: "페이지를 찾을 수 없어요" };
+const NOT_FOUND_METADATA: Metadata = { title: NOT_FOUND_TITLE };
 
 /**
  * 말머리별 목록 — **독립적인 랜딩 페이지**다.

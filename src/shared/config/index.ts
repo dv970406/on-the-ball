@@ -8,6 +8,7 @@ export {
   safeNextPath,
 } from "./routes";
 export { COLOR } from "./palette";
+export { OG_IMAGE, NOT_FOUND_TITLE } from "./metadata";
 export { OAUTH_PROVIDERS, OAUTH_PROVIDER_LABEL, type OAuthProvider } from "./oauth";
 // 공개 버킷 URL 조립의 단일 소스 — 세 번째 버킷이 생기면서 묶었다(reuse.md가 예고한 시점)
 export { publicStorageUrl } from "./storage";

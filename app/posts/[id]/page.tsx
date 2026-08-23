@@ -5,7 +5,7 @@ import { notFound, unstable_rethrow } from "next/navigation";
 import { parsePostId } from "@/shared/lib/post-id";
 // ⚠ 배럴(@/shared/lib)이 아니라 직접 경로 — 배럴은 "use client" 훅을 포함한다.
 import { clamp } from "@/shared/lib/text";
-import { ROUTES } from "@/shared/config";
+import { NOT_FOUND_TITLE, OG_IMAGE, ROUTES } from "@/shared/config";
 import { createSupabaseServerClient } from "@/shared/api/supabase-server";
 // ⚠ 배럴(@/entities/post)이 아니라 직접 경로 — 배럴은 "use client" 모듈을 포함한다.
 //   목록 카드의 발췌와 **같은 변환기**를 쓴다(둘이 갈리면 화면과 공유 프리뷰의 요약이 달라진다).
@@ -26,29 +26,14 @@ const FALLBACK_METADATA: Metadata = { title: "게시글" };
 /**
  * 없는 글 — `Page`가 `notFound()`를 부르므로 **404 화면과 같은 제목**이어야 한다.
  * ⚠ 이걸 `FALLBACK_METADATA`로 뭉뚱그리면 서버 HTML은 "페이지를 찾을 수 없어요"인데
- *   하이드레이션 후 탭 제목만 "게시글"로 바뀐다(실측). 문구는 `app/not-found.tsx`와 같이 간다.
+ *   하이드레이션 후 탭 제목만 "게시글"로 바뀐다(실측). 문구의 단일 소스는 `NOT_FOUND_TITLE`이다.
  */
-const NOT_FOUND_METADATA: Metadata = { title: "페이지를 찾을 수 없어요" };
+const NOT_FOUND_METADATA: Metadata = { title: NOT_FOUND_TITLE };
 
 /** <title>·og:title에 실을 최대 길이 — 원문을 그대로 넣으면 120자 제목이 통째로 들어간다 */
 const META_TITLE_MAX = 60;
 /** 공유 프리뷰 설명 길이 — 대부분의 플랫폼이 이 언저리에서 자른다 */
 const META_DESCRIPTION_MAX = 120;
-
-/**
- * 공유 카드 이미지 — 루트의 `app/opengraph-image.png`가 서빙되는 경로.
- *
- * 글마다 다른 이미지는 만들지 않는다: `ImageResponse`(satori)는 woff2를 읽지 못하는데
- * 이 프로젝트의 Pretendard는 woff2 동적 서브셋뿐이라, 한글 제목을 그리려면 한글 TTF를
- * 통째로 리포에 넣어야 한다. 카드의 제목·설명은 이미 글마다 다르므로 이미지만 공통으로 둔다.
- */
-const OG_IMAGE = {
-  url: "/opengraph-image.png",
-  type: "image/png",
-  width: 1200,
-  height: 630,
-  alt: "온더볼 — 모든 축구팬들을 위한 커뮤니티",
-};
 
 /** 글이 존재하는지 + 화면을 그릴 데이터까지 확인한 결과 */
 type PostHead =

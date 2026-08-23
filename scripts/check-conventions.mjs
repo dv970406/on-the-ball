@@ -33,6 +33,8 @@ const DEEP_IMPORT_ALLOWED = new Set([
   "@/shared/lib/format",
   "@/shared/lib/post-id",
   "@/shared/lib/text",
+  // 쿼리 키 조각 — `api/keys.ts`는 서버 소비자라 "use client"를 담은 배럴을 거칠 수 없다
+  "@/shared/lib/query-scope",
   "@/entities/post/api/list-query",
   "@/entities/survey/api/list-query",
   "@/entities/comment/api/list-query",

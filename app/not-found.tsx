@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Compass } from "lucide-react";
 import { EmptyState, buttonClassName } from "@/shared/ui";
-import { ROUTES } from "@/shared/config";
+import { NOT_FOUND_TITLE, ROUTES } from "@/shared/config";
 
-export const metadata: Metadata = { title: "페이지를 찾을 수 없어요" };
+export const metadata: Metadata = { title: NOT_FOUND_TITLE };
 
 /**
  * 404 — 존재하지 않는 경로이거나 notFound()가 호출된 세그먼트.
@@ -16,10 +16,10 @@ export const metadata: Metadata = { title: "페이지를 찾을 수 없어요" }
 export default function NotFound() {
   return (
     <main className="flex min-h-0 flex-1 items-center justify-center bg-canvas">
-      <h1 className="sr-only">페이지를 찾을 수 없어요</h1>
+      <h1 className="sr-only">{NOT_FOUND_TITLE}</h1>
       <EmptyState
         icon={Compass}
-        title="페이지를 찾을 수 없어요"
+        title={NOT_FOUND_TITLE}
         description="주소가 바뀌었거나 삭제된 화면이에요."
         action={
           <Link href={ROUTES.home} className={buttonClassName({ size: "sm" })}>

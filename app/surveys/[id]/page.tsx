@@ -5,7 +5,7 @@ import { notFound, unstable_rethrow } from "next/navigation";
 //   아니고, 이름은 첫 호출자를 기록할 뿐이다(`normalizeNickname`과 같은 사정).
 //   전에 `\d+`와 `Number()`로 판정이 갈려 가드가 뚫린 적이 있어 규약이 "파서는 하나"다.
 import { parsePostId } from "@/shared/lib/post-id";
-import { ROUTES } from "@/shared/config";
+import { NOT_FOUND_TITLE, OG_IMAGE, ROUTES } from "@/shared/config";
 import { createSupabaseServerClient } from "@/shared/api/supabase-server";
 // ⚠ 배럴(@/shared/lib)이 아니라 직접 경로 — 배럴은 "use client" 훅을 포함한다.
 import { clamp } from "@/shared/lib/text";
@@ -17,20 +17,8 @@ import { SurveyDetailView } from "@/views/survey-detail";
 
 const FALLBACK_METADATA: Metadata = { title: "서베이" };
 /** 없는 서베이 — `Page`가 `notFound()`를 부르므로 **404 화면과 같은 제목**이어야 한다. */
-const NOT_FOUND_METADATA: Metadata = { title: "페이지를 찾을 수 없어요" };
+const NOT_FOUND_METADATA: Metadata = { title: NOT_FOUND_TITLE };
 const META_TITLE_MAX = 60;
-
-/**
- * ⚠ 세그먼트가 `openGraph`를 채우면 루트 `opengraph-image.png`의 자동 상속이 **통째로
- *   대체되어 이미지가 빠진다**(글 상세에서 실측). 그래서 여기서 명시한다. `twitter`도 같다.
- */
-const OG_IMAGE = {
-  url: "/opengraph-image.png",
-  type: "image/png",
-  width: 1200,
-  height: 630,
-  alt: "온더볼 — 모든 축구팬들을 위한 커뮤니티",
-};
 
 type SurveyHead =
   | {

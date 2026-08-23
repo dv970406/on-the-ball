@@ -1,3 +1,5 @@
+import { userScope } from "@/shared/lib/query-scope";
+
 /**
  * 서베이 쿼리 키.
  *
@@ -7,17 +9,17 @@
  *   없으면 목록을 연 채 계정이 바뀌었을 때 **이전 사용자의 참여 표시가 그대로 남는다.**
  *   `pollKeys`·`identityKeys`·`blockKeys`와 같은 이유·같은 형태다.
  *
- * ⚠ 비로그인은 `userId`가 `undefined`다 — 문자열로 굳혀 로그인 사용자의 키와 겹치지 않게 한다.
+ * ⚠ 비로그인은 `userId`가 `undefined`다 — `userScope`가 문자열로 굳혀 로그인 사용자의 키와
+ *   겹치지 않게 한다. 셋이 같은 조각을 쓰므로 판정은 그 함수가 단독으로 소유한다.
  */
-const scope = (userId: string | undefined) => userId ?? "guest";
 
 export const surveyKeys = {
   all: ["survey"] as const,
   lists: () => [...surveyKeys.all, "list"] as const,
-  list: (userId: string | undefined) => [...surveyKeys.lists(), scope(userId)] as const,
+  list: (userId: string | undefined) => [...surveyKeys.lists(), userScope(userId)] as const,
   details: () => [...surveyKeys.all, "detail"] as const,
   detail: (id: number, userId: string | undefined) =>
-    [...surveyKeys.details(), id, scope(userId)] as const,
+    [...surveyKeys.details(), id, userScope(userId)] as const,
   results: (id: number, userId: string | undefined) =>
-    [...surveyKeys.all, "results", id, scope(userId)] as const,
+    [...surveyKeys.all, "results", id, userScope(userId)] as const,
 } as const;

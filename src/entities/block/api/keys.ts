@@ -1,3 +1,5 @@
+import { userScope } from "@/shared/lib/query-scope";
+
 /**
  * 차단 쿼리 키.
  *
@@ -6,11 +8,11 @@
  *   (`useSessionSync`는 활성 쿼리를 지우지 않고 무효화만 하므로 리페치가 끝날 때까지
  *   옛 데이터가 남는다). `identityKeys`·`pollKeys`·`profileKeys.detail`과 같은 이유·같은 형태다.
  *
- * ⚠ 비로그인은 `userId`가 `undefined`다 — 문자열로 굳혀 로그인 사용자의 키와 겹치지 않게 한다.
+ * ⚠ 비로그인은 `userId`가 `undefined`다 — `userScope`가 문자열로 굳혀 로그인 사용자의 키와
+ *   겹치지 않게 한다. 셋이 같은 조각을 쓰므로 판정은 그 함수가 단독으로 소유한다.
  */
-const scope = (userId: string | undefined) => userId ?? "guest";
 
 export const blockKeys = {
   all: ["block"] as const,
-  list: (userId: string | undefined) => [...blockKeys.all, "list", scope(userId)] as const,
+  list: (userId: string | undefined) => [...blockKeys.all, "list", userScope(userId)] as const,
 } as const;

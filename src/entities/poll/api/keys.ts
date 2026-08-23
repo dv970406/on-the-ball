@@ -1,3 +1,5 @@
+import { userScope } from "@/shared/lib/query-scope";
+
 /**
  * 투표 쿼리 키 — 글 단위다(1글 : 1투표라 목록 계층이 없다).
  *
@@ -11,15 +13,15 @@
  *   특히 결과 쪽은 비로그인 리페치가 42501로 실패해 옛 데이터가 **영구히** 눌러앉는다.
  *   `identityKeys`·`profileKeys.detail(userId)`와 같은 이유·같은 형태다.
  *
- * ⚠ 비로그인은 `userId`가 `undefined`다 — 문자열로 굳혀 로그인 사용자의 키와 겹치지 않게 한다.
+ * ⚠ 비로그인은 `userId`가 `undefined`다 — `userScope`가 문자열로 굳혀 로그인 사용자의 키와
+ *   겹치지 않게 한다. 셋이 같은 조각을 쓰므로 판정은 그 함수가 단독으로 소유한다.
  */
-const scope = (userId: string | undefined) => userId ?? "guest";
 
 export const pollKeys = {
   all: ["poll"] as const,
   details: () => [...pollKeys.all, "detail"] as const,
   detail: (postId: number, userId: string | undefined) =>
-    [...pollKeys.details(), postId, scope(userId)] as const,
+    [...pollKeys.details(), postId, userScope(userId)] as const,
   results: (postId: number, userId: string | undefined) =>
-    [...pollKeys.all, "results", postId, scope(userId)] as const,
+    [...pollKeys.all, "results", postId, userScope(userId)] as const,
 } as const;
