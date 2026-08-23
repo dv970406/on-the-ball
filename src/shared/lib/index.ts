@@ -11,6 +11,7 @@ export {
   graphemeLength,
   lengthOverflow,
   normalizeNickname,
+  clamp,
   type TextLimit,
 } from "./text";
 export { useNextParam } from "./use-next-param";

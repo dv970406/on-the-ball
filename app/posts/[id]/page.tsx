@@ -3,11 +3,13 @@ import type { Metadata } from "next";
 import { notFound, unstable_rethrow } from "next/navigation";
 // proxy(서버 가드)·수정 페이지와 같은 파서를 공유한다 — post-id 주석 참고
 import { parsePostId } from "@/shared/lib/post-id";
+// ⚠ 배럴(@/shared/lib)이 아니라 직접 경로 — 배럴은 "use client" 훅을 포함한다.
+import { clamp } from "@/shared/lib/text";
 import { ROUTES } from "@/shared/config";
 import { createSupabaseServerClient } from "@/shared/api/supabase-server";
 // ⚠ 배럴(@/entities/post)이 아니라 직접 경로 — 배럴은 "use client" 모듈을 포함한다.
 //   목록 카드의 발췌와 **같은 변환기**를 쓴다(둘이 갈리면 화면과 공유 프리뷰의 요약이 달라진다).
-import { clamp, toPlainSummary } from "@/entities/post/lib/plain-summary";
+import { toPlainSummary } from "@/entities/post/lib/plain-summary";
 // ⚠ 배럴이 아니라 직접 경로 — 매퍼는 "use client"가 없어 서버에서 쓸 수 있다.
 //   select 문자열·빌더를 클라이언트 훅과 **공유해야** 프리페치가 같은 모양을 만든다.
 import { POST_DETAIL_SELECT, buildPostDetail } from "@/entities/post/api/mappers";

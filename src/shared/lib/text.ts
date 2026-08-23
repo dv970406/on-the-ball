@@ -166,3 +166,18 @@ export function normalizeNickname(value: string): string {
     .replace(/ {2,}/g, " ")
     .trim();
 }
+
+/**
+ * 길면 말줄임 — 잘린 자리에 …를 남겨 원문이 더 있음을 알린다.
+ *
+ * ⚠ 코드포인트 단위로 센다. `.length`(UTF-16 코드유닛)로 자르면 이모지가 반쪽으로 잘린다.
+ *   위 `codePointLength`와 같은 단위라 한 쌍으로 읽힌다.
+ *
+ * 도메인을 전혀 모르는 순수 함수인데 한때 `entities/post/lib/plain-summary`에 살았다 —
+ * 소비처가 셋이 되면서(글 상세·서베이 상세의 `generateMetadata`, `toPlainSummary`) 그 파일
+ * 스스로 적어 둔 임계치("3번째 소비자가 생기면 shared로")를 넘겨 여기로 옮겼다.
+ */
+export function clamp(text: string, max: number): string {
+  const chars = [...text.trim()];
+  return chars.length <= max ? chars.join("") : `${chars.slice(0, max - 1).join("")}…`;
+}

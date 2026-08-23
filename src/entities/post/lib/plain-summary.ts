@@ -5,14 +5,13 @@
  *   - app/posts/[id]/page.tsx  : og:description(공유 프리뷰)
  *   - entities/post/api/mappers: 목록 카드의 발췌 2행
  * 두 곳이 서로 다른 변환기를 쓰면 같은 글의 요약이 화면과 공유 프리뷰에서 달라진다.
+ *
+ * ⚠ 말줄임(`clamp`)은 **여기 없다 → `@/shared/lib/text`.** 도메인을 모르는 순수 함수인데
+ *   서베이 상세까지 쓰게 되어 소비처가 셋이 됐다("3번째 소비자가 생기면 shared로").
+ *   ⚠ 서버 소비자가 있으므로 배럴이 아니라 **직접 경로**로 가져온다(shared/lib 배럴은
+ *   "use client" 훅을 담고 있다).
  */
-
-/** 길면 말줄임 — 잘린 자리에 …를 남겨 원문이 더 있음을 알린다 */
-export function clamp(text: string, max: number): string {
-  // ⚠ 코드포인트 단위로 센다. .length(UTF-16 코드유닛)로 자르면 이모지가 반쪽으로 잘린다.
-  const chars = [...text.trim()];
-  return chars.length <= max ? chars.join("") : `${chars.slice(0, max - 1).join("")}…`;
-}
+import { clamp } from "@/shared/lib/text";
 
 /**
  * 마크다운 기호를 걷어내 한 줄 평문으로 만든다.

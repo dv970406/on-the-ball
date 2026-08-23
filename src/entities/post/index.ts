@@ -32,7 +32,7 @@ export {
   buildPostDetail,
   isEdited,
 } from "./api/mappers";
-export { toPlainSummary, clamp } from "./lib/plain-summary";
+export { toPlainSummary } from "./lib/plain-summary";
 export { isHotPost, HOT_LIKE_THRESHOLD, HOT_WINDOW_MS } from "./lib/hot";
 export { usePostListQuery, usePostQuery } from "./api/queries";
 export { PostCard } from "./ui/post-card";

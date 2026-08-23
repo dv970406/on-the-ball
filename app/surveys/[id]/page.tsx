@@ -7,9 +7,8 @@ import { notFound, unstable_rethrow } from "next/navigation";
 import { parsePostId } from "@/shared/lib/post-id";
 import { ROUTES } from "@/shared/config";
 import { createSupabaseServerClient } from "@/shared/api/supabase-server";
-// ⚠ 배럴(@/entities/post)이 아니라 직접 경로 — 배럴은 "use client" 모듈을 포함한다.
-//   길이 클램프는 도메인을 모르는 순수 함수라 그대로 쓴다(3번째 소비자가 생기면 shared로).
-import { clamp } from "@/entities/post/lib/plain-summary";
+// ⚠ 배럴(@/shared/lib)이 아니라 직접 경로 — 배럴은 "use client" 훅을 포함한다.
+import { clamp } from "@/shared/lib/text";
 // ⚠ 배럴이 아니라 직접 경로 — 매퍼는 "use client"가 없어 서버에서 쓸 수 있다.
 //   select 문자열·빌더를 클라이언트 훅과 **공유해야** 프리페치가 같은 모양을 만든다.
 import { SURVEY_SELECT, buildSurvey, buildSurveyResult } from "@/entities/survey/api/mappers";
