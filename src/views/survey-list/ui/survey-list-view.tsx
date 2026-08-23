@@ -7,7 +7,7 @@ import { ClipboardList } from "lucide-react";
 import { SURVEY_LIST_LIMIT, type SurveyListPage, SurveyCard } from "@/entities/survey";
 import { signInWithNext } from "@/shared/config";
 import { cn, formatCount } from "@/shared/lib";
-import { Dialog, EmptyState } from "@/shared/ui";
+import { Dialog, EmptyState, StaleBanner } from "@/shared/ui";
 import { AppBar } from "@/widgets/app-bar";
 import { AuthStatus } from "@/widgets/auth-status";
 import { BottomTabBar } from "@/widgets/bottom-tab-bar";
@@ -86,16 +86,7 @@ export function SurveyListView({
 
         {/* 캐시된 목록은 그대로 두고 최신화 실패만 알린다 */}
         {error && surveys && (
-          <p className="px-5 py-3 text-center text-[12px] text-ink-mute-2">
-            최신 서베이를 불러오지 못했어요.{" "}
-            <button
-              type="button"
-              onClick={() => void refetch()}
-              className="underline underline-offset-2"
-            >
-              다시 시도
-            </button>
-          </p>
+          <StaleBanner noun="서베이" onRetry={() => void refetch()} />
         )}
 
         {surveys && surveys.length === 0 && (

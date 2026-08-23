@@ -16,7 +16,7 @@ import {
 } from "@/entities/post";
 import { ROUTES } from "@/shared/config";
 import { cn, formatCount } from "@/shared/lib";
-import { EmptyState, Icon, chipClassName } from "@/shared/ui";
+import { EmptyState, Icon, StaleBanner, chipClassName } from "@/shared/ui";
 import { AppBar } from "@/widgets/app-bar";
 import { AuthStatus } from "@/widgets/auth-status";
 import { BottomTabBar } from "@/widgets/bottom-tab-bar";
@@ -137,16 +137,7 @@ export function PostListView({ category, sort, initialData, serverNowMs }: PostL
 
 				{/* 캐시된 목록은 그대로 두고 최신화 실패만 알린다 (상세·수정·댓글과 같은 규약) */}
 				{error && posts && (
-					<p className="px-5 py-3 text-center text-[12px] text-ink-mute-2">
-						최신 글을 불러오지 못했어요.{" "}
-						<button
-							type="button"
-							onClick={() => void refetch()}
-							className="underline underline-offset-2"
-						>
-							다시 시도
-						</button>
-					</p>
+					<StaleBanner noun="글" onRetry={() => void refetch()} />
 				)}
 
 				{posts && posts.length === 0 && (

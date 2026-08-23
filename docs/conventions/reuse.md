@@ -172,7 +172,7 @@
 ## `@/shared/ui`
 **현역(게시판 v2가 실제로 쓰는 것)** — 새로 만들기 전 여기부터 확인:
 `Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·`Markdown`·
-`Chip`·`chipClassName`·`ActionChip`·`actionChipClassName`·`Dialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`·`RatioBar`
+`Chip`·`chipClassName`·`ActionChip`·`actionChipClassName`·`Dialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`·`RatioBar`·`StaleBanner`
 
 **현재 미사용** — **"검증된 현역"으로 오인하지 말 것**:
 `TabHeader`·`Flag`·`Shirt`·`SectionHead`·`LiveDot`·`LiveStatusPill`·`NightCard`·`PlayerSilhouette`
@@ -191,6 +191,7 @@
   - `Sheet`는 화면 하단에 붙는 **edge-to-edge** 시트다(`styling.md`). "닫기" 행을 두지 않는다.
   - ⚠ 닫기 수단은 스크림 탭 · Escape · 스와이프인데 **셋 다 포인터이거나 물리 키보드다.** 그래서 그래버가 `button aria-label="닫기"`를 겸한다 — 오버플로 메뉴는 남의 글이면 항목이 전부 `disabled`라 **시트 안 활성 컨트롤이 0개**가 되고, 그때 스크린리더·키보드의 유일한 탈출구가 이 버튼이다. `div`로 되돌리지 말 것.
   - ⚠ 진입·퇴장 애니메이션은 **바깥 요소**, 드래그 오프셋은 **안쪽 래퍼**가 갖는다. 한 요소에 겹치면 CSS animation이 캐스케이드에서 inline style을 이겨 드래그가 통째로 무시된다. 새 오버레이에 드래그를 붙일 때 같은 함정을 밟지 말 것.
+- `StaleBanner` — 리페치 실패를 **데이터를 유지한 채** 알리는 배너. ⚠ 호출부의 조건은 반드시 `error && data`다 — `error`를 데이터 렌더보다 먼저 보면 좋아요 한 번에 네트워크가 끊겨도 읽고 있던 목록이 통째로 사라진다(`data-and-state.md`). 목적격 조사(을/를)는 컴포넌트가 받침으로 판정하므로 **명사만** 넘긴다.
 - `ToastViewport` — 루트(`AppProviders`)에 **하나만** 둔다. 발행 API(`useToast`)는 `@/shared/lib`에 있다.
   - ⚠ **앱의 유일한 라이브 리전이다.** 문구가 없어도 언마운트하지 않는다(리전과 내용이 함께 마운트되면 발화가 불안정하다) — `if (!message) return null`로 되돌리지 말 것. 화면마다 `role="status"`를 새로 만들지 않는 이유는 `code-quality.md`에.
 - `MarkdownEditor` — textarea + 작성/미리보기 탭. **현재 미사용이라 배럴에서 뺐다**(파일은 `shared/ui/markdown-editor.tsx`에 남아 있다). 프로토타입에 미리보기 탭이 없어 `PostForm`이 일반 textarea를 쓴다. 되살릴 때 배럴 대신 직접 경로를 쓸지부터 정한다 — 마크다운 의존을 함께 끌고 온다.

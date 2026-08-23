@@ -16,6 +16,7 @@ export { Wordmark } from "./wordmark";
 export { RatioBar, type RatioSegment } from "./ratio-bar";
 export { Skeleton } from "./skeleton";
 export { EmptyState } from "./empty-state";
+export { StaleBanner } from "./stale-banner";
 export { TextField } from "./text-field";
 // 커뮤니티 화면 — 말머리 칩 / 카운터 액션 칩 / 오버레이 3종
 export { Chip } from "./chip";

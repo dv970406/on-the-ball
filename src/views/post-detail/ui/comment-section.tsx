@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from "react";
 import { formatCount } from "@/shared/lib";
-import { Dialog, EmptyState, Skeleton } from "@/shared/ui";
+import { Dialog, EmptyState, Skeleton, StaleBanner } from "@/shared/ui";
 import {
   // 잘림 판정은 훅이 갖지만 **문구의 숫자**는 뷰가 쓴다("최근 200개만 표시하고 있어요")
   COMMENT_LIST_LIMIT,
@@ -121,16 +121,7 @@ export function CommentSection({
       )}
 
       {error && comments && (
-        <p className="px-5 py-3 text-center text-[12px] text-ink-mute-2">
-          최신 댓글을 불러오지 못했어요.{" "}
-          <button
-            type="button"
-            onClick={() => void refetch()}
-            className="underline underline-offset-2"
-          >
-            다시 시도
-          </button>
-        </p>
+        <StaleBanner noun="댓글" onRetry={() => void refetch()} />
       )}
 
       {/* ⚠ 숨은 댓글 안내와 **동시에 뜨지 않게** 한다 — 차단한 사람의 댓글만 달린 글에서
