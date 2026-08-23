@@ -176,7 +176,7 @@
 
 **현재 미사용** — **"검증된 현역"으로 오인하지 말 것**:
 `TabHeader`·`Flag`·`Shirt`·`SectionHead`·`LiveDot`·`LiveStatusPill`·`NightCard`·`PlayerSilhouette`
-(전부 `docs/legacy/v1-inventory.md`가 보존 대상으로 명시한 v1 자산이다. `MarkdownEditor`는 v2에서 만들었다가 쓰이지 않아 **배럴에서 뺐다** — 파일은 남아 있다)
+(전부 `docs/legacy/v1-inventory.md`가 보존 대상으로 명시한 v1 자산이다.)
 
 ⚠ 위 v1 자산은 **실측상 번들에 실리지 않는다**(위 미사용 목록 전량이 프로덕션 청크에서 0건). 다만 그건 각 모듈이 순수해서이지 "배럴이라 공짜"여서가 아니다 — 서드파티 의존을 끌고 오는 무거운 모듈은 `sideEffects` 선언이 없으면 그대로 실린다(`architecture.md`의 트리셰이킹 절).
 
@@ -194,7 +194,6 @@
 - `StaleBanner` — 리페치 실패를 **데이터를 유지한 채** 알리는 배너. ⚠ 호출부의 조건은 반드시 `error && data`다 — `error`를 데이터 렌더보다 먼저 보면 좋아요 한 번에 네트워크가 끊겨도 읽고 있던 목록이 통째로 사라진다(`data-and-state.md`). 목적격 조사(을/를)는 컴포넌트가 받침으로 판정하므로 **명사만** 넘긴다.
 - `ToastViewport` — 루트(`AppProviders`)에 **하나만** 둔다. 발행 API(`useToast`)는 `@/shared/lib`에 있다.
   - ⚠ **앱의 유일한 라이브 리전이다.** 문구가 없어도 언마운트하지 않는다(리전과 내용이 함께 마운트되면 발화가 불안정하다) — `if (!message) return null`로 되돌리지 말 것. 화면마다 `role="status"`를 새로 만들지 않는 이유는 `code-quality.md`에.
-- `MarkdownEditor` — textarea + 작성/미리보기 탭. **현재 미사용이라 배럴에서 뺐다**(파일은 `shared/ui/markdown-editor.tsx`에 남아 있다). 프로토타입에 미리보기 탭이 없어 `PostForm`이 일반 textarea를 쓴다. 되살릴 때 배럴 대신 직접 경로를 쓸지부터 정한다 — 마크다운 의존을 함께 끌고 온다.
 - ⚠ `Link` 안에 `Button`을 넣지 않는다(`<a>` 안의 `<button>`). 버튼형 링크는 `buttonClassName({...})`을 `Link`의 className에 준다.
 
 ## `@/widgets`

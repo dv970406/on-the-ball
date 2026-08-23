@@ -59,7 +59,8 @@ const TOOL_BUTTON =
  * 두 화면이 같은 필드·같은 검증·같은 헤더를 쓰므로 한 곳에 둔다.
  *
  * 본문은 **마크다운 원문**을 그대로 담는다(상세에서 Markdown 컴포넌트가 렌더한다).
- * 프로토타입에 미리보기 탭이 없으므로 MarkdownEditor(작성/미리보기 토글)는 쓰지 않는다.
+ * 프로토타입에 미리보기 탭이 없으므로 일반 textarea를 쓴다 — 미리보기를 붙이면 마크다운
+ * 렌더 의존(react-markdown 54KB gz)을 작성 화면까지 끌고 오게 되므로 그때 다시 판단한다.
  */
 export function PostForm({
   mode,

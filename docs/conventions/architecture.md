@@ -77,7 +77,7 @@ shared ← entities ← features ← widgets ← views
 `"use client"` 파일의 export는 서버에서 값이 아니라 **클라이언트 참조**가 된다. 컴포넌트로 렌더하는 건 되지만 **함수로 호출하면 런타임 에러**다(`Attempted to call X() from the server`). 서버 컴포넌트(`not-found.tsx` 등)에서도 필요한 순수 함수는 별도 파일로 뺀다.
 
 - 선례: `shared/ui/button-class.ts`(순수 `buttonClassName`) ↔ `shared/ui/button.tsx`(`"use client"` `Button`). 배럴은 각각의 소스에서 재export하므로 소비 경로(`@/shared/ui`)는 그대로다.
-- 같은 이유로 `shared/ui/markdown.tsx`에는 `"use client"`를 **붙이지 않는다**(서버 렌더 여지를 남긴다). 입력기인 `markdown-editor.tsx`만 클라이언트다.
+- 같은 이유로 `shared/ui/markdown.tsx`에는 `"use client"`를 **붙이지 않는다**(서버 렌더 여지를 남긴다). 렌더러는 서버에 남기고, 입력·상호작용을 담는 컴포넌트만 클라이언트로 가른다.
 
 ### 클라이언트 컴포넌트를 서버에서 **렌더**하는 것은 정상이다
 

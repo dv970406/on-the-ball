@@ -28,14 +28,14 @@
 - prop으로 받은 px: `style={{ width: size, height: size }}`
 
 **값이 유한한 열거형(tone·side·상태)은 동적이 아니다** — `Record<K, string>` 클래스 맵으로 만든다.
-(예: `shared/ui/live-dot.tsx`의 `DOT_TONE`, `shared/ui/button-class.ts`의 `BUTTON_VARIANT`, `shared/ui/markdown-editor.tsx`의 `TAB_LABEL`)
+(예: `shared/ui/live-dot.tsx`의 `DOT_TONE`, `shared/ui/button-class.ts`의 `BUTTON_VARIANT`)
 
 CSS 변수를 `style`로 주입해 클래스에서 읽는 패턴(`style={{ "--w": ... }}` + `w-[var(--w)]`)은 쓰지 않는다 — 간접 계층만 늘어난다.
 
 ### `CSSProperties`를 반환하는 헬퍼 함수 금지
 
 상태별 스타일은 **className 문자열을 반환하는 함수**나 `cn()` 분기로 표현한다.
-선례: `shared/ui/button-class.ts`의 `buttonClassName`, `shared/ui/markdown-editor.tsx`의 `tabClassName`.
+선례: `shared/ui/button-class.ts`의 `buttonClassName`, `shared/ui/action-chip-class.ts`의 `actionChipClassName`.
 
 ```tsx
 // ❌ 금지
