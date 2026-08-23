@@ -24,7 +24,7 @@ import {
   Skeleton,
 } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
-import { type Poll, type PollResult, usePollQuery } from "@/entities/poll";
+import type { Poll, PollResult } from "@/entities/poll";
 import { type PostDetail, isEdited, isHotPost, usePostQuery } from "@/entities/post";
 import { type Comment } from "@/entities/comment";
 import { useSessionStore } from "@/entities/session";
@@ -34,6 +34,7 @@ import { LikeButton } from "@/features/toggle-post-like";
 import { useRecordPostView } from "@/features/view-post";
 import type { ReplyTarget } from "../model/reply-target";
 import { usePostBlock } from "../model/use-post-block";
+import { usePostPoll } from "../model/use-post-poll";
 import { usePostDeletion } from "../model/use-post-deletion";
 import { CommentBar } from "./comment-bar";
 import { CommentSection } from "./comment-section";
@@ -101,21 +102,11 @@ export function PostDetailView({
   // ⚠ 훅은 조건 없이 부른다 — 아래에 로딩·에러 조기 반환이 있어 post가 아직 없을 수 있다.
   //   인자는 `block()`을 부를 수 있게 된 뒤(=글이 그려진 뒤)에만 쓰이므로 폴백이 무해하다.
   const blocking = usePostBlock(post?.authorId ?? "", post?.authorNickname ?? "");
-  // ⚠ 키가 userId로 스코프된다 — `myOptionId`는 "나"에 종속된 값이라, 상세를 연 채 계정이
-  //   바뀌면 이전 사용자의 선택이 남는다(`identityKeys`와 같은 이유).
-  //   집계 조회는 뮤테이션과 같은 자리(`PollVote`)에 있다 — 사유는 그 파일 주석.
-  // ⚠ 세션이 확정된 뒤에만 조회한다 — 키가 userId로 스코프돼 있어 복원 중에 부르면
-  //   블록이 언마운트→리마운트되며 레이아웃이 두 번 튄다(사유는 usePollQuery 주석).
-  // 세션 복원 전에는 **서버가 알려준 사용자**를 키로 쓴다(위 initialUserId 주석)
-  const pollUserId = sessionStatus === "loading" ? initialUserId : user?.id;
-  const { data: poll, error: pollError } = usePollQuery(
-    postId,
-    pollUserId,
-    // ⚠ 프리페치가 있으면 복원을 기다리지 않는다 — 서버가 이미 정답(같은 userId 기준)을
-    //   채워 놨고, 기다리면 그 HTML을 스켈레톤으로 덮어 SSR이 헛일이 된다.
-    initialPoll !== undefined || sessionStatus !== "loading",
-    initialPoll,
-  );
+  // 투표 조회의 **세션·프리페치 판정은 훅이 소유한다** — 네 신호(세션 상태·서버가 준
+  // initialUserId·initialPoll의 undefined/null·스토어 user)가 서로를 조건으로 삼는 자리라
+  // 뷰에 두면 서베이 상세와 판정이 갈린다(사유는 그 파일 주석).
+  // 집계 조회는 뮤테이션과 같은 자리(`PollVote`)에 있다 — 사유는 그 파일 주석.
+  const { poll, error: pollError } = usePostPoll({ postId, initialPoll, initialUserId });
 
   /**
    * 오버플로 시트의 **열림 여부와 단계를 따로 둔다.** 한 오버레이의 children만 바꾸는 이유는
