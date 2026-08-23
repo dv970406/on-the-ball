@@ -1,7 +1,7 @@
 "use client";
 
 import { Link2, Unlink } from "lucide-react";
-import { OAUTH_PROVIDERS, OAUTH_PROVIDER_LABEL, type OAuthProvider } from "@/shared/config";
+import { OAUTH_PROVIDERS, OAUTH_PROVIDER_LABEL } from "@/shared/config";
 import { Button, EmptyState, Skeleton } from "@/shared/ui";
 import { useLinkedIdentitiesQuery } from "@/entities/session";
 import { useLinkIdentity, useUnlinkIdentity } from "@/features/link-identity";
@@ -81,7 +81,7 @@ export function LinkedAccounts({ userId }: { userId: string | undefined }) {
                   icon={identity ? Unlink : Link2}
                   disabled={disabled}
                   onClick={() =>
-                    identity ? unlink.remove(identity) : link.start(provider as OAuthProvider)
+                    identity ? unlink.remove(identity) : link.start(provider)
                   }
                 >
                   {identity ? "해제" : "연결"}

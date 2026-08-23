@@ -19,11 +19,14 @@ export function useProfileQuery(userId: string | undefined) {
   return useQuery({
     queryKey: profileKeys.detail(userId ?? ""),
     queryFn: async (): Promise<MyProfile | null> => {
+      // ⚠ `!`를 쓰지 않는다 — 아래 `enabled`와 **다른 줄에 떨어져 있어** 한쪽만 고치면
+      //   조용히 깨진다. 여기서 좁히면 그 실패가 한국어 에러로 드러난다.
+      if (!userId) throw new Error("로그인이 필요해요.");
       const supabase = requireBrowserSupabase();
       const { data, error } = await supabase
         .from("profiles")
         .select(PROFILE_SELECT)
-        .eq("id", userId!)
+        .eq("id", userId)
         .maybeSingle();
 
       if (error) {
