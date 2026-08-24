@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getBrowserSupabase } from "@/shared/api";
+import { clearSignOutIntent } from "../lib/sign-out-intent";
 import { useSessionStore } from "./session-store";
 
 /**
@@ -36,6 +37,10 @@ export function useSessionSync() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       applySession(session);
+
+      // 가드가 소비하지 못한 로그아웃 신호를 여기서 버린다 — 가드가 없는 화면(목록)에서
+      // 로그아웃하면 신호가 남고, 그대로 두면 다음 세션 만료가 "직접 로그아웃"으로 오인된다.
+      if (event === "SIGNED_IN") clearSignOutIntent();
 
       // 로그인·로그아웃 시 개인화된 데이터(isLiked, 내 글 여부)를 전량 리싱크한다.
       // TOKEN_REFRESHED·INITIAL_SESSION은 유저가 바뀐 게 아니므로 제외 — 무효화하면

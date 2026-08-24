@@ -173,6 +173,24 @@ void mutation.mutateAsync(id)
 → 목적지 결정은 `GuestOnly` 한 곳에서만 한다. `?next=`도 거기서 읽는다.
 서버 가드(proxy)도 **같은 `safeNextPath`** 를 써서 판정이 갈리지 않게 한다.
 
+### ⚠ 로그아웃 후 이동도 가드가 소유한다
+
+바로 위와 같은 사정이 반대편에서도 성립한다. `AuthRequired` 아래 화면(`/profile`)에서
+로그아웃하면 세션이 사라지는 순간 가드가 `/sign-in?next=…`으로 보내는데, 호출부에서 이동을
+걸어 해결할 수 없다.
+
+- **성공 콜백**: 그 시점엔 가드가 children을 스켈레톤으로 갈아치운 뒤라 **콜백이 실행되지 않는다**
+  (로그인 쪽과 같은 결정적 파손).
+- **`mutate` 직전 `router.replace`**: 순서 보장이 없다. `signOut({ scope: "local" })`도 `/logout`
+  POST를 먼저 태우고(auth-js 2.110 `_signOut` → `admin.signOut` → `_removeSession` → SIGNED_OUT),
+  목적지는 DB를 타는 동적 라우트다 — 어느 쪽이 먼저 커밋되든 **나중 이동이 앞 이동을 취소**하므로
+  결과가 갈린다.
+
+→ 목적지 판정은 가드(`use-auth-redirect`)에 두고 **호출부는 신호만 남긴다**
+  (`markSignOutIntent` — `@/entities/session`). 직접 로그아웃이면 목록으로, 세션 만료·비로그인
+  진입이면 로그인 화면 + `?next=`로 갈린다. ⚠ 신호는 **1회성**이다 — 소비하지 않고 남기면
+  나중의 세션 만료를 "직접 로그아웃"으로 오인한다.
+
 ### 낙관적 업데이트
 
 `onMutate`(취소 + 스냅샷) → `onError`(롤백) → `onSettled`(재동기화). 선례: `features/toggle-post-like`.

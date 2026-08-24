@@ -61,6 +61,9 @@
   `use-server-session-check`(로그인 시 1회 서버 검증)가 나눠 갖는다.
 - `AuthRequired` / `GuestOnly` — 클라이언트 라우트 가드. 렌더 분기만 갖고,
   **이동은 `use-auth-redirect`가 소유한다** — 로그인 후 목적지를 정하는 곳은 앱에서 거기 하나다.
+- **`markSignOutIntent()` / `clearSignOutIntent()`** — "사용자가 직접 로그아웃했다"는 1회성 신호. `features/sign-out`이 **`signOut()`을 부르기 전에** 찍고, 실패하면 버린다. 가드가 이걸 보고 목적지를 가른다(직접 로그아웃 → 목록 / 세션 만료·비로그인 진입 → 로그인 화면 + `?next=`).
+  ⚠ **로그아웃 후 이동을 호출부에서 하지 말 것** — 성공 콜백은 화면이 먼저 언마운트되어 실행되지 않고, `mutate` 직전 `router.replace`는 가드의 이동과 순서 보장이 없다(나중 이동이 앞 이동을 취소한다). 목적지는 가드가 소유하고 호출부는 신호만 남긴다.
+  ⚠ **신호는 전역이고 가드는 여럿이다** — 가드가 쓰지 않을 때도 읽어서 버리고, "이 화면에서 세션이 사라졌는가"를 함께 본다. 안 그러면 남은 신호를 다른 가드(`/posts/new` 등)가 먹어 비로그인 사용자가 로그인 화면 대신 목록으로 되튕긴다.
 - `toAuthErrorMessage` — supabase `AuthError` → 한국어. **`toDbErrorMessage`와 합치지 않는다**(데이터가 다르다).
   ⚠ 새 인증 흐름을 붙이면 **여기 커버리지부터 확인한다** — identity 코드를 빠뜨렸더니 "이미 다른 계정에 연결됨"처럼 재시도로 절대 안 풀리는 실패가 "잠시 후 다시 시도"로 접혔다.
 - **`useLinkedIdentitiesQuery(userId)` / `identityKeys`** — 연결된 로그인 수단 조회. 조회는 여기, 쓰기(연결·해제)는 `features/link-identity`다(`entities/post` ↔ `features/toggle-post-like`와 같은 분업). ⚠ 키를 **userId로 스코프**한다 — 계정 전환 시 이전 사용자의 목록이 노출되지 않게.

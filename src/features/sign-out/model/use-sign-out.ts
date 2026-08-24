@@ -3,7 +3,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { requireBrowserSupabase } from "@/shared/api";
 import { useToast } from "@/shared/lib";
-import { toAuthErrorMessage } from "@/entities/session";
+import { clearSignOutIntent, markSignOutIntent, toAuthErrorMessage } from "@/entities/session";
 
 /**
  * 로그아웃.
@@ -21,8 +21,13 @@ export function useSignOut() {
   return useMutation({
     mutationFn: async () => {
       const supabase = requireBrowserSupabase();
+      // ⚠ **signOut을 부르기 전에** 찍는다 — SIGNED_OUT이 먼저 나가면 가드가 신호를 놓쳐
+      //   로그인 필수 화면(`/profile`)에서 로그아웃한 사용자가 로그인 화면으로 되돌아간다.
+      markSignOutIntent();
       const { error } = await supabase.auth.signOut({ scope: "local" });
       if (error) {
+        // 세션이 그대로 남았으므로 신호도 버린다 — 두면 나중의 세션 만료가 로그아웃으로 오인된다
+        clearSignOutIntent();
         console.error("[auth] 로그아웃 실패:", error);
         throw new Error(toAuthErrorMessage(error));
       }

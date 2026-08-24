@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ROUTES, safeNextPath, signInWithNext } from "@/shared/config";
+import { consumeSignOutIntent } from "../lib/sign-out-intent";
 import type { SessionStatus } from "./types";
 
 /**
@@ -12,13 +13,36 @@ import type { SessionStatus } from "./types";
  *   `router.replace`로 이동한다.
  * ⚠ 복귀 경로(`?next=`)는 `signInWithNext`가 만든다 — proxy(서버 가드)가 쓰는 것과 **같은
  *   단일 소스**여야 두 가드의 판정이 갈리지 않는다.
+ *
+ * ⚠ **직접 로그아웃한 경우만 목적지가 다르다** — 방금 나온 로그인 화면으로 되돌리는 대신
+ *   목록으로 보낸다. 판정은 여기 한 곳에 두고 신호만 `features/sign-out`이 남긴다:
+ *   호출부에서 `router.replace`를 먼저 걸어 이 이동을 이기려 하면 **순서 보장이 없다**
+ *   (사유는 `lib/sign-out-intent` 주석). 세션 만료·비로그인 진입은 그대로 로그인 화면이다 —
+ *   그쪽은 `?next=`로 돌아올 자리가 있어야 한다.
+ *
+ * ⚠ **신호만 보고 판정하지 않는다 — "이 화면에서 세션이 사라졌는가"를 함께 본다.**
+ *   신호는 소비되기 전까지 전역에 남고 가드는 이 화면 말고도 둘이 더 있다(`/posts/new`·
+ *   `/posts/[id]/edit`). 소비되지 않은 신호가 남아 있으면 **비로그인 사용자가 글쓰기를
+ *   눌렀을 때 로그인 화면 대신 목록으로 되튕긴다** — 아무 일도 일어나지 않은 것처럼 보인다.
+ *   들어올 때 이미 비로그인이었다면 그 신호는 남의 것이므로 읽고 버리기만 한다.
+ *   (덤으로 개발 모드의 StrictMode 이중 effect에서도 판정이 갈리지 않는다.)
  */
 export function useRedirectGuestToSignIn(status: SessionStatus) {
   const router = useRouter();
   const pathname = usePathname();
+  /** 이 화면에 머무는 동안 로그인 상태였는가 — 로그아웃·만료와 "비로그인 진입"을 가른다 */
+  const wasAuthenticated = useRef(false);
 
   useEffect(() => {
-    if (status === "guest") router.replace(signInWithNext(pathname));
+    if (status === "authenticated") {
+      wasAuthenticated.current = true;
+      return;
+    }
+    if (status !== "guest") return;
+
+    // ⚠ 읽으면서 지운다 — 쓰지 않는 경우에도 버려야 다음 가드가 남의 신호를 먹지 않는다
+    const signedOut = consumeSignOutIntent() && wasAuthenticated.current;
+    router.replace(signedOut ? ROUTES.postList : signInWithNext(pathname));
   }, [status, router, pathname]);
 }
 
