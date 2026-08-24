@@ -152,7 +152,7 @@
 ## `@/entities/profile`
 - `useProfileQuery(userId)` / `profileKeys` / `PROFILE_SELECT` / `buildProfile` — 닉네임·아바타 조회.
 - `MyProfile` / `ProfileRow` — 도메인 타입 / DB 행 타입. `MyProfile.avatarPath`는 **경로**다(전체 URL이 아니다).
-- ⚠ **`userId`를 인자로 받는다.** 세션을 직접 읽지 않는 이유는 `entities`끼리 서로 import할 수 없기 때문이다 — 세션을 아는 **상위 레이어**(`widgets/auth-status`가 선례)가 `user?.id`를 넘긴다.
+- ⚠ **`userId`를 인자로 받는다.** 세션을 직접 읽지 않는 이유는 `entities`끼리 서로 import할 수 없기 때문이다 — 세션을 아는 **상위 레이어**(`views/profile`이 선례)가 `user?.id`를 넘긴다.
 - ⚠ **`avatarUrl`은 여기 없다 → `@/shared/config`.** 아바타를 쓰는 곳이 `entities/comment`·`entities/post`(상세)·`views/profile` 셋인데 entities끼리는 import할 수 없다(`OAUTH_PROVIDERS`와 같은 사정).
 - 서버에서는 배럴 대신 `model/types`·`api/keys`·`api/mappers`를 직접 import(`post`·`comment`와 같은 형태).
 
@@ -206,5 +206,5 @@
 - `SubHeader` — 상세·작성·수정 화면 상단(뒤로가기 + 공유).
 - `TabScrollArea` — 목록 스크롤 영역(`<main>` 제공 + 스크롤 복원).
 - `AuthShell` — 인증 화면의 공통 껍데기.
-- `AuthStatus` — 세션 표시 + 로그인 링크 / 로그아웃. 세션을 아는 레이어라 `useProfileQuery(user?.id)`에 id를 넘기는 선례이기도 하다.
-  **닉네임이 `/profile` 링크다.** ⚠ 이 링크를 없애려면 **대체 진입점을 먼저 만든다** — 프로필 화면으로 가는 다른 경로가 있는지 확인하지 않고 지우면 화면이 도달 불가능해진다. ⚠ 조회 실패로 닉네임이 비면 라벨 없는 링크가 되므로 폴백 문구를 둔다.
+- `AuthStatus` — **비로그인일 때의 로그인 링크**만 그린다(로그인 상태에서는 `null`).
+  ⚠ 계정 관련 동작(닉네임 표시·로그아웃)을 여기 되넣지 않는다 — 프로필 화면과 두 곳으로 갈린다. 프로필 진입은 하단 탭바가 상시 제공하고, **로그아웃은 `views/profile`이 단독으로 갖는다.**

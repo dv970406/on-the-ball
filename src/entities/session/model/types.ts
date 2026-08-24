@@ -13,7 +13,7 @@ export type SessionStatus = "loading" | "authenticated" | "guest";
  * ⚠ `email`은 **null일 수 있다.** 카카오의 이메일 제공은 별도 심사 항목이라 승인 전에는
  *   오지 않는다(config.toml의 `email_optional = true`). 전에는 `?? ""`로 빈 문자열을 넣어
  *   타입이 "항상 값이 있다"고 거짓말했다 — 이메일을 화면에 쓰는 순간 카카오 유저 전원에게
- *   빈 칸이 렌더된다. 표시 이름이 필요하면 `profiles.nickname`을 쓴다(widgets/auth-status).
+ *   빈 칸이 렌더된다. 표시 이름이 필요하면 `profiles.nickname`을 쓴다(views/profile).
  */
 export interface SessionUser {
   id: string;

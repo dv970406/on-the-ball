@@ -60,7 +60,7 @@ export function PostListView({ category, sort, initialData, serverNowMs }: PostL
 	return (
 		<>
 			<TabScrollArea>
-				{/* 세션 표시는 프로토타입에 없지만, 없으면 로그아웃 진입점이 앱에서 사라진다 — AppBar 주석 참고 */}
+				{/* 세션 표시는 프로토타입에 없지만, 없으면 비로그인 로그인 진입점이 사라진다 — AppBar 주석 참고 */}
 				<AppBar leading={<AuthStatus />} />
 
 				{/*

@@ -1,12 +1,13 @@
 "use client";
 
-import { Camera } from "lucide-react";
+import { Camera, LogOut } from "lucide-react";
 import { ROUTES, avatarUrl } from "@/shared/config";
 import { Avatar, Button, EmptyState, Icon, Skeleton, TextField } from "@/shared/ui";
 import { BottomTabBar } from "@/widgets/bottom-tab-bar";
 import { SubHeader } from "@/widgets/sub-header";
 import { useProfileQuery } from "@/entities/profile";
 import { useSessionStore } from "@/entities/session";
+import { useSignOut } from "@/features/sign-out";
 import { NICKNAME_LIMIT } from "@/features/update-profile";
 import { useAvatarUpload } from "../model/use-avatar-upload";
 import { useLinkReturn } from "../model/use-link-return";
@@ -38,6 +39,14 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
   const nickname = useNicknameForm(user?.id, profile.data?.nickname);
   const avatar = useAvatarUpload(user?.id);
   const link = useLinkReturn(linkPending, errorCode, errorDescription);
+  /**
+   * ⚠ 중복 실행 가드를 두지 않는다 — 로그아웃은 행을 남기지도 지우지도 않아 연타해도
+   *   결과가 같다(`data-and-state.md`의 가드 판정 기준). `disabled`로 족하다.
+   * ⚠ **성공 후 이동을 여기서 하지 않는다.** 이 화면은 `AuthRequired` 아래라 세션이 사라지는
+   *   순간 가드가 목적지를 정한다(직접 로그아웃이면 목록) — 여기서 `router.replace`를 걸면
+   *   두 이동이 경합한다. 사유는 `entities/session`의 `lib/sign-out-intent` 주석.
+   */
+  const signOut = useSignOut();
 
   const header = <SubHeader title="프로필" fallbackHref={ROUTES.postList} />;
   /**
@@ -195,11 +204,41 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
 
         <BlockedUsers userId={user?.id} />
 
-        {user?.email && (
-          <p className="px-5 pt-7 text-[12px] leading-[1.6] text-ink-faint">
-            로그인 계정 · {user.email}
-          </p>
-        )}
+        {/*
+          계정 — 공통 헤더(AppBar)에 있던 로그아웃이 내려온 자리다.
+          프로필로 가는 진입점은 하단 탭바가 상시 제공하므로, 계정 관련 동작은 이 화면이
+          단독으로 갖는다(헤더에는 비로그인 로그인 링크만 남는다).
+        */}
+        <section aria-labelledby="account-heading" className="px-5 pt-7">
+          <h2 id="account-heading" className="text-[15px] font-semibold tracking-[-0.3px] text-ink">
+            계정
+          </h2>
+          {user?.email && (
+            <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-mute">
+              로그인 계정 · {user.email}
+            </p>
+          )}
+          <Button
+            variant="secondary"
+            block
+            icon={LogOut}
+            className="mt-4"
+            disabled={signOut.isPending}
+            onClick={() => signOut.mutate()}
+          >
+            {signOut.isPending ? "로그아웃 중…" : "로그아웃"}
+          </Button>
+          {/*
+            훅이 한국어로 바꿔 던진 에러를 노출한다(변환은 훅, 노출은 컴포넌트).
+            토스트는 1.8초 뒤 사라지므로 지속 표시를 함께 남긴다 — 로그아웃은 성공하면
+            화면이 통째로 바뀌는 동작이라, 실패를 놓치면 "됐는지 안 됐는지" 알 수 없다.
+          */}
+          {signOut.error && (
+            <p className="mt-3 text-[13px] leading-[1.5] text-crimson">
+              {signOut.error.message}
+            </p>
+          )}
+        </section>
       </main>
       {tabBar}
     </>
