@@ -47,6 +47,19 @@ auth-js 2.110의 시그니처가 `signOut(options = { scope: 'global' })`이라,
 그래서 로그아웃 후 다른 계정으로 로그인하면 이전 사용자의 `isLiked`가 한 프레임 노출됐다.
 유저가 바뀌는 이벤트에서는 `removeQueries({ type: "inactive" })`를 **함께** 부른다.
 
+#### ⚠ 그 리싱크는 **콜백이 아니라 다음 커밋에서** 돌려야 한다
+
+`onAuthStateChange` 콜백 안에서 바로 무효화하면, 그 시점의 화면은 **아직 로그인 상태 그대로**다
+(`applySession`이 일으키는 리렌더는 비동기로 배치된다). 그래서 로그인이 있어야만 성립하는
+활성 쿼리에까지 리페치가 나가고 **그 요청은 세션이 이미 사라졌으니 반드시 실패한다** —
+프로필에서 로그아웃하면 `useLinkedIdentitiesQuery`가 `AuthSessionMissingError`로 죽어
+콘솔에 실패로 남았다(실측). `enabled`도 소용이 없다. 옵저버가 아직 낡은 props를 들고 있다.
+
+→ 이벤트에서는 **nonce만 올리고** 리싱크는 effect에서 한다. 한 커밋 뒤에는 그 쿼리들이
+  이미 언마운트되어(가드가 화면을 스켈레톤으로 갈아치운다) **비활성 정리 대상**이 된다 —
+  실패할 요청 자체가 사라진다. 노출 시간이 늘지도 않는다: 어차피 리페치가 끝날 때까지는
+  옛 데이터가 보이고, 비활성 캐시 삭제는 다음 마운트보다 **먼저** 끝난다(같은 커밋의 정리 단계).
+
 ⚠ **차단·해제도 같은 급의 변화다.** 어떤 행이 보이는지가 통째로 달라지므로, 언마운트된
 상세·댓글 캐시가 차단된 내용을 들고 있다가 다시 열릴 때 한 프레임 노출된다. 다만 전역이
 아니라 **키로 좁힌다**(`postKeys.all`·`commentKeys.all` — poll·profile 캐시는 차단과 무관하다).
@@ -151,7 +164,7 @@ const handleSubmit = (e) => {
 ⚠⚠ **그 해제를 `mutate`의 per-call 콜백에 걸면 안 된다.** `MutationObserver.mutate`는 호출마다 옵션을 덮어쓰고 **이전 mutation에서 옵저버를 떼어낸다**(query-core 5.101: `removeObserver` → `addObserver`). 그래서 A가 처리 중일 때 B를 누르면 **A의 `onSuccess`·`onSettled`가 영영 실행되지 않는다.** A가 실패해 목록에 그대로 남아 있으면 집합에서 A가 지워지지 않아 **버튼은 활성인데 눌러도 아무 일이 없는 무증상 잠금**이 된다. → `mutateAsync`가 돌려주는 promise는 **그 호출의 mutation에 묶여 있어** 통지와 무관하게 끝나므로 거기에 `.finally()`로 건다. 훅 레벨 콜백(무효화·실패 토스트)은 Mutation이 직접 부르므로 옵저버 분리와 무관하게 그대로 돈다.
 
 ```ts
-void mutation.mutateAsync(id)
+mutation.mutateAsync(id)
   .then(() => toast("…"))
   .catch(() => {})            // 문구는 훅의 onError가 이미 보냈다
   .finally(() => release(id));

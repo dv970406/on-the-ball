@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getBrowserSupabase } from "@/shared/api";
 import { clearSignOutIntent } from "../lib/sign-out-intent";
@@ -20,6 +20,11 @@ import { useSessionStore } from "./session-store";
 export function useSessionSync() {
   const applySession = useSessionStore((s) => s.applySession);
   const queryClient = useQueryClient();
+  /**
+   * 리싱크를 **다음 커밋으로 미루기 위한** 신호. 값 자체에는 뜻이 없고, 이 훅이 사는
+   * `AuthProvider`를 한 번 더 렌더시키는 것이 목적이다(아래 리싱크 effect 주석).
+   */
+  const [resyncNonce, setResyncNonce] = useState(0);
 
   useEffect(() => {
     const supabase = getBrowserSupabase();
@@ -46,19 +51,39 @@ export function useSessionSync() {
       // TOKEN_REFRESHED·INITIAL_SESSION은 유저가 바뀐 게 아니므로 제외 — 무효화하면
       // 토큰 갱신마다 화면 전체가 리페치된다.
       if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
-        // ⚠ invalidateQueries만으로는 부족하다. 기본 refetchType이 "active"라
-        //   **언마운트된(비활성) 쿼리는 stale 표시만 되고 데이터가 그대로 남는다.**
-        //   그래서 A로 보던 글 상세를 떠났다가 B로 로그인하면 A의 isLiked가 한 프레임 노출됐다.
-        //   비활성 캐시는 지우고(다시 열 때 새로 받는다), 활성 캐시만 무효화해
-        //   화면 깜빡임 없이 리페치한다.
-        // ⚠ 활성 쿼리는 리페치가 끝날 때까지 옛 데이터를 들고 있으므로, 유저별 데이터를
-        //   담는 키는 **userId로 스코프**해야 그 창에서도 남의 값이 보이지 않는다
-        //   (`identityKeys`·`profileKeys`가 그렇게 되어 있다).
-        queryClient.removeQueries({ type: "inactive" });
-        void queryClient.invalidateQueries();
+        setResyncNonce((n) => n + 1);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [applySession, queryClient]);
+  }, [applySession]);
+
+  /**
+   * 캐시 리싱크 — **세션 변화가 화면에 반영된 다음 커밋에서** 돈다.
+   *
+   * ⚠ invalidateQueries만으로는 부족하다. 기본 refetchType이 "active"라
+   *   **언마운트된(비활성) 쿼리는 stale 표시만 되고 데이터가 그대로 남는다.**
+   *   그래서 A로 보던 글 상세를 떠났다가 B로 로그인하면 A의 isLiked가 한 프레임 노출됐다.
+   *   비활성 캐시는 지우고(다시 열 때 새로 받는다), 활성 캐시만 무효화해
+   *   화면 깜빡임 없이 리페치한다.
+   * ⚠ 활성 쿼리는 리페치가 끝날 때까지 옛 데이터를 들고 있으므로, 유저별 데이터를
+   *   담는 키는 **userId로 스코프**해야 그 창에서도 남의 값이 보이지 않는다
+   *   (`identityKeys`·`profileKeys`가 그렇게 되어 있다).
+   *
+   * ⚠ **콜백 안에서 바로 부르면 안 된다.** `applySession`이 일으키는 리렌더는 비동기로
+   *   배치되므로, 콜백 시점의 화면은 아직 **로그인 상태 그대로**다 — 로그인이 있어야만
+   *   성립하는 활성 쿼리에까지 리페치가 나가고, 그 요청은 세션이 이미 사라졌으니 반드시
+   *   실패한다(실측: 프로필에서 로그아웃하면 `useLinkedIdentitiesQuery`가
+   *   `AuthSessionMissingError`로 죽어 콘솔에 실패로 찍혔다). `enabled`도 소용이 없다 —
+   *   옵저버가 아직 낡은 props(userId 있음)로 살아 있기 때문이다.
+   *   nonce를 거쳐 한 커밋 뒤로 미루면 그 쿼리들은 이미 언마운트되어(가드가 화면을
+   *   스켈레톤으로 갈아치운다) **비활성 정리 대상**이 된다 — 실패할 요청 자체가 사라진다.
+   * ⚠ 미뤄도 노출 시간은 늘지 않는다. 어차피 리페치가 끝날 때까지는 옛 데이터가 보이고,
+   *   비활성 캐시 삭제는 다음 마운트보다 **먼저** 끝난다(같은 커밋의 정리 단계).
+   */
+  useEffect(() => {
+    if (resyncNonce === 0) return; // 최초 마운트 — 리싱크할 이벤트가 아직 없다
+    queryClient.removeQueries({ type: "inactive" });
+    queryClient.invalidateQueries();
+  }, [resyncNonce, queryClient]);
 }
