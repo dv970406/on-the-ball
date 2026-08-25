@@ -37,7 +37,7 @@ export function useRecordPostView(postId: number) {
     const supabase = getBrowserSupabase();
     if (!supabase) return;
 
-    void supabase.rpc("increment_post_view", { p_post_id: postId }).then(({ error }) => {
+    supabase.rpc("increment_post_view", { p_post_id: postId }).then(({ error }) => {
       if (error) console.error("[post] 조회수 증가 실패:", error);
     });
   }, [postId]);

@@ -45,7 +45,7 @@ export function useBlockUser() {
     //   글이 사라지고, "글을 찾을 수 없어요"가 깜빡인 뒤에야 화면이 이동한다.
     //   이동 자체가 성공 표시라 리페치 완료를 기다릴 이유가 없다(`use-delete-post`와 같은 규약).
     onSuccess: () => {
-      void invalidateVisibility(queryClient);
+      invalidateVisibility(queryClient);
     },
     // 실패를 앱의 유일한 알림 채널로 — 화면 문구는 조건부 평문이라 스크린리더에 닿지 않는다
     onError: (error) => toast(error.message),

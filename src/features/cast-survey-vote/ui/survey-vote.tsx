@@ -123,7 +123,7 @@ export function SurveyVote({
           결과를 불러오지 못했어요.{" "}
           <button
             type="button"
-            onClick={() => void resultsQuery.refetch()}
+            onClick={() => resultsQuery.refetch()}
             className="font-medium text-ink underline underline-offset-2"
           >
             다시 시도

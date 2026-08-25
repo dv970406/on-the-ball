@@ -56,7 +56,7 @@ export function LinkedAccounts({ userId }: { userId: string | undefined }) {
         <EmptyState
           title="연결 정보를 불러오지 못했어요"
           description={identities.error.message}
-          onRetry={() => void identities.refetch()}
+          onRetry={() => identities.refetch()}
         />
       )}
 

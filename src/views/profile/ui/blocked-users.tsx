@@ -50,7 +50,7 @@ export function BlockedUsers({ userId }: { userId: string | undefined }) {
         <EmptyState
           title="차단 목록을 불러오지 못했어요"
           description={blocked.error.message}
-          onRetry={() => void blocked.refetch()}
+          onRetry={() => blocked.refetch()}
         />
       )}
 

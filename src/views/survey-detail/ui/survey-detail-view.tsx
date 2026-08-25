@@ -93,7 +93,7 @@ export function SurveyDetailView({
           <EmptyState
             title="서베이를 불러오지 못했어요"
             description={error.message}
-            onRetry={() => void refetch()}
+            onRetry={() => refetch()}
           />
         </main>
       </>

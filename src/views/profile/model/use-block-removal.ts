@@ -52,7 +52,7 @@ export function useBlockRemoval() {
      *   끝나므로 항목별 해제가 유실되지 않는다. 훅 레벨 콜백(무효화·실패 토스트)은 Mutation이
      *   직접 부르므로 옵저버 분리와 무관하게 그대로 돈다 — 그래서 catch는 삼키기만 한다.
      */
-    void unblock
+    unblock
       .mutateAsync(userId)
       .then(() => toast(`${nickname}님 차단을 해제했어요`))
       .catch(() => {})

@@ -182,7 +182,7 @@ export function PostDetailView({
           <EmptyState
             title="글을 불러오지 못했어요"
             description={error.message}
-            onRetry={() => void refetch()}
+            onRetry={() => refetch()}
           />
         </main>
       </>

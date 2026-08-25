@@ -116,12 +116,12 @@ export function CommentSection({
         <EmptyState
           title="댓글을 불러오지 못했어요"
           description={error.message}
-          onRetry={() => void refetch()}
+          onRetry={() => refetch()}
         />
       )}
 
       {error && comments && (
-        <StaleBanner noun="댓글" onRetry={() => void refetch()} />
+        <StaleBanner noun="댓글" onRetry={() => refetch()} />
       )}
 
       {/* ⚠ 숨은 댓글 안내와 **동시에 뜨지 않게** 한다 — 차단한 사람의 댓글만 달린 글에서

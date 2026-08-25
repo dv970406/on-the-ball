@@ -73,7 +73,7 @@ export function useUploadPostImage(userId: string | undefined) {
     if (paths.length === 0) return;
     uploaded.current = [];
     const supabase = requireBrowserSupabase();
-    void supabase.storage
+    supabase.storage
       .from(POST_IMAGE_BUCKET)
       .remove(paths)
       .then(({ error }) => {

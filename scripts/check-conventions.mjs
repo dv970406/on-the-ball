@@ -375,6 +375,10 @@ for (const f of files) {
     fail("banned-api", `${r}: src/ 안에서는 named export만 쓴다`);
   if (/\bprose(-\w+)?\b/.test(c))
     fail("banned-api", `${r}: Tailwind Typography(prose)는 도입하지 않는다 — Markdown의 components 맵을 쓴다`);
+  // 연산자 `void`(값 버리기)만 잡는다 — 타입 자리의 void(`() => void`·`Promise<void>`)는
+  // 뒤에 `;`·`>`·`,`·`)`가 오므로 이 패턴에 걸리지 않는다.
+  if (/\bvoid\s+[A-Za-z_$(]/.test(c))
+    fail("banned-api", `${r}: 연산자 \`void\` — 붙여도 실패를 잡아주지 않는다(code-quality.md)`);
 }
 
 if (files.some((f) => /^app\/.*\/route\.tsx?$/.test(rel(f))))

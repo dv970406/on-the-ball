@@ -72,7 +72,7 @@ export function useCreatePost() {
     //   리페치 완료를 기다릴 이유가 없다. 반환하면 그만큼 isPending이 길어져
     //   버튼이 "등록 중…"인 채 이동이 지연된다(삭제 훅과 같은 규약).
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: postKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: postKeys.lists() });
     },
     // 실패를 앱의 유일한 알림 채널로 — 폼 하단 문구는 조건부 평문이라 낭독되지 않는다
     onError: (error) => toast(error.message),

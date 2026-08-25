@@ -33,7 +33,7 @@ export function useDeletePost(postId: number) {
     //   그 사이 "글을 찾을 수 없어요"가 깜빡인 뒤에야 화면 이동이 일어난다.
     //   여기서는 이동이 곧 성공 표시라 리페치 완료를 기다릴 이유가 없다.
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: postKeys.all });
+      queryClient.invalidateQueries({ queryKey: postKeys.all });
     },
     // 실패는 앱의 유일한 알림 채널로 보낸다 — 화면의 빨간 문구는 조건부로 마운트되는
     // 평문이라 스크린리더에 닿지 않는다(code-quality.md의 라이브 리전 절)

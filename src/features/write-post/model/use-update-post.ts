@@ -34,8 +34,8 @@ export function useUpdatePost(postId: number) {
     //   반환하면 **같은 화면에서 활성 상태인** postKeys.detail 쿼리의 리페치가 끝날 때까지
     //   isPending이 유지되어 왕복 1회만큼 이동이 지연된다(작성·삭제 훅과 같은 규약).
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: postKeys.lists() });
-      void queryClient.invalidateQueries({ queryKey: postKeys.detail(postId) });
+      queryClient.invalidateQueries({ queryKey: postKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: postKeys.detail(postId) });
     },
     // 실패를 앱의 유일한 알림 채널로 — 폼 하단 문구는 조건부 평문이라 낭독되지 않는다
     onError: (error) => toast(error.message),

@@ -102,8 +102,8 @@ export function useTogglePostLike(postId: number) {
       //   `post_select_visible`의 행별 `is_blocked()`까지 함께 태운다.
       //   다음 마운트(뒤로가기·탭 전환)에 최신화되므로 남의 좋아요도 그때 따라온다.
       //   상세는 그대로 즉시 리페치한다 — 한 건이라 싸고, 지금 보고 있는 화면이다.
-      void queryClient.invalidateQueries({ queryKey: postKeys.lists(), refetchType: "none" });
-      void queryClient.invalidateQueries({ queryKey: postKeys.detail(postId) });
+      queryClient.invalidateQueries({ queryKey: postKeys.lists(), refetchType: "none" });
+      queryClient.invalidateQueries({ queryKey: postKeys.detail(postId) });
     },
   });
 }

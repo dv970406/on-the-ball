@@ -41,11 +41,13 @@ export const POST_CATEGORIES = [
  *   실제로 컴파일 에러를 내려면 그 타입에 **값을 할당**해야 한다. 처음에 별칭만 두었다가
  *   음성 대조(값을 일부러 빼고 tsc)로 무력함을 확인하고 이 형태로 바꿨다.
  *   `satisfies`는 반대 방향(없는 값)만 잡으므로 둘이 함께 있어야 양방향이 닫힌다.
+ *
+ * ⚠ **아무도 읽지 않는다고 지우지 말 것 — 선언 자체가 검사다.** 값을 하나 빠뜨리면 여기서
+ *   `TS2322: Type 'true' is not assignable to type 'never'`가 난다(실측). `_` 접두사라 린트도 조용하다.
  */
 const _CATEGORIES_EXHAUSTIVE: Exclude<PostCategory, (typeof POST_CATEGORIES)[number]> extends never
   ? true
   : never = true;
-void _CATEGORIES_EXHAUSTIVE;
 
 /**
  * URL 슬러그 ↔ 말머리.

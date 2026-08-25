@@ -158,7 +158,10 @@ export function useCastSurveyVote(surveyId: number) {
     onError: (error, _optionId, snapshot) => {
       // 키는 낙관값을 쓴 그 시점의 것을 쓴다(위 VoteSnapshot 주석)
       const keys = snapshot?.keys;
-      if (!keys) return void toast(error.message);
+      if (!keys) {
+        toast(error.message);
+        return;
+      }
       queryClient.setQueryData(keys.detail, snapshot.survey);
       // ⚠ `setQueryData(key, undefined)`는 **아무 일도 하지 않는다**(query-core가 undefined를
       //   "갱신 없음"으로 읽는다). 스냅샷이 없었다는 건 그 캐시가 원래 없었다는 뜻이므로
@@ -183,13 +186,13 @@ export function useCastSurveyVote(surveyId: number) {
         detail: surveyKeys.detail(surveyId, userId),
         results: surveyKeys.results(surveyId, userId),
       };
-      void queryClient.invalidateQueries({ queryKey: keys.detail });
-      void queryClient.invalidateQueries({ queryKey: keys.results });
+      queryClient.invalidateQueries({ queryKey: keys.detail });
+      queryClient.invalidateQueries({ queryKey: keys.results });
       // ⚠ **poll보다 무효화 대상이 하나 많다.** 목록 카드가 "참여 완료"를 표시하므로
       //   빼면 참여하고 목록으로 돌아왔을 때 배지가 갱신되지 않는다.
       //   ⚠ `lists()`(prefix)로 지운다 — 유저별로 키가 갈려 있어 `list(userId)`만 지우면
       //     계정을 오가는 동안 다른 키의 낡은 배지가 남는다.
-      void queryClient.invalidateQueries({ queryKey: surveyKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: surveyKeys.lists() });
     },
   });
 }

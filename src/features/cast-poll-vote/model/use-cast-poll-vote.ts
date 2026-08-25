@@ -127,7 +127,10 @@ export function useCastPollVote(postId: number) {
     onError: (error, _optionId, snapshot) => {
       // 키는 낙관값을 쓴 그 시점의 것을 쓴다(위 VoteSnapshot 주석)
       const keys = snapshot?.keys;
-      if (!keys) return void toast(error.message);
+      if (!keys) {
+        toast(error.message);
+        return;
+      }
       queryClient.setQueryData(keys.detail, snapshot.poll);
       // ⚠ `setQueryData(key, undefined)`는 **아무 일도 하지 않는다**(query-core가 undefined를
       //   "갱신 없음"으로 읽는다). 스냅샷이 없었다는 건 그 캐시가 원래 없었다는 뜻이므로
@@ -148,8 +151,8 @@ export function useCastPollVote(postId: number) {
         detail: pollKeys.detail(postId, userId),
         results: pollKeys.results(postId, userId),
       };
-      void queryClient.invalidateQueries({ queryKey: keys.detail });
-      void queryClient.invalidateQueries({ queryKey: keys.results });
+      queryClient.invalidateQueries({ queryKey: keys.detail });
+      queryClient.invalidateQueries({ queryKey: keys.results });
     },
   });
 }

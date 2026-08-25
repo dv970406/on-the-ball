@@ -73,7 +73,7 @@ export function useCommentDeletion(postId: number) {
      * 성공하면 그 댓글은 목록에서 사라지지만 그래도 지운다 —
      * "보낸 것만 담는다"는 집합의 뜻을 성공·실패 어느 쪽에서도 흐리지 않는다.
      */
-    void deleteComment
+    deleteComment
       .mutateAsync(commentId)
       .then(() => toast("댓글을 삭제했어요"))
       .catch(() => {})

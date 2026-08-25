@@ -38,13 +38,13 @@ export function useServerSessionCheck() {
     if (!supabase) return;
 
     let cancelled = false;
-    void supabase.auth.getUser().then(({ error }) => {
+    supabase.auth.getUser().then(({ error }) => {
       if (cancelled || !error) return;
       const rejectedByServer =
         isAuthApiError(error) && (error.status === 401 || error.status === 403);
       if (!rejectedByServer) return;
       console.error("[auth] 서버가 세션을 거부했습니다 — 로컬 세션을 정리합니다:", error);
-      void supabase.auth.signOut({ scope: "local" });
+      supabase.auth.signOut({ scope: "local" });
     });
 
     return () => {

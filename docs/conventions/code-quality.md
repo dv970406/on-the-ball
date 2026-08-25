@@ -72,6 +72,27 @@ per-call 콜백이 **상위 레이어의 결정**(이동 목적지, 입력창 �
   - 동작을 문자열 sentinel로 분기(`color === "var(--color-primary)"`) — 의미 기반 prop(`tone`)으로(예측 가능성).
   - 화면에서만 권한을 막고 끝내기 — 화면 차단은 안내이고 **실제 방어는 RLS**다. 둘 다 필요하다(결합도가 아니라 계층).
 
+## 연산자 `void`를 쓰지 않는다
+
+떠 있는 Promise 앞에 `void`를 붙이지 않는다. **`void`는 catch를 붙여주지 않는다** — 실패 처리는
+그대로 뮤테이션의 `onError`나 `.catch()`가 하고, 붙이든 안 붙이든 런타임 동작이 같다.
+이 프로젝트는 타입 인식 린트를 켜지 않아 `@typescript-eslint/no-floating-promises`도 없으므로
+강제하는 것도 없다. 남는 것은 "여기 뭔가 특별한 게 있다"는 **잘못된 신호**뿐이다.
+
+```ts
+queryClient.invalidateQueries({ queryKey: postKeys.all });   // ✅
+onRetry={() => refetch()}                                     // ✅
+```
+
+- **타입 자리의 `void`는 대상이 아니다** — `() => void`·`Promise<void>`·`useMutation<void, …>`는 그대로 쓴다.
+- 값을 버리며 조기 반환하려고 `return void f()`를 쓰지 않는다 → `f();` 다음 줄에 `return;`.
+- 미사용 변수를 "사용됨"으로 만들려고 `void x;`를 쓰지 않는다. 망라성 가드처럼 **선언 자체가 검사**인
+  상수는 `_` 접두사만으로 충분하다(ESLint `varsIgnorePattern: "^_"`, tsconfig에 `noUnusedLocals`가 없다).
+- 실패를 삼키면 안 되는 자리라면 `void`가 아니라 **`.catch()`를 붙인다** — 그게 `void`가 하지 않는 일이다.
+
+⚠ 검증은 `pnpm check:conventions`가 한다(`banned-api`). 타입 자리의 `void`와 갈라 보므로
+목록을 손으로 관리하지 않는다.
+
 ## ARIA는 두 경우에만 쓴다
 
 접근성 속성은 많이 붙일수록 좋아지지 않는다 — **틀린 ARIA는 없는 것보다 나쁘다.** 아래 둘에만 쓰고 그 밖에는 붙이지 않는다.

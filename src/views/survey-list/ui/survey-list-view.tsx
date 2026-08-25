@@ -80,13 +80,13 @@ export function SurveyListView({
           <EmptyState
             title="서베이를 불러오지 못했어요"
             description={error.message}
-            onRetry={() => void refetch()}
+            onRetry={() => refetch()}
           />
         )}
 
         {/* 캐시된 목록은 그대로 두고 최신화 실패만 알린다 */}
         {error && surveys && (
-          <StaleBanner noun="서베이" onRetry={() => void refetch()} />
+          <StaleBanner noun="서베이" onRetry={() => refetch()} />
         )}
 
         {surveys && surveys.length === 0 && (

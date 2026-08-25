@@ -22,11 +22,11 @@ export const REPORT_REASONS = [
  *
  * ⚠ 타입 별칭만 선언하면 아무것도 검사하지 못한다(`type X = never`는 그냥 선언일 뿐이다) —
  *   실제 값에 할당해야 컴파일러가 대조한다.
+ * ⚠ **아무도 읽지 않는다고 지우지 말 것 — 선언 자체가 검사다**(`POST_CATEGORIES`와 같은 형태).
  */
 const _REASONS_EXHAUSTIVE: Exclude<ReportReason, (typeof REPORT_REASONS)[number]> extends never
   ? true
   : never = true;
-void _REASONS_EXHAUSTIVE;
 
 /**
  * 화면 문구.

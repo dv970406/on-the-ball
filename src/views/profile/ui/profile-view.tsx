@@ -81,7 +81,7 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
           <EmptyState
             title="프로필을 불러오지 못했어요"
             description={profile.error.message}
-            onRetry={() => void profile.refetch()}
+            onRetry={() => profile.refetch()}
           />
         </main>
         {tabBar}

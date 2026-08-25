@@ -131,13 +131,13 @@ export function PostListView({ category, sort, initialData, serverNowMs }: PostL
 					<EmptyState
 						title="글을 불러오지 못했어요"
 						description={error.message}
-						onRetry={() => void refetch()}
+						onRetry={() => refetch()}
 					/>
 				)}
 
 				{/* 캐시된 목록은 그대로 두고 최신화 실패만 알린다 (상세·수정·댓글과 같은 규약) */}
 				{error && posts && (
-					<StaleBanner noun="글" onRetry={() => void refetch()} />
+					<StaleBanner noun="글" onRetry={() => refetch()} />
 				)}
 
 				{posts && posts.length === 0 && (
