@@ -27,7 +27,7 @@ export function usePostUpdate(postId: number) {
     updatePost.mutate(input, {
       onSuccess: () => {
         router.replace(ROUTES.post(postId));
-        toast("수정했어요");
+        toast("수정을 완료했어요");
       },
     });
   };

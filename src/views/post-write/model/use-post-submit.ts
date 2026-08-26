@@ -43,7 +43,7 @@ export function usePostSubmit() {
           // 프로토타입은 등록 후 **목록**으로 돌아간다(상세가 아니다).
           // 작성 화면으로 뒤로가기 하지 않도록 replace.
           router.replace(ROUTES.postList);
-          toast("글을 올렸어요");
+          toast("작성을 완료했어요");
         },
       },
     );
