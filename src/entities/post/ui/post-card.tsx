@@ -84,14 +84,25 @@ export function PostCard({
               </>
             )}
             <MetaDot />
-            {/* 목록에서는 좋아요를 잉크 래더로만 표현한다 — 이 화면의 컬러 이벤트는 0개다 */}
+            {/*
+              내가 누른 좋아요는 **하트만** 에메랄드다(에메랄드 자리 표 — `styling.md`).
+              윤곽선 없이 통짜로 칠한다 — 디자인 결정이다.
+              ⚠ **숫자까지 물들이지 않는다.** 에메랄드(#3ecf8e)는 흰 배경 대비가 1.99:1이라
+                10px 숫자를 실을 수 없다 — 색은 아이콘이 지고 값은 잉크가 진다.
+              ⚠ **상태를 색 혼자 지지 않게 `fill-current`를 함께 둔다.** 안 누른 하트는 속이 빈
+                윤곽이고 누른 하트는 꽉 찬 면이라, 색을 못 보아도 형태로 갈린다.
+            */}
             <span
               className={cn(
                 "inline-flex shrink-0 items-center gap-[3px] font-mono text-[10px] tabular-nums",
                 post.isLiked && "text-ink",
               )}
             >
-              <Icon as={Heart} size={11} className={post.isLiked ? "fill-current" : undefined} />
+              <Icon
+                as={Heart}
+                size={11}
+                className={post.isLiked ? "fill-current text-primary" : undefined}
+              />
               {formatCount(post.likeCount)}
               <span className="sr-only">좋아요</span>
             </span>

@@ -85,7 +85,35 @@ function cardClassName(peek: boolean) {
 
 ## 디자인 규칙 (Tifo)
 
-- **한 뷰포트당 컬러 이벤트는 에메랄드 1개.** 나머지는 잉크 그레이 래더.
+- **한 화면에서 "눌러야 할 곳"을 가리키는 에메랄드는 하나다.** 나머지는 잉크 그레이 래더.
+  - ⚠ **원칙은 이유를 설명할 뿐이고, 판정은 아래 표가 한다.** 브랜드 마크·상태 표시·메타
+    액센트는 CTA가 아니라서 이 셈에 들어가지 않는데, 그 경계를 문장으로 그으면 반드시
+    갈린다 — 실제로 활성 탭 아이콘(에메랄드)과 활성 말머리 칩(잉크)은 둘 다
+    `aria-current="page"`인 `Link`라 어떤 원칙으로도 나뉘지 않는다. 그래서 **자리를 센다.**
+  - ⚠ **에메랄드가 나타나는 자리는 아래가 전부다.** 새로 칠하려면 이 표와
+    `scripts/check-conventions.mjs`의 `bg-primary`·`text-primary` 항목에 함께 적는다 —
+    `pnpm check:conventions`가 양방향으로 대조한다(알약·그림자 예외와 같은 장치).
+
+    | 자리 | 무엇 |
+    |---|---|
+    | `shared/ui/button-class.ts` | `primary` 버튼 — 그 화면의 CTA |
+    | `shared/ui/dialog.tsx` | `confirmTone="primary"` 확인 버튼 |
+    | `shared/ui/action-chip-class.ts` | 좋아요 활성(상세) |
+    | `shared/ui/wordmark.tsx` | 워드마크의 볼 — 브랜드 마크 |
+    | `shared/ui/pill.tsx` | `green` 배지 |
+    | `shared/ui/live-dot.tsx` | `primary` 도트 |
+    | `entities/post/ui/post-card.tsx` | 목록 카드의 좋아요 하트 |
+    | `entities/comment/ui/comment-item.tsx` | "내 댓글" 배지 |
+    | `entities/survey/ui/vs-badge.tsx` | 분할 카드의 VS 배지 |
+    | `views/post-detail/ui/comment-section.tsx` | 댓글 수 |
+    | `widgets/bottom-tab-bar/ui/bottom-tab-bar.tsx` | 활성 탭 아이콘 |
+
+    (검사는 **주석을 걷어낸 소스**를 훑는다 — 주석에 적힌 `bg-primary`는 세지 않는다.)
+
+  - ⚠ **색이 정보를 혼자 지지 않는다.** 에메랄드(#3ecf8e)는 흰 배경 대비가 **1.99:1**이라
+    WCAG의 비텍스트 최소 3:1에 못 미친다 — 이 색에 **글자나 형태 없는 표시를 싣지 않는다.**
+    좋아요 하트가 성립하는 것은 채우기(`fill-current`)가 상태를 함께 지기 때문이고
+    (빈 윤곽 ↔ 꽉 찬 면), 그래서 옆 숫자는 잉크로 남는다.
 - 에메랄드(`bg-primary`) 위 텍스트는 항상 `text-on-primary`(#171717) — **흰색 금지**.
 - 버튼은 **6px 라운드**(`rounded-sm`) — pill 버튼 금지. **예외는 아래 표에 못박아 두었다.**
 - 그림자 대신 **1px 헤어라인**이 카드 구조를 담당, resting 상태는 flat. **예외는 "떠 있는 레이어"뿐이다(아래).**
@@ -159,6 +187,8 @@ function cardClassName(peek: boolean) {
 - 다만 **크롬(버튼·네비·헤더)의 에메랄드 1개 규칙은 그대로다.** 카드 바깥에 에메랄드를 더하지 않는다.
 - 그래서 서베이 화면의 액션 버튼은 `dark`·`secondary`를 쓴다 — `primary`를 쓰면 카드가 아닌
   자리에 에메랄드가 하나 더 생긴다.
+  ⚠ **말하는 대상은 카드와 같은 층에 있는 버튼이다.** 스크림 위로 뜬 `Dialog`는 여기 해당하지
+  않는다(위 "층에서 따로 센다") — 서베이 화면에서도 로그인 안내의 확인 버튼은 에메랄드다.
 - 목록의 일반 카드·상세의 비율 바는 지금처럼 잉크 래더만 쓴다.
 
 ⚠ 색은 `style`로 준다 — DB에서 오는 런타임 값이라 클래스로 확정할 수 없다(위 "동적 값" 규칙).

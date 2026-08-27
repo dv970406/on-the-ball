@@ -112,6 +112,24 @@ const STYLE_ALLOWED = {
     "src/widgets/bottom-tab-bar/ui/bottom-tab-bar.tsx",
   ],
   "backdrop-blur": ["src/widgets/bottom-tab-bar/ui/bottom-tab-bar.tsx"],
+  // 에메랄드가 나타나는 자리 — styling.md의 표와 한 쌍이다.
+  // ⚠ 원칙("눌러야 할 곳 하나")으로는 경계가 갈리지 않아(활성 탭 아이콘 ↔ 활성 말머리 칩은
+  //   둘 다 aria-current인 Link다) 자리를 센다. 새 에메랄드는 여기와 표에 함께 적는다.
+  "bg-primary": [
+    "src/shared/ui/button-class.ts", // primary 버튼 — 그 화면의 CTA
+    "src/shared/ui/dialog.tsx", // confirmTone="primary"
+    "src/shared/ui/action-chip-class.ts", // 좋아요 활성(상세)
+    "src/shared/ui/wordmark.tsx", // 워드마크의 볼 — 브랜드 마크
+    "src/shared/ui/pill.tsx", // green 배지
+    "src/shared/ui/live-dot.tsx", // primary 도트
+    "src/entities/survey/ui/vs-badge.tsx", // 분할 카드의 VS 배지
+  ],
+  "text-primary": [
+    "src/entities/post/ui/post-card.tsx", // 목록 카드의 좋아요 하트
+    "src/entities/comment/ui/comment-item.tsx", // "내 댓글" 배지
+    "src/views/post-detail/ui/comment-section.tsx", // 댓글 수
+    "src/widgets/bottom-tab-bar/ui/bottom-tab-bar.tsx", // 활성 탭 아이콘
+  ],
 };
 
 /** FSD 레이어 서열. 하위는 상위를 import할 수 없다. */
