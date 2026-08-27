@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { ClipboardList } from "lucide-react";
 import { SURVEY_LIST_LIMIT, type SurveyListPage, SurveyCard } from "@/entities/survey";
-import { signInWithNext } from "@/shared/config";
 import { cn, formatCount } from "@/shared/lib";
-import { Dialog, EmptyState, StaleBanner } from "@/shared/ui";
+import { EmptyState, SignInDialog, StaleBanner } from "@/shared/ui";
 import { AppBar } from "@/widgets/app-bar";
 import { AuthStatus } from "@/widgets/auth-status";
 import { BottomTabBar } from "@/widgets/bottom-tab-bar";
@@ -59,7 +57,6 @@ export function SurveyListView({
    *   영역을 기준으로 잡아 스크롤한 만큼 화면 밖에 뜨고, 목록에는 카드 수만큼 생긴다.
    */
   const [askSignIn, setAskSignIn] = useState(false);
-  const router = useRouter();
 
   return (
     <>
@@ -147,16 +144,10 @@ export function SurveyListView({
         )}
       </TabScrollArea>
       <BottomTabBar />
-      <Dialog
+      <SignInDialog
         open={askSignIn}
-        onCancel={() => setAskSignIn(false)}
-        // ⚠ 경로는 **누른 시점에** 읽는다 — `usePathname()`으로 구독하면 콜백에서만 쓰는
-        //   값 때문에 라우트가 바뀔 때마다 이 화면이 리렌더된다(`rerender-defer-reads`).
-        onConfirm={() => router.push(signInWithNext(window.location.pathname))}
-        title="로그인이 필요해요"
-        description="서베이에 참여하려면 먼저 로그인해 주세요. 로그인하면 이 화면으로 돌아와요."
-        cancelLabel="닫기"
-        confirmLabel="로그인하기"
+        onClose={() => setAskSignIn(false)}
+        action="서베이에 참여하려면"
       />
     </>
   );

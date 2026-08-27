@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   Flag,
   Flame,
@@ -10,7 +10,7 @@ import {
   Trash2,
   UserX,
 } from "lucide-react";
-import { ROUTES, avatarUrl, signInWithNext } from "@/shared/config";
+import { ROUTES, avatarUrl } from "@/shared/config";
 import { formatCount, formatRelativeTime, useNowMs } from "@/shared/lib";
 import {
   Avatar,
@@ -21,6 +21,7 @@ import {
   Pill,
   Sheet,
   SheetItem,
+  SignInDialog,
   Skeleton,
 } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
@@ -112,7 +113,6 @@ export function PostDetailView({
   );
   const user = useSessionStore((s) => s.user);
   const sessionStatus = useSessionStore((s) => s.status);
-  const pathname = usePathname();
   const deletion = usePostDeletion(postId);
   // ⚠ 훅은 조건 없이 부른다 — 아래에 로딩·에러 조기 반환이 있어 post가 아직 없을 수 있다.
   //   인자는 `block()`을 부를 수 있게 된 뒤(=글이 그려진 뒤)에만 쓰이므로 폴백이 무해하다.
@@ -136,6 +136,14 @@ export function PostDetailView({
   const [sheetStage, setSheetStage] = useState<"menu" | "report">("menu");
   const [askBlock, setAskBlock] = useState(false);
   const [askDelete, setAskDelete] = useState(false);
+  /**
+   * 비로그인이 로그인 필요한 액션을 눌렀을 때의 안내 — **무엇을 하려 했는지**를 담는다.
+   *
+   * ⚠ 다이얼로그는 **이 화면에 한 벌뿐이다.** 좋아요·투표·차단·신고가 같은 자리를 쓰고
+   *   문구만 갈린다 — 액션마다 `Dialog`를 두면 `absolute` 기준이 스크롤 `<main>`이 되어
+   *   스크롤한 만큼 화면 밖에 뜬다(`SignInDialog` 주석).
+   */
+  const [signInAction, setSignInAction] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
   // HOT 판정용 — 렌더 중 Date.now()는 순수하지 않다(use-now.ts 주석 참고)
   // 마운트 전에는 서버가 준 시각을 쓴다 — 상대시각이 첫 렌더부터 그려진다
@@ -289,6 +297,7 @@ export function PostDetailView({
           {poll && (
             <PollVote
               poll={poll}
+              onSignInRequired={() => setSignInAction("투표에 참여하려면")}
               initialUserId={initialUserId}
               initialResults={initialPollResults}
             />
@@ -310,6 +319,7 @@ export function PostDetailView({
               postId={post.id}
               likeCount={post.likeCount}
               isLiked={post.isLiked}
+              onSignInRequired={() => setSignInAction("좋아요를 누르려면")}
             />
           </footer>
         </article>
@@ -365,10 +375,10 @@ export function PostDetailView({
         ) : (
           /*
            * ⚠ 세션을 **3분기**한다 — `loading`을 비로그인과 같이 다루면 콜드 로드 직후
-           *   로그인한 사용자가 로그인 화면으로 튄다. 같은 화면의 `LikeButton`·`CommentBar`·
+           *   로그인한 사용자가 로그인 안내를 본다. 같은 화면의 `LikeButton`·`CommentBar`·
            *   `PollVote`가 이미 그렇게 판정하므로 여기만 2분기면 한 화면 안에서 판정이 갈린다.
            * ⚠ `SheetItem`은 `button`이라 `Link`를 쓸 수 없다 → 비로그인은 항목을 **활성**으로
-           *   두고 눌렀을 때 로그인 화면으로 보낸다(목적지는 `signInWithNext`로 같게 맞춘다).
+           *   두고 눌렀을 때 로그인 안내를 띄운다(시트를 먼저 닫는다 — 오버레이를 겹치지 않는다).
            */
           <>
             <SheetItem
@@ -377,7 +387,7 @@ export function PostDetailView({
               onClick={() => {
                 setSheetOpen(false);
                 if (sessionStatus === "guest") {
-                  router.push(signInWithNext(pathname));
+                  setSignInAction(`${post.authorNickname}님을 차단하려면`);
                   return;
                 }
                 setAskBlock(true);
@@ -392,7 +402,7 @@ export function PostDetailView({
               onClick={() => {
                 if (sessionStatus === "guest") {
                   setSheetOpen(false);
-                  router.push(signInWithNext(pathname));
+                  setSignInAction("이 글을 신고하려면");
                   return;
                 }
                 // 시트를 닫지 않는다 — 같은 오버레이의 단계만 바꾼다(위 상태 주석)
@@ -419,7 +429,18 @@ export function PostDetailView({
         }
         cancelLabel="취소"
         confirmLabel="차단"
-        destructive
+        confirmTone="danger"
+      />
+
+      {/*
+        로그인 안내 — 좋아요·투표·차단·신고가 **이 한 벌을 공유한다**(위 signInAction 주석).
+        ⚠ `<main>` 밖이라야 한다 — `Dialog`의 `absolute`가 스크롤 영역을 기준으로 잡으면
+          스크롤한 만큼 화면 밖에 뜬다.
+      */}
+      <SignInDialog
+        open={signInAction !== null}
+        onClose={() => setSignInAction(null)}
+        action={signInAction ?? ""}
       />
 
       <Dialog
@@ -433,7 +454,7 @@ export function PostDetailView({
         description={`댓글 ${formatCount(post.commentCount)}개도 같이 사라져요. 되돌릴 수 없습니다.`}
         cancelLabel="취소"
         confirmLabel="삭제"
-        destructive
+        confirmTone="danger"
       />
 
       {actionError && (

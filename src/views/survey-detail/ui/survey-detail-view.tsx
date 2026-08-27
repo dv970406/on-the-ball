@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 import type { Survey, SurveyResult } from "@/entities/survey";
 import { SurveyVote } from "@/features/cast-survey-vote";
-import { ROUTES, signInWithNext } from "@/shared/config";
-import { Dialog, EmptyState, Skeleton } from "@/shared/ui";
+import { ROUTES } from "@/shared/config";
+import { EmptyState, SignInDialog, Skeleton } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
 import { useSurveyDetail } from "../model/use-survey-detail";
 
@@ -61,7 +60,6 @@ export function SurveyDetailView({
 
   /** 비로그인이 선택지를 눌렀을 때의 안내 — 목록 화면과 같은 이유로 **뷰가 소유한다** */
   const [askSignIn, setAskSignIn] = useState(false);
-  const router = useRouter();
 
   // 헤더 라벨은 크롬이자 공유 시트에 실리는 이름이다 — 화면의 h1은 아래 제목이 따로 갖는다.
   // ⚠ titleHidden: 바로 아래에 제목이 있어 라벨을 그리면 두 번 읽힌다(글 상세와 같은 처리).
@@ -140,15 +138,10 @@ export function SurveyDetailView({
           <p className="mt-3 text-[12px] text-ink-mute">최신 결과를 불러오지 못했어요.</p>
         )}
       </main>
-      <Dialog
+      <SignInDialog
         open={askSignIn}
-        onCancel={() => setAskSignIn(false)}
-        // ⚠ 경로는 **누른 시점에** 읽는다(목록 화면과 같은 이유 — `rerender-defer-reads`)
-        onConfirm={() => router.push(signInWithNext(window.location.pathname))}
-        title="로그인이 필요해요"
-        description="서베이에 참여하려면 먼저 로그인해 주세요. 로그인하면 이 화면으로 돌아와요."
-        cancelLabel="닫기"
-        confirmLabel="로그인하기"
+        onClose={() => setAskSignIn(false)}
+        action="서베이에 참여하려면"
       />
     </>
   );

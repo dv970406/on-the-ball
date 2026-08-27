@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { PenLine } from "lucide-react";
 import Link from "next/link";
 import {
@@ -14,9 +15,10 @@ import {
 	type PostSort,
 	usePostListQuery,
 } from "@/entities/post";
+import { useSessionStore } from "@/entities/session";
 import { ROUTES } from "@/shared/config";
 import { cn, formatCount } from "@/shared/lib";
-import { EmptyState, Icon, StaleBanner, chipClassName } from "@/shared/ui";
+import { EmptyState, Icon, SignInDialog, StaleBanner, chipClassName } from "@/shared/ui";
 import { AppBar } from "@/widgets/app-bar";
 import { AuthStatus } from "@/widgets/auth-status";
 import { BottomTabBar } from "@/widgets/bottom-tab-bar";
@@ -50,6 +52,18 @@ export function PostListView({ category, sort, initialData, serverNowMs }: PostL
 	);
 
 	const posts = data?.items;
+
+	/**
+	 * 비로그인이 글쓰기를 눌렀을 때의 안내.
+	 *
+	 * ⚠ **앵커는 그대로 둔다.** 크롤러가 `/posts/new`를 발견하는 유일한 경로가 이 링크이고
+	 *   (`robots.txt`가 아무것도 막지 않는 근거다 — nextjs.md), 비로그인에게는 proxy가 307을
+	 *   준다. 여기서는 그 이동을 **가로채기만** 한다.
+	 * ⚠ `loading`에는 가로채지 않는다 — 복원 중인 로그인 사용자가 안내를 보면 안 되고,
+	 *   그대로 보내도 proxy가 쿠키로 옳게 판정한다(상세 화면들과 같은 3분기).
+	 */
+	const sessionStatus = useSessionStore((s) => s.status);
+	const [askSignIn, setAskSignIn] = useState(false);
 
 	/** 기본 정렬에는 파라미터를 붙이지 않는다 — `?sort=latest`라는 중복 URL을 만들지 않는다 */
 	const hrefFor = (target: PostCategory | null, targetSort: PostSort) => {
@@ -182,17 +196,43 @@ export function PostListView({ category, sort, initialData, serverNowMs }: PostL
 			</TabScrollArea>
 
 			{/*
-        플로팅 글쓰기 버튼 — **잉크 블랙**이다. 목록 화면의 컬러 이벤트는 0개다.
+        플로팅 글쓰기 버튼 — **잉크 블랙**이다. 목록 화면의 "눌러야 할 곳"에는 에메랄드를
+        쓰지 않는다(이 화면의 에메랄드는 워드마크의 볼과 카드의 좋아요 하트뿐이고, 어디에
+        둘 수 있는지는 `styling.md`의 에메랄드 자리 표가 정한다).
         알약 형태는 "버튼 6px 라운드" 규칙의 명시적 예외 중 하나.
         Link 안에 Button을 넣지 않는다(<a> 안의 <button>) — 클래스만 재현한다.
       */}
 			<Link
 				href={ROUTES.postNew}
+				// ⚠ 수식어 클릭은 가로채지 않는다 — Next의 Link는 사용자 onClick을 **먼저** 부르고
+				//   `defaultPrevented`면 빠져나가므로, 무조건 막으면 ⌘/Ctrl+클릭의 "새 탭"까지 함께
+				//   죽는다(가운데 클릭은 auxclick이라 원래 안 걸린다 — 좌클릭만 다르게 굴면 어긋난다).
+				onClick={(e) => {
+					if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+					if (sessionStatus !== "guest") return;
+					e.preventDefault();
+					setAskSignIn(true);
+				}}
+				// 이동하지 않고 안내가 뜬다는 것을 활성화 **전에** 알린다(role은 link 그대로다)
+				aria-haspopup={sessionStatus === "guest" ? "dialog" : undefined}
 				className="absolute bottom-[100px] right-4 z-[66] inline-flex h-11 items-center gap-1.5 rounded-full bg-ink pl-[13px] pr-4 text-sm font-medium text-white shadow-[0_8px_24px_rgba(0,0,0,0.18)]"
 			>
 				<Icon as={PenLine} size={16} />
 				글쓰기
 			</Link>
+
+			{/*
+        ⚠ `TabScrollArea` **밖**이라야 한다 — `Dialog`의 `absolute`가 스크롤 영역을 기준으로
+          잡으면 스크롤한 만큼 화면 밖에 뜬다(FAB이 같은 이유로 여기 있다).
+        ⚠ 목적지를 `/posts/new`로 준다 — 지금 화면으로 되돌리면 로그인하고 와서 글쓰기를
+          다시 눌러야 한다.
+      */}
+			<SignInDialog
+				open={askSignIn}
+				onClose={() => setAskSignIn(false)}
+				action="글을 쓰려면"
+				next={ROUTES.postNew}
+			/>
 
 			<BottomTabBar />
 		</>

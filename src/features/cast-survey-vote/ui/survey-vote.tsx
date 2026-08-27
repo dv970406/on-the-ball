@@ -49,7 +49,7 @@ interface SurveyVoteProps {
  * 그리는 일은 `entities/survey`의 `SplitCard`·`SurveyBlock`이 한다.
  *
  * ⚠ **세션 `status`를 3분기한다.** `loading`을 비로그인과 같이 다루면 콜드 로드 직후
- *   로그인한 사용자가 선택지를 눌렀을 때 로그인 화면으로 튄다.
+ *   로그인한 사용자가 선택지를 눌렀을 때 로그인 안내를 본다.
  * ⚠ `!== "authenticated"`가 아니라 **`=== "guest"`로 판정한다** — 상태가 하나 늘면
  *   부정형만 그 새 상태를 조용히 게스트로 취급한다.
  */

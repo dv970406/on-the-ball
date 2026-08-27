@@ -198,7 +198,7 @@ export function CommentSection({
         description={`답글 ${formatCount(confirmTarget?.replyCount ?? 0)}개도 함께 삭제돼요. 되돌릴 수 없습니다.`}
         cancelLabel="취소"
         confirmLabel="삭제"
-        destructive
+        confirmTone="danger"
       />
     </section>
   );

@@ -100,7 +100,9 @@
 - ⚠ **`entities/post`가 아니라 별도 슬라이스다.** 임베딩하면 poll 타입과 낙관적 스냅샷이 `PostDetail` 안에 중첩되어 post가 투표 도메인을 떠안는다. 대가로 상세 화면에 요청이 하나 는다.
 
 ## `@/features/cast-poll-vote`
-- `PollVote` — `PollBlock`에 세션과 뮤테이션을 붙인 컴포넌트. ⚠ 세션 `status`를 **3분기**한다(`loading`을 비로그인과 같이 다루면 콜드 로드 직후 로그인 사용자가 로그인 화면으로 튄다 — `LikeButton`·`CommentBar`와 판정을 맞춘다).
+- `PollVote` — `PollBlock`에 세션과 뮤테이션을 붙인 컴포넌트. ⚠ 세션 `status`를 **3분기**한다(`loading`을 비로그인과 같이 다루면 콜드 로드 직후 로그인 사용자가 로그인 안내를 본다 — `LikeButton`·`CommentBar`와 판정을 맞춘다).
+- ⚠ **비로그인에게도 선택지를 연결한다** — 눌러야 로그인 안내가 뜬다(`SurveyVote`와 같은 형태). 선택지를 죽이고 아래에 "로그인하고 투표하기" 링크를 다는 형태로 되돌리지 말 것: 사용자가 실제로 누르는 것은 선택지라 **눌러도 아무 반응이 없는 UI**가 된다.
+- ⚠ **팝업은 뷰가 소유한다**(`onSignInRequired` 콜백으로 올린다) — 사유는 `cast-survey-vote`와 같다.
 - ⚠ 투표하기에는 **RPC가 없다.** 집계 컬럼이 없어 지킬 불변조건이 행 하나뿐이라 잠금이 필요 없다. 다만 **PostgREST upsert도 쓰지 않는다** — payload 전 컬럼에 UPDATE 권한을 요구해서 `post_id`를 열게 되고, 그러면 표를 다른 글로 옮겨 "취소 불가"가 뚫린다.
 
 ## `@/entities/survey`
@@ -124,9 +126,9 @@
 
 ## `@/features/cast-survey-vote`
 - `SurveyVote` — `SurveyBlock`에 세션과 뮤테이션을 붙인 컴포넌트. 조회는 `@/entities/survey`다(`PollVote`와 같은 분업).
-- ⚠ 세션 `status`를 **3분기**한다(`loading`을 비로그인과 같이 다루면 콜드 로드 직후 로그인 사용자가 로그인 화면으로 튄다).
-- ⚠ **비로그인에게도 선택지를 연결한다** — 눌러야 로그인 팝업이 뜬다. 읽기 전용으로 두면 "왜 안 눌리지"가 되고 별도 안내 링크를 다시 붙여야 한다. 읽기 전용은 마감된 서베이뿐이다.
-- ⚠ **팝업(`Dialog`)은 이 컴포넌트가 아니라 뷰가 소유한다**(`onSignInRequired` 콜백으로 올린다). `Dialog`는 `absolute`라 `TabScrollArea`의 relative 스크롤 영역 안에 두면 스크롤한 만큼 화면 밖에 뜨고, 목록에는 카드 수만큼 생긴다 — `ToastViewport`를 루트에 하나만 두는 것과 같은 이유다.
+- ⚠ 세션 `status`를 **3분기**한다(`loading`을 비로그인과 같이 다루면 콜드 로드 직후 로그인 사용자가 로그인 안내를 본다).
+- ⚠ **비로그인에게도 선택지를 연결한다** — 눌러야 로그인 안내가 뜬다. 읽기 전용으로 두면 "왜 안 눌리지"가 되고 별도 안내 링크를 다시 붙여야 한다. 읽기 전용은 마감된 서베이뿐이다.
+- ⚠ **안내(`SignInDialog`)는 이 컴포넌트가 아니라 뷰가 소유한다**(`onSignInRequired` 콜백으로 올린다). `Dialog`는 `absolute`라 `TabScrollArea`의 relative 스크롤 영역 안에 두면 스크롤한 만큼 화면 밖에 뜨고, 목록에는 카드 수만큼 생긴다 — `ToastViewport`를 루트에 하나만 두는 것과 같은 이유다.
 - ⚠ **무효화 대상이 `cast-poll-vote`보다 하나 많다** — 목록 카드가 "참여 완료"를 표시하므로 `surveyKeys.lists()`도 함께 지운다. 빼면 참여하고 목록으로 돌아왔을 때 배지가 갱신되지 않는다.
 - ⚠ 참여하기에는 **RPC가 없고 PostgREST upsert도 쓰지 않는다** — 사유는 `cast-poll-vote`와 같다(집계 컬럼이 없어 잠금이 불필요하고, upsert는 `survey_id` UPDATE 권한을 요구해 "취소 불가"를 뚫는다).
 
@@ -159,7 +161,7 @@
 ## `@/shared/config`
 - `ROUTES` — 경로 헬퍼. **경로 문자열 하드코딩 금지**(`"/posts"` ❌ → `ROUTES.postList`).
 - **`isTabBarRoute(pathname)` / `activeTabHref(pathname)`** — 하단 탭바를 그리는 화면인지와 그때 활성인 탭. **정확 일치 배열로 되돌리지 말 것** — 말머리 목록(`/posts/category/…`)이 생기면서 값이 유한하지 않게 됐고, 빠뜨리면 그 화면에서 **탭바가 사라지고 토스트가 탭바 자리로 내려간다.** 탭바(`widgets`)와 토스트(`shared/ui`)가 이 둘만 본다.
-- `signInWithNext(pathname)` / `withNext(path, next)` — 복귀 경로를 붙인 URL. proxy(서버 가드)와 클라 가드가 **같은 형태**를 만들어야 하므로 여기로 모았다.
+- `signInWithNext(pathname)` / `withNext(path, next)` — 복귀 경로를 붙인 URL. proxy(서버 가드)와 클라 가드가 **같은 형태**를 만들어야 하므로 여기로 모았다. ⚠ 액션 컨트롤에서 이걸로 **직접 이동하지 않는다** — `SignInDialog`가 안내를 끼고 그 안에서 부른다(예외는 라벨이 "로그인"인 컨트롤).
 - **`safeNextPath(next, origin)`** — `?next=` 값을 앱 내부 경로로만 통과시킨다. **직접 문자열 검사를 짜지 말 것** — `startsWith("/") && !startsWith("//")`로는 `/\evil.com`도 `/..//evil.com`도 못 막는다(둘 다 실제로 뚫렸다).
 - `COLOR` — JS 인라인 style용 색 상수. **토큰 hex 하드코딩 금지**. 클래스로 확정할 수 없는 자리(런타임 색과의 비교·인라인 세그먼트 색)에서 쓴다 — 현역 선례는 `shared/ui/ratio-bar.tsx`·`entities/survey/ui/split-card.tsx`.
 - **`OAUTH_PROVIDERS` / `OAUTH_PROVIDER_LABEL`** — 지원 소셜 프로바이더의 단일 소스. `supabase/config.toml`의 `[auth.external.*]`와 갈리면 안 된다. ⚠ `shared`에 있는 이유는 로그인(`features/sign-in`)과 계정 연결(`features/link-identity`)이 같은 목록을 써야 하는데 features끼리는 import할 수 없어서다.
@@ -176,7 +178,7 @@
 ## `@/shared/ui`
 **현역(게시판 v2가 실제로 쓰는 것)** — 새로 만들기 전 여기부터 확인:
 `Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·`Markdown`·
-`Chip`·`chipClassName`·`ActionChip`·`actionChipClassName`·`Dialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`·`RatioBar`·`StaleBanner`
+`Chip`·`chipClassName`·`ActionChip`·`actionChipClassName`·`Dialog`·`SignInDialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`·`RatioBar`·`StaleBanner`
 
 **현재 미사용** — **"검증된 현역"으로 오인하지 말 것**:
 `TabHeader`·`Flag`·`Shirt`·`SectionHead`·`LiveDot`·`LiveStatusPill`·`NightCard`·`PlayerSilhouette`
@@ -190,11 +192,17 @@
 - `Markdown` — 마크다운 렌더(GFM). `"use client"` **없음** — 서버 렌더 가능.
 - `Chip` — 말머리 칩. **`rounded-sm`(6px)** 이다 — 칩이라고 알약이 아니다(`styling.md` 예외 목록 참고).
 - `chipClassName(selected)` — 위 칩의 클래스만. 목록의 말머리 레일은 **이동**이라 `<Link>`에 이 클래스를 입히고(`Link` 안에 `button`을 넣지 않는다), 작성 폼은 **선택**이라 `Chip`(`button`)을 그대로 쓴다. 분리 사유는 `Button`↔`buttonClassName`과 같다.
-- `ActionChip` / `actionChipClassName` — 좋아요·댓글 카운터 칩. 클래스 함수가 분리된 이유는 `Button`↔`buttonClassName`과 같다 — 비로그인 좋아요는 `Link`로 렌더해야 하는데 `Link` 안에 `button`을 넣을 수 없어 **클래스만** 필요하다.
+- `ActionChip` / `actionChipClassName` — 좋아요·댓글 카운터 칩. 클래스 함수가 분리된 이유는 `Button`↔`buttonClassName`과 같다 — **버튼이 아닌 요소로 같은 칩을 그려야 하는 자리**가 있어 클래스만 필요하다(세션 복원 중의 좋아요는 누를 수 없어 `span`이다).
 - `Dialog` / `Sheet`(+`SheetItem`) — 확인 대화상자 / 하단 시트. 포커스 가둠은 `@/shared/lib`의 `useFocusTrap`.
   - `Sheet`는 화면 하단에 붙는 **edge-to-edge** 시트다(`styling.md`). "닫기" 행을 두지 않는다.
   - ⚠ 닫기 수단은 스크림 탭 · Escape · 스와이프인데 **셋 다 포인터이거나 물리 키보드다.** 그래서 그래버가 `button aria-label="닫기"`를 겸한다 — 오버플로 메뉴는 남의 글이면 항목이 전부 `disabled`라 **시트 안 활성 컨트롤이 0개**가 되고, 그때 스크린리더·키보드의 유일한 탈출구가 이 버튼이다. `div`로 되돌리지 말 것.
   - ⚠ 진입·퇴장 애니메이션은 **바깥 요소**, 드래그 오프셋은 **안쪽 래퍼**가 갖는다. 한 요소에 겹치면 CSS animation이 캐스케이드에서 inline style을 이겨 드래그가 통째로 무시된다. 새 오버레이에 드래그를 붙일 때 같은 함정을 밟지 말 것.
+- **`SignInDialog`** — "로그인이 필요해요" 안내. **로그인이 필요한 액션을 비로그인이 눌렀을 때 `router.push(signInWithNext(...))`로 곧바로 화면을 갈아치우지 않는다** — 무엇 때문에 화면을 잃는지 모른 채 이동하게 되고, 되돌아올 길도 없다. 문구는 `action`(`"좋아요를 누르려면"`처럼 **`~하려면`으로 끝나는 구절**) 하나만 받고 나머지 문장은 컴포넌트가 갖는다.
+  - ⚠ **예외는 대놓고 "로그인"이라고 쓰인 컨트롤이다** — `AuthStatus`·`CommentBar`의 로그인 버튼은 목적지가 라벨에 적혀 있어 한 단계 더 묻는 것이 방해다. 그대로 `signInWithNext`로 보낸다.
+  - ⚠ **화면을 떠나는 동작에는 `next`를 준다**(글쓰기 → `/posts/new`, 프로필 탭 → `/profile`). 기본값(지금 화면)으로 두면 로그인하고 돌아와서 그 동작을 처음부터 다시 눌러야 한다.
+  - ⚠ **열림 상태는 호출부가 갖고, 렌더 자리는 스크롤 영역 밖이다.** `Dialog`가 `absolute`라 스크롤 컨테이너 안에 두면 스크롤한 만큼 화면 밖에 뜨고, 목록에서는 항목 수만큼 생긴다 → 액션 컴포넌트(`LikeButton`·`PollVote`·`SurveyVote`)는 `onSignInRequired` 콜백만 올리고 **뷰가 한 벌** 렌더한다. 한 화면의 여러 액션은 **문구만 다른 한 벌**을 공유한다(글 상세가 그 형태다 — `signInAction: string | null` 하나로 무엇이 막혔는지를 담는다).
+  - ⚠ **앵커는 앵커로 남긴다.** 크롤 가능한 링크(`/posts/new` FAB·프로필 탭)는 `<Link>`를 유지하고 `onClick`에서 비로그인일 때만 `preventDefault`한다 — 그 앵커가 크롤러의 유일한 발견 경로이고 `robots.txt`가 아무것도 막지 않는 근거다(`nextjs.md`).
+  - ⚠ 세션 `status`는 **3분기**한다 — `loading`에 가로채면 복원 중인 로그인 사용자가 안내를 본다.
 - `StaleBanner` — 리페치 실패를 **데이터를 유지한 채** 알리는 배너. ⚠ 호출부의 조건은 반드시 `error && data`다 — `error`를 데이터 렌더보다 먼저 보면 좋아요 한 번에 네트워크가 끊겨도 읽고 있던 목록이 통째로 사라진다(`data-and-state.md`). 목적격 조사(을/를)는 컴포넌트가 받침으로 판정하므로 **명사만** 넘긴다.
 - `ToastViewport` — 루트(`AppProviders`)에 **하나만** 둔다. 발행 API(`useToast`)는 `@/shared/lib`에 있다.
   - ⚠ **앱의 유일한 라이브 리전이다.** 문구가 없어도 언마운트하지 않는다(리전과 내용이 함께 마운트되면 발화가 불안정하다) — `if (!message) return null`로 되돌리지 말 것. 화면마다 `role="status"`를 새로 만들지 않는 이유는 `code-quality.md`에.
@@ -203,8 +211,10 @@
 ## `@/widgets`
 - `AppBar` — 목록 화면 상단(워드마크 + `leading` 슬롯).
 - `BottomTabBar` — 하단 탭바. **`backdrop-blur`가 허용된 유일한 요소**다(`styling.md`).
+  - ⚠ **로그인해야 열리는 탭을 추가하면 `signInAction` 문구를 함께 적는다.** 그 값이 있는 탭만 비로그인의 이동을 가로채 `SignInDialog`를 띄운다 — 앵커는 그대로 두고 `preventDefault`만 한다. 빠뜨리면 그 탭은 예전처럼 proxy 307로 로그인 화면에 떨궈진다.
+  - ⚠ 그 다이얼로그는 `<nav>`의 **형제**여야 한다. 탭바가 `absolute`라 자기 안의 `Dialog`에게 컨테이닝 블록이 되어, 안에 두면 알약 한가운데에 뜬다.
 - `SubHeader` — 상세·작성·수정 화면 상단(뒤로가기 + 공유).
 - `TabScrollArea` — 목록 스크롤 영역(`<main>` 제공 + 스크롤 복원).
 - `AuthShell` — 인증 화면의 공통 껍데기.
-- `AuthStatus` — **비로그인일 때의 로그인 링크**만 그린다(로그인 상태에서는 `null`).
+- `AuthStatus` — **비로그인일 때의 로그인 링크**만 그린다(로그인 상태에서는 `null`). ⚠ 라벨이 "로그인"이라 `SignInDialog`를 거치지 않고 곧바로 이동한다 — 목적지가 라벨에 적혀 있어 한 단계 더 묻는 것이 방해다(`CommentBar`의 로그인 버튼도 같다).
   ⚠ 계정 관련 동작(닉네임 표시·로그아웃)을 여기 되넣지 않는다 — 프로필 화면과 두 곳으로 갈린다. 프로필 진입은 하단 탭바가 상시 제공하고, **로그아웃은 `views/profile`이 단독으로 갖는다.**

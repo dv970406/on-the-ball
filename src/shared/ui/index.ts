@@ -29,6 +29,8 @@ export { actionChipClassName } from "./action-chip-class";
 // 그래버가 `button aria-label="닫기"`를 겸하는 이유는 sheet.tsx 주석에 있다(스크린리더 탈출구).
 export { Sheet, SheetItem } from "./sheet";
 export { Dialog } from "./dialog";
+// 액션을 누른 비로그인 사용자에게 한 단계 안내를 끼운다 — 곧바로 로그인 화면으로 갈아치우지 않는다
+export { SignInDialog } from "./sign-in-dialog";
 // 토스트의 상태(useToast·useToastStore)는 @/shared/lib에 있다 — ui는 뷰포트만 노출한다
 export { ToastViewport } from "./toast";
 export { Markdown } from "./markdown";

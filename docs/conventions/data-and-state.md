@@ -99,7 +99,7 @@ TanStack Query는 성공 후 리페치가 실패해도 `data`를 유지한다(`s
 
 ## 뮤테이션
 
-- 로그인이 필요한 액션은 UI에서 `useSessionStore`의 `status`로 유도하고(로그인 링크), **실제 차단은 RLS와 함수 EXECUTE 권한이 한다.** 훅의 `if (!user) throw`는 이중 방어일 뿐이다.
+- 로그인이 필요한 액션은 UI에서 `useSessionStore`의 `status`로 유도하고(`SignInDialog` 안내 — 라벨이 "로그인"인 컨트롤만 곧바로 이동한다, `reuse.md`), **실제 차단은 RLS와 함수 EXECUTE 권한이 한다.** 훅의 `if (!user) throw`는 이중 방어일 뿐이다.
 - 결과가 여러 화면에 걸치면 `onSuccess`에서 관련 `queryKey`를 무효화한다. 카운터가 DB 트리거로 움직이면(댓글 수) **글 캐시도 함께** 무효화해야 화면에 반영된다.
 - 에러는 훅에서 `console.error`로 원본을 남기고 한국어 메시지로 바꿔 throw한다(로깅은 훅, 노출은 컴포넌트).
 

@@ -1,14 +1,19 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { signInWithNext } from "@/shared/config";
 import { type Poll, PollBlock, type PollResult, usePollResultsQuery } from "@/entities/poll";
 import { useSessionStore } from "@/entities/session";
 import { useCastPollVote } from "../model/use-cast-poll-vote";
 
 interface PollVoteProps {
   poll: Poll;
+  /**
+   * 비로그인이 선택지를 눌렀다.
+   *
+   * ⚠ **다이얼로그를 여기서 렌더하지 않고 위로 올린다.** `Dialog`는 `absolute`라 가장 가까운
+   *   positioned 조상을 기준으로 잡는데, 이 블록은 상세의 `relative` 스크롤 `<main>` 안이라
+   *   스크롤을 내린 만큼 화면 밖에 뜬다(`SurveyVote`와 같은 형태·같은 이유).
+   */
+  onSignInRequired: () => void;
   /**
    * 서버가 본 로그인 사용자(상세가 SSR이라 함께 내려온다).
    *
@@ -26,18 +31,22 @@ interface PollVoteProps {
  * 그리는 일은 전부 `entities/poll`의 `PollBlock`이 한다.
  *
  * ⚠ **세션 `status`를 3분기한다.** `loading`을 비로그인과 같이 다루면 콜드 로드 직후
- *   로그인한 사용자가 선택지를 눌렀을 때 로그인 화면으로 튄다. 같은 화면의 `LikeButton`·
+ *   로그인한 사용자가 선택지를 눌렀을 때 로그인 안내를 본다. 같은 화면의 `LikeButton`·
  *   `CommentBar`가 이미 `loading`을 따로 다루므로, 여기만 2분기로 두면 **한 화면 안에서
  *   세 컴포넌트의 판정이 갈린다.**
  * ⚠ `!== "authenticated"`가 아니라 **`=== "guest"`로 판정한다** — 상태가 하나 늘면
  *   부정형만 그 새 상태를 조용히 게스트로 취급한다(`LikeButton`과 같은 형태).
  */
-export function PollVote({ poll, initialUserId, initialResults }: PollVoteProps) {
+export function PollVote({
+  poll,
+  onSignInRequired,
+  initialUserId,
+  initialResults,
+}: PollVoteProps) {
   const status = useSessionStore((s) => s.status);
   const storeUserId = useSessionStore((s) => s.user?.id);
   // 세션 복원 전에는 서버가 알려준 사용자를 키로 쓴다(위 initialUserId 주석)
   const userId = status === "loading" ? initialUserId : storeUserId;
-  const pathname = usePathname();
   const castVote = useCastPollVote(poll.postId);
 
   /**
@@ -70,24 +79,19 @@ export function PollVote({ poll, initialUserId, initialResults }: PollVoteProps)
     return <PollBlock poll={poll} results={results} resultsPending={resultsPending} />;
   }
 
-  if (status === "guest") {
-    return (
-      <PollBlock
-        poll={poll}
-        results={results}
-        resultsPending={resultsPending}
-        footer={
-          // ⚠ Link 안에 button을 넣지 않는다 — 링크형 컨트롤은 클래스만 공유한다
-          <Link
-            href={signInWithNext(pathname)}
-            className="mt-3 inline-block text-[13px] font-medium text-ink underline underline-offset-2"
-          >
-            로그인하고 투표하기
-          </Link>
-        }
-      />
-    );
-  }
+  /**
+   * 선택지를 누르면 무슨 일이 일어나는가.
+   *
+   * ⚠ **비로그인에게도 연결한다** — 눌러야 로그인 안내가 뜬다(`SurveyVote`와 같은 형태).
+   *   전에는 선택지를 죽여 두고 아래에 "로그인하고 투표하기" 링크를 달았는데, 사용자가
+   *   실제로 누르는 것은 선택지라 **눌러도 아무 반응이 없는 UI**가 됐고, 링크를 찾아 누른
+   *   사람은 설명 없이 읽던 글을 잃었다.
+   */
+  const guest = status === "guest";
+  // ⚠ `onSignInRequired`를 그대로 넘기지 않고 **인자 없이 감싼다.** `onVote`는 `optionId`를
+  //   실어 부르는데 TS는 인자를 덜 받는 함수를 허용하므로, 그대로 두면 나중에 인자를 쓰는
+  //   콜백으로 갈아끼웠을 때 선택지 id가 조용히 흘러 들어간다.
+  const pick = guest ? () => onSignInRequired() : (optionId: number) => castVote.mutate(optionId);
 
   return (
     <>
@@ -95,7 +99,8 @@ export function PollVote({ poll, initialUserId, initialResults }: PollVoteProps)
         poll={poll}
         results={results}
         resultsPending={resultsPending}
-        onVote={(id) => castVote.mutate(id)}
+        onVote={pick}
+        signInRequired={guest}
       />
       {/* 토스트는 1.8초 뒤 사라진다 — 지속 표시를 함께 남긴다(둘은 경쟁하지 않는다) */}
       {castVote.error && (

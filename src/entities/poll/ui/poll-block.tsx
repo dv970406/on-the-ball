@@ -1,6 +1,5 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { COLOR } from "@/shared/config";
 import { cn, formatCount } from "@/shared/lib";
 import { RatioBar, Skeleton } from "@/shared/ui";
@@ -21,10 +20,20 @@ interface PollBlockProps {
    *   실패는 상위가 배너로 알리고 이 값은 false가 된다.
    */
   resultsPending?: boolean;
-  /** 없으면 읽기 전용 — 세션 판정은 상위(features)가 한다 */
+  /**
+   * 없으면 읽기 전용 — 세션 판정은 상위(features)가 한다.
+   * ⚠ **비로그인에게도 연결된다** — 눌러야 로그인 안내가 뜬다(사유는 `PollVote` 주석).
+   */
   onVote?: (optionId: number) => void;
-  /** 로그인 유도 등. entity가 인증 경로를 알 이유가 없어 슬롯으로 받는다 */
-  footer?: ReactNode;
+  /**
+   * 누르면 투표가 아니라 **로그인 안내**가 뜨는 상태인가(비로그인).
+   *
+   * ⚠ 이 값이 없으면 선택지가 `aria-pressed="false"`인 토글 버튼으로 읽히는데, 비로그인은
+   *   `myOptionId`가 영원히 `null`이라 **누르든 말든 바뀌지 않는 토글**을 예고하는 거짓말이 된다.
+   *   같은 화면의 `LikeButton`은 비로그인 분기에서 `aria-pressed`를 떼고 "(로그인 필요)"를
+   *   붙이므로, 여기만 그대로 두면 한 화면 안에서 두 컨트롤의 안내가 갈린다.
+   */
+  signInRequired?: boolean;
 }
 
 /**
@@ -40,7 +49,13 @@ interface PollBlockProps {
  * ⚠ `role="radiogroup"`을 쓰지 않는다 — 화살표 키 이동(roving tabindex)을 약속하는 롤인데
  *   구현하지 않기 때문이다(선택 토글이라 이동이 아니다 — 레일의 `aria-current`와 갈리는 지점). `aria-pressed`로 상태만 알린다.
  */
-export function PollBlock({ poll, results, resultsPending, onVote, footer }: PollBlockProps) {
+export function PollBlock({
+  poll,
+  results,
+  resultsPending,
+  onVote,
+  signInRequired,
+}: PollBlockProps) {
   const total = results?.reduce((sum, r) => sum + r.voteCount, 0) ?? 0;
   const countOf = (optionId: number) =>
     results?.find((r) => r.optionId === optionId)?.voteCount ?? 0;
@@ -80,7 +95,9 @@ export function PollBlock({ poll, results, resultsPending, onVote, footer }: Pol
               <button
                 type="button"
                 // ⚠ 텍스트가 든 버튼이라 aria-label을 붙이지 않는다(콘텐츠를 덮어쓴다)
-                aria-pressed={mine}
+                //   — 아래 "(로그인 필요)"도 그래서 sr-only 텍스트다.
+                aria-pressed={signInRequired ? undefined : mine}
+                aria-haspopup={signInRequired ? "dialog" : undefined}
                 disabled={!onVote}
                 onClick={onVote ? () => onVote(option.id) : undefined}
                 className={cn(
@@ -100,6 +117,7 @@ export function PollBlock({ poll, results, resultsPending, onVote, footer }: Pol
                     {option.label}
                   </span>
                   {mine && <span className="sr-only">— 내가 고른 선택지</span>}
+                  {signInRequired && <span className="sr-only"> (로그인 필요)</span>}
                   {results && (
                     <span className="shrink-0 font-mono text-[12px] tabular-nums text-ink-mute">
                       {Math.round(ratio * 100)}%
@@ -132,7 +150,6 @@ export function PollBlock({ poll, results, resultsPending, onVote, footer }: Pol
       {results && (
         <p className="mt-3 text-[12px] text-ink-mute-2">{formatCount(total)}명이 투표했어요</p>
       )}
-      {footer}
     </section>
   );
 }
