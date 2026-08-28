@@ -8,11 +8,12 @@ import { useSessionStore } from "./session-store";
 /**
  * 서버에게 세션이 아직 유효한지 물어본다(로그인 상태가 될 때 1회).
  *
- * ⚠ 이게 없으면 **서버와 클라이언트의 판정이 갈려 무한 리다이렉트에 빠진다.**
- *   proxy는 getUser()로 GoTrue에 물어보지만 클라이언트는 쿠키의 expires_at만 로컬 검사한다.
+ * ⚠ 이게 없으면 **화면은 로그인 상태인데 모든 조회가 RLS에 막혀 실패한다.**
+ *   서버는 getUser()로 GoTrue에 물어보지만 클라이언트는 쿠키의 expires_at만 로컬 검사한다.
  *   다른 기기에서 로그아웃하거나 계정이 삭제되면 토큰은 만료 전인데 서버는 403을 준다 →
- *   proxy가 /posts/new → /sign-in으로 보내고, 가드는 여전히 authenticated라 보고
- *   다시 /posts/new로 보낸다. 탈출 수단 없이 계속 왕복한다.
+ *   사용자는 자기가 로그인돼 있다고 믿는 채로 아무것도 못 하고, 스스로 빠져나올 방법이 없다.
+ *   (proxy에 라우트 가드가 있던 시절에는 이 불일치가 무한 리다이렉트까지 갔다. 가드를
+ *   걷어내 루프는 사라졌지만, 판정 불일치 자체는 남아 있어 이 확인이 여전히 필요하다.)
  *
  * getUser()가 session_not_found를 받으면 auth-js가 스스로 세션을 지우고 SIGNED_OUT을
  * 발행하므로(2.110 `_getUser`의 AuthSessionMissingError 분기 — 실측 확인) 대부분은

@@ -14,7 +14,7 @@ let client: SupabaseClient<Database> | null = null;
  * 단 컴포넌트가 직접 부르지 않고 entities/{*}/api의 TanStack Query 훅만 이 클라이언트를 만진다.
  *
  * ⚠ @supabase/ssr의 createBrowserClient는 세션을 **쿠키**에 저장한다.
- *   proxy.ts의 서버 가드·토큰 리프레시가 같은 쿠키를 읽어야 하므로,
+ *   proxy.ts의 토큰 리프레시와 SSR이 같은 쿠키를 읽어야 하므로,
  *   localStorage에 저장하는 @supabase/supabase-js의 createClient로 바꾸지 않는다.
  *
  * env 미설정이면 null을 반환한다 — 호출부에서 가드.

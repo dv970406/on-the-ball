@@ -59,7 +59,7 @@ export function activeTabHref(pathname: string): string | null {
 
 /**
  * 로그인 후 원래 목적지로 돌려보내기 위한 `next` 파라미터를 붙인 로그인 경로.
- * proxy(서버 가드)와 AuthRequired(클라 가드)가 같은 형태를 만들어야 하므로 여기로 모은다.
+ * 가드·SignInDialog·AuthStatus가 같은 형태를 만들어야 하므로 여기로 모은다.
  */
 export function signInWithNext(next: string) {
   return withNext(ROUTES.signIn, next);
@@ -86,7 +86,7 @@ export function withNext(path: string, next: string | null | undefined) {
  *   그래서 실제로 파싱해 origin이 같은지로 판정한다.
  *
  * ⚠ origin을 인자로 받는다 — `window.location.origin`을 안에서 읽으면
- *   이 모듈을 import하는 proxy(서버)에서 쓸 수 없다. 서버는 `request.nextUrl.origin`을 넘긴다.
+ *   서버에서 쓸 수 없다. 서버 소비자가 생기면 origin을 인자로 넘긴다.
  *
  * ⚠⚠ **파싱 시점의 origin 검사만으로는 부족하다.** URL 파서는 `/..`을 정규화하면서
  *   `//`로 시작하는 pathname을 남기고, 그 문자열을 다시 해석하면 프로토콜 상대 URL이 된다:

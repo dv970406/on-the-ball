@@ -22,9 +22,9 @@ function AuthGateSkeleton() {
 /**
  * 로그인 필수 화면.
  *
- * proxy.ts의 서버 가드가 하드 내비게이션을 이미 막지만, SPA 전이나
- * 화면에 머무는 동안의 세션 만료는 서버가 잡지 못한다 — 그 구멍을 이쪽이 메운다.
- * 실제 차단은 두 층 모두 아니고 DB의 RLS다.
+ * **인증 판정은 여기가 단독으로 갖는다** — proxy에는 라우트 가드가 없다(사유는 `nextjs.md`:
+ * 판정자가 둘이 되면 서버·클라 불일치가 무한 리다이렉트가 된다).
+ * 다만 이건 **안내**이고 실제 차단은 DB의 RLS다.
  *
  * 이동은 `useRedirectGuestToSignIn`이, 그 동안 무엇을 그릴지는 여기가 정한다.
  */
@@ -47,7 +47,7 @@ export function GuestOnly({ children }: { children: ReactNode }) {
   useRedirectAfterSignIn(status);
 
   // ⚠ AuthRequired와 달리 "loading"에서도 children을 그린다 — 이 화면은 **서버가 이미 걸렀다.**
-  //   로그인 상태로 /sign-in에 하드 진입하면 proxy가 목록으로 리다이렉트하므로,
+  //   로그인 상태로 /sign-in에 하드 진입하면 이 가드가 목록으로 보내므로,
   //   여기까지 온 요청은 사실상 비로그인이다. 그리고 status가 "loading"인 순간은
   //   최초 로드뿐이라(useSessionSync가 한 번 확정하면 유지) SPA 전이에는 해당하지 않는다.
   //   앱 안에 로그인 유저에게 노출되는 /sign-in 링크도 없다(전부 guest 분기).

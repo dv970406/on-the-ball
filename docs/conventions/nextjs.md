@@ -14,7 +14,7 @@
   ```
   ⚠ 새 동적 라우트를 만든 직후에는 `npx next typegen`을 돌려야 타입이 생긴다.
 - URL의 `[id]`는 **문자열**이다. **`@/shared/lib`의 `parsePostId`로만 판정**하고, 실패하면 조회 없이 `notFound()`.
-  ⚠ `Number()`로 직접 검증하지 말 것 — `1e3`·`0x10`·`1.0`을 받아들여 proxy와 판정이 갈렸고 가드가 뚫렸다(아래 proxy 절).
+  ⚠ `Number()`로 직접 검증하지 말 것 — `1e3`·`0x10`·`1.0`을 받아들여 `/posts/2`·`/posts/002`·`/posts/2.0`이 전부 같은 글의 별칭 URL이 된다(전에 proxy와 판정이 갈려 가드가 뚫린 적도 있다).
 - ⚠ **`useSearchParams`는 프리렌더를 CSR로 떨어뜨린다.** `<Suspense>`로 감싸는 게 정석이지만, **경계가 children까지 감싸면 페이지 본문 전체가 빈 껍데기가 된다** — 인증 화면 3개가 실제로 그렇게 됐다(서버 HTML에 `BAILOUT_TO_CLIENT_SIDE_RENDERING`만 남았다).
   effect 안에서만 쿼리 값이 필요하다면 **`useSearchParams`를 쓰지 말고** `@/shared/lib`의 `useNextParam`처럼 `useSyncExternalStore`로 읽는다. 그러면 경계 자체가 필요 없다.
 - 로그인 후 복귀 경로(`?next=`)는 **`safeNextPath`로만 검증한다**(`@/shared/config`). 직접 문자열 검사를 짜지 말 것 — 아래 오픈 리다이렉트 항목 참고.
@@ -245,10 +245,11 @@ Router Cache는 **URL로만 키가 잡히고 세션은 키에 들어가지 않�
   ⚠ 미래 시각을 넣지 않는다(입축구의 `closes_at`이 그 함정이라 `created_at`을 쓴다).
 - **robots.txt는 아무것도 막지 않는다.** 크롤을 막는 것과 색인을 막는 것은 다른 일이고,
   이 앱에서 색인을 원치 않는 화면은 전부 막지 않는 편이 낫다.
-  - 로그인 필수 화면은 비로그인에게 proxy가 307로 `/sign-in`에 보낸다 → **크롤을 허용하면
-    크롤러가 리다이렉트를 따라가 그 URL을 색인하지 않는다.** 막으면 리다이렉트도 `noindex`도
-    보지 못한 채 **링크만 보고 URL을 색인할 수 있는데**, 그 화면들은 탭바·FAB의 크롤 가능한
-    앵커로 모든 목록 화면에서 링크되므로 그 조건이 실제로 성립한다.
+  - 로그인 필수 화면은 크롤러에게 `robots: { index: false }`를 내보인다 → **크롤을 허용해야
+    크롤러가 그 `noindex`를 읽는다.** 막으면 보지 못한 채 **링크만 보고 URL을 색인할 수 있는데**,
+    그 화면들은 탭바·FAB의 크롤 가능한 앵커로 모든 목록 화면에서 링크되므로 그 조건이 실제로
+    성립한다. ⚠ 그래서 그 세 화면의 `noindex`는 **지우면 안 된다** — 한때 proxy의 307이 함께
+    막아 줬지만 지금은 이것이 유일한 색인 차단이다.
   - `/sign-in`도 같다(모든 화면의 `AuthStatus`가 링크한다) → 크롤은 열어 두고
     `robots: { index: false }`가 판정한다.
   - 막을 대상이 생긴다면 기준은 **"크롤러가 그 URL에서 아무것도 보지 못하고, 어디서도
@@ -268,9 +269,9 @@ Router Cache는 **URL로만 키가 잡히고 세션은 키에 들어가지 않�
   단독으로 소유한다"(`data-and-state.md`)를 지키려면 복귀 지점을 `/sign-in`으로 두는 편이 맞다.
   `?next=`도 `redirectTo`에 실어 보내 같은 경로로 되돌아온다.
 
-- ⚠ **proxy의 `GUEST_ONLY`에 `/sign-in` 예외를 파지 않는다.** 복귀 시점에는 아직 쿠키가 없어
-  (교환이 브라우저에서 일어난다) 비로그인으로 통과한다. 예외를 파면 로그인한 채로 `/sign-in`을
-  열 수 있게 되어 가드가 헐거워진다.
+- ⚠ **`GuestOnly`가 복귀를 가로막지 않는다.** 복귀 시점에는 세션이 아직 없어(교환이 브라우저에서
+  일어난다) 화면이 정상적으로 그려지고, 교환이 끝나면 그때 목적지로 보낸다. 이 순서에 기대는
+  구조이므로 가드에 `/sign-in` 예외를 파 넣지 않는다.
 - ⚠ 복귀 화면은 **세 가지를 모두** 처리해야 한다 — `?code=` 동안의 대기 표시, 교환이 끝나지
   않을 때의 **상한**(supabase는 교환에 실패해도 조용히 빠져나간다), 프로바이더가 돌려준
   `?error=`·`error_description=`(사용자가 동의를 취소한 경우가 여기로 온다).
@@ -317,25 +318,41 @@ HTTP 상태가 200이면 색인·공유에서 정상 페이지로 취급된다.
 
 ## Proxy (구 middleware)
 
-- 세션 쿠키 갱신 + **낙관적 라우트 가드**를 `proxy.ts`가 담당한다(Next 16에서 middleware → proxy로 개명).
-- Next 공식 authentication 가이드가 권하는 구조다 — proxy는 낙관적 체크만 하고 **진짜 방어는 데이터 소스에 가장 가까운 곳(DB의 RLS)** 에서 한다. 이미 매 요청 돌던 `getUser()` 결과를 재사용하므로 추가 비용이 없다.
-- **3중 방어**: proxy(하드 내비게이션·직접 URL) → `AuthRequired`/`GuestOnly`(SPA 전이·세션 만료) → **RLS(최종)**.
-- **matcher는 빌드타임에 정적 분석되므로 상수여야 한다** → 경로별 분기는 함수 안에서 한다.
-- ⚠ **proxy와 페이지가 같은 파서를 써야 한다.** proxy가 `\d+` 정규식, 페이지가 `Number(id)`로
-  판정했더니 `Number()`가 받아들이는 `1e3`·`0x10`·`1.0`에서 판정이 갈려 **가드가 그냥 뚫렸다**.
-  지금은 양쪽 다 `@/shared/lib/post-id`의 `parsePostId`(엄격한 십진수)를 쓴다.
-  덤으로 `/posts/2`·`/posts/002`·`/posts/2.0` 별칭 URL도 사라졌다.
-- ⚠ **경로 비교 전에 `decodeURIComponent`** 한다. Next는 퍼센트 인코딩을 디코딩해 라우팅하므로
-  원문과 비교하면 `/posts/%6Eew`(= `/posts/new`)가 가드를 통과한다(실측 확인).
-- ⚠ **`?next=` 오픈 리다이렉트는 두 번 뚫렸다.** 반드시 `safeNextPath`를 쓰고 직접 짜지 않는다.
-  1차: 문자열 prefix 검사(`startsWith("/") && !startsWith("//")`)는 `/\evil.com`을 통과시킨다 —
-     WHATWG 파서가 http(s)에서 역슬래시를 슬래시로 취급하기 때문.
-  2차: `new URL(next, origin).origin === origin`만으로도 부족하다 — 파서가 `/..`을 정규화하며
-     `//evil.com`을 **pathname으로** 남기고, 그 문자열을 다시 해석하면 프로토콜 상대 URL이 된다.
-  → **파싱 결과로 만든 반환값을 같은 기준으로 한 번 더 대조**해야 닫힌다.
-- 브라우저 세션이 **쿠키**에 있어야 proxy가 읽을 수 있다. `@supabase/ssr`의 `createBrowserClient`를 `@supabase/supabase-js`의 `createClient`(localStorage)로 바꾸면 서버 가드가 통째로 무력화된다.
+**`proxy.ts`가 하는 일은 세션 쿠키 갱신 하나다.** 라우트 가드는 여기 없다.
+
+- **존재 이유는 "서버가 쿠키를 쓸 수 있는 자리가 여기뿐"이다.** access token은 만료되고 갱신하면
+  새 쿠키를 **저장**해야 하는데, 서버 컴포넌트는 쿠키를 쓸 수 없다(`supabase-server.ts`의 `setAll`이
+  throw를 삼킨다). 쓸 수 있는 곳은 proxy · Server Action · Route Handler 셋인데 뒤의 둘은 쓰지
+  않는다(`api-and-db.md`) → 남는 것이 proxy다.
+- ⚠ **없애면 조용히 간헐적으로 로그아웃된다.** 오래 떠나 있다 돌아오면 서버 렌더가 만료 토큰을
+  보고 스스로 리프레시하는데 저장을 못 해 쿠키에는 **회전된 옛 refresh token**이 남는다.
+  브라우저의 갱신이 `refresh_token_reuse_interval`을 놓치면 재사용 탐지로 세션이 무효화된다 —
+  화면은 멀쩡히 그려지므로 **재현도 로그도 없이** 터진다.
+- 비로그인 요청은 **네트워크를 타지 않는다** — 쿠키에 access_token이 없으면 auth-js가
+  `AuthSessionMissingError`로 바로 빠져나간다. 크롤러 비용이 0인 이유다.
+- 브라우저 세션이 **쿠키**에 있어야 proxy가 읽을 수 있다. `@supabase/ssr`의 `createBrowserClient`를
+  `@supabase/supabase-js`의 `createClient`(localStorage)로 바꾸면 **서버 토큰 갱신이 통째로 죽는다.**
+- **matcher는 빌드타임에 정적 분석되므로 상수여야 한다.**
 - ⚠ **프리페치 요청은 matcher에서 제외한다**(`missing: [{ type: "header", key: "next-router-prefetch" }]`).
   `<Link>`가 뷰포트에 들어오면 프리페치가 나가는데, 이 앱에는 loading 경계가 없어 **빈 라우터 트리**만
   돌려주면서(실측 75~252B, 서버 조회 없음) proxy는 그대로 타서 **로그인 사용자에게 링크당
-  GoTrue 왕복이 하나씩** 붙었다. 프리페치가 가드를 건너뛰어도 **실제 이동은 헤더 없이 다시 요청되어**
-  정상적으로 막힌다.
+  GoTrue 왕복이 하나씩** 붙었다. 프리페치가 갱신을 놓쳐도 실제 이동이 곧바로 갱신한다.
+
+### ⚠ 인증 가드를 proxy에 되돌리지 않는다
+
+한때 여기에 낙관적 가드를 함께 뒀다(`/posts/new`·`/profile`·`/posts/[id]/edit` → 307,
+`/sign-in` → 목록). 걷어낸 이유는 비용이 아니라 — 가드는 `getUser()` 결과를 재사용해 실제로
+공짜였다 — **판정자가 둘이 되는 것** 자체다.
+
+- 서버는 `getUser()`로 GoTrue에 **검증**하고 클라이언트는 쿠키의 `expires_at`만 **로컬 검사**한다.
+  두 판정이 갈리면 **무한 리다이렉트**가 된다(`data-and-state.md`) — 그걸 막으려고
+  `use-server-session-check`라는 대응 코드를 따로 두어야 했다.
+- 가드를 빼도 **방어선이 얇아지지 않는다.** 인증 판정은 `AuthRequired`/`GuestOnly`(화면)와
+  **RLS**(실차단)가 갖고, 로그인 필수 화면의 서버 렌더는 **개인 데이터를 내려주지 않는다**
+  (`/posts/[id]/edit`이 뷰에 넘기는 것은 `postId` 숫자 하나뿐이고, 존재 확인 조회에도 RLS가 걸린다).
+  색인도 그 화면들의 `robots: { index: false }`가 막는다.
+- 잃은 것은 하드 진입 시 307 대신 **스켈레톤 한 프레임**이다.
+- ⚠ 되돌린다면 갱신된 쿠키를 리다이렉트 응답에 **손으로 옮겨 실어야 한다** —
+  `NextResponse.redirect`는 새 응답이라 `Set-Cookie`가 통째로 사라진다. 그리고 경로 판정은
+  `parsePostId`·`safeNextPath`를 그대로 쓰고, 비교 전에 `decodeURIComponent`한다
+  (`/posts/%6Eew`가 그냥 통과한다 — 실측).

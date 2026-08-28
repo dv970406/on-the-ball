@@ -60,7 +60,7 @@ per-call 콜백이 **상위 레이어의 결정**(이동 목적지, 입력창 �
 ## 이 코드베이스의 본보기
 
 - **좋은 예(따를 것):**
-  - `ROUTES`·`signInWithNext` — 경로 문자열을 하드코딩하지 않고 서버 가드(proxy)와 클라 가드가 **같은 단일 소스**를 참조(응집도).
+  - `ROUTES`·`signInWithNext` — 경로 문자열을 하드코딩하지 않고 가드·`SignInDialog`·탭바가 **같은 단일 소스**를 참조(응집도).
   - `POST_LIST_SELECT` 등 select 문자열 상수 — 스키마가 바뀌면 한 곳만 고친다(응집도).
   - `requireBrowserSupabase` — 10곳 넘게 반복되던 null 가드를 한 번에 한국어 에러로(중복 3회 이상 + 형태가 진짜 같음).
   - `PostForm` — 작성·수정이 같은 필드·같은 검증을 쓰므로 한 곳에 둔다.

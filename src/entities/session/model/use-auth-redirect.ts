@@ -11,7 +11,7 @@ import type { SessionStatus } from "./types";
  *
  * ⚠ 렌더 중 부작용은 금지고 `redirect()`는 이벤트 핸들러·effect에서 쓸 수 없으므로
  *   `router.replace`로 이동한다.
- * ⚠ 복귀 경로(`?next=`)는 `signInWithNext`가 만든다 — proxy(서버 가드)가 쓰는 것과 **같은
+ * ⚠ 복귀 경로(`?next=`)는 `signInWithNext`가 만든다 — 이 형태를 만드는 다른 곳과 **같은
  *   단일 소스**여야 두 가드의 판정이 갈리지 않는다.
  *
  * ⚠ **직접 로그아웃한 경우만 목적지가 다르다** — 방금 나온 로그인 화면으로 되돌리는 대신
