@@ -334,4 +334,8 @@ HTTP 상태가 200이면 색인·공유에서 정상 페이지로 취급된다.
      `//evil.com`을 **pathname으로** 남기고, 그 문자열을 다시 해석하면 프로토콜 상대 URL이 된다.
   → **파싱 결과로 만든 반환값을 같은 기준으로 한 번 더 대조**해야 닫힌다.
 - 브라우저 세션이 **쿠키**에 있어야 proxy가 읽을 수 있다. `@supabase/ssr`의 `createBrowserClient`를 `@supabase/supabase-js`의 `createClient`(localStorage)로 바꾸면 서버 가드가 통째로 무력화된다.
-- `<Link>`가 뷰포트에 들어오면 **프리페치 요청도 proxy를 탄다** → 비로그인 상태에서 `/posts/new` 링크가 307을 받는다. 기능은 정상이고 로그만 시끄럽다. 문제가 되면 matcher에 `missing: [{ type: "header", key: "next-router-prefetch" }]`를 적용한다(초기에는 넣지 않는다).
+- ⚠ **프리페치 요청은 matcher에서 제외한다**(`missing: [{ type: "header", key: "next-router-prefetch" }]`).
+  `<Link>`가 뷰포트에 들어오면 프리페치가 나가는데, 이 앱에는 loading 경계가 없어 **빈 라우터 트리**만
+  돌려주면서(실측 75~252B, 서버 조회 없음) proxy는 그대로 타서 **로그인 사용자에게 링크당
+  GoTrue 왕복이 하나씩** 붙었다. 프리페치가 가드를 건너뛰어도 **실제 이동은 헤더 없이 다시 요청되어**
+  정상적으로 막힌다.

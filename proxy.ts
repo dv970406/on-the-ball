@@ -121,7 +121,22 @@ export const config = {
   //   뒤에 슬래시가 없는 `/_next/image?url=...` 형태라, `_next/image/`로 적으면 제외가
   //   무효가 되어 **이미지 요청마다 proxy + getUser() 왕복**이 붙는다(Next 공식 예제도
   //   경계 없이 `_next/image`로 적는다).
+  // ⚠ **프리페치 요청은 제외한다.** `<Link>`가 뷰포트에 들어오면 프리페치 요청이 나가는데,
+  //   이 앱의 동적 라우트는 `loading.tsx`가 없어 **페이지 세그먼트가 없는 빈 라우터 트리**만
+  //   돌려준다(실측: 75~252B, 서버 조회는 돌지 않는다). 그런데 proxy는 그대로 타서
+  //   **로그인 사용자에게 링크당 GoTrue `getUser()` 왕복이 하나씩** 붙었다 — 아무것도 렌더하지
+  //   않는 요청에 대한 순수 낭비다. 목록 화면에는 말머리·정렬 링크만 10개가 있다.
+  // ⚠ 가드에 구멍이 생기지 않는다. 프리페치는 사용자에게 아무것도 보여주지 않고, **실제 이동은
+  //   프리페치 헤더 없이 다시 요청되어** proxy를 정상적으로 탄다. 헤더를 위조해 이 제외를
+  //   노려도 얻는 것은 스켈레톤뿐이다 — `AuthRequired`가 화면을 갈아치우고 RLS가 쓰기를 막는다.
+  // ⚠ 헤더 이름은 Next 내부 상수다(`next/dist/client/components/app-router-headers.js`의
+  //   `NEXT_ROUTER_PREFETCH_HEADER = 'next-router-prefetch'`). 버전이 올라 이름이 바뀌면
+  //   제외가 조용히 무효가 되는데, 그때의 대가는 예전 동작(왕복이 도로 붙는다)이라 안전한 방향이다.
   matcher: [
-    "/((?!api/|api$|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|ico|woff2?)$).*)",
+    {
+      source:
+        "/((?!api/|api$|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|ico|woff2?)$).*)",
+      missing: [{ type: "header", key: "next-router-prefetch" }],
+    },
   ],
 };
