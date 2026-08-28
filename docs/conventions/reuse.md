@@ -53,6 +53,8 @@
 - `getBrowserSupabase` — null을 그대로 받아 분기해야 할 때만.
 - `toDbErrorMessage` — PostgREST/RPC 에러 → 한국어. `P0001`(우리가 띄운 메시지)은 그대로 통과시킨다.
 - ⚠ `createSupabaseServerClient`는 배럴에 없다 — `@/shared/api/supabase-server`를 직접 import(`next/headers` 의존).
+- **`createSupabaseAnonClient` / `ANON_REVALIDATE`** (`@/shared/api/supabase-anon` 직접 경로) — 쿠키를 읽지 않는 서버 클라이언트. fetch가 Next Data Cache를 타므로 **응답이 모든 익명 요청에 동일한 조회에만** 쓴다. 새로 만들지 말 것 — 수명 상수가 TanStack `staleTime`과 한 값으로 묶여 있다(`nextjs.md`). ⚠ 캐시 히트가 DB를 없애는 것이지 **왕복이 0이 되는 것은 아니다** — in-flight 중복 제거가 없어 캐시가 빈 순간의 동시 요청은 전부 통과한다.
+- **`hasSessionCookie()`** (같은 자리, `supabase-server`) — 이 요청에 세션이 있는지를 **네트워크 없이** 판정. 위 두 클라이언트를 고르는 데만 쓴다. ⚠ `getUser()`로 바꾸지 말 것(로그인 사용자에게 GoTrue 왕복이 하나 더 붙는다). ⚠ 판정을 **좁히지 말 것** — 넓게 잡혀 있어야 헛짚어도 평소 경로로 갈 뿐이고, 좁히면 로그인 사용자가 좋아요 상태·차단 숨김이 빠진 익명 목록을 받는다.
 
 ## `@/entities/session`
 - `useSessionStore` — zustand 세션 스토어. 셀렉터로 구독한다.

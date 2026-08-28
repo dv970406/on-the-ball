@@ -33,3 +33,22 @@ export async function createSupabaseServerClient(): Promise<SupabaseClient<Datab
     },
   });
 }
+
+/**
+ * 이 요청에 세션 쿠키가 있는가 — **네트워크를 타지 않는 판정**이다.
+ *
+ * 익명 응답을 캐시에서 줄지(=`createSupabaseAnonClient`) 고르는 데만 쓴다.
+ * **인가 판정이 아니다** — 그건 여전히 RLS가 한다. 그래서 쿠키 이름만 보는 것으로 충분하고,
+ * `getUser()`를 부르지 않는다(로그인 사용자에게 GoTrue 왕복이 하나 더 붙는다).
+ *
+ * ⚠ **틀리는 방향이 규약이다.** `sb-` 접두어는 넓게 잡혀 있어 세션이 있는데 없다고 볼 일이
+ *   없다 — 헛짚어도 캐시를 못 타고 평소 경로로 갈 뿐이다. 반대로 좁게 고치면 로그인 사용자가
+ *   익명 목록(좋아요 상태·차단 숨김이 빠진)을 받게 되는데, **빌드도 린트도 잡지 못하고
+ *   화면만 조용히 남의 시점이 된다.**
+ * ⚠ `@supabase/ssr`의 저장소 키는 `sb-<project-ref>-auth-token`이고 값이 길면 `.0`·`.1`로
+ *   쪼개진다 — 접두어로만 보는 이유다.
+ */
+export async function hasSessionCookie(): Promise<boolean> {
+  const cookieStore = await cookies();
+  return cookieStore.getAll().some(({ name }) => name.startsWith("sb-"));
+}

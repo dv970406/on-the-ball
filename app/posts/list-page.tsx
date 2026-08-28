@@ -1,7 +1,8 @@
 import { cache } from "react";
 import type { Metadata } from "next";
 import { unstable_rethrow } from "next/navigation";
-import { createSupabaseServerClient } from "@/shared/api/supabase-server";
+import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
+import { createSupabaseServerClient, hasSessionCookie } from "@/shared/api/supabase-server";
 // ⚠ 배럴(@/entities/post)이 아니라 직접 경로 — 배럴은 "use client" 모듈을 포함한다.
 //   쿼리 조립과 매퍼를 클라이언트 훅과 **공유해야** 프리페치가 같은 목록을 만든다.
 import { buildPostListQuery } from "@/entities/post/api/list-query";
@@ -40,7 +41,18 @@ export const fetchPostList = cache(
     //   키가 하나라도 다르면 initialData가 캐시에 닿지 못하고 스켈레톤으로 되돌아간다.
     const filters: PostListFilters = { category, sort };
     try {
-      const supabase = await createSupabaseServerClient();
+      /**
+       * 세션이 없으면 이 목록은 **모든 익명 요청에 동일하다**(크롤러가 받는 것과 같은 응답이다)
+       * → 쿠키 없는 클라이언트로 갈아타 Data Cache를 태운다. 비로그인·크롤러의 조회가
+       *   캐시 히트에서 DB를 타지 않는다(단 in-flight 중복 제거는 없다 — `nextjs.md`).
+       *
+       * ⚠ 판정은 쿠키만 본다 — 네트워크를 타지 않고, 헛짚어도 평소 경로로 갈 뿐이다
+       *   (틀리는 방향이 왜 규약인지는 `hasSessionCookie` 주석에).
+       * ⚠ `nowMs`는 캐시 밖이라 요청마다 새로 찍힌다 — 상대시각·HOT 배지는 캐시를 타도 정확하다.
+       */
+      const supabase = (await hasSessionCookie())
+        ? await createSupabaseServerClient()
+        : createSupabaseAnonClient();
       if (!supabase) return { nowMs: Date.now() };
 
       const { data, error } = await buildPostListQuery(supabase, filters);

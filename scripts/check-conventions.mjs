@@ -29,6 +29,8 @@ const rel = (abs) => relative(ROOT, abs).split(sep).join("/");
 /** 배럴을 거치지 않아도 되는 경로. 서버 소비자(또는 서버 렌더 여지를 남기는 모듈)의 탈출구다. */
 const DEEP_IMPORT_ALLOWED = new Set([
   "@/shared/api/supabase-server",
+  // 익명 서버 클라이언트 — Data Cache가 서버 전용이라 supabase-server와 같은 취급이다
+  "@/shared/api/supabase-anon",
   "@/shared/lib/cn",
   "@/shared/lib/format",
   "@/shared/lib/post-id",

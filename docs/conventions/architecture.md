@@ -56,7 +56,7 @@ shared ← entities ← features ← widgets ← views
 
 **서버 소비자는 `generateMetadata`와 서버 컴포넌트(page·layout)다.**
 
-- `@/shared/api` — 클라이언트 안전 모듈만 노출. 서버 전용(`supabase-server` = `next/headers` 의존)은 **직접 경로**로 import: `@/shared/api/supabase-server`.
+- `@/shared/api` — 클라이언트 안전 모듈만 노출. 서버 전용은 **직접 경로**로 import: `@/shared/api/supabase-server`(`next/headers` 의존) · `@/shared/api/supabase-anon`(Next Data Cache 의존).
 - `@/shared/lib` — `"use client"` 훅(`useScrollRestore`·`useNowMs`·`useToast`·`useFocusTrap`·`useNextParam`) 포함. **서버에서는 순수 함수를 직접 경로로 import**: `@/shared/lib/cn`·`format`·`post-id`·`text`·`query-scope`. 위 나열이 곧 `shared/lib`의 화이트리스트이고 **단일 소스는 `src/shared/lib/index.ts` 말미의 주석**이다.
   - ⚠ **`"use client"`를 붙이지 않은 `shared/ui` 컴포넌트도 서버 소비자다.** 배럴을 거치면 서버 렌더 여지를 잃는다 — `markdown`·`empty-state`·`avatar`·`pill`·`skeleton`과 클래스 함수들(`button-class`·`action-chip-class`·`chip-class`)이 `@/shared/lib/cn` 직접 경로를 쓰는 이유다(사유는 `empty-state.tsx` 주석에).
 - `@/entities/post`·`@/entities/comment`·`@/entities/profile`·`@/entities/survey` — `"use client"` 쿼리 훅·UI 포함. **서버는 `model/types`·`api/mappers`·`api/keys`·`api/list-query`를 직접 import**. post의 순수 헬퍼도 마찬가지다 — `app/posts/[id]/page.tsx`가 `@/entities/post/lib/plain-summary`를 직접 경로로 가져와 `og:description`을 만든다.
