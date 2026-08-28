@@ -15,8 +15,8 @@ import { SURVEY_SELECT, buildSurvey, buildSurveyResult } from "@/entities/survey
 import type { Survey, SurveyResult } from "@/entities/survey/model/types";
 import { SurveyDetailView } from "@/views/survey-detail";
 
-const FALLBACK_METADATA: Metadata = { title: "서베이" };
-/** 없는 서베이 — `Page`가 `notFound()`를 부르므로 **404 화면과 같은 제목**이어야 한다. */
+const FALLBACK_METADATA: Metadata = { title: "입축구" };
+/** 없는 입축구 — `Page`가 `notFound()`를 부르므로 **404 화면과 같은 제목**이어야 한다. */
 const NOT_FOUND_METADATA: Metadata = { title: NOT_FOUND_TITLE };
 const META_TITLE_MAX = 60;
 
@@ -33,7 +33,7 @@ type SurveyHead =
       results: SurveyResult[] | undefined;
       /**
        * 이 데이터를 읽은 시각.
-       * ⚠ **없으면 마감된 서베이가 참여 가능한 상태로 SSR된다** — `SurveyVote`의
+       * ⚠ **없으면 마감된 입축구가 참여 가능한 상태로 SSR된다** — `SurveyVote`의
        *   `useNowMs()`가 서버에서 `null`이라 마감 분기를 타지 못한다(실측). 하이드레이션
        *   직후 읽기 전용 UI로 통째로 갈아치워지고 크롤러에게는 참여 가능한 문항으로 나간다.
        * ⚠ 렌더 본문이 아니라 여기서 찍는다(`react-hooks/purity`가 서버 컴포넌트도 막는다).
@@ -41,7 +41,7 @@ type SurveyHead =
       nowMs: number;
     }
   | { state: "missing" }
-  /** 조회 자체가 실패 — 일시 장애로 멀쩡한 서베이를 없다고 단정하면 안 되므로 구분한다 */
+  /** 조회 자체가 실패 — 일시 장애로 멀쩡한 입축구를 없다고 단정하면 안 되므로 구분한다 */
   | { state: "unknown" };
 
 /**
@@ -65,7 +65,7 @@ const fetchSurveyHead = cache(async (surveyId: number): Promise<SurveyHead> => {
     //   그 사용자 기준으로 채워져 `myOptionId`가 서버·클라에서 갈리지 않는다.
     // ⚠ 셋은 서로의 결과를 쓰지 않는다(RLS가 쿠키 세션으로 걸린다) → **병렬로** 보낸다.
     //   직렬로 두면 왕복 세 번이 그대로 쌓여 TTFB에 더해진다.
-    // ⚠ **집계(`survey_results`)도 여기서 함께 쏜다.** 전에는 서베이 응답을 받은 뒤
+    // ⚠ **집계(`survey_results`)도 여기서 함께 쏜다.** 전에는 입축구 응답을 받은 뒤
     //   `myOptionId`를 보고 직렬로 매달았는데, 게이팅이 UI가 아니라 definer 함수 안에 있어
     //   (미참여자는 0행) 무조건 쏴도 뜻이 달라지지 않는다. 목록에서 바로 투표하고 들어오는
     //   화면이라 **참여자 비율이 높아** 그 한 왕복이 그대로 체감되던 자리다.
@@ -92,7 +92,7 @@ const fetchSurveyHead = cache(async (surveyId: number): Promise<SurveyHead> => {
     // Next 내부 에러를 throw해서 동작한다. 삼키면 페이지가 스켈레톤 상태로 정적
     // 프리렌더되어 조용히 망가지므로 반드시 되던진다.
     unstable_rethrow(e);
-    console.error("[surveys/[id]] 서베이 조회 실패:", e);
+    console.error("[surveys/[id]] 입축구 조회 실패:", e);
     return { state: "unknown" };
   }
 });

@@ -8,7 +8,7 @@ import { Icon } from "@/shared/ui";
 import type { SurveyListItem } from "../model/types";
 
 /**
- * 목록의 서베이 한 줄. 링크로 감싼 리스트 행이라 article 래퍼 없이 li만 쓴다.
+ * 목록의 입축구 한 줄. 링크로 감싼 리스트 행이라 article 래퍼 없이 li만 쓴다.
  * 제목은 구역 헤딩(h2) 아래 계층이라 h3.
  *
  * ⚠ **참여자 수를 그리지 않는다.** 득표수 컬럼이 없어 집계는 `survey_results`를 거쳐야
@@ -42,7 +42,7 @@ export function SurveyCard({
       >
         <div className="flex items-center gap-2">
           <span className="font-mono text-[10px] uppercase tracking-[0.4px] text-ink-mute-2">
-            서베이
+            입축구
           </span>
           {survey.myOptionId !== null && (
             <span className="inline-flex items-center gap-[3px] text-[10px] font-medium text-ink">

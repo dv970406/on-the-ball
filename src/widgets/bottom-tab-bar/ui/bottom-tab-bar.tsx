@@ -28,7 +28,7 @@ interface TabItem {
  */
 const TABS: TabItem[] = [
   { label: "커뮤니티", icon: MessagesSquare, href: ROUTES.postList },
-  { label: "서베이", icon: ClipboardList, href: ROUTES.surveyList },
+  { label: "입축구", icon: ClipboardList, href: ROUTES.surveyList },
   { label: "프로필", icon: User, href: ROUTES.profile, signInAction: "프로필을 보려면" },
 ];
 

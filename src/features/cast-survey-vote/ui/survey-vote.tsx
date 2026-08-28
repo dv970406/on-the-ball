@@ -37,7 +37,7 @@ interface SurveyVoteProps {
   initialUserId?: string;
   /**
    * 서버가 렌더한 시점의 시각.
-   * ⚠ **없으면 마감된 서베이가 참여 가능한 상태로 SSR된다** — `useNowMs()`가 서버에서
+   * ⚠ **없으면 마감된 입축구가 참여 가능한 상태로 SSR된다** — `useNowMs()`가 서버에서
    *   `null`이라 `open`이 `null`이 되고 아래 마감 분기를 타지 못한다. 하이드레이션 직후
    *   읽기 전용 UI로 통째로 갈아치워지고, 크롤러에게는 참여 가능한 문항으로 나간다.
    */
@@ -45,7 +45,7 @@ interface SurveyVoteProps {
 }
 
 /**
- * 서베이에 세션·기간·뮤테이션을 붙인다 — **목록과 상세가 이 컴포넌트를 공유한다.**
+ * 입축구에 세션·기간·뮤테이션을 붙인다 — **목록과 상세가 이 컴포넌트를 공유한다.**
  * 그리는 일은 `entities/survey`의 `SplitCard`·`SurveyBlock`이 한다.
  *
  * ⚠ **세션 `status`를 3분기한다.** `loading`을 비로그인과 같이 다루면 콜드 로드 직후
@@ -69,7 +69,7 @@ export function SurveyVote({
 
   /**
    * 아직 참여할 수 있는가. **`null`은 "아직 판정 전"** 이다(마운트 전 프레임) —
-   * `false`로 접으면 멀쩡한 서베이가 한 프레임 "마감됨"으로 보인다.
+   * `false`로 접으면 멀쩡한 입축구가 한 프레임 "마감됨"으로 보인다.
    */
   const open = nowMs === null ? null : isSurveyOpen(survey, nowMs);
   const answered = survey.myOptionId !== null;
@@ -150,7 +150,7 @@ export function SurveyVote({
           />
         </div>
         {open === false && (
-          <p className="mt-2 text-[12px] text-ink-mute-2">마감된 서베이라 선택을 바꿀 수 없어요.</p>
+          <p className="mt-2 text-[12px] text-ink-mute-2">마감된 입축구라 선택을 바꿀 수 없어요.</p>
         )}
         {errors}
       </>
@@ -162,7 +162,7 @@ export function SurveyVote({
     return (
       <>
         <SurveyBlock survey={survey} results={null} />
-        <p className="mt-3 text-[12px] text-ink-mute-2">마감된 서베이예요.</p>
+        <p className="mt-3 text-[12px] text-ink-mute-2">마감된 입축구예요.</p>
       </>
     );
   }

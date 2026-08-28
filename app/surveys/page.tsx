@@ -11,7 +11,7 @@ import type { SurveyListItem } from "@/entities/survey/model/types";
 import { SurveyListView } from "@/views/survey-list";
 
 export const metadata: Metadata = {
-  title: "서베이",
+  title: "입축구",
   // ⚠ 정렬·필터가 없어도 자기 참조 canonical을 둔다 — 임의의 쿼리(`?utm_…`)가 붙은 URL이
   //   별개 페이지로 색인되는 것을 막는다(글 목록과 같은 처리).
   alternates: { canonical: ROUTES.surveyList },

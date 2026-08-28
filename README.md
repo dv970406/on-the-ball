@@ -18,13 +18,13 @@
 | 게시글 | 목록 · 상세 · 작성 · 수정 · 삭제(소프트). 본문은 **마크다운**(GFM) |
 | 댓글 | 작성 · 삭제. 글의 `comment_count`는 DB 트리거가 관리 |
 | 좋아요 | 토글(낙관적 업데이트). 동시성은 `SECURITY DEFINER` RPC의 행 잠금으로 직렬화 |
-| 서베이 | 운영진이 등록하는 전 유저 대상 단일 선택 문항. **참여한 사람에게만** 결과 공개(DB 함수가 게이팅). 색을 지정한 문항은 선택지 수(2·3·4)에 따라 면적을 등분하는 **분할 카드**로 그리고 목록에서 바로 투표한다. 면 배경은 **이미지 > 색** 순으로 폴백한다. 기간은 생성 후 7일(`closes_at`)이고 마감 뒤 차단은 RLS가 한다 |
+| 입축구 | 운영진이 등록하는 전 유저 대상 단일 선택 문항. 코드·DB·URL에서는 `survey`다(화면 라벨만 "입축구"). **참여한 사람에게만** 결과 공개(DB 함수가 게이팅). 색을 지정한 문항은 선택지 수(2·3·4)에 따라 면적을 등분하는 **분할 카드**로 그리고 목록에서 바로 투표한다. 면 배경은 **이미지 > 색** 순으로 폴백한다. 기간은 생성 후 7일(`closes_at`)이고 마감 뒤 차단은 RLS가 한다 |
 | 인증 | **카카오 · 구글 소셜 로그인**(로그인 = 가입) · 로그아웃. 에러는 한국어로 매핑 |
 | 프로필 | 닉네임(가입 시 랜덤 배정 → 본인이 변경) · 프로필 사진 업로드 · **로그인 수단 연결** |
 | 권한 | **3중 방어** — `proxy.ts` 서버 가드 → 클라이언트 가드 → **RLS + 컬럼 권한(최종)** |
 | 검색 유입 | 목록·상세 **SSR** · 말머리별 랜딩(`/posts/category/[slug]`) · 정렬은 쿼리 + canonical · `sitemap.xml` · `robots.txt` |
 
-> **색인 대상 화면은 전부 SSR**입니다 — 목록(글·말머리·서베이)과 상세(글·서베이) 모두
+> **색인 대상 화면은 전부 SSR**입니다 — 목록(글·말머리·입축구)과 상세(글·입축구) 모두
 > 서버가 본문·댓글·선택지·집계를 조립해 초기 HTML에 담습니다(작성·수정·프로필처럼 색인하지
 > 않는 화면만 클라이언트 쿼리). 프리페치는 최적화라 실패하면 클라이언트 조회로 폴백합니다 —
 > 자세한 규약은 [`docs/conventions/nextjs.md`](docs/conventions/nextjs.md).
@@ -40,7 +40,7 @@
 청산 시점의 실사용 데이터는 0건이었습니다. 화면 9개 · 테이블 13개 · RPC 2개 등 전체 스냅샷은
 [`docs/legacy/v1-inventory.md`](docs/legacy/v1-inventory.md)에, 코드 실물은 커밋 `5d02657` 이전 이력에 있습니다.
 
-그중 **단일 선택 서베이 1종만** 2026-08-23에 되살렸습니다 — 데이터 레이어는 물려받지 않고 v2 규약으로 다시 설계했습니다(결과 게이팅을 DB에, 집계 컬럼 없이, jsonb 없이).
+그중 **단일 선택 문항(입축구) 1종만** 2026-08-23에 되살렸습니다 — 데이터 레이어는 물려받지 않고 v2 규약으로 다시 설계했습니다(결과 게이팅을 DB에, 집계 컬럼 없이, jsonb 없이).
 
 `src/shared/ui`의 일부 컴포넌트와 `shared/lib`의 포맷터 몇 개는 그때의 자산으로 **의도적으로 보존**돼 있습니다
 (현재 미사용, 트리셰이킹되어 번들 비용 0). 현역/보존 구분은 [`docs/conventions/reuse.md`](docs/conventions/reuse.md).
@@ -78,7 +78,7 @@ pnpm install
 supabase start                          # 로컬 스택 기동 (643xx 포트)
 supabase db reset                       # 마이그레이션 적용 + seed.sql 자동 실행
 # 계정(alice/bob)·글·댓글은 supabase/seed.sql이 db reset 때 자동으로 넣는다
-node scripts/upload-survey-images.mjs supabase/seed-images   # 서베이 면 배경 (스토리지는 SQL 밖이다)
+node scripts/upload-survey-images.mjs supabase/seed-images   # 입축구 면 배경 (스토리지는 SQL 밖이다)
 pnpm dev
 ```
 
@@ -156,8 +156,8 @@ src/
 └── types/               # database.types.ts (supabase 생성 — 손으로 고치지 않는다)
 supabase/
 ├── migrations/          # 스키마 = 보안 설계
-├── seed.sql             # db reset이 자동 실행 (계정·글·댓글·좋아요·투표·서베이)
-├── seed-images/         # 서베이 면 배경 (db reset이 올리지 않는다 — 위 스크립트로)
+├── seed.sql             # db reset이 자동 실행 (계정·글·댓글·좋아요·투표·입축구)
+├── seed-images/         # 입축구 면 배경 (db reset이 올리지 않는다 — 위 스크립트로)
 └── tests/               # run-rls.sh · rls.sql · concurrency.sh
 handoff_community/       # 디자인 핸드오프 레퍼런스 (구현 대상 아님 — 린트 제외)
 docs/

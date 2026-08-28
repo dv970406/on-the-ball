@@ -1,7 +1,7 @@
 import { userScope } from "@/shared/lib/query-scope";
 
 /**
- * 서베이 쿼리 키.
+ * 입축구 쿼리 키.
  *
  * ⚠ **목록까지 userId로 스코프한다.** 상세(`myOptionId`)·결과뿐 아니라 **목록도** "나"에
  *   종속된 값을 담는다 — 카드가 "참여 완료"를 표시하려고 `survey_vote` 임베딩을 쓰기 때문이다.

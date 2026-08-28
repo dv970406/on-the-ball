@@ -10,7 +10,7 @@ import { SubHeader } from "@/widgets/sub-header";
 import { useSurveyDetail } from "../model/use-survey-detail";
 
 /**
- * 서베이 상세 — 제목 + 선택지 + (참여 후) 결과.
+ * 입축구 상세 — 제목 + 선택지 + (참여 후) 결과.
  *
  * 하단 탭바를 렌더하지 않는다(글 상세와 같다 — 서브헤더 화면이다).
  *
@@ -20,7 +20,7 @@ import { useSurveyDetail } from "../model/use-survey-detail";
 interface SurveyDetailViewProps {
   surveyId: number;
   /**
-   * 서버가 미리 조회한 서베이. **SEO를 위해 초기 HTML에 제목·선택지가 담기게 하는 장치다.**
+   * 서버가 미리 조회한 입축구. **SEO를 위해 초기 HTML에 제목·선택지가 담기게 하는 장치다.**
    * ⚠ 서버 조회가 실패하면 `undefined`가 오고 화면은 클라이언트 쿼리로 폴백한다.
    */
   initialSurvey?: Survey;
@@ -39,7 +39,7 @@ interface SurveyDetailViewProps {
   /**
    * 서버가 렌더한 시점의 시각.
    * ⚠ **`SurveyVote`까지 흘려보내야 한다** — 거기서 마감을 판정하는데 `useNowMs()`는
-   *   서버에서 `null`이라, 이 값이 없으면 **마감된 서베이가 참여 가능한 상태로 SSR된다.**
+   *   서버에서 `null`이라, 이 값이 없으면 **마감된 입축구가 참여 가능한 상태로 SSR된다.**
    */
   serverNowMs?: number;
 }
@@ -63,7 +63,7 @@ export function SurveyDetailView({
 
   // 헤더 라벨은 크롬이자 공유 시트에 실리는 이름이다 — 화면의 h1은 아래 제목이 따로 갖는다.
   // ⚠ titleHidden: 바로 아래에 제목이 있어 라벨을 그리면 두 번 읽힌다(글 상세와 같은 처리).
-  const header = <SubHeader title="서베이" titleHidden fallbackHref={ROUTES.surveyList} />;
+  const header = <SubHeader title="입축구" titleHidden fallbackHref={ROUTES.surveyList} />;
 
   if (isLoading) {
     return (
@@ -81,7 +81,7 @@ export function SurveyDetailView({
 
   /**
    * ⚠ 에러 화면으로 갈아치우는 건 **보여줄 데이터가 없을 때뿐이다.** 참여 한 번
-   * (`onSettled` 무효화)에 네트워크가 잠깐 끊겨도 읽던 서베이가 사라지면 안 된다.
+   * (`onSettled` 무효화)에 네트워크가 잠깐 끊겨도 읽던 입축구가 사라지면 안 된다.
    */
   if (error && !survey) {
     return (
@@ -89,7 +89,7 @@ export function SurveyDetailView({
         {header}
         <main className="px-5 py-6">
           <EmptyState
-            title="서베이를 불러오지 못했어요"
+            title="입축구를 불러오지 못했어요"
             description={error.message}
             onRetry={() => refetch()}
           />
@@ -105,7 +105,7 @@ export function SurveyDetailView({
         {header}
         <main className="px-5 py-6">
           <EmptyState
-            title="서베이를 찾을 수 없어요"
+            title="입축구를 찾을 수 없어요"
             description="삭제되었거나 주소가 잘못됐어요."
           />
         </main>
@@ -141,7 +141,7 @@ export function SurveyDetailView({
       <SignInDialog
         open={askSignIn}
         onClose={() => setAskSignIn(false)}
-        action="서베이에 참여하려면"
+        action="입축구에 끼려면"
       />
     </>
   );

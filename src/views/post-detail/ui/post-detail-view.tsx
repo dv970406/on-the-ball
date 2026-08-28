@@ -119,7 +119,7 @@ export function PostDetailView({
   const blocking = usePostBlock(post?.authorId ?? "", post?.authorNickname ?? "");
   // 투표 조회의 **세션·프리페치 판정은 훅이 소유한다** — 네 신호(세션 상태·서버가 준
   // initialUserId·initialPoll의 undefined/null·스토어 user)가 서로를 조건으로 삼는 자리라
-  // 뷰에 두면 서베이 상세와 판정이 갈린다(사유는 그 파일 주석).
+  // 뷰에 두면 입축구 상세와 판정이 갈린다(사유는 그 파일 주석).
   // 집계 조회는 뮤테이션과 같은 자리(`PollVote`)에 있다 — 사유는 그 파일 주석.
   const { poll, error: pollError } = usePostPoll({ postId, initialPoll, initialUserId });
 

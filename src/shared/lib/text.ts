@@ -174,7 +174,7 @@ export function normalizeNickname(value: string): string {
  *   위 `codePointLength`와 같은 단위라 한 쌍으로 읽힌다.
  *
  * 도메인을 전혀 모르는 순수 함수인데 한때 `entities/post/lib/plain-summary`에 살았다 —
- * 소비처가 셋이 되면서(글 상세·서베이 상세의 `generateMetadata`, `toPlainSummary`) 그 파일
+ * 소비처가 셋이 되면서(글 상세·입축구 상세의 `generateMetadata`, `toPlainSummary`) 그 파일
  * 스스로 적어 둔 임계치("3번째 소비자가 생기면 shared로")를 넘겨 여기로 옮겼다.
  */
 export function clamp(text: string, max: number): string {

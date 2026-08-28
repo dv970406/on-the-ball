@@ -16,7 +16,7 @@ interface UseSurveyListArgs {
 }
 
 /**
- * 서베이 목록의 **조회·대기·구역 판정**을 소유한다.
+ * 입축구 목록의 **조회·대기·구역 판정**을 소유한다.
  *
  * 뷰에 두지 않는 이유가 규약이다 — 세션 상태·서버가 내려준 prop·시각 셋이 서로를 조건으로
  * 삼고, 아래처럼 **적어 둘 실패 모드**가 여럿이다(`code-quality.md`의 "여러 신호가 얽힌 판정").
@@ -39,7 +39,7 @@ export function useSurveyList({ initialSurveys, initialUserId, serverNowMs }: Us
 
   /**
    * ⚠ `null`이면 진행/마감을 가를 수 없다 → 아래에서 스켈레톤을 유지한다.
-   *   `false`로 접으면 첫 프레임에 진행 중 서베이가 전부 "마감" 구역으로 떨어진다.
+   *   `false`로 접으면 첫 프레임에 진행 중 입축구가 전부 "마감" 구역으로 떨어진다.
    *   서버가 `serverNowMs`를 주면 애초에 `null`이 되지 않는다.
    */
   const nowMs = useNowMs() ?? serverNowMs ?? null;

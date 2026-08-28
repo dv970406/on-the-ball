@@ -14,9 +14,9 @@ interface UsePostPollArgs {
 /**
  * 글에 딸린 투표의 **조회·대기 판정**을 소유한다.
  *
- * 서베이 상세(`views/survey-detail/model/use-survey-detail.ts`)와 같은 형태·같은 이유다 —
+ * 입축구 상세(`views/survey-detail/model/use-survey-detail.ts`)와 같은 형태·같은 이유다 —
  * 세션 상태와 서버가 내려준 prop이 서로를 조건으로 삼는 판정이라, 뷰 본문에 두면 같은
- * 판정이 두 화면에서 갈린다. 실제로 서베이 쪽만 훅으로 나가 있고 여기만 남아 있었다.
+ * 판정이 두 화면에서 갈린다. 실제로 입축구 쪽만 훅으로 나가 있고 여기만 남아 있었다.
  *
  * ⚠ `pollKeys.detail`이 **userId로 스코프**돼 있다. `myOptionId`도 집계도 "나"에 종속된
  *   값이라 상세를 연 채 계정이 바뀌면 이전 사용자의 선택이 남기 때문이다(`identityKeys`와

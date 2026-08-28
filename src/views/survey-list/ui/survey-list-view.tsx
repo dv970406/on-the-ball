@@ -15,7 +15,7 @@ import { SurveyOpenItem } from "./survey-open-item";
 import { SurveyListSkeleton } from "./survey-list-skeleton";
 
 /**
- * 서베이 목록.
+ * 입축구 목록.
  *
  * 필터·정렬·글쓰기 FAB가 없다 — 문항을 만드는 것은 운영진이고 그 경로는 마이그레이션이다.
  *
@@ -64,7 +64,7 @@ export function SurveyListView({
         <AppBar leading={<AuthStatus />} />
 
         {/* ⚠ 화면 제목은 sr-only다 — 현재 탭은 하단 탭바가 이미 알린다(목록 화면과 같은 처리) */}
-        <h1 className="sr-only">서베이</h1>
+        <h1 className="sr-only">입축구</h1>
 
         {isLoading && <SurveyListSkeleton />}
 
@@ -75,7 +75,7 @@ export function SurveyListView({
         */}
         {error && !surveys && (
           <EmptyState
-            title="서베이를 불러오지 못했어요"
+            title="입축구를 불러오지 못했어요"
             description={error.message}
             onRetry={() => refetch()}
           />
@@ -83,14 +83,14 @@ export function SurveyListView({
 
         {/* 캐시된 목록은 그대로 두고 최신화 실패만 알린다 */}
         {error && surveys && (
-          <StaleBanner noun="서베이" onRetry={() => refetch()} />
+          <StaleBanner noun="입축구" onRetry={() => refetch()} />
         )}
 
         {surveys && surveys.length === 0 && (
           <EmptyState
             icon={ClipboardList}
-            title="아직 서베이가 없어요"
-            description="새 문항이 열리면 여기에 올라와요."
+            title="아직 입축구가 없어요"
+            description="새 주제가 열리면 여기에 올라와요."
           />
         )}
 
@@ -115,7 +115,7 @@ export function SurveyListView({
         {closed.length > 0 && (
           <section>
             <h2 className="border-b border-hairline-cool px-5 pb-2 pt-5 text-[13px] font-medium text-ink-mute">
-              마감된 서베이
+              마감된 입축구
             </h2>
             {/* 계정이 바뀌는 동안(placeholderData) 이전 목록이 남아 있다는 걸 은은하게 알린다 */}
             <ul
@@ -147,7 +147,7 @@ export function SurveyListView({
       <SignInDialog
         open={askSignIn}
         onClose={() => setAskSignIn(false)}
-        action="서베이에 참여하려면"
+        action="입축구에 끼려면"
       />
     </>
   );

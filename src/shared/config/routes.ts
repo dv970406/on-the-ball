@@ -16,7 +16,7 @@ export const ROUTES = {
    */
   postCategory: (slug: string) => `/posts/category/${slug}`,
 
-  // 서베이 — 운영진이 등록하는 전 유저 대상 문항. 사용자가 만드는 화면이 없어 new/edit가 없다
+  // 입축구 — 운영진이 등록하는 전 유저 대상 문항. 사용자가 만드는 화면이 없어 new/edit가 없다
   surveyList: "/surveys",
   survey: (id: number | string) => `/surveys/${id}`,
 

@@ -25,7 +25,7 @@ interface VoteSnapshot {
   keys: { detail: readonly unknown[]; results: readonly unknown[] };
 }
 
-/** 목록 페이지 안의 해당 서베이만 낙관적으로 갈아끼운다 */
+/** 목록 페이지 안의 해당 입축구만 낙관적으로 갈아끼운다 */
 function withMyOption(
   page: { items: SurveyListItem[] } | undefined,
   surveyId: number,
@@ -49,15 +49,15 @@ function shifted(results: SurveyResult[], from: number | null, to: number): Surv
 }
 
 /**
- * 서베이에 참여한다(갈아타기 포함, 취소 불가).
+ * 입축구에 참여한다(갈아타기 포함, 취소 불가).
  *
  * ⚠ **RPC가 아니다.** 좋아요는 카운터 컬럼을 함께 움직여야 해서 잠금이 필요했지만,
- *   서베이는 집계 컬럼이 없어 지킬 불변조건이 행 하나뿐이고 그 행은 `(survey_id, user_id)`
+ *   입축구는 집계 컬럼이 없어 지킬 불변조건이 행 하나뿐이고 그 행은 `(survey_id, user_id)`
  *   기본키가 이미 하나로 묶는다(사유는 마이그레이션 20260823000001 머리말).
  *
  * ⚠ **PostgREST upsert를 쓰지 않는다.** `ON CONFLICT DO UPDATE SET`에 payload의 모든 컬럼을
  *   실어 `survey_id`·`user_id`에도 UPDATE 권한을 요구하는데, 그걸 열면 자기 표를 다른
- *   서베이로 옮겨 "취소 불가"를 우회할 수 있다. 그래서 **내 표가 있는지로 갈라** insert 또는
+ *   입축구로 옮겨 "취소 불가"를 우회할 수 있다. 그래서 **내 표가 있는지로 갈라** insert 또는
  *   `option_id`만 바꾸는 update를 보낸다. 컬럼 grant는 `option_id` 하나뿐이다.
  *
  * ⚠ **중복 실행 가드를 두지 않는다.** 낙관적 업데이트가 있고 결과가 멱등이다
@@ -112,7 +112,7 @@ export function useCastSurveyVote(surveyId: number) {
       }
       // RLS 위반은 에러가 아니라 0행이다 — "참여됐다"고 거짓말하지 않는다
       // 마감(`survey_is_open`)·삭제 둘 다 여기로 온다 — 정책은 이유를 말해주지 않는다
-      if (!data || data.length === 0) throw new Error("마감됐거나 참여할 수 없는 서베이예요.");
+      if (!data || data.length === 0) throw new Error("마감됐거나 참여할 수 없는 입축구예요.");
     },
 
     onMutate: async (optionId) => {

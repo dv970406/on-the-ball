@@ -4,7 +4,7 @@ import { type SurveyListItem } from "@/entities/survey";
 import { SurveyVote } from "@/features/cast-survey-vote";
 
 /**
- * 목록의 **진행 중** 서베이 한 건 — 카드에서 바로 투표한다.
+ * 목록의 **진행 중** 입축구 한 건 — 카드에서 바로 투표한다.
  *
  * ⚠ **상세로 보내는 버튼을 두지 않는다.** 면을 직접 탭해 투표하고, 참여했으면 결과 바가
  *   그 자리에 뜨므로 "한 표 던지기 / 결과" 버튼이 갈 곳을 잃었다.

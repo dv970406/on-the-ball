@@ -225,7 +225,7 @@ select id, '11111111-1111-4111-8111-111111111111'::uuid, 'etc'
 on conflict do nothing;
 
 -- ---------------------------------------------------------------------
--- 8. 서베이 — 분할 3형태 × 색 유무 × 기간
+-- 8. 입축구 — 분할 3형태 × 색 유무 × 기간
 --
 -- ⚠ 실제 운영 문항은 여기가 아니라 **마이그레이션**에 넣는다(쓰기 정책·grant가 없어
 --   앱에서는 만들 수 없다). 이 시드는 로컬에서 화면을 밟아 보기 위한 것이다.
@@ -264,8 +264,8 @@ select x.title, x.created_at, x.closes_at
  where not exists (select 1 from public.survey s where s.title = x.title)
  order by x.ord;
 
--- ⚠ 서베이를 제목으로 특정한다. `cross join`만 걸면 문항이 하나 더 생기는 순간
---   **모든 서베이에 같은 선택지가 붙는다**(poll_option 시드와 같은 함정이다).
+-- ⚠ 입축구를 제목으로 특정한다. `cross join`만 걸면 문항이 하나 더 생기는 순간
+--   **모든 입축구에 같은 선택지가 붙는다**(poll_option 시드와 같은 함정이다).
 
 -- (1) 색 없음 · 진행 중 → 분할 카드가 아니라 바 UI로 폴백되는지
 insert into public.survey_option (survey_id, label, sort_order)

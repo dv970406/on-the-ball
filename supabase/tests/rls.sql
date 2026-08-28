@@ -1484,7 +1484,7 @@ rollback to s29;
 
 -- ---------------------------------------------------------------------
 \echo ''
-\echo '=== 30. 서베이 (20260823000001) ==='
+\echo '=== 30. 입축구 (20260823000001) ==='
 \echo '    설계 요약: 운영진 문항이라 **앱에서 만들 수 있는 경로가 없다**(정책도 grant도 없다).'
 \echo '    유일한 생성 경로가 마이그레이션이므로 아래 insert 차단들이 그 성질을 지킨다.'
 \echo '    글에 딸린 투표(섹션 27)와 갈리는 점은 부모가 없다는 것뿐 — 나머지 규약은 같다.'
@@ -1493,7 +1493,7 @@ rollback to s29;
 -- (그게 아래 검사들이 지키는 성질이다).
 savepoint s30;
 insert into public.survey (title) values ('가장 좋아하는 포지션은?') returning id as sid \gset
-insert into public.survey (title) values ('두 번째 서베이')         returning id as sid2 \gset
+insert into public.survey (title) values ('두 번째 입축구')         returning id as sid2 \gset
 insert into public.survey_option (survey_id, label, sort_order)
 values (:sid, '공격수', 1), (:sid, '미드필더', 2), (:sid, '수비수', 3);
 insert into public.survey_option (survey_id, label, sort_order)
@@ -1506,12 +1506,12 @@ select id as sopt_other from public.survey_option where survey_id = :sid2 and so
 \echo '-- 30a. 문항은 앱에서 만들 수도 고칠 수도 없다 --'
 
 savepoint s; :login_alice
-\echo '[❌차단] 서베이를 직접 만든다 — 쓰기 정책도 grant도 없다'
-insert into public.survey (title) values ('내가 만든 서베이');
+\echo '[❌차단] 입축구를 직접 만든다 — 쓰기 정책도 grant도 없다'
+insert into public.survey (title) values ('내가 만든 입축구');
 rollback to s;
 
 savepoint s; :login_alice
-\echo '[❌차단] 진행 중인 서베이에 선택지를 끼워 넣는다 (섹션 27과 같은 성질)'
+\echo '[❌차단] 진행 중인 입축구에 선택지를 끼워 넣는다 (섹션 27과 같은 성질)'
 insert into public.survey_option (survey_id, label, sort_order) values (:sid, '골키퍼', 4);
 rollback to s;
 
@@ -1526,7 +1526,7 @@ update public.survey_option set label = '바꿔치기' where id = :sopt1;
 rollback to s;
 
 savepoint s; :login_alice
-\echo '[❌차단] 서베이 통째로 삭제'
+\echo '[❌차단] 입축구 통째로 삭제'
 delete from public.survey where id = :sid;
 rollback to s;
 
@@ -1574,15 +1574,15 @@ insert into public.survey_option (survey_id, label, sort_order, subtitle, bg_col
 values (:sid2, '정상', 3, '부제입니다', '#171717', '#ffffff');
 rollback to s;
 
-\echo '[0 기대] **색이 일부 선택지에만 있는 서베이** — 분할 카드가 깨지는 유일한 경로다'
-\echo '         (한 서베이 안에서 전부 갖거나 전부 없거나는 행 간 제약이라 CHECK로 못 쓴다)'
+\echo '[0 기대] **색이 일부 선택지에만 있는 입축구** — 분할 카드가 깨지는 유일한 경로다'
+\echo '         (한 입축구 안에서 전부 갖거나 전부 없거나는 행 간 제약이라 CHECK로 못 쓴다)'
 select count(*) from public.survey s
  where exists (select 1 from public.survey_option o
                 where o.survey_id = s.id and o.bg_color is not null)
    and exists (select 1 from public.survey_option o
                 where o.survey_id = s.id and o.bg_color is null);
 
-\echo '[0 기대] **선택지가 2개 미만인 서베이** — 하한 2의 유일한 보증이다'
+\echo '[0 기대] **선택지가 2개 미만인 입축구** — 하한 2의 유일한 보증이다'
 \echo '         (행 수는 CHECK로 셀 수 없어 이 검사가 마이그레이션 실수를 대신 잡는다)'
 select count(*) from public.survey s
  where (select count(*) from public.survey_option o where o.survey_id = s.id) < 2;
@@ -1618,13 +1618,13 @@ insert into public.survey_vote (survey_id, user_id, option_id) values (:sid, :'b
 rollback to s;
 
 savepoint s; :login_bob
-\echo '[❌차단] **다른 서베이의 선택지**로 참여 — 복합 FK가 막는다'
+\echo '[❌차단] **다른 입축구의 선택지**로 참여 — 복합 FK가 막는다'
 insert into public.survey_vote (survey_id, user_id, option_id) values (:sid, :'bob', :sopt_other);
 rollback to s;
 
 savepoint s; :login_bob
 insert into public.survey_vote (survey_id, user_id, option_id) values (:sid, :'bob', :sopt1);
-\echo '[❌차단] 내 표를 **다른 서베이로 옮긴다** — "취소 불가"를 우회하는 경로다'
+\echo '[❌차단] 내 표를 **다른 입축구로 옮긴다** — "취소 불가"를 우회하는 경로다'
 \echo '         (컬럼 UPDATE 권한이 option_id 하나뿐이라 막힌다)'
 update public.survey_vote set survey_id = :sid2, option_id = :sopt_other
  where survey_id = :sid and user_id = :'bob';
@@ -1676,13 +1676,13 @@ select count(*) from public.survey_results(:sid);
 rollback to s;
 
 savepoint s; :login_anon
-\echo '[3 기대] 다만 서베이와 선택지는 비로그인에게도 보인다 (참여만 로그인이 필요하다)'
-\echo '         ⚠ 시드에도 서베이가 있어 전체 개수는 세지 않는다 — 이 섹션이 만든 것만 본다'
+\echo '[3 기대] 다만 입축구와 선택지는 비로그인에게도 보인다 (참여만 로그인이 필요하다)'
+\echo '         ⚠ 시드에도 입축구가 있어 전체 개수는 세지 않는다 — 이 섹션이 만든 것만 본다'
 select (select count(*) from public.survey where id = :sid)
      + (select count(*) from public.survey where id = :sid2)
      + (select count(*) from public.survey_option where survey_id = :sid and sort_order = 1) as visible;
 \echo '[0 기대] survey_vote는 grant는 있지만 정책이 to authenticated라 0행이다'
-\echo '         (grant를 빼면 임베딩이 42501로 죽어 비로그인에게 서베이가 통째로 안 보인다)'
+\echo '         (grant를 빼면 임베딩이 42501로 죽어 비로그인에게 입축구가 통째로 안 보인다)'
 select count(*) from public.survey_vote;
 rollback to s;
 
@@ -1737,11 +1737,11 @@ select public                                                   as is_public,
 \echo ''
 \echo '-- 30d. 기간(마감) — 쓰기만 막고 읽기는 열어 둔다 --'
 
--- 마감된 서베이를 하나 만든다. ⚠ superuser라 created_at·closes_at을 직접 넣을 수 있다
+-- 마감된 입축구를 하나 만든다. ⚠ superuser라 created_at·closes_at을 직접 넣을 수 있다
 --   (authenticated에는 survey 쓰기 권한이 아예 없다).
 savepoint s;
 insert into public.survey (title, created_at, closes_at)
-values ('마감된 서베이', now() - interval '30 days', now() - interval '23 days')
+values ('마감된 입축구', now() - interval '30 days', now() - interval '23 days')
 returning id as csid \gset
 insert into public.survey_option (survey_id, label, sort_order)
 values (:csid, '예', 1), (:csid, '아니오', 2);
@@ -1749,7 +1749,7 @@ select id as copt1 from public.survey_option where survey_id = :csid and sort_or
 select id as copt2 from public.survey_option where survey_id = :csid and sort_order = 2 \gset
 
 savepoint s2; :login_bob
-\echo '[❌차단] **마감된 서베이에 투표** — 이번 기능의 실제 방어선이다'
+\echo '[❌차단] **마감된 입축구에 투표** — 이번 기능의 실제 방어선이다'
 insert into public.survey_vote (survey_id, user_id, option_id) values (:csid, :'bob', :copt1);
 rollback to s2;
 
@@ -1757,7 +1757,7 @@ rollback to s2;
 insert into public.survey_vote (survey_id, user_id, option_id) values (:csid, :'bob', :copt1);
 
 savepoint s2; :login_bob
-\echo '[UPDATE 0 기대] 마감된 서베이에서 갈아타기 — using이 후보에서 빼 조용히 0행이 된다'
+\echo '[UPDATE 0 기대] 마감된 입축구에서 갈아타기 — using이 후보에서 빼 조용히 0행이 된다'
 update public.survey_vote set option_id = :copt2
  where survey_id = :csid and user_id = :'bob';
 rollback to s2;
@@ -1775,7 +1775,7 @@ select count(*) from public.survey_results(:csid);
 rollback to s2;
 
 savepoint s2; :login_bob
-\echo '[성공] 진행 중인 서베이에는 여전히 투표된다 (만료 조건이 과잉 차단하지 않는다)'
+\echo '[성공] 진행 중인 입축구에는 여전히 투표된다 (만료 조건이 과잉 차단하지 않는다)'
 insert into public.survey_vote (survey_id, user_id, option_id) values (:sid2, :'bob', :sopt_other);
 rollback to s2;
 rollback to s;

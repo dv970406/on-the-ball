@@ -3,7 +3,7 @@ import type { Database } from "@/types/database.types";
 import { SURVEY_LIST_LIMIT, SURVEY_LIST_SELECT } from "./mappers";
 
 /**
- * 서베이 목록 쿼리 조립의 **단일 소스** — 훅과 SSR 페이지가 같은 함수를 부른다.
+ * 입축구 목록 쿼리 조립의 **단일 소스** — 훅과 SSR 페이지가 같은 함수를 부른다.
  *
  * ⚠ **서버가 정렬·상한·select를 다시 짜면 안 된다.** 한 글자만 달라도 하이드레이션 직후
  *   목록이 재배열된다 — `buildPostListQuery`가 글 목록에 대해 하는 일과 같다.

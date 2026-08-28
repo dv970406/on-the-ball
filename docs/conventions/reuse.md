@@ -106,6 +106,17 @@
 - ⚠ 투표하기에는 **RPC가 없다.** 집계 컬럼이 없어 지킬 불변조건이 행 하나뿐이라 잠금이 필요 없다. 다만 **PostgREST upsert도 쓰지 않는다** — payload 전 컬럼에 UPDATE 권한을 요구해서 `post_id`를 열게 되고, 그러면 표를 다른 글로 옮겨 "취소 불가"가 뚫린다.
 
 ## `@/entities/survey`
+> ⚠ **한국어로 부를 때는 "입축구", 영문 식별자는 `survey`.** 이 기능을 가리키는 한국어는
+> 화면·주석·문서 어디서든 "입축구" 하나다 — "서베이"와 섞어 쓰지 않는다. 반대로
+> `survey`·`surveyKeys`·`SurveyBlock`·`/surveys`·`survey_vote`는 그대로 둔다.
+> URL은 사이트맵에 실린 영구 계약이고(`nextjs.md`), 테이블·RPC까지 개명하면 마이그레이션이
+> 줄줄이 딸려온다. 그래서 한 문장에 둘이 함께 나오는 것이 정상이다 —
+> "입축구(`survey`·`survey_option`)가 그 자리다".
+> ⚠ **예외는 이미 적용된 마이그레이션뿐이다** — `supabase/migrations/`는 주석이라도 고치지
+> 않는다("원격에 적용된 마이그레이션은 수정하지 않고 새 파일로 추가한다", `api-and-db.md`).
+> 그 파일들에는 "서베이"가 남아 있고, 그게 유일하게 남아도 되는 자리다.
+> ⚠ 조사는 손으로 붙이지 않는다 — `StaleBanner`가 받침으로 판정한다("입축구**를**").
+
 - `useSurveyListQuery(userId, enabled, initialData)` / `useSurveyQuery(id, userId, enabled, initialData)` / `useSurveyResultsQuery(id, userId, enabled, initialData)` — 목록 · 단건 · 집계.
   - ⚠ `initialData`는 **서버 프리페치의 결과**다. 넘길 때는 **키의 `userId`도 서버가 준 값**이어야 하고 `enabled`도 함께 열어야 한다 — 하나라도 어긋나면 서버가 그린 HTML을 첫 프레임에 스켈레톤이 덮는다(실측). 사유는 `nextjs.md`.
 - `surveyKeys` / `SURVEY_LIST_LIMIT` / `Survey` · `SurveyListItem` · `SurveyResult` / `SurveyCard` · `SurveyBlock`.
@@ -113,8 +124,8 @@
 - ⚠ **`entities/poll`과 합치지 않았다.** 부모가 다르고(글에 딸림 ↔ 독립) 목록 계층 유무도 다르다. 무엇보다 entities끼리는 import할 수 없어 `PollBlock`을 재사용하는 길 자체가 없다 — 3번째 소비자가 생기면 그때 `shared/ui`로 올린다(`code-quality.md`의 공용화 기준).
 - ⚠ **키를 `userId`로 스코프한다 — 목록까지 그렇다.** 카드의 "참여 완료"가 `survey_vote` 임베딩("내 행만")에서 오므로 목록 응답 자체가 "나"에 종속된다. `pollKeys`·`blockKeys`와 같은 이유.
 - ⚠ **참여자 수를 목록에서 그리지 않는다.** 득표수 컬럼이 없어 집계는 `survey_results`를 거쳐야 하는데 그건 참여자에게만 열린다 — 목록에서 부르면 미참여자에게 0이 나가 화면이 거짓말을 한다.
-- **`isSurveyOpen(survey, nowMs)`** — 마감 판정. ⚠ `nowMs`를 인자로 받는 이유가 규약이다(`isHotPost`와 같다). 호출부는 `useNowMs()`를 넘기고 **`null`은 "아직 판정 전"** 으로 다룬다 — `false`로 접으면 첫 프레임에 멀쩡한 서베이가 마감으로 보인다. ⚠ 이 판정은 안내일 뿐이고 실제 차단은 `survey_is_open` 정책이 한다.
-- ⚠ `SurveyBlock`은 **제목을 렌더하지 않는다**(`PollBlock`과 갈리는 유일한 지점). 서베이는 `title`이 곧 화면의 `h1`이라 뷰가 소유한다.
+- **`isSurveyOpen(survey, nowMs)`** — 마감 판정. ⚠ `nowMs`를 인자로 받는 이유가 규약이다(`isHotPost`와 같다). 호출부는 `useNowMs()`를 넘기고 **`null`은 "아직 판정 전"** 으로 다룬다 — `false`로 접으면 첫 프레임에 멀쩡한 입축구가 마감으로 보인다. ⚠ 이 판정은 안내일 뿐이고 실제 차단은 `survey_is_open` 정책이 한다.
+- ⚠ `SurveyBlock`은 **제목을 렌더하지 않는다**(`PollBlock`과 갈리는 유일한 지점). 입축구는 `title`이 곧 화면의 `h1`이라 뷰가 소유한다.
 - **`SplitCard` / `splitCount(options)`** — 선택지를 **면적으로 등분한** 분할 카드와 그 판정.
   - ⚠ **`splitCount`가 "분할 카드로 그릴 문항인가"를 단독으로 소유한다.** 목록과 상세가 같은 `SurveyVote`를 공유하므로 판정 지점이 하나뿐인데, 그 하나를 함수로 둬야 새 소비자가 생겨도 답이 갈리지 않는다. 판별자는 `bg_color`의 유무이고, layout enum을 두지 않은 이유는 `api-and-db.md`에.
   - ⚠ 도형(clip-path·텍스트 앵커·이름 크기)은 `lib/split-layout`이 **한 곳에서** 내려준다. 흩어지면 선택지 수를 늘렸을 때 조용히 어긋난다.
@@ -127,7 +138,7 @@
 ## `@/features/cast-survey-vote`
 - `SurveyVote` — `SurveyBlock`에 세션과 뮤테이션을 붙인 컴포넌트. 조회는 `@/entities/survey`다(`PollVote`와 같은 분업).
 - ⚠ 세션 `status`를 **3분기**한다(`loading`을 비로그인과 같이 다루면 콜드 로드 직후 로그인 사용자가 로그인 안내를 본다).
-- ⚠ **비로그인에게도 선택지를 연결한다** — 눌러야 로그인 안내가 뜬다. 읽기 전용으로 두면 "왜 안 눌리지"가 되고 별도 안내 링크를 다시 붙여야 한다. 읽기 전용은 마감된 서베이뿐이다.
+- ⚠ **비로그인에게도 선택지를 연결한다** — 눌러야 로그인 안내가 뜬다. 읽기 전용으로 두면 "왜 안 눌리지"가 되고 별도 안내 링크를 다시 붙여야 한다. 읽기 전용은 마감된 입축구뿐이다.
 - ⚠ **안내(`SignInDialog`)는 이 컴포넌트가 아니라 뷰가 소유한다**(`onSignInRequired` 콜백으로 올린다). `Dialog`는 `absolute`라 `TabScrollArea`의 relative 스크롤 영역 안에 두면 스크롤한 만큼 화면 밖에 뜨고, 목록에는 카드 수만큼 생긴다 — `ToastViewport`를 루트에 하나만 두는 것과 같은 이유다.
 - ⚠ **무효화 대상이 `cast-poll-vote`보다 하나 많다** — 목록 카드가 "참여 완료"를 표시하므로 `surveyKeys.lists()`도 함께 지운다. 빼면 참여하고 목록으로 돌아왔을 때 배지가 갱신되지 않는다.
 - ⚠ 참여하기에는 **RPC가 없고 PostgREST upsert도 쓰지 않는다** — 사유는 `cast-poll-vote`와 같다(집계 컬럼이 없어 잠금이 불필요하고, upsert는 `survey_id` UPDATE 권한을 요구해 "취소 불가"를 뚫는다).
@@ -167,7 +178,7 @@
 - **`OAUTH_PROVIDERS` / `OAUTH_PROVIDER_LABEL`** — 지원 소셜 프로바이더의 단일 소스. `supabase/config.toml`의 `[auth.external.*]`와 갈리면 안 된다. ⚠ `shared`에 있는 이유는 로그인(`features/sign-in`)과 계정 연결(`features/link-identity`)이 같은 목록을 써야 하는데 features끼리는 import할 수 없어서다.
 - **`avatarUrl(path)` / `AVATAR_BUCKET`** — 아바타 **경로** → 공개 URL. ⚠ DB에는 전체 URL이 아니라 경로만 저장한다(호스트가 환경마다 다르다: 로컬 `127.0.0.1:64321` ↔ 원격 `*.supabase.co`). 조립은 이 함수 한 곳에서만. `shared`에 있는 이유는 `OAUTH_PROVIDERS`와 같다 — entities 셋이 함께 쓴다. 버킷명 문자열도 여기서 가져다 쓴다(`features/update-profile`이 선례).
 - **`publicStorageUrl(bucket, path)`** — 공개 버킷 경로 → URL 조립의 **단일 소스**. 새 공개 버킷이 생기면 여기에 붙인다(버킷별 함수는 이 함수를 감싸기만 한다).
-- **`surveyImageUrl(path)`** — 서베이 면 배경 경로 → URL. ⚠ 버킷명 상수는 **배럴에 없다**(TS 호출부가 0이라 올리지 않았다) — 필요하면 `@/shared/config/survey-image` 직접 경로. ⚠ 이 버킷은 **쓰기 정책이 없다**(운영진 문항과 같은 취급) — 파일은 `scripts/upload-survey-images.mjs`가 service_role로 올린다.
+- **`surveyImageUrl(path)`** — 입축구 면 배경 경로 → URL. ⚠ 버킷명 상수는 **배럴에 없다**(TS 호출부가 0이라 올리지 않았다) — 필요하면 `@/shared/config/survey-image` 직접 경로. ⚠ 이 버킷은 **쓰기 정책이 없다**(운영진 문항과 같은 취급) — 파일은 `scripts/upload-survey-images.mjs`가 service_role로 올린다.
 - **`postImageUrl(path)` / `POST_IMAGE_BUCKET`** — 본문 이미지 경로 → 공개 URL.
   ⚠ **아바타와 달리 결과(전체 URL)가 그대로 `post.content`에 들어간다.** 본문은 사용자가 외부 주소도 적을 수 있는 자유 텍스트라 경로 규약을 강제할 자리가 없다 — 사유는 `api-and-db.md`의 "본문 이미지는 URL을 본문에 담는다" 절에 있다.
   ⚠ 조립 자체는 `publicStorageUrl`이 한다. **이 함수만 결과(전체 URL)가 DB에 들어간다** — 본문은 자유 텍스트라 경로 규약을 강제할 자리가 없다.

@@ -1,5 +1,5 @@
 /**
- * 서베이 면 배경 이미지를 `survey-images` 버킷에 올린다.
+ * 입축구 면 배경 이미지를 `survey-images` 버킷에 올린다.
  *
  *   node scripts/upload-survey-images.mjs <이미지_디렉터리>
  *

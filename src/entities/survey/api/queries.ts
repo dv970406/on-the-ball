@@ -17,7 +17,7 @@ export interface SurveyListPage {
 }
 
 /**
- * 서베이 목록 — 최신순.
+ * 입축구 목록 — 최신순.
  *
  * ⚠ **세션이 확정되기 전에는 부르지 않는다**(`enabled`). 키가 userId로 스코프돼 있어서,
  *   복원 중에 `undefined`로 한 번 조회하면 세션이 선 뒤 키가 바뀌며 목록이 통째로
@@ -53,7 +53,7 @@ export function useSurveyListQuery(
 }
 
 /**
- * 서베이 하나 — 없으면 `null`.
+ * 입축구 하나 — 없으면 `null`.
  *
  * ⚠ 존재 판정은 서버(`app/surveys/[id]/page.tsx`)가 이미 하고 404를 낸다. 여기서 `null`이
  *   되는 것은 그 사이에 지워졌을 때뿐이라, 화면은 그 경우만 안내하면 된다.
