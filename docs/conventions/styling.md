@@ -126,6 +126,16 @@ function cardClassName(peek: boolean) {
     진입에는 안착감을 주지만 퇴장에 쓰면 다 닫힌 것처럼 보이는 잔상이 100ms 가까이 남아
     **"닫기가 느리다"는 체감**이 된다. 그래서 퇴장만 가속 커브로 뒤집고 하한(150ms)도 아래로 연다.
     바운스·스프링이 아니므로 위 금지에는 걸리지 않는다. 선례: `Sheet`(`shared/ui/sheet.tsx`).
+  - ⚠ **끝이 없는 진행 표시(스피너)도 이 시간·이징 규칙의 대상이 아니다** — 시작과 끝이 없어
+    감속·가속 커브가 뜻을 갖지 않고, 등속(`linear`)이라 바운스·스프링 금지에도 걸리지 않는다.
+    Tailwind 기본 `animate-spin`(1s linear infinite)을 그대로 쓴다.
+    - ⚠ **다만 뮤테이션 진행 표시의 기본값이 아니다.** 라벨을 가진 컨트롤은 그 라벨을 바꾸는 것이
+      먼저다(`저장 중…`·`로그아웃 중…`) — 무엇이 진행 중인지를 글자가 말해 준다.
+      스피너는 **라벨을 둘 자리가 없을 때**만 쓴다: 아이콘만 있는 컨트롤이거나, 진행 중임을
+      대상 위에 겹쳐 보여야 하는 자리. 선례는 아바타 업로드(`views/profile/ui/profile-view.tsx`).
+    - ⚠ **사진 위에 얹는 스피너는 스크림 없이 성립하지 않는다.** 아래 깔린 것이 사용자가 올린
+      이미지라 밝기를 가정할 수 없다 — 순백 사진 위 흰 링의 대비는 `bg-ink/40`에서 **1.6:1**로
+      비텍스트 최소 3:1에 한참 못 미쳐 링이 묻힌다. `bg-ink/75`가 3.4:1로 그 선을 넘는 지점이다.
 - 강한 컬러(클럽 컬러·국기)는 **콘텐츠**로만 허용 — 크롬(버튼·네비)에는 금지.
 - `prefers-reduced-motion` 존중(전역 처리됨).
   - ⚠ **언마운트를 `animationend`에 거는 요소에는 `motion-safe:`를 붙이지 않는다.** reduce 환경에서
@@ -164,7 +174,7 @@ function cardClassName(peek: boolean) {
 |---|---|---|
 | `size-11`/`size-9` 원형 아이콘 **버튼** | 버튼 라운드가 아니라 **원형 히트 영역** | `sub-header` · `post-detail-view` · `profile-view`(사진 변경) |
 | 원형 아이콘 **컨테이너**(클릭 불가) | 히트 영역도 아닌 순수 장식 | `shared/ui/empty-state.tsx` |
-| 도트·아바타·`Pill`·`RatioBar`·워드마크의 볼 | 컨트롤이 아닌 **표시 요소** | `live-dot` · `avatar` · `pill` · `ratio-bar` · `wordmark` · `post-card`의 구분점 · `profile-view`의 아바타 스켈레톤 |
+| 도트·아바타·`Pill`·`RatioBar`·워드마크의 볼 | 컨트롤이 아닌 **표시 요소** | `live-dot` · `avatar` · `pill` · `ratio-bar` · `wordmark` · `post-card`의 구분점 · `profile-view`의 아바타 스켈레톤·업로드 스피너 |
 | 바텀시트 **그래버**(36×4px 바) | 누르는 컨트롤이 아니라 **드래그 어포던스** — 아래로 끌면 시트가 따라 내려간다 | `shared/ui/sheet.tsx` |
 | 분할 카드의 **VS 배지** | `aria-hidden` 장식이라 컨트롤이 아니다 — 원이 아니면 성립하지 않는 형태다 | `entities/survey/ui/vs-badge.tsx` |
 

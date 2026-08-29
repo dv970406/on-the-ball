@@ -322,7 +322,8 @@ export function PostForm({
         </button>
         {/* ⚠ 코드포인트로 센다 — .length(UTF-16)로 세면 이모지가 2로 잡혀 DB 한도와 어긋난다.
             위에서 이미 센 값을 재사용한다(렌더당 1회). */}
-        {/* 업로드 진행 표시 — 스피너를 만들지 않는다(선례가 없고 이징·시간 규칙과 충돌한다) */}
+        {/* 업로드 진행 표시 — 여기는 글자 한 줄 높이의 인라인 슬롯이라 텍스트가 맞다.
+            스피너는 라벨을 둘 자리가 없을 때 쓴다(styling.md) — 아바타 업로드가 그 경우다. */}
         {image.isPending && (
           <span className="ml-auto text-[11px] text-ink-faint">사진 올리는 중…</span>
         )}

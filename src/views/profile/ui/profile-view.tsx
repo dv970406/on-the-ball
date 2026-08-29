@@ -156,13 +156,28 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
               <h2 id="avatar-heading" className="sr-only">
                 프로필 사진
               </h2>
-              <div className="relative">
+              {/* ⚠ flex다 — Avatar가 inline-flex라 블록 래퍼에서는 라인박스 디센더만큼
+                  아래에 여백이 붙어, inset-0 오버레이가 원보다 세로로 커진다(카메라 버튼의
+                  -bottom-1도 그만큼 아래로 밀린다). */}
+              <div className="relative flex">
                 <Avatar
                   label={profile.data.nickname}
                   src={avatarUrl(profile.data.avatarPath)}
                   size={96}
                   className="text-[32px]"
                 />
+                {/* 업로드 중 — 사진 위에 스피너를 얹는다.
+                    ⚠ 스크림이 75%인 이유가 규약이다 — 아래에 깔린 것이 사용자가 올린 사진이라
+                       밝기를 가정할 수 없다. 순백 사진 기준으로 흰 링과의 대비가 3:1을 넘는
+                       지점이 여기다(ink/40이면 1.6:1로 링이 묻힌다).
+                    ⚠ prefers-reduced-motion에서는 전역 블록이 회전을 멈춰 정지된 링이 되는데,
+                       스크림이 함께 깔려 있어 "지금 처리 중"은 그대로 읽힌다. */}
+                {avatar.isPending && (
+                  <span className="absolute inset-0 flex items-center justify-center rounded-full bg-ink/75">
+                    <span className="size-7 animate-spin rounded-full border-2 border-canvas/30 border-t-canvas" />
+                    <span className="sr-only">프로필 사진 올리는 중</span>
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={avatar.open}
@@ -174,11 +189,10 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
                 </button>
               </div>
               <input type="file" {...avatar.inputProps} className="sr-only" />
-              <p className="mt-3 text-[12px] text-ink-faint">
-                {avatar.isPending ? "올리는 중…" : "JPG · PNG · WebP"}
-              </p>
+              {/* mt-3 — 아바타 아래 첫 요소의 여백을 그대로 잇는다. mt-2면 원 밖으로 4px
+                  돌출한 카메라 버튼과 4px까지 붙는다(실측). */}
               {avatar.error && (
-                <p className="mt-2 text-center text-[13px] text-crimson">{avatar.error.message}</p>
+                <p className="mt-3 text-center text-[13px] text-crimson">{avatar.error.message}</p>
               )}
             </section>
 
