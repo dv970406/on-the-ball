@@ -443,12 +443,16 @@ select p.proname
 \echo '        is_blocked(차단 숨김 판정 — post의 SELECT 정책에 `to` 절이 없어 비로그인 조회도'
 \echo '        이 함수를 지난다. 닫으면 목록·상세가 통째로 42501로 죽는다. anon은 auth.uid()가'
 \echo '        null이라 항상 false를 받아 아무것도 감춰지지 않는다)'
+\echo '        match_prediction_results(승부예측 집계 — 게이팅 축이 "참여"가 아니라 "킥오프"라,'
+\echo '        마감 후에는 비로그인에게도 열어야 한다. "커뮤니티의 68%가 이렇게 봤다"가 이 기능의'
+\echo '        콘텐츠 자체이고 크롤러도 그것을 본다. 킥오프 전에는 누구에게나 0행이다)'
 select p.proname
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
  where n.nspname = 'public'
    and has_function_privilege('anon', p.oid, 'EXECUTE')
    and p.proname not in ('post_is_alive', 'has_visible_char', 'normalize_nickname',
-                         'increment_post_view', 'is_blocked');
+                         'increment_post_view', 'is_blocked',
+                         'match_prediction_results');
 
 -- ---------------------------------------------------------------------
 \echo ''
@@ -954,27 +958,27 @@ rollback to s;
 
 \echo ''
 \echo '=== 27. 투표 (20260817000003) ==='
-\echo '    설계 요약: 득표수 컬럼도 트리거도 없다(poll_results가 그때그때 센다).'
+\echo '    설계 요약: 득표수 컬럼도 트리거도 없다(post_poll_results가 그때그때 센다).'
 \echo '    개별 표는 "내 행만" SELECT라 남의 표가 구조적으로 새지 않고,'
 \echo '    집계는 **투표한 사람에게만** 열린다(v1은 UI에서만 가려 게이팅이 아니었다).'
 
 -- alice의 글에 투표를 붙인다. ⚠ 시드는 **superuser로** 넣는다 — authenticated에는
--- poll·poll_option INSERT 권한이 아예 없다(그게 아래 검사들이 지키는 성질이다).
+-- post_poll·post_poll_option INSERT 권한이 아예 없다(그게 아래 검사들이 지키는 성질이다).
 savepoint s27;
-insert into public.poll (post_id, question) values (:pid, '누구를 데려와야 할까?');
-insert into public.poll_option (post_id, label, sort_order)
+insert into public.post_poll (post_id, question) values (:pid, '누구를 데려와야 할까?');
+insert into public.post_poll_option (post_id, label, sort_order)
 values (:pid, '윙어', 1), (:pid, '수비형 미드필더', 2);
-select id as opt1 from public.poll_option where post_id = :pid and sort_order = 1 \gset
-select id as opt2 from public.poll_option where post_id = :pid and sort_order = 2 \gset
+select id as opt1 from public.post_poll_option where post_id = :pid and sort_order = 1 \gset
+select id as opt2 from public.post_poll_option where post_id = :pid and sort_order = 2 \gset
 
 savepoint s; :login_bob
 \echo '[❌차단] 남의 글에 투표를 붙인다'
-insert into public.poll (post_id, question) values (:pid, '가로채기');
+insert into public.post_poll (post_id, question) values (:pid, '가로채기');
 rollback to s;
 
 savepoint s; :login_bob
 \echo '[❌차단] 남의 글에 선택지를 끼워 넣는다'
-insert into public.poll_option (post_id, label, sort_order) values (:pid, '몰래', 4);
+insert into public.post_poll_option (post_id, label, sort_order) values (:pid, '몰래', 4);
 rollback to s;
 
 -- ⚠ 아래 둘이 이 절의 핵심이다. 한때 "작성자면 넣을 수 있다"로 INSERT를 열어 두고
@@ -983,64 +987,64 @@ rollback to s;
 --   작성자 본인의 사후 삽입을 보지 않아 그대로 살아남았다.
 savepoint s; :login_alice
 \echo '[❌차단] **작성자도** 진행 중인 투표에 선택지를 추가할 수 없다'
-insert into public.poll_option (post_id, label, sort_order) values (:pid, '뒤늦게', 4);
+insert into public.post_poll_option (post_id, label, sort_order) values (:pid, '뒤늦게', 4);
 rollback to s;
 
 savepoint s; :login_alice
 \echo '[❌차단] **작성자도** 옛 글에 투표를 나중에 붙일 수 없다'
-insert into public.poll (post_id, question) values (:bpid, '사후 투표');
+insert into public.post_poll (post_id, question) values (:bpid, '사후 투표');
 rollback to s;
 
 savepoint s; :login_alice
 \echo '[❌차단] 질문 수정 — 생성 시 고정이라 UPDATE 정책이 없다'
-update public.poll set question = '바꿔치기' where post_id = :pid;
+update public.post_poll set question = '바꿔치기' where post_id = :pid;
 rollback to s;
 
 savepoint s; :login_alice
 \echo '[❌차단] 선택지 수정 — 던져진 표의 뜻이 바뀌면 안 된다'
-update public.poll_option set label = '바꿔치기' where id = :opt1;
+update public.post_poll_option set label = '바꿔치기' where id = :opt1;
 rollback to s;
 
 savepoint s; :login_alice
 \echo '[❌차단] 투표 통째로 삭제'
-delete from public.poll where post_id = :pid;
+delete from public.post_poll where post_id = :pid;
 rollback to s;
 
 savepoint s; :login_bob
 \echo '[성공] 첫 투표'
-insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
+insert into public.post_poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
 \echo '[성공] 갈아타기 — option_id만 바꾼다'
-update public.poll_vote set option_id = :opt2 where post_id = :pid and user_id = :'bob';
+update public.post_poll_vote set option_id = :opt2 where post_id = :pid and user_id = :'bob';
 \echo '[1행 기대] 갈아타도 표는 하나다'
-select count(*) as my_votes from public.poll_vote where post_id = :pid and user_id = :'bob';
+select count(*) as my_votes from public.post_poll_vote where post_id = :pid and user_id = :'bob';
 rollback to s;
 
 savepoint s; :login_bob
-insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
+insert into public.post_poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
 \echo '[❌차단] 표를 다른 글로 옮겨 "취소 불가"를 우회 — 컬럼 권한이 막는다'
-update public.poll_vote set post_id = :bpid where post_id = :pid and user_id = :'bob';
+update public.post_poll_vote set post_id = :bpid where post_id = :pid and user_id = :'bob';
 rollback to s;
 
 savepoint s; :login_bob
-insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
+insert into public.post_poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
 \echo '[❌차단] 투표 취소 — DELETE 정책이 없다'
-delete from public.poll_vote where post_id = :pid and user_id = :'bob';
+delete from public.post_poll_vote where post_id = :pid and user_id = :'bob';
 rollback to s;
 
 savepoint s; :login_bob
 \echo '[❌차단] 남의 명의로 투표'
-insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'alice', :opt1);
+insert into public.post_poll_vote (post_id, user_id, option_id) values (:pid, :'alice', :opt1);
 rollback to s;
 
 savepoint s; :login_bob
 \echo '[❌차단] 한 사람 두 표 (기본키)'
-insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
-insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt2);
+insert into public.post_poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
+insert into public.post_poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt2);
 rollback to s;
 
 savepoint s; :login_bob
 \echo '[❌차단] 다른 글의 선택지로 투표 — 복합 FK가 막는다'
-insert into public.poll_vote (post_id, user_id, option_id) values (:bpid, :'bob', :opt1);
+insert into public.post_poll_vote (post_id, user_id, option_id) values (:bpid, :'bob', :opt1);
 rollback to s;
 
 savepoint s;
@@ -1048,7 +1052,7 @@ savepoint s;
 select public.soft_delete_post(:pid);
 :login_bob
 \echo '[❌차단] 삭제된 글에 투표'
-insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
+insert into public.post_poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
 rollback to s;
 
 -- ⚠ 위 검사와 savepoint를 나눈다. 에러가 트랜잭션을 abort시켜 뒤따르는 select까지
@@ -1058,43 +1062,43 @@ savepoint s;
 select public.soft_delete_post(:pid);
 :login_bob
 \echo '[0 / 0 기대] 삭제된 글의 투표·선택지는 보이지 않는다'
-select (select count(*) from public.poll where post_id = :pid) as polls,
-       (select count(*) from public.poll_option where post_id = :pid) as opts;
+select (select count(*) from public.post_poll where post_id = :pid) as polls,
+       (select count(*) from public.post_poll_option where post_id = :pid) as opts;
 rollback to s;
 
 savepoint s; :login_bob
-insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
+insert into public.post_poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
 :login_alice
 \echo '[0행 기대] 남의 표는 조회되지 않는다'
-select * from public.poll_vote where post_id = :pid;
+select * from public.post_poll_vote where post_id = :pid;
 \echo '[0행 기대] 투표하지 않은 사람에게 집계는 닫혀 있다'
-select * from public.poll_results(:pid);
-insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'alice', :opt1);
+select * from public.post_poll_results(:pid);
+insert into public.post_poll_vote (post_id, user_id, option_id) values (:pid, :'alice', :opt1);
 \echo '[opt1=2 기대] 투표하면 집계가 열린다 (bob·alice 둘 다 opt1)'
-select option_id = :opt1 as is_opt1, vote_count from public.poll_results(:pid);
-update public.poll_vote set option_id = :opt2 where post_id = :pid and user_id = :'alice';
+select option_id = :opt1 as is_opt1, vote_count from public.post_poll_results(:pid);
+update public.post_poll_vote set option_id = :opt2 where post_id = :pid and user_id = :'alice';
 \echo '[opt1=1 / opt2=1 기대] 갈아타면 집계가 따라 움직인다'
-select (select vote_count from public.poll_results(:pid) where option_id = :opt1) as opt1,
-       (select vote_count from public.poll_results(:pid) where option_id = :opt2) as opt2;
+select (select vote_count from public.post_poll_results(:pid) where option_id = :opt1) as opt1,
+       (select vote_count from public.post_poll_results(:pid) where option_id = :opt2) as opt2;
 rollback to s;
 
 savepoint s; :login_anon
 \echo '[❌차단] 비로그인은 집계 함수를 못 부른다'
-select * from public.poll_results(:pid);
+select * from public.post_poll_results(:pid);
 rollback to s;
 
 savepoint s; :login_bob
-insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
+insert into public.post_poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
 :login_anon
 -- ⚠ 설명은 **라벨보다 앞**에 둔다. 러너가 라벨 뒤 3줄만 값으로 뽑아서, 사이에 끼우면
 --   정작 확인해야 할 숫자가 잘려 나간다.
-\echo '    ⚠ poll_vote SELECT를 **에러 없이 0행**으로 받아야 한다. grant를 빼면 임베딩이'
+\echo '    ⚠ post_poll_vote SELECT를 **에러 없이 0행**으로 받아야 한다. grant를 빼면 임베딩이'
 \echo '      42501로 죽어 비로그인에게 투표가 통째로 사라진다(실측). post_like와 같은 형태로,'
 \echo '      행을 막는 것은 grant가 아니라 정책(to authenticated)이다.'
 \echo '[1 / 2 / 0 기대] 비로그인도 투표·선택지는 보고 표만 못 본다'
-select (select count(*) from public.poll where post_id = :pid)        as polls,
-       (select count(*) from public.poll_option where post_id = :pid) as opts,
-       (select count(*) from public.poll_vote where post_id = :pid)   as votes;
+select (select count(*) from public.post_poll where post_id = :pid)        as polls,
+       (select count(*) from public.post_poll_option where post_id = :pid) as opts,
+       (select count(*) from public.post_poll_vote where post_id = :pid)   as votes;
 rollback to s;
 
 \echo ''
@@ -1120,7 +1124,7 @@ select public.create_post_with_poll('잡담', '제목', '본문', '질문', arra
 rollback to s;
 
 /*
- * 원자성 — 글 insert는 성공하고 **그 뒤 poll에서** 실패하는 입력으로 확인한다.
+ * 원자성 — 글 insert는 성공하고 **그 뒤 post_poll에서** 실패하는 입력으로 확인한다.
  *
  * ⚠ 한때 실패 호출과 누수 확인을 **다른 savepoint**에 두었는데, 실패를 롤백한 뒤에 세고
  *   있어서 함수가 원자적이든 아니든 결과가 항상 0이었다 — 증명하려던 것을 증명하지 못하는
@@ -1138,7 +1142,7 @@ begin
   -- ⚠ 실패 지점이 **post insert보다 뒤**여야 원자성을 증명한다. 함수 머리의 사전 검사
   --   (선택지 개수·NULL·중복·질문 공백)는 전부 insert 앞에서 걸리므로 여기 쓸 수 없다 —
   --   한때 "질문이 제로폭 공백뿐"으로 썼다가, 그 검사가 앞으로 옮겨지자 이 검사가
-  --   증명하려던 것을 증명하지 못하게 됐다. 길이 CHECK는 poll insert 시점이라 뒤에 있다.
+  --   증명하려던 것을 증명하지 못하게 됐다. 길이 CHECK는 post_poll insert 시점이라 뒤에 있다.
   perform public.create_post_with_poll('잡담', '원자성 확인', '본문', repeat('가', 1001), array['a','b']);
   raise exception '원자성 검사가 통과해 버렸다 — 함수가 실패하지 않았다';
 exception
@@ -1155,8 +1159,8 @@ rollback to s;
 savepoint s; :login_alice
 select public.create_post_with_poll('잡담', '투표 글', '본문', '누가 MVP?', array['가','나','다']) as new_id \gset
 \echo '[1 / 3 기대] 글·투표·선택지가 함께 생긴다'
-select (select count(*) from public.poll where post_id = :new_id) as polls,
-       (select count(*) from public.poll_option where post_id = :new_id) as opts;
+select (select count(*) from public.post_poll where post_id = :new_id) as polls,
+       (select count(*) from public.post_poll_option where post_id = :new_id) as opts;
 rollback to s;
 
 \echo ''
@@ -1184,7 +1188,7 @@ savepoint s; :login_alice
 select public.create_post_with_poll('잡담', '제목', '본문', '질문',
   array[' 찬성 ', U&'\BC18'||U&'\00A0'||U&'\B300']) as nid \gset
 \echo '[찬성 / 반대 기대] 저장되는 값이 정규형이라 화면 문구와 갈리지 않는다'
-select label from public.poll_option where post_id = :nid order by sort_order;
+select label from public.post_poll_option where post_id = :nid order by sort_order;
 rollback to s;
 
 savepoint s; :login_alice
@@ -1214,18 +1218,18 @@ rollback to s;
 
 \echo ''
 \echo '--- 27c. 소프트 삭제된 글의 투표는 어느 경로로도 새지 않는다'
-\echo '    ⚠ poll_results는 security definer라 **RLS를 우회한다** — 정책에 건 post_is_alive가'
+\echo '    ⚠ post_poll_results는 security definer라 **RLS를 우회한다** — 정책에 건 post_is_alive가'
 \echo '      닿지 않아, 빠뜨렸더니 삭제된 글의 집계가 투표자에게 영구히 열려 있었다.'
-\echo '      id가 연번이라 poll_results(N)을 훑으면 "삭제됐지만 투표가 있던 글"이 식별됐다.'
+\echo '      id가 연번이라 post_poll_results(N)을 훑으면 "삭제됐지만 투표가 있던 글"이 식별됐다.'
 savepoint s;
 :login_bob
-insert into public.poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
+insert into public.post_poll_vote (post_id, user_id, option_id) values (:pid, :'bob', :opt1);
 :login_alice
 select public.soft_delete_post(:pid);
 :login_bob
 \echo '[0행 / 0행 기대] 삭제 후 집계도, 내 표도 보이지 않는다'
-select (select count(*) from public.poll_results(:pid))                            as results,
-       (select count(*) from public.poll_vote where post_id = :pid)                as my_votes;
+select (select count(*) from public.post_poll_results(:pid))                            as results,
+       (select count(*) from public.post_poll_vote where post_id = :pid)                as my_votes;
 rollback to s;
 
 rollback to s27;
@@ -1794,6 +1798,284 @@ select closes_at = created_at + interval '7 days' as seven_days
 rollback to s;
 
 rollback to s30;
+
+-- ---------------------------------------------------------------------
+\echo ''
+\echo '=== 31. 승부예측 (20260830000002) ==='
+\echo '    설계 요약: 일정·결과는 운영 데이터라 앱에서 만들 수 없다(정책도 grant도 없다).'
+\echo '    사용자가 쓰는 표면은 match_prediction 하나뿐이고, 마감은 킥오프가 정한다.'
+\echo '    입축구(섹션 30)와 갈리는 핵심은 **집계 게이팅의 축**이다 — 저쪽은 "참여했는가",'
+\echo '    이쪽은 "킥오프가 지났는가"이고 지난 뒤에는 비로그인에게도 열린다.'
+
+-- 시드는 **superuser로** 넣는다. authenticated에는 team·match 권한이 아예 없다
+-- (그게 아래 검사들이 지키는 성질이다).
+-- ⚠ 시각을 리터럴로 박지 않는다 — now() 기준 상대값이라야 시간이 흘러도 "예정/종료"의
+--   뜻이 유지된다(입축구의 closes_at 검사와 같은 이유).
+-- ⚠ **팀 코드를 테스트 전용 네임스페이스로 둔다.** 처음엔 실제 구단 슬러그를 썼는데,
+--   동기화 스크립트(`scripts/sync-matches.mjs`)가 팀 이름을 슬러그로 만들어 **같은 코드를
+--   먼저 넣어 두면** 이 seed가 `team_pkey` 중복으로 죽는다. 그러면 뒤따르는 `\gset`이 전부
+--   비어 40건이 연쇄로 실패한다(실측) — 검사가 죽었는데 원인은 검사와 무관한 자리다.
+--   `match.external_id`는 숫자 문자열(API id)이라 'm-open' 같은 값과 겹칠 일이 없다.
+savepoint s31;
+insert into public.team (code, name, short_name, external_id) values
+  ('rlstest-a', '알파FC',  'AAA', 'rlstest-t-a'),
+  ('rlstest-b', '베타FC',  'BBB', 'rlstest-t-b'),
+  ('rlstest-c', '감마FC',  'CCC', 'rlstest-t-c');
+
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, external_id)
+values ('2025-26', 12, 'rlstest-a', 'rlstest-b', now() + interval '3 days', 'm-open')
+returning id as m_open \gset
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, external_id)
+values ('2025-26', 11, 'rlstest-c', 'rlstest-a', now() - interval '2 days', 'm-past')
+returning id as m_past \gset
+
+\echo ''
+\echo '-- 31a. 일정·결과는 앱에서 만들 수도 고칠 수도 없다 --'
+
+savepoint s; :login_alice
+\echo '[❌차단] 팀을 직접 만든다 — 쓰기 정책도 grant도 없다'
+insert into public.team (code, name, short_name) values ('fake', '가짜FC', 'FAK');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 경기를 직접 만든다'
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, external_id)
+values ('2025-26', 1, 'rlstest-a', 'rlstest-c', now() + interval '1 day', 'm-fake');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 스코어 조작 — 정답이 여기서 파생되므로 이게 곧 적중 조작이다'
+update public.match set home_score = 9, away_score = 0 where id = :m_past;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 킥오프를 미뤄 마감을 늘린다'
+update public.match set kickoff_at = now() + interval '10 days' where id = :m_past;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 경기 삭제'
+delete from public.match where id = :m_open;
+rollback to s;
+
+\echo ''
+\echo '-- 31b. 예측 — 명의·중복·취소 --'
+
+savepoint s; :login_bob
+\echo '[성공 기대] 킥오프 전이면 예측할 수 있다'
+insert into public.match_prediction (match_id, user_id, pick) values (:m_open, :'bob', 'home');
+\echo '[성공 기대] 킥오프 전이면 갈아탈 수 있다 (오클릭 구제·라인업 발표 반영)'
+update public.match_prediction set pick = 'draw' where match_id = :m_open and user_id = :'bob';
+\echo '[1 기대] 갈아타도 행은 하나다 (기본키가 "한 사람 한 표"를 겸한다)'
+select count(*) as my_rows from public.match_prediction where match_id = :m_open and user_id = :'bob';
+rollback to s;
+
+-- ⚠ **시드를 과거로 민다.** `now()`는 트랜잭션 시작 시각이라, 같은 트랜잭션에서 넣고 고치면
+--   insert의 default와 트리거가 찍는 값이 **같아져** 검사가 아무것도 증명하지 못한다
+--   (섹션 2의 updated_at 검사가 같은 함정을 밟았다). 시각을 실을 수 있는 것은 컬럼 권한을
+--   지나지 않는 superuser뿐이므로 시드는 로그인 전에 넣는다.
+savepoint s;
+insert into public.match_prediction (match_id, user_id, pick, created_at, updated_at)
+values (:m_open, :'bob', 'home', now() - interval '1 hour', now() - interval '1 hour');
+:login_bob
+update public.match_prediction set pick = 'draw' where match_id = :m_open and user_id = :'bob';
+\echo '[t 기대] 갈아탄 흔적이 남는다 (updated_at > created_at — 트리거가 찍는다)'
+select updated_at > created_at as touched
+  from public.match_prediction where match_id = :m_open and user_id = :'bob';
+rollback to s;
+
+savepoint s;
+insert into public.match_prediction (match_id, user_id, pick, created_at, updated_at)
+values (:m_open, :'bob', 'home', now() - interval '1 hour', now() - interval '1 hour');
+:login_bob
+update public.match_prediction set pick = 'home' where match_id = :m_open and user_id = :'bob';
+\echo '[f 기대] **같은 값으로 덮으면 흔적이 남지 않는다** (트리거의 when 절이 좁힌다 —'
+\echo '        post_touch_updated_at이 좋아요 UPDATE에도 발화해 "수정됨"이 잘못 붙었던 사고)'
+select updated_at > created_at as touched
+  from public.match_prediction where match_id = :m_open and user_id = :'bob';
+rollback to s;
+
+savepoint s; :login_bob
+insert into public.match_prediction (match_id, user_id, pick) values (:m_open, :'bob', 'home');
+\echo '[❌차단] 같은 경기에 두 번째 표 — 제약이 막는다(애플리케이션 로직이 아니다)'
+insert into public.match_prediction (match_id, user_id, pick) values (:m_open, :'bob', 'away');
+rollback to s;
+
+savepoint s; :login_bob
+\echo '[❌차단] 남의 명의로 예측'
+insert into public.match_prediction (match_id, user_id, pick) values (:m_open, :'alice', 'home');
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[❌차단] 비로그인 예측'
+insert into public.match_prediction (match_id, user_id, pick) values (:m_open, :'bob', 'home');
+rollback to s;
+
+savepoint s; :login_bob
+insert into public.match_prediction (match_id, user_id, pick) values (:m_open, :'bob', 'home');
+\echo '[❌차단] 예측 취소 — DELETE는 **grant 자체가 없어** 42501이다'
+\echo '        (정책 부재는 0행이지만 grant 부재가 먼저 걸린다 — 두 겹이 다 서 있다)'
+delete from public.match_prediction where match_id = :m_open and user_id = :'bob';
+rollback to s;
+
+savepoint s; :login_bob
+insert into public.match_prediction (match_id, user_id, pick) values (:m_open, :'bob', 'home');
+\echo '[❌차단] 표를 다른 경기로 옮겨 "취소 불가"를 우회 — match_id에 UPDATE 권한이 없다'
+update public.match_prediction set match_id = :m_past where match_id = :m_open and user_id = :'bob';
+rollback to s;
+
+savepoint s; :login_bob
+insert into public.match_prediction (match_id, user_id, pick) values (:m_open, :'bob', 'home');
+\echo '[❌차단] 소유권 이전 — user_id에 UPDATE 권한이 없다(with check도 함께 막는다)'
+update public.match_prediction set user_id = :'alice' where match_id = :m_open and user_id = :'bob';
+rollback to s;
+
+savepoint s; :login_bob
+\echo '[❌차단] created_at 위조 — 컬럼 INSERT 권한이 없다'
+insert into public.match_prediction (match_id, user_id, pick, created_at)
+values (:m_open, :'bob', 'home', now() - interval '30 days');
+rollback to s;
+
+savepoint s; :login_bob
+insert into public.match_prediction (match_id, user_id, pick) values (:m_open, :'bob', 'home');
+:login_alice
+\echo '[0 기대] 남의 예측은 애초에 보이지 않는다 (SELECT 정책이 "내 행만")'
+select count(*) as others from public.match_prediction where match_id = :m_open;
+rollback to s;
+
+\echo ''
+\echo '-- 31c. 마감은 킥오프가 정한다 --'
+
+savepoint s; :login_bob
+\echo '[❌차단] 킥오프가 지난 경기에 예측'
+insert into public.match_prediction (match_id, user_id, pick) values (:m_past, :'bob', 'home');
+rollback to s;
+
+savepoint s;
+insert into public.match_prediction (match_id, user_id, pick) values (:m_past, :'bob', 'home');
+:login_bob
+\echo '[UPDATE 0 기대] 킥오프 후 갈아타기 — using이 후보에서 빼 조용히 0행이 된다'
+update public.match_prediction set pick = 'away' where match_id = :m_past and user_id = :'bob';
+\echo '[1 기대] 마감돼도 **내 예측은 조회된다** (SELECT 정책에 마감을 걸지 않았다)'
+select count(*) as mine from public.match_prediction where match_id = :m_past and user_id = :'bob';
+rollback to s;
+
+savepoint s;
+update public.match set voided_at = now() where id = :m_open;
+:login_bob
+\echo '[❌차단] 취소된 경기에 예측 (match_is_open이 voided_at도 본다)'
+insert into public.match_prediction (match_id, user_id, pick) values (:m_open, :'bob', 'home');
+rollback to s;
+
+\echo ''
+\echo '-- 31d. 집계 게이팅 — 축이 "참여"가 아니라 "킥오프"다 --'
+
+savepoint s;
+insert into public.match_prediction (match_id, user_id, pick) values (:m_open, :'bob', 'home');
+:login_bob
+\echo '[0 기대] 킥오프 전에는 **참여자 본인에게도** 안 보인다'
+\echo '        ⚠ 여기를 미참여자(alice)로 조회하면 게이팅이 survey_results처럼 "참여했으면'
+\echo '          보인다"로 퇴행해도 검사가 그대로 통과한다 — 그 퇴행이야말로 이 기능의 전제를'
+\echo '          무너뜨리는 회귀(마감 전 분포 노출 → 다수파 추종 → 적중률 오염)라 본인으로 본다.'
+select count(*) as rows_for_participant from public.match_prediction_results(:m_open);
+:login_alice
+\echo '[0 기대] 미참여자에게도 물론 안 보인다'
+select count(*) as rows_for_others from public.match_prediction_results(:m_open);
+:login_anon
+\echo '[0 기대] 비로그인에게도 안 보인다 (마감 후에만 열린다)'
+select count(*) as rows_for_anon from public.match_prediction_results(:m_open);
+rollback to s;
+
+savepoint s;
+insert into public.match_prediction (match_id, user_id, pick) values (:m_past, :'bob', 'home');
+insert into public.match_prediction (match_id, user_id, pick) values (:m_past, :'alice', 'home');
+:login_anon
+\echo '[1 / 2 기대] 킥오프 후에는 **비로그인에게도** 열린다 (크롤러가 보는 콘텐츠다)'
+select count(*) as rows, sum(vote_count) as votes from public.match_prediction_results(:m_past);
+rollback to s;
+
+savepoint s;
+insert into public.match_prediction (match_id, user_id, pick) values (:m_past, :'bob', 'home');
+:login_alice
+\echo '[t 기대] 참여하지 않아도 마감 후면 보인다 — 입축구와 정반대다(저쪽은 미참여자에게 0행)'
+select count(*) > 0 as visible_to_non_participant from public.match_prediction_results(:m_past);
+rollback to s;
+
+\echo ''
+\echo '-- 31e. 채점 — 정답은 컬럼이 아니라 스코어에서 파생된다 --'
+
+savepoint s;
+\echo '[t 기대] 스코어가 없으면 result도 없다 (= 아직 채점 대상이 아니다)'
+select result is null as unscored from public.match where id = :m_past;
+
+update public.match set home_score = 2, away_score = 1, finished_at = now() where id = :m_past;
+\echo '[home 기대] 스코어를 넣으면 정답이 파생된다'
+select result from public.match where id = :m_past;
+
+\echo '[t 기대] **스코어를 정정하면 정답이 따라 움직인다** — 재채점을 손으로 하지 않는 근거다'
+update public.match set home_score = 0 where id = :m_past;
+select result = 'away' as rescored from public.match where id = :m_past;
+
+\echo '[t 기대] 무효 처리하면 result가 null이 되어 채점에서 빠진다'
+\echo '        (voided_at을 따로 거르는 술어를 두지 않기 위해서다 — 빠뜨리는 조회가 반드시 생긴다)'
+update public.match set voided_at = now() where id = :m_past;
+select result is null as excluded from public.match where id = :m_past;
+rollback to s;
+
+savepoint s;
+update public.match set home_score = 1, away_score = 1, finished_at = now() where id = :m_past;
+insert into public.match_prediction (match_id, user_id, pick) values (:m_past, :'bob', 'draw');
+insert into public.match_prediction (match_id, user_id, pick) values (:m_past, :'alice', 'home');
+\echo '[1 / 2 기대] 적중률은 컬럼이 아니라 원본과 result를 대조해 그때그때 센다'
+\echo '        ⚠ **반드시 이 경기로 좁힌다.** 좁히지 않으면 DB에 이미 있는 채점 완료 경기가'
+\echo '          전부 합산된다 — 지금 통과하는 것은 동기화된 경기에 스코어가 없어서일 뿐이고,'
+\echo '          종료 경기가 하나만 들어와도 값이 틀어진다(실측: 3/8). 게다가 run-rls.sh는'
+\echo '          값 검사를 자동 대조하지 않아 "✅ 통과"인 채로 지나간다(31a의 팀 코드 충돌과'
+\echo '          같은 원인 — 운영 데이터가 검사에 새어 든다).'
+select count(*) filter (where p.pick = m.result) as hits, count(*) as total
+  from public.match_prediction p
+  join public.match m on m.id = p.match_id
+ where p.match_id = :m_past and m.result is not null and m.voided_at is null;
+rollback to s;
+
+\echo ''
+\echo '-- 31f. 스키마 불변식 --'
+
+savepoint s;
+\echo '[❌차단] 같은 팀끼리 붙는 경기'
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, external_id)
+values ('2025-26', 1, 'rlstest-a', 'rlstest-a', now() + interval '1 day', 'm-self');
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 한쪽 스코어만 — result가 뜻을 갖지 못한다'
+update public.match set home_score = 1 where id = :m_past;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 스코어 없이 종료 표시'
+update public.match set finished_at = now() where id = :m_past;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 시즌 형식 위반 (동기화 스크립트의 필드 오매핑을 여기서 잡는다)'
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, external_id)
+values ('2025', 1, 'rlstest-a', 'rlstest-c', now() + interval '1 day', 'm-badseason');
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 라운드 39 — EPL 상한 밖'
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, external_id)
+values ('2025-26', 39, 'rlstest-a', 'rlstest-c', now() + interval '1 day', 'm-badround');
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] external_id 중복 — 동기화 재실행이 행을 늘리면 안 된다'
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, external_id)
+values ('2025-26', 5, 'rlstest-b', 'rlstest-c', now() + interval '1 day', 'm-past');
+rollback to s;
+
+rollback to s31;
 
 rollback;
 \echo ''
