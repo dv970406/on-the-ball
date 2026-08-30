@@ -31,6 +31,7 @@ function staticEntries(now: Date): MetadataRoute.Sitemap {
   return [
     { url: url(ROUTES.postList), lastModified: now },
     { url: url(ROUTES.surveyList), lastModified: now },
+    { url: url(ROUTES.matchList), lastModified: now },
     ...POST_CATEGORIES.map((category) => ({
       url: url(ROUTES.postCategory(POST_CATEGORY_SLUG[category])),
       lastModified: now,
@@ -50,7 +51,7 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
     const supabase = await createSupabaseServerClient();
     if (!supabase) return statics;
 
-    const [posts, surveys] = await Promise.all([
+    const [posts, surveys, matches] = await Promise.all([
       supabase
         .from("post")
         .select("id, updated_at")
@@ -60,6 +61,14 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
         .from("survey")
         // ⚠ `closes_at`을 lastModified로 쓰지 않는다 — 진행 중이면 미래 시각이 된다
         .select("id, created_at")
+        .order("id", { ascending: false })
+        .limit(URL_LIMIT),
+      supabase
+        .from("match")
+        // ⚠ `kickoff_at`을 lastModified로 쓰지 않는다 — 예정 경기는 **미래 시각**이다
+        //   (입축구의 `closes_at`과 같은 함정). 결과가 들어온 시각이 실제 마지막 변경이고,
+        //   아직 없으면 그 경기는 바뀐 적이 없다.
+        .select("id, finished_at")
         .order("id", { ascending: false })
         .limit(URL_LIMIT),
     ]);
@@ -73,6 +82,12 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
       ...(surveys.data ?? []).map((survey) => ({
         url: url(ROUTES.survey(survey.id)),
         lastModified: new Date(survey.created_at),
+      })),
+      ...(matches.data ?? []).map((match) => ({
+        url: url(ROUTES.match(match.id)),
+        // 결과가 없으면 lastModified를 생략한다 — 없는 값을 now()로 채우면 사이트맵을 부를
+        // 때마다 "방금 바뀌었다"는 거짓 신호가 나간다
+        ...(match.finished_at ? { lastModified: new Date(match.finished_at) } : {}),
       })),
     ];
   } catch (e) {

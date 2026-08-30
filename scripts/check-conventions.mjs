@@ -40,6 +40,10 @@ const DEEP_IMPORT_ALLOWED = new Set([
   "@/entities/post/api/list-query",
   "@/entities/survey/api/list-query",
   "@/entities/comment/api/list-query",
+  "@/entities/match/api/list-query",
+  // 마감 판정의 단일 소스. `"use client"`가 없어 서버 안전하고, SSR 페이지가 클라이언트와
+  // **같은 판정**을 써야 한다(`lib/plain-summary`와 같은 형태).
+  "@/entities/match/lib/open",
   "@/entities/post/lib/plain-summary",
   "@/entities/post/lib/hot",
   "@/entities/session/lib/auth-error-message",
@@ -125,6 +129,26 @@ const STYLE_ALLOWED = {
     "src/shared/ui/pill.tsx", // green 배지
     "src/shared/ui/live-dot.tsx", // primary 도트
     "src/entities/survey/ui/vs-badge.tsx", // 분할 카드의 VS 배지
+  ],
+  /*
+   * ⚠ **에메랄드는 리터럴로만 오지 않는다.** `Pill variant="green"`은 `bg-primary`를
+   *   간접으로 쓰므로 위 리터럴 대조를 **구조적으로 통과할 수 없다** — 실제로 그 경로로
+   *   목록 카드에 에메랄드가 카드 수만큼 들어왔는데 검사도 표도 알지 못했다.
+   *   `Pill`은 v1 자산에만 쓰이던 정의라 아무도 그 자리를 세지 않고 있었다.
+   */
+  /*
+   * ⚠ **동적 variant는 검사가 볼 수 없다.** `variant={ok ? "green" : "crimson"}`은 리터럴
+   *   대조를 그대로 통과한다(실측 — 주입 테스트에서 잡히지 않았다). 그래서 `Pill`의
+   *   variant는 **리터럴이어야 한다**는 규칙 자체를 검사로 만든다(허용 목록이 비어 있다).
+   *   `Button variant={…}`는 에메랄드와 무관해 대상이 아니다.
+   */
+  "Pill variant={": [],
+  // 에메랄드 확인 버튼 — `bg-primary` 리터럴이 아니라 위 대조에 걸리지 않던 자리
+  'confirmTone="primary"': ["src/shared/ui/sign-in-dialog.tsx"],
+  'variant="green"': [
+    "src/shared/ui/live-status-pill.tsx", // v1 자산(미사용)
+    "src/entities/match/ui/match-card.tsx", // 예측 적중 배지 — 예측했고 채점된 카드에만 1개
+    "src/views/match-detail/ui/match-detail-view.tsx", // 상세의 적중 배지 — 한 화면에 1개
   ],
   "text-primary": [
     "src/entities/post/ui/post-card.tsx", // 목록 카드의 좋아요 하트

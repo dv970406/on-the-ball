@@ -20,6 +20,15 @@ export const ROUTES = {
   surveyList: "/surveys",
   survey: (id: number | string) => `/surveys/${id}`,
 
+  /**
+   * 승부예측 — 경기 일정·결과와 예측.
+   * ⚠ `/predictions`가 아니라 `/matches`다. 나중에 선수 평점·매치 스레드가 붙으면 전부
+   *   경기를 부모로 삼는데, 그때 `/predictions/[id]`는 거짓말이 된다 — **URL은 영구 계약**이라
+   *   확장 여지를 지금 잡아 둔다(탭 라벨은 "승부예측"이고, 표시 문구와 경로는 다른 계약이다).
+   */
+  matchList: "/matches",
+  match: (id: number | string) => `/matches/${id}`,
+
   // 인증 — 소셜 로그인은 로그인과 가입이 같은 동작이라 화면이 하나다
   signIn: "/sign-in",
   // 프로필 — 닉네임·사진 수정과 로그인 수단 연결
@@ -53,6 +62,7 @@ export function activeTabHref(pathname: string): string | null {
     return ROUTES.postList;
   }
   if (pathname === ROUTES.surveyList) return ROUTES.surveyList;
+  if (pathname === ROUTES.matchList) return ROUTES.matchList;
   if (pathname === ROUTES.profile) return ROUTES.profile;
   return null;
 }

@@ -171,28 +171,28 @@ on conflict do nothing;
 -- ---------------------------------------------------------------------
 -- 5. 투표 — 이적설 글에 하나 붙인다
 --
--- ⚠ 득표수 컬럼이 없다(집계는 poll_results가 그때그때 센다) → 시드할 값도 없다.
+-- ⚠ 득표수 컬럼이 없다(집계는 post_poll_results가 그때그때 센다) → 시드할 값도 없다.
 -- ⚠ bob의 표만 넣는다. alice(글쓴이)를 미투표로 남겨야 **"투표해야 결과가 보인다"** 를
 --   화면에서 확인할 수 있다 — 둘 다 투표시키면 게이팅이 걸린 화면을 볼 수 없다.
 -- ---------------------------------------------------------------------
-insert into public.poll (post_id, question)
+insert into public.post_poll (post_id, question)
 select id, '겨울에 어느 자리를 먼저 보강해야 할까요?'
   from public.post
  where title = '겨울 이적시장, 이번엔 진짜 움직일까'
 on conflict do nothing;
 
--- ⚠ poll을 이름으로 특정한다. `from public.poll p cross join (…)`로 두면 시드에 투표가
+-- ⚠ poll을 이름으로 특정한다. `from public.post_poll p cross join (…)`로 두면 시드에 투표가
 --   하나 더 생기는 순간 **모든 투표에 같은 선택지가 붙는다**(지금은 하나라 무해할 뿐이다).
-insert into public.poll_option (post_id, label, sort_order)
+insert into public.post_poll_option (post_id, label, sort_order)
 select p.post_id, x.label, x.ord::smallint
-  from public.poll p
+  from public.post_poll p
   cross join (values ('수비형 미드필더', 1), ('센터백', 2), ('윙어', 3)) as x(label, ord)
  where p.question = '겨울에 어느 자리를 먼저 보강해야 할까요?'
 on conflict do nothing;
 
-insert into public.poll_vote (post_id, user_id, option_id)
+insert into public.post_poll_vote (post_id, user_id, option_id)
 select o.post_id, '22222222-2222-4222-8222-222222222222'::uuid, o.id
-  from public.poll_option o
+  from public.post_poll_option o
  where o.sort_order = 1 and o.label = '수비형 미드필더'
 on conflict do nothing;
 
@@ -265,7 +265,7 @@ select x.title, x.created_at, x.closes_at
  order by x.ord;
 
 -- ⚠ 입축구를 제목으로 특정한다. `cross join`만 걸면 문항이 하나 더 생기는 순간
---   **모든 입축구에 같은 선택지가 붙는다**(poll_option 시드와 같은 함정이다).
+--   **모든 입축구에 같은 선택지가 붙는다**(post_poll_option 시드와 같은 함정이다).
 
 -- (1) 색 없음 · 진행 중 → 분할 카드가 아니라 바 UI로 폴백되는지
 insert into public.survey_option (survey_id, label, sort_order)
@@ -337,3 +337,40 @@ select o.survey_id, '22222222-2222-4222-8222-222222222222'::uuid, o.id
  where (s.title = '올해 EPL 우승팀은 어디일까요?' and o.sort_order = 2)
     or (s.title = '발롱도르, 누가 받아야 할까요?' and o.sort_order = 1)
 on conflict do nothing;
+
+-- ---------------------------------------------------------------------
+-- 승부예측 — 팀·경기 (20260830000002)
+--
+-- ⚠ **lookup 테이블에는 초기 행이 필요하다**(`api-and-db.md`의 체크리스트). 이게 없으면
+--   `db reset` 한 번에 승부예측 화면이 통째로 비고, 복구하려면 동기화 스크립트를 따로
+--   돌려야 한다 — 개발 데이터를 지키자고 둔 시드의 취지와 어긋난다.
+-- ⚠ **시각을 리터럴로 박지 않는다.** `now()` 기준 상대값이라야 시간이 흘러도 "지난/다가오는"
+--   구역이 둘 다 채워진다(rls.sql 섹션 31이 같은 이유로 같은 형태를 쓴다).
+-- ⚠ 팀 코드는 동기화 스크립트가 만드는 슬러그와 **같은 값**이라, 나중에 실제 API를 돌려도
+--   `team_pkey`가 충돌하지 않고 이름만 갱신된다(external_id로 찾기 때문).
+-- ⚠ `external_id`는 `scripts/fixtures/epl-sample.json`과 **같은 값**이다. 다르게 두면
+--   fixture로 동기화를 시험할 때마다 같은 대진이 두 벌씩 쌓여 목록이 중복으로 보인다.
+-- ---------------------------------------------------------------------
+insert into public.team (code, name, short_name, external_id) values
+  ('liverpool',  '리버풀',              '리버풀',   '64'),
+  ('arsenal',    '아스날',              '아스날',   '57'),
+  ('chelsea',    '첼시',                '첼시',     '61'),
+  ('man-city',   '맨체스터 시티',       '맨시티',   '65'),
+  ('man-united', '맨체스터 유나이티드', '맨유',     '66'),
+  ('tottenham',  '토트넘 홋스퍼',       '토트넘',   '73')
+on conflict (code) do nothing;
+
+-- 지난 경기(채점됨 — 홈승·무·원정승 셋) + 다가오는 경기(예측 가능)
+insert into public.match
+  (season, matchday, home_team, away_team, kickoff_at, home_score, away_score, finished_at, external_id)
+values
+  ('2025-26', 12, 'arsenal',    'chelsea',    now() - interval '4 days', 2, 0, now() - interval '4 days', '1004'),
+  ('2025-26', 12, 'man-united', 'tottenham',  now() - interval '5 days', 1, 1, now() - interval '5 days', '1005'),
+  ('2025-26', 12, 'chelsea',    'liverpool',  now() - interval '6 days', 0, 3, now() - interval '6 days', '1006')
+on conflict (external_id) do nothing;
+
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, external_id) values
+  ('2025-26', 13, 'liverpool', 'arsenal',    now() + interval '3 days', '1001'),
+  ('2025-26', 13, 'man-city',  'man-united', now() + interval '4 days', '1002'),
+  ('2025-26', 13, 'tottenham', 'chelsea',    now() + interval '5 days', '1003')
+on conflict (external_id) do nothing;

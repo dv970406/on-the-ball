@@ -1,0 +1,284 @@
+{
+  "count": 9,
+  "matches": [
+    {
+      "id": 1001,
+      "utcDate": "2026-09-02T04:05:05Z",
+      "status": "TIMED",
+      "matchday": 13,
+      "lastUpdated": "2026-08-29T04:05:05Z",
+      "season": {
+        "id": 1,
+        "startDate": "2025-08-15",
+        "endDate": "2026-05-24",
+        "currentMatchday": 12
+      },
+      "homeTeam": {
+        "id": 64,
+        "name": "Liverpool FC",
+        "shortName": "Liverpool",
+        "tla": "LIV"
+      },
+      "awayTeam": {
+        "id": 57,
+        "name": "Arsenal FC",
+        "shortName": "Arsenal",
+        "tla": "ARS"
+      },
+      "score": {
+        "fullTime": {
+          "home": null,
+          "away": null
+        }
+      }
+    },
+    {
+      "id": 1002,
+      "utcDate": "2026-09-03T04:05:05Z",
+      "status": "SCHEDULED",
+      "matchday": 13,
+      "lastUpdated": "2026-08-29T04:05:05Z",
+      "season": {
+        "id": 1,
+        "startDate": "2025-08-15",
+        "endDate": "2026-05-24",
+        "currentMatchday": 12
+      },
+      "homeTeam": {
+        "id": 65,
+        "name": "Manchester City FC",
+        "shortName": "Man City",
+        "tla": "MCI"
+      },
+      "awayTeam": {
+        "id": 66,
+        "name": "Manchester United FC",
+        "shortName": "Man United",
+        "tla": "MUN"
+      },
+      "score": {
+        "fullTime": {
+          "home": null,
+          "away": null
+        }
+      }
+    },
+    {
+      "id": 1003,
+      "utcDate": "2026-09-04T04:05:05Z",
+      "status": "SCHEDULED",
+      "matchday": 13,
+      "lastUpdated": "2026-08-29T04:05:05Z",
+      "season": {
+        "id": 1,
+        "startDate": "2025-08-15",
+        "endDate": "2026-05-24",
+        "currentMatchday": 12
+      },
+      "homeTeam": {
+        "id": 73,
+        "name": "Tottenham Hotspur FC",
+        "shortName": "Tottenham",
+        "tla": "TOT"
+      },
+      "awayTeam": {
+        "id": 61,
+        "name": "Chelsea FC",
+        "shortName": "Chelsea",
+        "tla": "CHE"
+      },
+      "score": {
+        "fullTime": {
+          "home": null,
+          "away": null
+        }
+      }
+    },
+    {
+      "id": 1004,
+      "utcDate": "2026-08-26T04:05:05Z",
+      "status": "FINISHED",
+      "matchday": 12,
+      "lastUpdated": "2026-08-29T04:05:05Z",
+      "season": {
+        "id": 1,
+        "startDate": "2025-08-15",
+        "endDate": "2026-05-24",
+        "currentMatchday": 12
+      },
+      "homeTeam": {
+        "id": 57,
+        "name": "Arsenal FC",
+        "shortName": "Arsenal",
+        "tla": "ARS"
+      },
+      "awayTeam": {
+        "id": 61,
+        "name": "Chelsea FC",
+        "shortName": "Chelsea",
+        "tla": "CHE"
+      },
+      "score": {
+        "fullTime": {
+          "home": 2,
+          "away": 0
+        }
+      }
+    },
+    {
+      "id": 1005,
+      "utcDate": "2026-08-25T04:05:05Z",
+      "status": "FINISHED",
+      "matchday": 12,
+      "lastUpdated": "2026-08-29T04:05:05Z",
+      "season": {
+        "id": 1,
+        "startDate": "2025-08-15",
+        "endDate": "2026-05-24",
+        "currentMatchday": 12
+      },
+      "homeTeam": {
+        "id": 66,
+        "name": "Manchester United FC",
+        "shortName": "Man United",
+        "tla": "MUN"
+      },
+      "awayTeam": {
+        "id": 73,
+        "name": "Tottenham Hotspur FC",
+        "shortName": "Tottenham",
+        "tla": "TOT"
+      },
+      "score": {
+        "fullTime": {
+          "home": 1,
+          "away": 1
+        }
+      }
+    },
+    {
+      "id": 1006,
+      "utcDate": "2026-08-24T04:05:05Z",
+      "status": "FINISHED",
+      "matchday": 12,
+      "lastUpdated": "2026-08-29T04:05:05Z",
+      "season": {
+        "id": 1,
+        "startDate": "2025-08-15",
+        "endDate": "2026-05-24",
+        "currentMatchday": 12
+      },
+      "homeTeam": {
+        "id": 61,
+        "name": "Chelsea FC",
+        "shortName": "Chelsea",
+        "tla": "CHE"
+      },
+      "awayTeam": {
+        "id": 64,
+        "name": "Liverpool FC",
+        "shortName": "Liverpool",
+        "tla": "LIV"
+      },
+      "score": {
+        "fullTime": {
+          "home": 0,
+          "away": 3
+        }
+      }
+    },
+    {
+      "id": 1007,
+      "utcDate": "2026-08-28T04:05:05Z",
+      "status": "POSTPONED",
+      "matchday": 11,
+      "lastUpdated": "2026-08-29T04:05:05Z",
+      "season": {
+        "id": 1,
+        "startDate": "2025-08-15",
+        "endDate": "2026-05-24",
+        "currentMatchday": 12
+      },
+      "homeTeam": {
+        "id": 73,
+        "name": "Tottenham Hotspur FC",
+        "shortName": "Tottenham",
+        "tla": "TOT"
+      },
+      "awayTeam": {
+        "id": 65,
+        "name": "Manchester City FC",
+        "shortName": "Man City",
+        "tla": "MCI"
+      },
+      "score": {
+        "fullTime": {
+          "home": null,
+          "away": null
+        }
+      }
+    },
+    {
+      "id": 1008,
+      "utcDate": "2026-08-27T04:05:05Z",
+      "status": "CANCELLED",
+      "matchday": 11,
+      "lastUpdated": "2026-08-29T04:05:05Z",
+      "season": {
+        "id": 1,
+        "startDate": "2025-08-15",
+        "endDate": "2026-05-24",
+        "currentMatchday": 12
+      },
+      "homeTeam": {
+        "id": 66,
+        "name": "Manchester United FC",
+        "shortName": "Man United",
+        "tla": "MUN"
+      },
+      "awayTeam": {
+        "id": 57,
+        "name": "Arsenal FC",
+        "shortName": "Arsenal",
+        "tla": "ARS"
+      },
+      "score": {
+        "fullTime": {
+          "home": null,
+          "away": null
+        }
+      }
+    },
+    {
+      "id": 1009,
+      "utcDate": "2026-09-05T04:05:05Z",
+      "status": "SCHEDULED",
+      "matchday": null,
+      "lastUpdated": "2026-08-29T04:05:05Z",
+      "season": {
+        "id": 1,
+        "startDate": "2025-08-15",
+        "endDate": "2026-05-24",
+        "currentMatchday": 12
+      },
+      "homeTeam": {
+        "id": 64,
+        "name": "Liverpool FC",
+        "shortName": "Liverpool",
+        "tla": "LIV"
+      },
+      "awayTeam": {
+        "id": 65,
+        "name": "Manchester City FC",
+        "shortName": "Man City",
+        "tla": "MCI"
+      },
+      "score": {
+        "fullTime": {
+          "home": null,
+          "away": null
+        }
+      }
+    }
+  ]
+}

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, MessagesSquare, User } from "lucide-react";
+import { ClipboardList, MessagesSquare, Target, User } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/shared/lib";
 import { ROUTES, activeTabHref } from "@/shared/config";
@@ -29,6 +29,7 @@ interface TabItem {
 const TABS: TabItem[] = [
   { label: "커뮤니티", icon: MessagesSquare, href: ROUTES.postList },
   { label: "입축구", icon: ClipboardList, href: ROUTES.surveyList },
+  { label: "승부예측", icon: Target, href: ROUTES.matchList },
   { label: "프로필", icon: User, href: ROUTES.profile, signInAction: "프로필을 보려면" },
 ];
 
@@ -54,9 +55,11 @@ export function BottomTabBar() {
    * 로그인이 필요한 탭을 비로그인이 눌렀다 — 로그인 화면으로 바로 던지지 않고 안내를 낀다.
    *
    * ⚠ **앵커는 그대로 두고 이동만 가로챈다.** 크롤러가 그 URL을 발견하는 경로가 이 링크이고
-   *   (`robots.txt`가 아무것도 막지 않는 근거다 — nextjs.md), 크롤러에게는 proxy가 307을 준다.
-   * ⚠ `loading`에는 가로채지 않는다 — 복원 중인 로그인 사용자가 안내를 보면 안 되고,
-   *   그대로 보내도 proxy가 쿠키로 옳게 판정한다(액션 컴포넌트들과 같은 3분기).
+   *   (`robots.txt`가 아무것도 막지 않는 근거다 — nextjs.md), 크롤러는 목적지 화면의
+   *   `robots: { index: false }`를 읽고 색인하지 않는다.
+   * ⚠ `loading`에는 가로채지 않는다 — 복원 중인 로그인 사용자가 안내를 보면 안 된다.
+   *   그대로 보내도 목적지의 `AuthRequired`가 옳게 판정한다(액션 컴포넌트들과 같은 3분기).
+   *   ⚠ proxy에는 라우트 가드가 없다 — 인증 판정은 화면 가드와 RLS가 갖는다(`nextjs.md`).
    */
   const sessionStatus = useSessionStore((s) => s.status);
   const [askSignIn, setAskSignIn] = useState<TabItem | null>(null);

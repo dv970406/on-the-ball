@@ -1,0 +1,28 @@
+{
+  "_comment": [
+    "EPL 팀의 한국어 표기. 키는 우리 team.code(동기화가 API shortName을 슬러그로 만든 값)다.",
+    "name = 정식 표기(카드·상세 제목), short = 팬들이 실제로 쓰는 약칭(예측 버튼 라벨).",
+    "여기 없는 팀은 API의 영문 이름이 그대로 들어가고, 동기화가 그 목록을 경고로 찍는다 —",
+    "승격팀이 생기면 그 경고를 보고 한 줄씩 더한다."
+  ],
+  "arsenal": { "name": "아스날", "short": "아스날" },
+  "aston-villa": { "name": "아스톤 빌라", "short": "빌라" },
+  "bournemouth": { "name": "본머스", "short": "본머스" },
+  "brentford": { "name": "브렌트포드", "short": "브렌트포드" },
+  "brighton-hove": { "name": "브라이턴", "short": "브라이턴" },
+  "burnley": { "name": "번리", "short": "번리" },
+  "chelsea": { "name": "첼시", "short": "첼시" },
+  "crystal-palace": { "name": "크리스털 팰리스", "short": "팰리스" },
+  "everton": { "name": "에버턴", "short": "에버턴" },
+  "fulham": { "name": "풀럼", "short": "풀럼" },
+  "leeds-united": { "name": "리즈 유나이티드", "short": "리즈" },
+  "liverpool": { "name": "리버풀", "short": "리버풀" },
+  "man-city": { "name": "맨체스터 시티", "short": "맨시티" },
+  "man-united": { "name": "맨체스터 유나이티드", "short": "맨유" },
+  "newcastle": { "name": "뉴캐슬 유나이티드", "short": "뉴캐슬" },
+  "nottingham": { "name": "노팅엄 포레스트", "short": "노팅엄" },
+  "sunderland": { "name": "선덜랜드", "short": "선덜랜드" },
+  "tottenham": { "name": "토트넘 홋스퍼", "short": "토트넘" },
+  "west-ham": { "name": "웨스트햄 유나이티드", "short": "웨스트햄" },
+  "wolverhampton": { "name": "울버햄프턴 원더러스", "short": "울브스" }
+}

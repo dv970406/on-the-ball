@@ -105,3 +105,24 @@ export function formatRelativeTime(iso: string, nowMs: number | null): string {
   return p.year === seoulParts(new Date(nowMs)).year ? monthDay : withYear;
 }
 
+/**
+ * 킥오프 시각을 "11월 3일 (일) 04:30"으로 표기. 해가 다르면 앞에 연도를 붙인다.
+ *
+ * ⚠ **`formatRelativeTime`을 쓸 수 없다.** 그 함수는 `nowMs - date`로 과거를 전제하는데
+ *   킥오프는 대개 **미래**라 차이가 음수가 되어 전부 "방금 전"이 된다.
+ *
+ * ⚠ **요일을 함께 찍는다.** 축구 일정에서 요일은 장식이 아니라 정보다 — "11월 3일"만으로는
+ *   주말 경기인지 알 수 없고, 사용자가 실제로 기억하는 단위가 요일이다.
+ *
+ * ⚠ `nowMs`를 받는 계약은 형제 함수와 같다 — **연도를 붙일지만** 그 값으로 정하고,
+ *   `null`이면(서버·하이드레이션 직전) **항상 붙인다.** 연도를 빼는 쪽이 거짓이 될 수 있는
+ *   방향이라 모를 때는 붙이는 쪽으로 기운다.
+ */
+export function formatKickoff(iso: string, nowMs: number | null): string {
+  // ⚠ **런타임 TZ를 읽지 않는다** — 서버(UTC)와 브라우저(KST)가 다른 날짜를 그린다(위 주석).
+  const p = seoulParts(new Date(iso));
+  const base = `${p.month}월 ${p.day}일 (${p.weekday}) ${p.hour}:${p.minute}`;
+
+  if (nowMs !== null && p.year === seoulParts(new Date(nowMs)).year) return base;
+  return `${p.year}년 ${base}`;
+}
