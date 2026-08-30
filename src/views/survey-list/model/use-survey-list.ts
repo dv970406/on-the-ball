@@ -42,7 +42,11 @@ export function useSurveyList({ initialSurveys, initialUserId, serverNowMs }: Us
    *   `false`로 접으면 첫 프레임에 진행 중 입축구가 전부 "마감" 구역으로 떨어진다.
    *   서버가 `serverNowMs`를 주면 애초에 `null`이 되지 않는다.
    */
-  const nowMs = useNowMs() ?? serverNowMs ?? null;
+  // ⚠ **서버 시각이 우선이다** — `useNowMs()`는 모듈 스코프에 세션당 한 번 고정되어 앱을
+  //   처음 연 순간에 굳는다(사유는 `use-now.ts`). 그 값을 앞에 두면 갓 받은 서버 시각을
+  //   낡은 클라 시계가 이긴다.
+  const clientNowMs = useNowMs();
+  const nowMs = serverNowMs ?? clientNowMs ?? null;
   const surveys = data?.items;
 
   // 목록을 **기간으로** 가른다 — 진행 중은 분할 카드로 그 자리에서 투표하고,

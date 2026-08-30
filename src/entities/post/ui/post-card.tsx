@@ -36,7 +36,11 @@ export function PostCard({
   /** 서버가 렌더한 시점의 시각 — 마운트 전 판정의 기준(PostDetailView와 같은 형태) */
   serverNowMs?: number;
 }) {
-  const nowMs = useNowMs() ?? serverNowMs ?? null;
+  // ⚠ **서버 시각이 우선이다** — `useNowMs()`는 모듈 스코프에 세션당 한 번 고정되어 앱을
+  //   처음 연 순간에 굳는다(사유는 `use-now.ts`). 그 값을 앞에 두면 갓 받은 서버 시각을
+  //   낡은 클라 시계가 이긴다.
+  const clientNowMs = useNowMs();
+  const nowMs = serverNowMs ?? clientNowMs ?? null;
   const hot = nowMs !== null && isHotPost(post, nowMs);
 
   return (

@@ -48,7 +48,11 @@ export function CommentItem({
 }: CommentItemProps) {
   // ⚠ 렌더 중 시계를 읽지 않는다 — SSR HTML과 하이드레이션이 갈린다(format.ts 주석).
   //   마운트 전에는 서버가 준 시각을 쓴다(위 serverNowMs 주석).
-  const nowMs = useNowMs() ?? serverNowMs ?? null;
+  // ⚠ **서버 시각이 우선이다** — `useNowMs()`는 모듈 스코프에 세션당 한 번 고정되어 앱을
+  //   처음 연 순간에 굳는다(사유는 `use-now.ts`). 그 값을 앞에 두면 갓 받은 서버 시각을
+  //   낡은 클라 시계가 이긴다.
+  const clientNowMs = useNowMs();
+  const nowMs = serverNowMs ?? clientNowMs ?? null;
   return (
     <li>
       <article

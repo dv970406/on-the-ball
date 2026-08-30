@@ -13,6 +13,11 @@ function subscribe() {
  *   무한 렌더에 빠진다(useSyncExternalStore의 계약).
  *   탭을 며칠 열어둔 세션에서 값이 늙는 대신, 라우팅·리페치와 무관하게 안정적이다 —
  *   24시간 창(HOT 판정)에는 이 정밀도로 충분하다.
+ *
+ * ⚠ **그래서 서버 시각이 있으면 그쪽이 우선이다** — `serverNowMs ?? useNowMs()` 순서다.
+ *   이 값은 "지금"이 아니라 "이 세션이 처음 렌더된 순간"이라, 이동할 때마다 서버가 새로
+ *   찍어 주는 값(Router Cache TTL 0)보다 늘 낡았다. 뒤집으면 마감·구역 판정이 그만큼
+ *   과거에 머문다(실측 사례는 `data-and-state.md`).
  */
 let mountedAtMs: number | null = null;
 

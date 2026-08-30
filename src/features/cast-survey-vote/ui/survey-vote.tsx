@@ -64,7 +64,11 @@ export function SurveyVote({
   const storeUserId = useSessionStore((s) => s.user?.id);
   // 세션 복원 전에는 서버가 알려준 사용자를 키로 쓴다(위 initialUserId 주석)
   const userId = status === "loading" ? initialUserId : storeUserId;
-  const nowMs = useNowMs() ?? serverNowMs ?? null;
+  // ⚠ **서버 시각이 우선이다** — `useNowMs()`는 모듈 스코프에 세션당 한 번 고정되어 앱을
+  //   처음 연 순간에 굳는다(사유는 `use-now.ts`). 그 값을 앞에 두면 갓 받은 서버 시각을
+  //   낡은 클라 시계가 이긴다.
+  const clientNowMs = useNowMs();
+  const nowMs = serverNowMs ?? clientNowMs ?? null;
   const castVote = useCastSurveyVote(survey.id);
 
   /**
