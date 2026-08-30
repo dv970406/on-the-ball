@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getBrowserSupabase } from "@/shared/api";
+import { rememberAuthProvider } from "../lib/last-auth-provider";
 import { clearSignOutIntent } from "../lib/sign-out-intent";
 import { useSessionStore } from "./session-store";
 
@@ -42,6 +43,13 @@ export function useSessionSync() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       applySession(session);
+
+      // 이번 세션이 어느 프로바이더로 섰는지 남긴다 — 로그인 화면의 "최근 사용" 배지가 읽는다.
+      // ⚠ **이벤트를 가리지 않는다.** SIGNED_IN은 이미 로그인해 둔 사용자에게 다시 발행되지
+      //   않고 복원은 INITIAL_SESSION으로 오므로, 그것까지 받아야 값이 채워진다.
+      // ⚠ SIGNED_OUT은 session이 null이라 아무 일도 일어나지 않는다 — 로그아웃으로 지우면
+      //   정작 필요한 순간(다시 왔을 때)에 값이 없다.
+      rememberAuthProvider(session?.user.app_metadata.provider);
 
       // 가드가 소비하지 못한 로그아웃 신호를 여기서 버린다 — 가드가 없는 화면(목록)에서
       // 로그아웃하면 신호가 남고, 그대로 두면 다음 세션 만료가 "직접 로그아웃"으로 오인된다.

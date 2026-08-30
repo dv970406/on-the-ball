@@ -2,6 +2,7 @@
 
 import { type OAuthProvider } from "@/shared/config";
 import { cn } from "@/shared/lib";
+import { Pill } from "@/shared/ui";
 
 /**
  * 소셜 로그인 버튼.
@@ -72,27 +73,52 @@ const PROVIDER_META: Record<
 
 interface ProviderButtonProps {
   provider: OAuthProvider;
+  /** 지난번에 이 방법으로 로그인했는지 — 계정이 둘로 갈리는 것을 막는 힌트다 */
+  recent?: boolean;
   disabled?: boolean;
   onClick: () => void;
 }
 
-export function ProviderButton({ provider, disabled, onClick }: ProviderButtonProps) {
+export function ProviderButton({
+  provider,
+  recent,
+  disabled,
+  onClick,
+}: ProviderButtonProps) {
   const { label, mark: Mark, className } = PROVIDER_META[provider];
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        // 라운드·높이·이징은 우리 시스템 값이다 — 가이드가 강제하는 건 색·로고·문구뿐이다
-        "flex h-[50px] w-full items-center justify-center gap-2 rounded-sm",
-        "text-[15px] font-medium transition-colors duration-150 ease-otb",
-        "disabled:opacity-40",
-        className,
+    <div className="relative">
+      {/*
+        ⚠ **배지는 버튼 "밖"에 둔다.** 카카오·구글 가이드가 강제하는 것이 버튼의 색·로고·문구라
+          그 안에 무언가를 얹으면 심사에서 지적 대상이 된다(이 파일 머리말의 예외 규약).
+          그래서 위 모서리에 걸쳐 놓아 버튼에 붙은 주석처럼 읽히게 한다.
+        ⚠ `aria-hidden`인 이유는 같은 문구를 버튼 **안에** sr-only로 한 번 더 두기 때문이다 —
+          그래야 탭으로 버튼에 닿은 사람에게도 읽힌다(`aria-label`은 라벨을 덮으므로 금지).
+      */}
+      {recent && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -top-2 right-3 z-10"
+        >
+          <Pill variant="dark">최근 사용</Pill>
+        </span>
       )}
-    >
-      <Mark />
-      {label}
-    </button>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className={cn(
+          // 라운드·높이·이징은 우리 시스템 값이다 — 가이드가 강제하는 건 색·로고·문구뿐이다
+          "flex h-[50px] w-full items-center justify-center gap-2 rounded-sm",
+          "text-[15px] font-medium transition-colors duration-150 ease-otb",
+          "disabled:opacity-40",
+          className,
+        )}
+      >
+        <Mark />
+        {recent && <span className="sr-only">최근 사용한 로그인 방법. </span>}
+        {label}
+      </button>
+    </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useNextParam } from "@/shared/lib";
+import { useLastAuthProvider } from "@/entities/session";
 import { useOAuthSignIn } from "@/features/sign-in";
 
 /**
@@ -66,8 +67,23 @@ export function useSignInFlow(
    */
   const exchangeFailed = hasCode && (!canExchange || exchangeTimedOut);
 
+  /**
+   * 지난번에 로그인에 쓴 프로바이더 — 계정이 둘로 갈리는 것을 예방하는 힌트다
+   * (사유는 `entities/session/lib/last-auth-provider`에).
+   *
+   * ⚠ 서버에는 localStorage가 없어 **하이드레이션까지는 null**이다(`useNextParam`과 같은
+   *   형태). 배지가 한 프레임 늦게 뜨는 것은 힌트라 무해하다.
+   */
+  const lastProvider = useLastAuthProvider();
+
   return {
     start: oauth.start,
+    /**
+     * "최근 사용" 배지를 붙일 프로바이더. 아직 모르면 null.
+     * ⚠ 이 값으로 **버튼 순서를 바꾸지 않는다** — 마운트 이후에야 정해지므로 하이드레이션
+     *   직후 목록이 재배열되고, 방문할 때마다 버튼 자리가 달라져 오히려 잘못 누르게 된다.
+     */
+    lastProvider,
     /** 이동이 시작될 때까지의 시각 표시 — 실제 연타 차단은 훅의 동기 가드가 한다 */
     isPending: oauth.isPending,
     /**

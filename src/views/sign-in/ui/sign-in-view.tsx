@@ -58,11 +58,14 @@ export function SignInView({
 				</div>
 			}
 		>
-			<div className="flex flex-col gap-2.5">
+			{/* ⚠ gap이 2.5(10px)가 아니라 3.5(14px)인 이유: "최근 사용" 배지가 버튼 위로 8px
+			    걸쳐 올라온다 — 10px이면 위 버튼과 2px까지 붙어 배지가 끼인 것처럼 보인다 */}
+			<div className="flex flex-col gap-3.5">
 				{OAUTH_PROVIDERS.map((provider) => (
 					<ProviderButton
 						key={provider}
 						provider={provider}
+						recent={provider === flow.lastProvider}
 						disabled={flow.isPending}
 						onClick={() => flow.start(provider)}
 					/>
