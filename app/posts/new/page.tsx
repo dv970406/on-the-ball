@@ -10,7 +10,8 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  // proxy.ts가 하드 내비게이션을 이미 막지만, SPA 전이·세션 만료는 이쪽이 잡는다
+  // ⚠ **인증 판정은 여기(화면 가드)와 RLS가 전부다** — proxy에는 라우트 가드가 없다
+  //   (걷어낸 사유는 `nextjs.md`). 하드 진입도 SPA 전이도 세션 만료도 모두 이쪽이 잡는다.
   return (
     <AuthRequired>
       <PostWriteView />

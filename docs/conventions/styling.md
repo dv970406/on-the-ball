@@ -101,14 +101,21 @@ function cardClassName(peek: boolean) {
     | `shared/ui/action-chip-class.ts` | 좋아요 활성(상세) |
     | `shared/ui/wordmark.tsx` | 워드마크의 볼 — 브랜드 마크 |
     | `shared/ui/pill.tsx` | `green` 배지 |
+    | `shared/ui/sign-in-dialog.tsx` | `confirmTone="primary"` — 로그인 안내의 확인 버튼 |
+    | `shared/ui/live-status-pill.tsx` | `green` 배지 소비 — v1 자산(현재 미사용) |
     | `shared/ui/live-dot.tsx` | `primary` 도트 |
     | `entities/post/ui/post-card.tsx` | 목록 카드의 좋아요 하트 |
     | `entities/comment/ui/comment-item.tsx` | "내 댓글" 배지 |
     | `entities/survey/ui/vs-badge.tsx` | 분할 카드의 VS 배지 |
+    | `views/match-detail/ui/match-detail-view.tsx` | 승부예측 상세의 "적중" 배지 — 한 화면에 1개 |
+    | `entities/match/ui/match-card.tsx` | 승부예측 "적중" 배지 — **예측했고 채점까지 끝난 카드에만 1개**. 선택지(카드당 3개)에 에메랄드를 쓰지 않는 것과 갈리는 지점이고, 글자를 담아 "색이 정보를 혼자 지지 않는다"도 만족한다 |
     | `views/post-detail/ui/comment-section.tsx` | 댓글 수 |
     | `widgets/bottom-tab-bar/ui/bottom-tab-bar.tsx` | 활성 탭 아이콘 |
 
     (검사는 **주석을 걷어낸 소스**를 훑는다 — 주석에 적힌 `bg-primary`는 세지 않는다.)
+
+  - ⚠ **리터럴만 세면 새는 자리가 있다.** `Pill variant="green"`은 `bg-primary`를 간접으로 쓰므로 리터럴 대조를 구조적으로 통과할 수 없다 — 실제로 그 경로로 목록 카드에 에메랄드가 들어왔는데 검사도 이 표도 알지 못했다. 그래서 `check-conventions.mjs`가 `variant="green"`도 함께 센다. **에메랄드를 감싼 컴포넌트를 새로 만들면 그 prop도 검사에 등재한다.**
+  - ⚠ **그마저도 리터럴일 때만 보인다.** `variant={ok ? "green" : …}` 같은 동적 값은 어떤 문자열 대조도 통과하므로, 검사가 **`Pill variant={` 자체를 금지**한다 — 에메랄드가 걸린 prop은 리터럴로 쓴다.
 
   - ⚠ **색이 정보를 혼자 지지 않는다.** 에메랄드(#3ecf8e)는 흰 배경 대비가 **1.99:1**이라
     WCAG의 비텍스트 최소 3:1에 못 미친다 — 이 색에 **글자나 형태 없는 표시를 싣지 않는다.**

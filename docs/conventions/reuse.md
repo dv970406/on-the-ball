@@ -7,8 +7,13 @@
 - `formatRelativeTime(iso, nowMs)` — 과거 시각 → `"방금 전"`/`"3분 전"`/`"2시간 전"`/`"5일 전"`, 7일↑은 `"7월 30일"`, **해가 다르면 `"2025년 7월 30일"`**.
   - 연도를 붙이는 이유: 전에는 무조건 `"7월 30일"`이라 **작년 글이 올해 글과 구분되지 않았다**(`<time dateTime>`은 정확한데 화면 텍스트만 거짓말).
   - ⚠ **`nowMs`를 인자로 받는다**(`isHotPost`와 같은 형태·같은 이유). 렌더 중에 시계를 읽으면 서버 렌더와 하이드레이션이 다른 값을 만든다 — 상세·목록이 모두 SSR이라 실제로 깨진다. 호출부는 `useNowMs()`를 그대로 넘긴다.
-  - ⚠ **SSR 화면에서는 서버 시각을 흘려보낸다** — `useNowMs() ?? serverNowMs`. 안 그러면 첫 렌더가 절대시각이었다가 바뀌며 **시프트**한다(글 상세가 실제로 그랬다).
+  - ⚠ **SSR 화면에서는 서버 시각을 흘려보낸다** — `serverNowMs ?? useNowMs()`. 안 그러면 첫 렌더가 절대시각이었다가 바뀌며 **시프트**한다(글 상세가 실제로 그랬다). ⚠ **순서를 뒤집지 말 것** — `useNowMs()`는 세션당 한 번 고정되어 낡은 값이 갓 받은 서버 시각을 이긴다(`data-and-state.md`).
   - ⚠ **`nowMs`가 `null`이면 절대시각을 돌려준다**(연도 포함). 기준 시각 없이 상대시각을 추측하면 그 순간이 불일치다. 연도를 빼는 쪽이 거짓이 될 수 있어, 모를 때는 붙이는 쪽으로 기운다.
+
+- `formatKickoff(iso, nowMs)` — 킥오프 시각 → `"11월 3일 (일) 04:30"`, 해가 다르면 앞에 연도.
+  - ⚠ **`formatRelativeTime`을 킥오프에 쓰지 말 것** — 그쪽은 `nowMs - date`로 과거를 전제해서 **미래 시각이 전부 "방금 전"** 이 된다.
+  - ⚠ 요일을 함께 찍는 것이 규약이다. 축구 일정에서 요일은 장식이 아니라 정보다.
+  - ⚠ `nowMs` 계약은 형제 함수와 같다 — **연도를 붙일지만** 그 값으로 정하고 `null`이면 항상 붙인다.
 
 ## `@/shared/lib` (배럴 — 클라이언트 훅 포함)
 - `cn` — Tailwind 클래스 병합
@@ -32,7 +37,9 @@
   - ⚠ **`isPending`을 prop으로 받는 컴포넌트에 두지 말 것.** 부모가 리렌더될 때까지 낡은 값을 읽으므로 같은 무증상 잠금이 된다 → 뮤테이션을 조립하는 쪽에 둔다.
   - ⚠ 확인과 잠금이 **나뉜 이유가 규약이다** — 사이에 끼는 검증이 실패하면 잠그지 않고 빠져나가야 한다. 잠그면 뮤테이션이 시작되지 않아 `isPending`이 돌지 않고, 그 자물쇠는 영영 풀리지 않는다.
   - ⚠ 목록의 **항목별** 가드는 이 훅이 아니다 — 렌더 표시용 상태를 함께 가져야 해서 형태가 다르다. 그리고 해제를 `mutate`의 per-call 콜백에 걸면 **다음 항목을 누르는 순간 앞 항목의 콜백이 유실되어** 무증상 잠금이 된다 → `mutateAsync().finally()`로 건다(사유는 `data-and-state.md`).
-- **`useNowMs`** — 마운트 이후의 현재 시각(ms). 마운트 전에는 `null`.
+- **`useNowMs`** — 클라이언트 시계. 마운트 전에는 `null`.
+  - ⚠ **"현재 시각"이 아니다.** 값이 **모듈 스코프에 세션당 한 번** 고정되어(앱을 처음 연 화면에서 굳는다) SPA 세션 내내 그대로다 — `useSyncExternalStore` 계약상 스냅샷이 매번 달라지면 무한 렌더가 되기 때문이다(그 훅 주석).
+  - ⚠ **그래서 서버 시각이 있으면 그쪽이 우선이다** — `serverNowMs ?? useNowMs()`. 순서를 뒤집으면 낡은 클라 시계가 갓 받은 서버 시각을 이겨 **마감된 것이 진행 중으로 보인다**(`data-and-state.md`에 실측).
   렌더 중 `Date.now()`를 부르지 않기 위한 훅이다. **시간에 따라 달라지는 표시(HOT 배지 등)는 이걸로 판정한다** — `null`인 첫 렌더에서는 그 표시를 그리지 않으면 서버·클라 출력이 같아진다. 선례: `entities/post`의 `isHotPost(post, nowMs)`.
 - `useScrollRestore` / `clearScrollRestore` — 목록 스크롤 위치 저장/복원 (`clearScrollRestore`는 목록을 처음부터 보여야 할 때 저장분을 버린다)
 - `useFocusTrap` — 오버레이(`Dialog`·`Sheet`) 안에 포커스를 가둔다. ⚠ 초기 포커스는 **`preventScroll: true`** 로 준다 — 화면 밖에서 올라오는 시트에 그냥 `focus()`하면 브라우저가 `overflow-hidden`인 430px 프레임을 스크롤시켜 **되돌릴 수 없게** 화면이 밀린다(실측)
@@ -63,6 +70,7 @@
   `use-server-session-check`(로그인 시 1회 서버 검증)가 나눠 갖는다.
 - `AuthRequired` / `GuestOnly` — 클라이언트 라우트 가드. 렌더 분기만 갖고,
   **이동은 `use-auth-redirect`가 소유한다** — 로그인 후 목적지를 정하는 곳은 앱에서 거기 하나다.
+- **`useLastAuthProvider()`** — 마지막으로 로그인에 성공한 소셜 프로바이더(로그인 화면의 "최근 사용" 배지). ⚠ 순수 리더가 아니라 **훅**을 노출한다 — 그대로 내보내면 호출부마다 "렌더 중에 부르면 하이드레이션이 깨진다"를 기억해야 하는데 그런 방어는 방어가 아니다(`useNextParam`과 같은 형태).
 - **`markSignOutIntent()` / `clearSignOutIntent()`** — "사용자가 직접 로그아웃했다"는 1회성 신호. `features/sign-out`이 **`signOut()`을 부르기 전에** 찍고, 실패하면 버린다. 가드가 이걸 보고 목적지를 가른다(직접 로그아웃 → 목록 / 세션 만료·비로그인 진입 → 로그인 화면 + `?next=`).
   ⚠ **로그아웃 후 이동을 호출부에서 하지 말 것** — 성공 콜백은 화면이 먼저 언마운트되어 실행되지 않고, `mutate` 직전 `router.replace`는 가드의 이동과 순서 보장이 없다(나중 이동이 앞 이동을 취소한다). 목적지는 가드가 소유하고 호출부는 신호만 남긴다.
   ⚠ **신호는 전역이고 가드는 여럿이다** — 가드가 쓰지 않을 때도 읽어서 버리고, "이 화면에서 세션이 사라졌는가"를 함께 본다. 안 그러면 남은 신호를 다른 가드(`/posts/new` 등)가 먹어 비로그인 사용자가 로그인 화면 대신 목록으로 되튕긴다.
@@ -93,11 +101,11 @@
 ## `@/entities/poll`
 - `usePollQuery(postId, userId)` — 글에 딸린 투표. 없으면 `null`(투표 없는 글이 대부분이라 정상값이다).
 - `usePollResultsQuery(postId, userId, enabled)` — 선택지별 득표수.
-  ⚠ **투표한 사람에게만 열린다.** 게이팅이 화면이 아니라 `poll_results` 함수 안에 있어, 미투표자에게는 0행이 오고 비로그인은 EXECUTE 권한 자체가 없다. `enabled`는 요청을 아끼는 것일 뿐 방어가 아니다.
+  ⚠ **투표한 사람에게만 열린다.** 게이팅이 화면이 아니라 `post_poll_results` 함수 안에 있어, 미투표자에게는 0행이 오고 비로그인은 EXECUTE 권한 자체가 없다. `enabled`는 요청을 아끼는 것일 뿐 방어가 아니다.
 - `pollKeys` — ⚠ **`postId`와 `userId`를 함께** 받는다. `myOptionId`도 집계도 "나"에 종속된 값이라, 상세를 연 채 계정이 바뀌면 이전 사용자의 것이 남는다(`identityKeys`와 같은 이유).
 - `POLL_SELECT` / `buildPoll` / `buildPollResult` — PostgREST select 문자열의 단일 소스와 매퍼.
   ⚠ **득표수가 select에 없다.** 컬럼이 아니라 함수가 세기 때문이다 — 여기에 넣으려고 컬럼을 만들면 게이팅이 무너진다.
-- `Poll` / `PollResult` — 도메인 타입. `Poll.myOptionId`는 `poll_vote` 임베딩이 "내 행만"이라 **배열 길이가 곧 그 값**이다(`post_like` 트릭과 같다).
+- `Poll` / `PollResult` — 도메인 타입. `Poll.myOptionId`는 `post_poll_vote` 임베딩이 "내 행만"이라 **배열 길이가 곧 그 값**이다(`post_like` 트릭과 같다).
 - `PollBlock` — 투표 UI. **프레젠테이션 전용이라 세션도 뮤테이션도 모른다.** 세션 3분기와 실제 투표는 `features/cast-poll-vote`의 `PollVote`가 갖는다(`PostCard` ↔ `LikeButton`과 같은 분업).
 - ⚠ **`entities/post`가 아니라 별도 슬라이스다.** 임베딩하면 poll 타입과 낙관적 스냅샷이 `PostDetail` 안에 중첩되어 post가 투표 도메인을 떠안는다. 대가로 상세 화면에 요청이 하나 는다.
 
@@ -145,6 +153,37 @@
 - ⚠ **무효화 대상이 `cast-poll-vote`보다 하나 많다** — 목록 카드가 "참여 완료"를 표시하므로 `surveyKeys.lists()`도 함께 지운다. 빼면 참여하고 목록으로 돌아왔을 때 배지가 갱신되지 않는다.
 - ⚠ 참여하기에는 **RPC가 없고 PostgREST upsert도 쓰지 않는다** — 사유는 `cast-poll-vote`와 같다(집계 컬럼이 없어 잠금이 불필요하고, upsert는 `survey_id` UPDATE 권한을 요구해 "취소 불가"를 뚫는다).
 
+## `@/entities/match`
+> ⚠ **한국어로 부를 때는 "승부예측", 영문 식별자는 `match`·`prediction`.** `/matches` URL과
+> `match_prediction` 테이블은 그대로 두고, 화면·주석·문서의 한국어는 "승부예측" 하나로 쓴다
+> ("경기 예측"·"매치 예측"과 섞지 않는다). 입축구(`survey`)와 같은 형태의 규약이다.
+
+- `useMatchListQuery(userId, enabled, initialData)` / `useMatchQuery(id, userId, enabled, initialData)` / `useMatchPredictionResultsQuery(id, userId, enabled, initialData)` — 목록 · 단건 · 예측 분포.
+- **`useMyAccuracyQuery(userId)`** — 내 적중률. ⚠ **`truncated`를 함께 돌려준다** — PostgREST의 `max_rows`(1,000)에 잘리면 비율이 거짓이 되므로 호출부가 그때는 숫자를 그리지 않고 사실을 알린다(실측: 행 1000 / `Content-Range` 총계 1108). 도달하면 세는 일을 DB로 내린다. ⚠ **컬럼이 아니라 그때그때 센다** — 카운터를 흔드는 경로가 다섯이라(예측 생성·변경·채점·**스코어 정정**·무효화, 그리고 탈퇴 cascade) `like_count`가 겪은 어긋남을 그대로 되풀이한다. ⚠ `match!inner`가 필수다(왼쪽 조인이면 경기 없는 행이 `result` null과 섞인다).
+- `matchKeys` / `Match` · `MatchListPage` · `MatchPick` · `MatchPredictionResult` / `MatchCard` · `PredictionBlock`.
+  ⚠ `MATCH_PICKS`·`MATCH_PICK_LABEL`·`Team`·`PredictionAccuracy`는 **배럴에 없다** — 슬라이스 밖 소비자가 0이라 올리지 않았다(`entities/survey`가 `SurveyOption`·`SplitCount`를 뺀 것과 같은 이유). `check:conventions`는 상대 경로 소비를 현역으로 세어 **이 유형을 잡지 못하므로** 손으로 지킨다.
+- ⚠ **`Team.name`은 한국어다**(DB에 그렇게 저장된다 — 사유는 `api-and-db.md`). 화면에서 옮기지 말 것. ⚠ `name`(정식)과 `shortName`(약칭)의 쓰임이 다르다 — **카드·상세 제목은 정식명, 예측 버튼 라벨은 약칭**이다. 버튼에 정식명을 쓰면 좁은 화면에서 잘리는데 잘린 팀 이름은 고를 수가 없다. 표기 추가는 `scripts/team-names-ko.json`.
+- **`buildMatchListQueries(supabase, nowMs)`** — 목록 조립의 단일 소스(`api/list-query.ts` — 서버 안전). **지난/다가오는 두 쿼리를 돌려준다** — 구역이 조회 조건으로 갈리므로 화면이 클라이언트 시계로 다시 나누지 않는다(그러면 조회 기준과 표시 기준이 서로 다른 순간을 본다). ⚠ **기준 시각을 인자로 받는다** — 안에서 시계를 읽으면 훅과 서버가 다른 순간을 보게 되어 경계에 걸친 경기가 한쪽에만 실린다.
+- **`MATCH_PAST_LIMIT` / `MATCH_UPCOMING_LIMIT`** — **구역별** 상한. ⚠ **하나로 합치지 말 것** — 상한 하나에 킥오프 오름차순으로 뒀더니 혼잡기에 지난 경기가 상한을 다 먹어 **다가오는 경기가 0건**이 됐다(실측). 예측할 대상이 화면에서 사라지는 방향이다.
+- `MATCH_LIST_LOOKBACK_MS` — 지난 경기 구역의 창(**배럴에 없다** — 소비처가 `api/list-query` 하나다. 필요하면 `api/mappers` 직접 경로). ⚠ **7일보다 짧게 두지 말 것** — EPL은 라운드가 주 단위라 3일로 뒀더니 주중 접속 시 지난 라운드 결과가 통째로 창 밖으로 밀려났다(실측).
+- **`isPredictionResultsOpen(match, nowMs)`** — 예측 **분포**를 볼 수 있는가(킥오프 지남 + 취소 아님).
+  - ⚠ **`!isMatchOpen(...)`으로 대신하지 말 것.** 취소가 두 판정에 다르게 작용해 **뒤집기로 합성되지 않는다** — 실제로 그렇게 고쳤다가 취소된 경기에 "취소된 경기예요"와 분포 패널이 함께 떴고, **취소된 미래 경기**에서는 게이팅된 0행이 `[]`로 접혀 "0명이 예측했어요"라는 거짓말이 됐다.
+  - ⚠ **서버(SSR 프리페치)와 클라이언트가 이 함수 하나를 부른다.** 각자 조건을 조립하면 서버가 내려준 `initialData`가 클라이언트 게이팅을 조용히 우회해 `undefined`(볼 수 없음)/`[]`(열렸는데 0건) 구분이 그 지점에서 무너진다.
+- **`isMatchOpen(match, nowMs)`** — 예측 마감 판정. **DB의 `match_is_open`과 같은 판정**이어야 한다. ⚠ `nowMs`가 `null`이면 "아직 판정 전"이다(`false`로 접으면 첫 프레임에 멀쩡한 경기가 잠긴다). ⚠ 이 판정은 안내일 뿐이고, 입축구보다 **훨씬 자주 경계를 놓친다**(사람들이 킥오프 직전에 예측한다) — 실제 차단은 정책이 한다.
+- **`isMatchSettled(match)`** — 채점 가능한가(= `result !== null`). ⚠ **`nowMs`를 받지 않는 유일한 시각 계열 판정이다** — 결과의 유무는 시계가 아니라 DB가 정한다. `!isMatchOpen`으로 대신하지 말 것(킥오프만 지나고 결과가 아직 없는 경기가 통째로 섞인다).
+- **`isMatchInProgress(match, nowMs)`** — 지금 뛰고 있다고 볼 수 있는가. ⚠ **상한(4시간)이 규약이다** — "킥오프 지남 + 결과 없음"으로만 두면 **이틀 전 경기가 "진행 중"** 으로 뜬다(실측). 지난 경기 창이 7일이라 최대 일주일간 거짓 표기이고, 그 모양은 동기화가 정상이라고 명시한 두 상태(연기 · 스코어를 못 읽은 종료)와 구분되지 않는다. 창 밖은 진행 중이 아니라 **결과 대기**다.
+- ⚠ **`result`를 클라이언트가 다시 계산하지 않는다.** 스코어에서 파생된 컬럼이고 **무효 경기에서 null이 되는 규칙까지** DB가 단독으로 소유한다 → `result is not null`이 "채점 가능"의 유일한 술어다.
+- ⚠ **select 문자열을 `+`로 잇지 말 것.** supabase-js가 **리터럴 타입**을 파싱해 결과 형태를 만드는데, 조각을 이어 붙이면 `string`으로 넓어져 추론이 통째로 `GenericStringError`가 된다(실측).
+- ⚠ `MATCH_SELECT`는 **`team!home_team` 형태**다. `match → team` 경로가 둘이라 그냥 `team(...)`은 PGRST201이고, 컬럼명만 쓴 `home:home_team(...)`은 런타임엔 통하지만 **생성 타입이 모호성을 풀지 못한다**(`BLOCKED_SELECT`와 같은 함정 — 실측).
+- 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/keys`·`api/list-query`를 직접 import.
+
+## `@/features/predict-match`
+- `MatchPrediction` — `PredictionBlock`에 세션·마감·뮤테이션을 붙인 컴포넌트. 조회는 `@/entities/match`다(`cast-survey-vote`와 같은 분업).
+- ⚠ 세션 `status`를 **3분기**한다(`loading`을 비로그인과 같이 다루면 콜드 로드 직후 로그인 사용자가 안내를 본다).
+- ⚠ **비로그인에게도 선택지를 연결한다** — 눌러야 로그인 안내가 뜬다. 안내(`SignInDialog`)는 **뷰가 소유한다**(`onSignInRequired`로 올린다).
+- ⚠ **집계 캐시를 건드리지 않는다 — 투표·입축구와 갈리는 지점이다.** 저쪽은 참여하는 순간 결과가 열려 낙관적으로 막대를 밀어야 하지만, 여기는 **마감 시점과 공개 시점이 같은 킥오프**라 예측할 수 있는 동안 분포가 반드시 닫혀 있다 — 밀 막대가 애초에 없다. 같은 이유로 적중률 캐시도 건드리지 않는다(채점은 킥오프 뒤다).
+- ⚠ RPC도 upsert도 쓰지 않는다 — 사유는 `cast-poll-vote`와 같다(upsert는 `match_id` UPDATE 권한을 요구해 "취소 불가"를 뚫는다).
+
 ## `@/entities/block`
 - `useBlockedUsersQuery(userId)` / `blockKeys` / `BlockedUser` — 내가 차단한 사람 목록. (select 문자열과 매퍼는 슬라이스 내부다 — 배럴에 올리면 호출부가 0인 export가 되어 `check:conventions`가 막는다.)
 - ⚠ **`entities/profile`에 얹지 않고 별도 슬라이스다.** 얹으면 그 슬라이스가 "프로필 + 차단" 두 도메인을 떠안는다(`entities/poll`을 `entities/post`에서 뗀 것과 같은 판단). entities끼리 import할 수 없는 것은 걸림돌이 아니다 — 행 타입은 각 슬라이스가 `@/types/database.types`에서 직접 뽑는 것이 이미 관례다.
@@ -173,6 +212,7 @@
 
 ## `@/shared/config`
 - `ROUTES` — 경로 헬퍼. **경로 문자열 하드코딩 금지**(`"/posts"` ❌ → `ROUTES.postList`).
+  ⚠ 승부예측은 `/predictions`가 아니라 **`/matches`** 다 — 나중에 선수 평점·매치 스레드가 붙으면 전부 경기를 부모로 삼는데, 그때 `/predictions/[id]`는 거짓말이 된다. 탭 라벨은 "승부예측"이고 **표시 문구와 경로는 다른 계약**이다.
 - **`isTabBarRoute(pathname)` / `activeTabHref(pathname)`** — 하단 탭바를 그리는 화면인지와 그때 활성인 탭. **정확 일치 배열로 되돌리지 말 것** — 말머리 목록(`/posts/category/…`)이 생기면서 값이 유한하지 않게 됐고, 빠뜨리면 그 화면에서 **탭바가 사라지고 토스트가 탭바 자리로 내려간다.** 탭바(`widgets`)와 토스트(`shared/ui`)가 이 둘만 본다.
 - `signInWithNext(pathname)` / `withNext(path, next)` — 복귀 경로를 붙인 URL. 이 형태를 만드는 곳이 가드·`SignInDialog`·`AuthStatus`로 여럿이라 여기로 모았다. ⚠ 액션 컨트롤에서 이걸로 **직접 이동하지 않는다** — `SignInDialog`가 안내를 끼고 그 안에서 부른다(예외는 라벨이 "로그인"인 컨트롤).
 - **`safeNextPath(next, origin)`** — `?next=` 값을 앱 내부 경로로만 통과시킨다. **직접 문자열 검사를 짜지 말 것** — `startsWith("/") && !startsWith("//")`로는 `/\evil.com`도 `/..//evil.com`도 못 막는다(둘 다 실제로 뚫렸다).

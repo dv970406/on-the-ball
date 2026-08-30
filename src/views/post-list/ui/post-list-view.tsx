@@ -57,10 +57,11 @@ export function PostListView({ category, sort, initialData, serverNowMs }: PostL
 	 * 비로그인이 글쓰기를 눌렀을 때의 안내.
 	 *
 	 * ⚠ **앵커는 그대로 둔다.** 크롤러가 `/posts/new`를 발견하는 유일한 경로가 이 링크이고
-	 *   (`robots.txt`가 아무것도 막지 않는 근거다 — nextjs.md), 비로그인에게는 proxy가 307을
-	 *   준다. 여기서는 그 이동을 **가로채기만** 한다.
-	 * ⚠ `loading`에는 가로채지 않는다 — 복원 중인 로그인 사용자가 안내를 보면 안 되고,
-	 *   그대로 보내도 proxy가 쿠키로 옳게 판정한다(상세 화면들과 같은 3분기).
+	 *   (`robots.txt`가 아무것도 막지 않는 근거다 — nextjs.md), 크롤러는 목적지 화면의
+	 *   `robots: { index: false }`를 읽고 색인하지 않는다. 여기서는 이동을 **가로채기만** 한다.
+	 * ⚠ `loading`에는 가로채지 않는다 — 복원 중인 로그인 사용자가 안내를 보면 안 된다.
+	 *   그대로 보내도 목적지의 `AuthRequired`가 옳게 판정한다(상세 화면들과 같은 3분기).
+	 *   ⚠ proxy에는 라우트 가드가 없다 — 인증 판정은 화면 가드와 RLS가 갖는다(`nextjs.md`).
 	 */
 	const sessionStatus = useSessionStore((s) => s.status);
 	const [askSignIn, setAskSignIn] = useState(false);

@@ -9,11 +9,13 @@ import { env } from "@/shared/config";
  *
  *   - 정렬 쿼리(`?sort=`) — 막으면 크롤러가 그 URL의 `rel=canonical`을 **읽지 못해**
  *     통합 신호가 사라진다(구글 *Consolidate duplicate URLs*가 경고하는 지점).
- *   - 로그인 필수 화면(`/profile`·`/posts/new`·`/posts/[id]/edit`) — 비로그인에게는
- *     proxy가 307로 `/sign-in`에 보내므로, **크롤을 허용하면 크롤러가 리다이렉트를 따라가
- *     그 URL을 색인하지 않는다.** 반대로 `Disallow`로 막으면 크롤러는 리다이렉트도
- *     `noindex`도 보지 못한 채 **링크만 보고 URL을 색인할 수 있다** — 셋 다 탭바·FAB의
- *     크롤 가능한 앵커로 모든 목록 화면에서 링크되므로 그 조건이 실제로 성립한다.
+ *   - 로그인 필수 화면(`/profile`·`/posts/new`·`/posts/[id]/edit`) — 이 셋은 각자
+ *     `robots: { index: false }`를 내보인다. **크롤을 허용해야 크롤러가 그 `noindex`를
+ *     읽는다.** `Disallow`로 막으면 크롤러는 그것을 보지 못한 채 **링크만 보고 URL을
+ *     색인할 수 있는데**, 셋 다 탭바·FAB의 크롤 가능한 앵커로 모든 목록 화면에서
+ *     링크되므로 그 조건이 실제로 성립한다.
+ *     ⚠ 한때는 proxy의 307도 함께 막아 줬지만 **라우트 가드를 걷어낸 뒤로는 그
+ *       `noindex`가 유일한 색인 차단이다** — 지우면 안 된다(`nextjs.md`).
  *   - `/sign-in` — 같은 이유. 크롤은 열어 두고 페이지의 `robots: { index: false }`가 판정한다.
  *
  * → 색인 여부는 **페이지가 `noindex`로 말하고**, robots.txt는 사이트맵 위치만 알린다.
