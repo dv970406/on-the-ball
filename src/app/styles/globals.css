@@ -121,7 +121,13 @@ body {
   color: var(--color-on-primary);
 }
 
-button {
+/*
+  ⚠ **`:not(:disabled)`가 규칙의 핵심이다.** 이 선언은 `@layer` 밖에 있어 레이어를 가진
+    Tailwind 유틸을 **언제나 이긴다** — 그냥 `button`으로 두면 컴포넌트에서
+    `disabled:cursor-default`를 붙여도 먹지 않아(실측: 클래스는 DOM에 있는데 계산값이
+    `pointer`) 비활성 버튼의 커서가 "누를 수 있다"고 거짓말한다.
+*/
+button:not(:disabled) {
   cursor: pointer;
 }
 
