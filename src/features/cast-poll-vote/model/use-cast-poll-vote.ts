@@ -55,7 +55,7 @@ export function useCastPollVote(postId: number) {
       // 캐시가 아니라 **서버에 물어** 분기한다 — 캐시가 낡아 있으면 insert가 23505로 죽는다.
       // 정책이 "내 행만"이라 이 조회는 남의 표를 볼 수 없다.
       const { data: mine, error: readError } = await supabase
-        .from("poll_vote")
+        .from("post_poll_vote")
         .select("option_id")
         .eq("post_id", postId)
         .eq("user_id", userId)
@@ -69,13 +69,13 @@ export function useCastPollVote(postId: number) {
       const castVote = (existing: boolean) =>
         existing
           ? supabase
-              .from("poll_vote")
+              .from("post_poll_vote")
               .update({ option_id: optionId })
               .eq("post_id", postId)
               .eq("user_id", userId)
               .select("option_id")
           : supabase
-              .from("poll_vote")
+              .from("post_poll_vote")
               .insert({ post_id: postId, user_id: userId, option_id: optionId })
               .select("option_id");
 

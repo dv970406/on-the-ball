@@ -10,7 +10,7 @@ import { hasVisibleChar, lengthOverflow, normalizeNickname, type TextLimit } fro
 /** 질문 — 화면 100그래핌 / DB 1,000코드포인트(`poll.question` CHECK와 같은 값) */
 export const POLL_QUESTION_LIMIT: TextLimit = { grapheme: 100, codePoint: 1000 };
 
-/** 선택지 — 화면 40그래핌 / DB 400코드포인트(`poll_option.label` CHECK와 같은 값) */
+/** 선택지 — 화면 40그래핌 / DB 400코드포인트(`post_poll_option.label` CHECK와 같은 값) */
 export const POLL_OPTION_LIMIT: TextLimit = { grapheme: 40, codePoint: 400 };
 
 /** DB의 `sort_order between 1 and 4`·`create_post_with_poll`의 P0001과 같은 값 */

@@ -43,7 +43,7 @@ export interface Survey {
   /**
    * 내가 고른 선택지. 비로그인·미참여면 `null`.
    * ⚠ `survey_vote`의 SELECT 정책이 "내 행만"이라 임베딩 결과가 곧 이 값이다
-   *   (`post_like`·`poll_vote`와 같은 트릭).
+   *   (`post_like`·`post_poll_vote`와 같은 트릭).
    */
   myOptionId: SurveyVoteRow["option_id"] | null;
 }

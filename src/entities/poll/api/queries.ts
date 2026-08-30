@@ -36,7 +36,7 @@ export function usePollQuery(
     queryFn: async () => {
       const supabase = requireBrowserSupabase();
       const { data, error } = await supabase
-        .from("poll")
+        .from("post_poll")
         .select(POLL_SELECT)
         .eq("post_id", postId)
         // 투표가 없는 글이 정상이다 — single()이면 PGRST116으로 "없음"과 진짜 에러가 섞인다
@@ -57,7 +57,7 @@ export function usePollQuery(
  *
  * ⚠ 게이팅이 화면이 아니라 DB에 있다. v1은 수치를 항상 내려주고 UI에서만 가려
  *   "실제로는 게이팅이 아니었다"(`docs/legacy/v1-inventory.md` 판단 #4).
- * ⚠ `enabled`는 최적화일 뿐 방어가 아니다 — 꺼도 `poll_results`가 0행을 돌려준다.
+ * ⚠ `enabled`는 최적화일 뿐 방어가 아니다 — 꺼도 `post_poll_results`가 0행을 돌려준다.
  *   비로그인은 EXECUTE 권한 자체가 없다.
  */
 /**
@@ -78,7 +78,7 @@ export function usePollResultsQuery(
     queryKey: pollKeys.results(postId, userId),
     queryFn: async () => {
       const supabase = requireBrowserSupabase();
-      const { data, error } = await supabase.rpc("poll_results", { p_post_id: postId });
+      const { data, error } = await supabase.rpc("post_poll_results", { p_post_id: postId });
 
       if (error) {
         console.error("[poll] 집계 조회 실패:", error);

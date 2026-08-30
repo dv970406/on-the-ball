@@ -89,7 +89,7 @@ const fetchPostHead = cache(async (postId: number): Promise<PostHead> => {
     // 삭제된 글은 RLS(post_select_visible)가 걸러내므로 여기서도 자동으로 "없음"이 된다.
     // ⚠ **차단한 작성자의 글도 같은 정책이 감춘다** — 쿠키 기반 서버 클라이언트라
     //   auth.uid()가 잡혀 서버·클라 판정이 갈리지 않는다(차단한 글은 그 사용자에게 404다).
-    // ⚠ 쿠키 기반 클라이언트라 `auth.uid()`가 잡힌다 → `post_like`·`poll_vote` 임베딩
+    // ⚠ 쿠키 기반 클라이언트라 `auth.uid()`가 잡힌다 → `post_like`·`post_poll_vote` 임베딩
     //   ("내 행만")이 그 사용자 기준으로 채워져 `isLiked`·`myOptionId`가 갈리지 않는다.
     // ⚠ **다섯은 서로의 결과를 쓰지 않는다** → 병렬로 보낸다. 직렬로 두면 왕복 다섯 번이
     //   그대로 쌓여 TTFB가 된다(색인 대상 화면이라 특히 비싸다).
@@ -99,7 +99,7 @@ const fetchPostHead = cache(async (postId: number): Promise<PostHead> => {
     //   `buildCommentListQuery`가 단독으로 소유해 어긋날 자리를 없앤다.
     // ⚠ 투표 질문·선택지도 **그 글의 콘텐츠**라 초기 HTML에 담긴다. 투표가 없는 글이
     //   대부분이라 0행으로 끝나는 경우가 많은데, 그건 정상값(`null`)이다.
-    // ⚠ **집계(`poll_results`)도 여기서 함께 쏜다.** 전에는 poll 응답을 받은 뒤 `myOptionId`를
+    // ⚠ **집계(`post_poll_results`)도 여기서 함께 쏜다.** 전에는 poll 응답을 받은 뒤 `myOptionId`를
     //   보고 직렬로 매달았는데, 그러면 **투표에 참여한 사용자만 왕복이 한 번 더** 쌓였다.
     //   게이팅은 UI가 아니라 definer 함수 안에 있어(미참여자·투표 없는 글 모두 0행) 무조건
     //   쏴도 뜻이 달라지지 않는다 — 쓸지 말지의 판정은 아래에서 `myOptionId`가 그대로 갖는다.
@@ -109,8 +109,8 @@ const fetchPostHead = cache(async (postId: number): Promise<PostHead> => {
         supabase.auth.getUser(),
         supabase.from("post").select(POST_DETAIL_SELECT).eq("id", postId).maybeSingle(),
         buildCommentListQuery(supabase, postId),
-        supabase.from("poll").select(POLL_SELECT).eq("post_id", postId).maybeSingle(),
-        supabase.rpc("poll_results", { p_post_id: postId }),
+        supabase.from("post_poll").select(POLL_SELECT).eq("post_id", postId).maybeSingle(),
+        supabase.rpc("post_poll_results", { p_post_id: postId }),
       ]);
 
     if (error) return { state: "unknown" };

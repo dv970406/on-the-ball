@@ -58,97 +58,98 @@ export type Database = {
           },
         ]
       }
-      poll: {
+      match: {
         Row: {
-          created_at: string
-          post_id: number
-          question: string
-        }
-        Insert: {
-          created_at?: string
-          post_id: number
-          question: string
-        }
-        Update: {
-          created_at?: string
-          post_id?: number
-          question?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "poll_post_id_fkey"
-            columns: ["post_id"]
-            isOneToOne: true
-            referencedRelation: "post"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      poll_option: {
-        Row: {
+          away_score: number | null
+          away_team: string
+          external_id: string
+          finished_at: string | null
+          home_score: number | null
+          home_team: string
           id: number
-          label: string
-          post_id: number
-          sort_order: number
+          kickoff_at: string
+          matchday: number
+          result: Database["public"]["Enums"]["match_pick"] | null
+          season: string
+          voided_at: string | null
         }
         Insert: {
+          away_score?: number | null
+          away_team: string
+          external_id: string
+          finished_at?: string | null
+          home_score?: number | null
+          home_team: string
           id?: never
-          label: string
-          post_id: number
-          sort_order: number
+          kickoff_at: string
+          matchday: number
+          result?: Database["public"]["Enums"]["match_pick"] | null
+          season: string
+          voided_at?: string | null
         }
         Update: {
+          away_score?: number | null
+          away_team?: string
+          external_id?: string
+          finished_at?: string | null
+          home_score?: number | null
+          home_team?: string
           id?: never
-          label?: string
-          post_id?: number
-          sort_order?: number
+          kickoff_at?: string
+          matchday?: number
+          result?: Database["public"]["Enums"]["match_pick"] | null
+          season?: string
+          voided_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "poll_option_post_id_fkey"
-            columns: ["post_id"]
+            foreignKeyName: "match_away_team_fkey"
+            columns: ["away_team"]
             isOneToOne: false
-            referencedRelation: "poll"
-            referencedColumns: ["post_id"]
+            referencedRelation: "team"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "match_home_team_fkey"
+            columns: ["home_team"]
+            isOneToOne: false
+            referencedRelation: "team"
+            referencedColumns: ["code"]
           },
         ]
       }
-      poll_vote: {
+      match_prediction: {
         Row: {
           created_at: string
-          option_id: number
-          post_id: number
+          match_id: number
+          pick: Database["public"]["Enums"]["match_pick"]
+          updated_at: string
           user_id: string
         }
         Insert: {
           created_at?: string
-          option_id: number
-          post_id: number
+          match_id: number
+          pick: Database["public"]["Enums"]["match_pick"]
+          updated_at?: string
           user_id: string
         }
         Update: {
           created_at?: string
-          option_id?: number
-          post_id?: number
+          match_id?: number
+          pick?: Database["public"]["Enums"]["match_pick"]
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "poll_vote_post_id_fkey"
-            columns: ["post_id"]
+            foreignKeyName: "match_prediction_match_id_fkey"
+            columns: ["match_id"]
             isOneToOne: false
-            referencedRelation: "poll"
-            referencedColumns: ["post_id"]
+            referencedRelation: "match"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "poll_vote_post_id_option_id_fkey"
-            columns: ["post_id", "option_id"]
-            isOneToOne: false
-            referencedRelation: "poll_option"
-            referencedColumns: ["post_id", "id"]
-          },
-          {
-            foreignKeyName: "poll_vote_user_id_fkey"
+            foreignKeyName: "match_prediction_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -235,6 +236,104 @@ export type Database = {
           },
           {
             foreignKeyName: "post_like_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_poll: {
+        Row: {
+          created_at: string
+          post_id: number
+          question: string
+        }
+        Insert: {
+          created_at?: string
+          post_id: number
+          question: string
+        }
+        Update: {
+          created_at?: string
+          post_id?: number
+          question?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_poll_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: true
+            referencedRelation: "post"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_poll_option: {
+        Row: {
+          id: number
+          label: string
+          post_id: number
+          sort_order: number
+        }
+        Insert: {
+          id?: never
+          label: string
+          post_id: number
+          sort_order: number
+        }
+        Update: {
+          id?: never
+          label?: string
+          post_id?: number
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_poll_option_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "post_poll"
+            referencedColumns: ["post_id"]
+          },
+        ]
+      }
+      post_poll_vote: {
+        Row: {
+          created_at: string
+          option_id: number
+          post_id: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          option_id: number
+          post_id: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          option_id?: number
+          post_id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_poll_vote_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "post_poll"
+            referencedColumns: ["post_id"]
+          },
+          {
+            foreignKeyName: "post_poll_vote_post_id_option_id_fkey"
+            columns: ["post_id", "option_id"]
+            isOneToOne: false
+            referencedRelation: "post_poll_option"
+            referencedColumns: ["post_id", "id"]
+          },
+          {
+            foreignKeyName: "post_poll_vote_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -404,6 +503,27 @@ export type Database = {
           },
         ]
       }
+      team: {
+        Row: {
+          code: string
+          external_id: string | null
+          name: string
+          short_name: string
+        }
+        Insert: {
+          code: string
+          external_id?: string | null
+          name: string
+          short_name: string
+        }
+        Update: {
+          code?: string
+          external_id?: string | null
+          name?: string
+          short_name?: string
+        }
+        Relationships: []
+      }
       user_block: {
         Row: {
           blocked_id: string
@@ -455,15 +575,23 @@ export type Database = {
       has_visible_char: { Args: { p_text: string }; Returns: boolean }
       increment_post_view: { Args: { p_post_id: number }; Returns: undefined }
       is_blocked: { Args: { p_user_id: string }; Returns: boolean }
+      match_is_open: { Args: { p_match_id: number }; Returns: boolean }
+      match_prediction_results: {
+        Args: { p_match_id: number }
+        Returns: {
+          pick: Database["public"]["Enums"]["match_pick"]
+          vote_count: number
+        }[]
+      }
       normalize_nickname: { Args: { p_text: string }; Returns: string }
-      poll_results: {
+      post_is_alive: { Args: { p_id: number }; Returns: boolean }
+      post_poll_results: {
         Args: { p_post_id: number }
         Returns: {
           option_id: number
           vote_count: number
         }[]
       }
-      post_is_alive: { Args: { p_id: number }; Returns: boolean }
       random_nickname: { Args: never; Returns: string }
       soft_delete_post: { Args: { p_post_id: number }; Returns: undefined }
       survey_is_open: { Args: { p_survey_id: number }; Returns: boolean }
@@ -477,6 +605,7 @@ export type Database = {
       toggle_post_like: { Args: { p_post_id: number }; Returns: boolean }
     }
     Enums: {
+      match_pick: "home" | "draw" | "away"
       post_category: "이적설" | "경기" | "선수" | "유니폼" | "잡담"
       report_reason: "spam" | "abuse" | "sexual" | "false_info" | "etc"
     }
@@ -606,6 +735,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      match_pick: ["home", "draw", "away"],
       post_category: ["이적설", "경기", "선수", "유니폼", "잡담"],
       report_reason: ["spam", "abuse", "sexual", "false_info", "etc"],
     },
