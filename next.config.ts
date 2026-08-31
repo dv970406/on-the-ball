@@ -16,6 +16,22 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        /*
+         * 구단 엠블럼(`scripts/fetch-team-crests.mjs`가 만들어 커밋한다).
+         *
+         * ⚠ **`immutable`을 쓰지 않는다.** 파일명이 팀 코드라 버전이 박혀 있지 않다 —
+         *   구단이 엠블럼을 바꿔 파일을 갈아끼워도 이름은 그대로이므로, 불변으로 걸면
+         *   1년 동안 옛 로고가 남는다. 30일은 제공자 CDN이 원본에 거는 값과 같다.
+         */
+        source: "/crests/:file*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=2592000",
+          },
+        ],
+      },
     ];
   },
 };

@@ -79,6 +79,8 @@ supabase start                          # 로컬 스택 기동 (643xx 포트)
 supabase db reset                       # 마이그레이션 적용 + seed.sql 자동 실행
 # 계정(alice/bob)·글·댓글은 supabase/seed.sql이 db reset 때 자동으로 넣는다
 node scripts/upload-survey-images.mjs supabase/seed-images   # 입축구 면 배경 (스토리지는 SQL 밖이다)
+# 구단 엠블럼(public/crests/)은 이미 커밋돼 있어 따로 받을 필요가 없다.
+#   승격팀이 생겨 빈 자리가 보이면: node scripts/fetch-team-crests.mjs   (FOOTBALL_DATA_TOKEN 필요)
 pnpm dev
 ```
 
