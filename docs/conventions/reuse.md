@@ -15,6 +15,14 @@
   - ⚠ 요일을 함께 찍는 것이 규약이다. 축구 일정에서 요일은 장식이 아니라 정보다.
   - ⚠ `nowMs` 계약은 형제 함수와 같다 — **연도를 붙일지만** 그 값으로 정하고 `null`이면 항상 붙인다.
 
+- `formatMatchDay(iso, nowMs)` — 경기 목록의 **날짜 헤딩** → `"오늘 (금)"`/`"내일 (토)"`/`"9월 5일 (토)"`, 해가 다르면 앞에 연도.
+  - ⚠ **`formatKickoff`을 이걸로 바꾸지 말 것.** 상세는 공유·색인되는 페이지라 "오늘"이 크롤 시점에 굳어 거짓이 된다(`formatRelativeTime` 주석이 남긴 판단) — 날짜 헤딩만 상대 표기를 쓴다.
+  - ⚠ 날짜 차이를 ms로 재지 않는다. `(kickoff - now) / 86400000`은 "24시간 뒤"라 오늘 23시와 내일 01시가 같은 날로 접힌다 — 세는 것은 **달력 하루**다.
+  - ⚠ `nowMs`가 `null`이면 오늘/내일을 판정할 수 없다 → 연도까지 붙인 절대 날짜(형제 함수와 같은 계약).
+- `seoulDayKey(iso)` — KST 달력 하루의 키 `"2026-09-05"`. `groupMatchesByDay`가 그룹 경계를 이걸로 가른다.
+  - ⚠ **표시 문구로 묶지 말 것** — 라벨은 해가 다른 같은 날짜에서 똑같아져 1년 떨어진 두 경기가 한 그룹이 된다.
+- `formatKickoffTime(iso)` — 킥오프의 시:분만 `"23:00"`. 날짜를 헤딩이 갖는 목록 카드용이고, 날짜까지 필요하면 `formatKickoff`.
+
 ## `@/shared/lib` (배럴 — 클라이언트 훅 포함)
 - `cn` — Tailwind 클래스 병합
 - **`parsePostId`** — URL의 `[id]` → 게시글 id. **새로 정규식을 만들지 말 것** — 같은 id를 해석하는 곳이 여럿이라 파서가 갈리면 `/posts/2`·`/posts/002`·`/posts/2.0`이 같은 글의 별칭 URL이 된다(전에 `\d+` vs `Number()`로 갈려 서버 가드가 뚫린 적도 있다). 서버에서는 `@/shared/lib/post-id` 직접 경로로.
@@ -160,9 +168,10 @@
 
 - `useMatchListQuery(userId, enabled, initialData)` / `useMatchQuery(id, userId, enabled, initialData)` / `useMatchPredictionResultsQuery(id, userId, enabled, initialData)` — 목록 · 단건 · 예측 분포.
 - **`useMyAccuracyQuery(userId)`** — 내 적중률. ⚠ **`truncated`를 함께 돌려준다** — PostgREST의 `max_rows`(1,000)에 잘리면 비율이 거짓이 되므로 호출부가 그때는 숫자를 그리지 않고 사실을 알린다(실측: 행 1000 / `Content-Range` 총계 1108). 도달하면 세는 일을 DB로 내린다. ⚠ **컬럼이 아니라 그때그때 센다** — 카운터를 흔드는 경로가 다섯이라(예측 생성·변경·채점·**스코어 정정**·무효화, 그리고 탈퇴 cascade) `like_count`가 겪은 어긋남을 그대로 되풀이한다. ⚠ `match!inner`가 필수다(왼쪽 조인이면 경기 없는 행이 `result` null과 섞인다).
-- `matchKeys` / `Match` · `MatchListPage` · `MatchPick` · `MatchPredictionResult` / `MatchCard` · `PredictionBlock`.
+- `matchKeys` / `Match` · `MatchListPage` · `MatchPick` · `MatchPredictionResult` / `MatchCard` · `TeamCrest` · `PredictionBlock`.
   ⚠ `MATCH_PICKS`·`MATCH_PICK_LABEL`·`Team`·`PredictionAccuracy`는 **배럴에 없다** — 슬라이스 밖 소비자가 0이라 올리지 않았다(`entities/survey`가 `SurveyOption`·`SplitCount`를 뺀 것과 같은 이유). `check:conventions`는 상대 경로 소비를 현역으로 세어 **이 유형을 잡지 못하므로** 손으로 지킨다.
-- ⚠ **`Team.name`은 한국어다**(DB에 그렇게 저장된다 — 사유는 `api-and-db.md`). 화면에서 옮기지 말 것. ⚠ `name`(정식)과 `shortName`(약칭)의 쓰임이 다르다 — **카드·상세 제목은 정식명, 예측 버튼 라벨은 약칭**이다. 버튼에 정식명을 쓰면 좁은 화면에서 잘리는데 잘린 팀 이름은 고를 수가 없다. 표기 추가는 `scripts/team-names-ko.json`.
+- ⚠ **`Team.name`은 한국어다**(DB에 그렇게 저장된다 — 사유는 `api-and-db.md`). 화면에서 옮기지 말 것. ⚠ `name`(정식)과 `shortName`(약칭)의 쓰임이 다르다 — **상세 제목만 정식명이고 목록 카드와 예측 버튼은 약칭**이다. 좁은 폭에 좌우로 두 팀을 놓는 자리에서 정식명은 잘리는데 **잘린 팀 이름은 고를 수가 없다.** 상세가 정식명을 감당하는 것은 엠블럼을 이름 **위**에 얹어 가로 폭을 이름에 전부 내주기 때문이다. 표기 추가는 `scripts/team-names-ko.json`.
+- **`TeamCrest`** — 구단 엠블럼 + 폴백. **엠블럼은 DB에 없다** — `public/crests/{team.code}.png`를 `team.code`에서 유도한다(사유는 `api-and-db.md`). ⚠ **직접 `<img>`로 그리지 말 것** — 폴백이 두 갈래인데 둘 다 필요하다: 팀 코드가 비었을 때와, **파일이 없어 404일 때**(승격팀이 생기면 반드시 겪는다). ⚠ `onError`만으로는 부족하다 — SSR HTML의 `<img>`는 **하이드레이션 전에** 실패할 수 있고 그러면 이벤트가 지나가 버린다(마운트 시 `complete && naturalWidth === 0`을 함께 확인하는 이유). ⚠ `Avatar`로 대신하지 말 것 — `rounded-full` + `object-cover`라 방패 모양 엠블럼의 모서리가 잘린다. ⚠ 자산을 새로 뽑을 때는 `scripts/fetch-team-crests.mjs`를 쓴다 — 크기·포맷·품질의 근거가 거기 있고, 손으로 만든 파일은 그 판단과 갈린다.
 - **`buildMatchListQueries(supabase, nowMs)`** — 목록 조립의 단일 소스(`api/list-query.ts` — 서버 안전). **지난/다가오는 두 쿼리를 돌려준다** — 구역이 조회 조건으로 갈리므로 화면이 클라이언트 시계로 다시 나누지 않는다(그러면 조회 기준과 표시 기준이 서로 다른 순간을 본다). ⚠ **기준 시각을 인자로 받는다** — 안에서 시계를 읽으면 훅과 서버가 다른 순간을 보게 되어 경계에 걸친 경기가 한쪽에만 실린다.
 - **`MATCH_PAST_LIMIT` / `MATCH_UPCOMING_LIMIT`** — **구역별** 상한. ⚠ **하나로 합치지 말 것** — 상한 하나에 킥오프 오름차순으로 뒀더니 혼잡기에 지난 경기가 상한을 다 먹어 **다가오는 경기가 0건**이 됐다(실측). 예측할 대상이 화면에서 사라지는 방향이다.
 - `MATCH_LIST_LOOKBACK_MS` — 지난 경기 구역의 창(**배럴에 없다** — 소비처가 `api/list-query` 하나다. 필요하면 `api/mappers` 직접 경로). ⚠ **7일보다 짧게 두지 말 것** — EPL은 라운드가 주 단위라 3일로 뒀더니 주중 접속 시 지난 라운드 결과가 통째로 창 밖으로 밀려났다(실측).
@@ -172,6 +181,8 @@
 - **`isMatchOpen(match, nowMs)`** — 예측 마감 판정. **DB의 `match_is_open`과 같은 판정**이어야 한다. ⚠ `nowMs`가 `null`이면 "아직 판정 전"이다(`false`로 접으면 첫 프레임에 멀쩡한 경기가 잠긴다). ⚠ 이 판정은 안내일 뿐이고, 입축구보다 **훨씬 자주 경계를 놓친다**(사람들이 킥오프 직전에 예측한다) — 실제 차단은 정책이 한다.
 - **`isMatchSettled(match)`** — 채점 가능한가(= `result !== null`). ⚠ **`nowMs`를 받지 않는 유일한 시각 계열 판정이다** — 결과의 유무는 시계가 아니라 DB가 정한다. `!isMatchOpen`으로 대신하지 말 것(킥오프만 지나고 결과가 아직 없는 경기가 통째로 섞인다).
 - **`isMatchInProgress(match, nowMs)`** — 지금 뛰고 있다고 볼 수 있는가. ⚠ **상한(4시간)이 규약이다** — "킥오프 지남 + 결과 없음"으로만 두면 **이틀 전 경기가 "진행 중"** 으로 뜬다(실측). 지난 경기 창이 7일이라 최대 일주일간 거짓 표기이고, 그 모양은 동기화가 정상이라고 명시한 두 상태(연기 · 스코어를 못 읽은 종료)와 구분되지 않는다. 창 밖은 진행 중이 아니라 **결과 대기**다.
+- **`isAwaitingResult(match, nowMs)`** — 킥오프는 지났는데 결과가 없고 진행 중 창도 벗어났다(연기 · 스코어 미반영). ⚠ **화면이 침묵하면 거짓말이 된다** — 과거 날짜에 스코어가 빈 카드가 `진행 중` 배지도 없이 그려져 "아직 시작 안 한 경기"로 읽혔다. ⚠ `!isMatchSettled`나 `!isMatchOpen`으로 대신하지 말 것 — 둘 다 취소된 경기를 함께 끌고 온다(`isPredictionResultsOpen`과 같은 이유). 목록 카드와 상세가 **같은 어휘**로 `결과 대기`를 말해야 해서 함수 하나가 소유한다.
+- **`groupMatchesByDay(matches, nowMs)`** — 목록을 **KST 달력 하루**로 묶는다(`{ key, label, matches }[]`). 카드마다 되풀이되던 날짜를 헤딩 하나로 접기 위한 것이고, 카드는 시각만 그린다. ⚠ **라운드(matchday)로 묶지 말 것** — 라운드는 킥오프 순서와 어긋날 수 있어(연기·재배치) 한 라운드가 여러 토막으로 갈린다. 날짜는 목록이 이미 킥오프 정렬이라 **연속 구간을 접기만 하면 된다.** ⚠ 여기서 다시 정렬하지 않는다(정렬은 `buildMatchListQueries`가 소유한다 — 두 구역의 방향이 다르다).
 - ⚠ **`result`를 클라이언트가 다시 계산하지 않는다.** 스코어에서 파생된 컬럼이고 **무효 경기에서 null이 되는 규칙까지** DB가 단독으로 소유한다 → `result is not null`이 "채점 가능"의 유일한 술어다.
 - ⚠ **select 문자열을 `+`로 잇지 말 것.** supabase-js가 **리터럴 타입**을 파싱해 결과 형태를 만드는데, 조각을 이어 붙이면 `string`으로 넓어져 추론이 통째로 `GenericStringError`가 된다(실측).
 - ⚠ `MATCH_SELECT`는 **`team!home_team` 형태**다. `match → team` 경로가 둘이라 그냥 `team(...)`은 PGRST201이고, 컬럼명만 쓴 `home:home_team(...)`은 런타임엔 통하지만 **생성 타입이 모호성을 풀지 못한다**(`BLOCKED_SELECT`와 같은 함정 — 실측).
