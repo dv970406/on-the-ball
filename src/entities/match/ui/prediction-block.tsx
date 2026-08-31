@@ -59,16 +59,19 @@ export function PredictionBlock({
     results?.find((r) => r.pick === pick)?.voteCount ?? 0;
 
   /**
-   * 팀을 아는 자리에서는 이름을 쓴다 — "홈 승"보다 "맨유 승"이 읽힌다.
+   * 팀을 아는 자리에서는 이름을 쓴다 — "홈"보다 "맨유"가 읽힌다.
    *
+   * ⚠ **"승"을 붙이지 않는다.** 세 줄이 `아스날 / 무승부 / 첼시`로 나란히 놓이면 그 자체가
+   *   1X2 보기라 팀 이름만으로 뜻이 완성된다 — "승"은 세 줄 중 둘에만 붙는 접미사라
+   *   정보가 아니라 반복이고, 좁은 행에서 이름이 잘릴 폭을 먼저 먹는다.
    * ⚠ **정식명이 아니라 약칭이다** — 버튼 세 개가 세로로 쌓이는 자리다. 사유와 폴백 규약은
    *   `Team.shortName`(`model/types.ts`) 주석이 갖는다.
    */
   const labelOf = (pick: MatchPick) =>
     pick === "home"
-      ? `${match.homeTeam.shortName} 승`
+      ? match.homeTeam.shortName
       : pick === "away"
-        ? `${match.awayTeam.shortName} 승`
+        ? match.awayTeam.shortName
         : MATCH_PICK_LABEL.draw;
 
   const awaitingResults = results === null && resultsPending === true;
@@ -123,17 +126,29 @@ export function PredictionBlock({
                   >
                     {labelOf(pick)}
                   </span>
+                  {/*
+                    ⚠ **화면에서 뗀 "승"을 낭독에는 남긴다.** 눈으로는 세 줄이 나란히 놓여
+                      `아스날 / 무승부 / 첼시`가 1X2 보기로 읽히지만, 스크린리더는 버튼을
+                      **하나씩** 읽으므로 "아스날"만으로는 무엇을 고르는 것인지 알 수 없다.
+                      `aria-label`로 덮지 않고 `sr-only`를 덧붙이는 형태다(`code-quality.md`).
+                  */}
+                  {pick !== "draw" && <span className="sr-only"> 승</span>}
                   {mine && <span className="sr-only">— 내가 고른 예측</span>}
                   {/*
-                    ⚠ **정답은 눈에 보여야 한다.** 전에는 `sr-only` + 잉크 막대뿐이었는데,
-                      아무도 안 고른 정답은 막대 폭이 **0%라 사라져** 화면에 아무 표시가
-                      없었다(실측: 오답자에게 잉크 막대가 둘 뜨고 어느 쪽이 정답인지
+                    ⚠ **실제로 일어난 쪽은 눈에 보여야 한다.** 전에는 `sr-only` + 잉크 막대뿐이었는데,
+                      아무도 안 고른 쪽이 결과면 막대 폭이 **0%라 사라져** 화면에 아무 표시가
+                      없었다(실측: 빗나간 사람에게 잉크 막대가 둘 뜨고 어느 쪽이 결과인지
                       구분되지 않았다). `styling.md`의 "색이 정보를 혼자 지지 않는다" 그대로
-                      **글자로** 표시한다 — 목록 카드가 `적중`/`실패`로 하는 것과 같은 급이다.
+                      **글자로** 표시한다.
+
+                    ⚠ **`적중`이라고 쓰지 않는다.** 이 배지는 "내가 맞췄나"가 아니라
+                      **"이 일이 실제로 일어났다"** 를 뜻한다 — 내가 무승부를 골랐는데 아스날이
+                      이겼으면 아스날 줄에 배지가 붙는데, 거기에 `적중`이라고 쓰면 거짓말이 된다.
+                      내 예측의 성패는 상세 메타 줄과 목록 카드의 `적중`/`실패`가 따로 진다.
                   */}
                   {correct && (
                     <span className="shrink-0 rounded-xs bg-ink px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
-                      정답
+                      결과
                     </span>
                   )}
                   {signInRequired && <span className="sr-only"> (로그인 필요)</span>}
@@ -152,8 +167,8 @@ export function PredictionBlock({
                   height={4}
                   segments={[
                     // 실제 결과는 잉크로 진하게 — 내 예측(경계선)과 다른 축으로 구분된다
-                    // ⚠ `correct || mine`으로 두면 **한 채널에 두 뜻**이 실려 오답자에게
-                    //   진한 막대가 둘 뜬다 — 정답은 위 `정답` 배지가 지고, 막대는 내 예측만 진다.
+                    // ⚠ `correct || mine`으로 두면 **한 채널에 두 뜻**이 실려 빗나간 사람에게
+                    //   진한 막대가 둘 뜬다 — 실제 결과는 위 `결과` 배지가 지고, 막대는 내 예측만 진다.
                     { ratio, color: mine ? COLOR.ink : COLOR.hairlineStrong },
                   ]}
                 />
