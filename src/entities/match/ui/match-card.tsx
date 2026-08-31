@@ -1,20 +1,43 @@
 "use client";
 
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { ROUTES } from "@/shared/config";
-import { cn, formatKickoff, useNowMs } from "@/shared/lib";
-import { Pill } from "@/shared/ui";
-import { isMatchInProgress, isMatchSettled } from "../lib/open";
-import type { Match } from "../model/types";
+import { cn, formatKickoffTime, useNowMs } from "@/shared/lib";
+import { Icon, Pill } from "@/shared/ui";
+import { isAwaitingResult, isMatchInProgress, isMatchOpen, isMatchSettled } from "../lib/open";
+import type { Match, MatchPick } from "../model/types";
 import { MATCH_PICK_LABEL } from "../model/types";
+import { TeamCrest } from "./team-crest";
 
 /**
- * 목록의 경기 한 줄. 링크로 감싼 리스트 행이라 article 래퍼 없이 li만 쓴다(`SurveyCard`와 같은 형태).
+ * 승패를 **굵기와 잉크 단계**로 말한다.
  *
- * ⚠ 렌더 중에 시계를 읽지 않는다 — 킥오프 표기가 `nowMs`를 받아 연도 표시를 정한다.
- * ⚠ **`serverNowMs`가 없으면 SSR에서 시프트한다** — 마운트 전에는 연도가 붙었다가
- *   (`nowMs`가 null이면 항상 붙인다) 마운트 직후 사라지며 글자 폭이 변한다.
- *   목록이 SSR되므로 서버 시각을 받아 **첫 프레임부터 최종 모습**을 그린다.
+ * ⚠ 색만으로 지지 않는다(`styling.md`) — 굵기가 함께 움직이므로 색을 못 보는 사용자도
+ *   이긴 쪽을 읽는다.
+ * ⚠ **진 쪽에 `ink-mute-2`를 쓰지 않는다.** #9a9a9a는 흰 배경 대비 2.85:1이라 본문 기준에
+ *   못 미친다 — `ink-mute`(#707070)가 5.29:1로 그 선을 넘는 가장 옅은 단계다.
+ * ⚠ `result`가 `null`(미종료·무효)이거나 `draw`면 **아무도 강조하지 않는다.**
+ */
+function outcomeClassName(side: MatchPick, result: MatchPick | null) {
+  if (result === null || result === "draw") return "text-ink";
+  return result === side ? "text-ink" : "text-ink-mute";
+}
+
+/**
+ * 목록의 경기 한 장. 링크로 감싼 리스트 행이라 article 래퍼 없이 li만 쓴다(`SurveyCard`와 같은 형태).
+ *
+ * ⚠ **날짜를 그리지 않는다 — 뷰의 날짜 헤딩이 갖는다.** 카드마다 "8월 28일 (금) 13:05"를
+ *   되풀이하던 것이 이 화면에서 가장 긴 텍스트였다. 그래서 가운데 칸이 **아직 모르는 것**을
+ *   담는다: 채점 전이면 킥오프 시각, 채점 후면 스코어(옛 `VS`는 아무 정보도 아니었다).
+ *
+ * ⚠ **좌우를 `grid-cols-[1fr_auto_1fr]`로 고정한다.** 예전엔 `flex-1` + 좌우 정렬이라
+ *   팀 이름 길이에 따라 중심축이 행마다 흔들렸다. 그리드로 두면 두 엠블럼의 x좌표가 모든
+ *   카드에서 같아져 목록을 훑는 스캔 라인이 생긴다.
+ *
+ * ⚠ 렌더 중에 시계를 읽지 않는다 — 상태 배지·예측 가능 여부가 `nowMs`를 받아 정해진다.
+ * ⚠ **`serverNowMs`가 없으면 SSR에서 시프트한다** — 목록이 SSR되므로 서버 시각을 받아
+ *   첫 프레임부터 최종 모습을 그린다.
  */
 export function MatchCard({
   match,
@@ -29,56 +52,101 @@ export function MatchCard({
   //   ⚠ `??`는 단축평가라 훅을 뒤에 두면 조건부 호출이 된다 → 먼저 무조건 부른다.
   const clientNowMs = useNowMs();
   const nowMs = serverNowMs ?? clientNowMs ?? null;
+
   const settled = isMatchSettled(match);
   const scored = match.homeScore !== null && match.awayScore !== null;
-  // 판정은 `isMatchInProgress`가 단독으로 소유한다 — 상한이 왜 필요한지는 그 함수 주석에
+  // 상태 판정은 전부 `lib/open`이 단독으로 소유한다 — 상세와 같은 어휘를 쓰기 위해서다
   const inProgress = nowMs !== null && isMatchInProgress(match, nowMs);
+  const awaiting = nowMs !== null && isAwaitingResult(match, nowMs);
+  const canPredict = nowMs !== null && isMatchOpen(match, nowMs);
 
   return (
     <li>
       <Link
         href={ROUTES.match(match.id)}
-        className="block border-b border-hairline-cool px-5 py-4 transition-colors duration-150 ease-otb active:bg-canvas-soft"
+        className="block border-b border-hairline-cool px-5 py-3.5 transition-colors duration-150 ease-otb active:bg-canvas-soft"
       >
         <div className="flex items-center gap-2">
           <span className="font-mono text-[10px] uppercase tracking-[0.4px] text-ink-mute-2">
             {match.matchday}R
           </span>
-          <time dateTime={match.kickoffAt} className="text-[11px] text-ink-mute-2">
-            {formatKickoff(match.kickoffAt, nowMs)}
-          </time>
+          {/*
+            ⚠ **`Pill variant`는 리터럴이어야 한다** — `check:conventions`의 에메랄드 대조가
+              리터럴을 훑기 때문에 삼항으로 넘기면 화이트리스트를 조용히 우회한다.
+            ⚠ 진행 중만 `dark`인 것은 위계다. 취소·결과 대기는 "정보가 없다"이고 진행 중은
+              **지금 벌어지는 일**이라 가장 강하다. 에메랄드를 쓰지 않는 이유는 동시 킥오프가
+              흔해서다 — 목록에 그 배지가 여러 개 깔리면 "한 뷰포트당 컬러 이벤트"가 무너진다.
+          */}
           {match.isVoided && <Pill variant="outline">취소됨</Pill>}
-          {inProgress && <Pill variant="outline">진행 중</Pill>}
+          {inProgress && <Pill variant="dark">진행 중</Pill>}
+          {/*
+            ⚠ **침묵하면 거짓말이 된다.** 연기·스코어 미반영 경기는 과거 날짜에 스코어가
+              비어 있어 "아직 시작 안 함"으로 읽혔다(사유는 `isAwaitingResult`).
+          */}
+          {awaiting && <Pill variant="outline">결과 대기</Pill>}
         </div>
 
-        {/* 대진이 곧 이 행의 제목이다 — 읽으면 "리버풀 2 - 1 아스날"이 된다 */}
-        <h3 className="mt-1.5 flex items-center gap-2 text-[15px] leading-[1.4] tracking-[-0.3px]">
-          <span className="min-w-0 flex-1 truncate text-right font-medium text-ink">
-            {match.homeTeam.name}
+        {/*
+          대진이 이 카드의 제목이다. ⚠ **`h4`인 이유는 위에 날짜 헤딩(`h3`)이 있어서다** —
+            화면의 계층이 h1(sr-only 승부예측) → h2(구역) → h3(날짜) → h4(대진)로 내려간다.
+        */}
+        <h4 className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2.5 text-[15px] leading-[1.3] tracking-[-0.3px]">
+          <span className="flex min-w-0 items-center justify-end gap-2">
+            {/* ⚠ **목록은 약칭이다**(상세 제목만 정식명) — 정식명은 이 폭에서 두 줄이 된다 */}
+            <span
+              className={cn(
+                "truncate",
+                settled && match.result === "home" ? "font-semibold" : "font-medium",
+                outcomeClassName("home", match.result),
+              )}
+            >
+              {match.homeTeam.shortName}
+            </span>
+            <TeamCrest team={match.homeTeam} size={24} />
           </span>
-          <span
-            className={cn(
-              "shrink-0 font-mono tabular-nums",
-              scored ? "text-[15px] font-semibold text-ink" : "text-[11px] text-ink-mute-2",
-            )}
-          >
-            {scored ? `${match.homeScore} - ${match.awayScore}` : "VS"}
+
+          {scored ? (
+            <span className="flex shrink-0 items-center gap-1.5 font-mono text-[17px] font-semibold tabular-nums">
+              <span className={outcomeClassName("home", match.result)}>{match.homeScore}</span>
+              <span className="text-ink-faint">-</span>
+              <span className={outcomeClassName("away", match.result)}>{match.awayScore}</span>
+            </span>
+          ) : (
+            // 아직 모르는 것이 스코어가 아니라 "언제 하는가"인 자리 — 날짜는 헤딩이 갖는다
+            <time
+              dateTime={match.kickoffAt}
+              className="shrink-0 font-mono text-[13px] tabular-nums text-ink-mute"
+            >
+              {formatKickoffTime(match.kickoffAt)}
+            </time>
+          )}
+
+          <span className="flex min-w-0 items-center gap-2">
+            <TeamCrest team={match.awayTeam} size={24} />
+            <span
+              className={cn(
+                "truncate",
+                settled && match.result === "away" ? "font-semibold" : "font-medium",
+                outcomeClassName("away", match.result),
+              )}
+            >
+              {match.awayTeam.shortName}
+            </span>
           </span>
-          <span className="min-w-0 flex-1 truncate font-medium text-ink">
-            {match.awayTeam.name}
-          </span>
-        </h3>
+        </h4>
 
         {/*
-          ⚠ **내가 예측한 경기에만 뜬다.** 채점된 경기 전부에 배지를 달면 목록이 색으로
-            뒤덮여 "한 뷰포트당 컬러 이벤트"가 무너진다 — 대부분의 카드는 이 줄이 없다.
+          ⚠ **내가 예측한 경기에만 배지가 뜬다.** 채점된 경기 전부에 달면 목록이 색으로
+            뒤덮여 "한 뷰포트당 컬러 이벤트"가 무너진다.
         */}
         {match.myPick !== null && (
-          <p className="mt-2 flex items-center gap-2 text-[12px] text-ink-mute">
+          <p className="mt-2 flex items-center justify-center gap-2 text-[12px] text-ink-mute">
             {/*
-              ⚠ **상세와 같은 어휘를 쓴다.** 목록만 "홈 승"으로 말하면 사용자가 어느 팀인지
-                다시 매핑해야 하고, `MATCH_PICK_LABEL` 주석 스스로 "팀을 모르는 자리용"이라
-                적어 뒀는데 여기는 바로 윗줄에 두 팀 이름을 그리는 **팀을 아는 자리**다.
+              ⚠ **팀을 가리키는 말은 상세와 같아야 한다.** "홈 승"으로 말하면 어느 팀인지 다시
+                매핑해야 하고, 여기는 바로 윗줄에 두 팀을 그리는 **팀을 아는 자리**다.
+              ⚠ 다만 **"승" 접미사는 상세와 일부러 갈린다.** 상세의 예측 블록은 세 줄이
+                `아스날 / 무승부 / 첼시`로 놓이는 **보기 나열**이라 이름만으로 뜻이 완성되지만,
+                여기는 "내 예측 …"에 이어지는 **문장**이라 "내 예측 아스날"이 어색해진다.
             */}
             <span>
               내 예측{" "}
@@ -94,6 +162,18 @@ export function MatchCard({
               ) : (
                 <Pill variant="crimson">실패</Pill>
               ))}
+          </p>
+        )}
+
+        {/*
+          ⚠ **이 화면의 할 일을 카드가 말한다.** 예전에는 예측하지 않은 경기와 예측한 경기가
+            "줄이 있나 없나"로만 갈려, 다가오는 구역에 아무 유도도 없었다. 줄이 늘 있으면
+            카드 높이도 균일해져 목록의 리듬이 생긴다.
+        */}
+        {match.myPick === null && canPredict && (
+          <p className="mt-2 flex items-center justify-center gap-0.5 text-[12px] text-ink-mute">
+            예측하기
+            <Icon as={ChevronRight} size={13} />
           </p>
         )}
       </Link>

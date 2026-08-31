@@ -126,3 +126,60 @@ export function formatKickoff(iso: string, nowMs: number | null): string {
   if (nowMs !== null && p.year === seoulParts(new Date(nowMs)).year) return base;
   return `${p.year}년 ${base}`;
 }
+
+/**
+ * 한국 시간 기준의 달력 하루를 가리키는 키 — `"2026-09-05"`.
+ *
+ * 경기 목록을 날짜로 묶는 데 쓴다(`groupMatchesByDay`).
+ *
+ * ⚠ **표시 문구로 묶지 않는다.** `formatMatchDay`가 돌려주는 라벨은 해가 다른 같은 날짜에서
+ *   똑같아지므로("9월 5일 (토)"), 그걸 키로 삼으면 1년 떨어진 두 경기가 한 그룹이 된다.
+ * ⚠ 하루의 경계는 **KST**다 — 서버(UTC)에서 자르면 화면이 그리는 날짜와 어긋난다(위 주석).
+ */
+export function seoulDayKey(iso: string): string {
+  const p = seoulParts(new Date(iso));
+  return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+}
+
+/**
+ * 경기 목록의 날짜 헤딩 — `"오늘 (금)"` · `"내일 (토)"` · `"9월 5일 (토)"`.
+ *
+ * 카드마다 되풀이되던 날짜를 헤딩 하나로 접기 위한 표기라, **시각을 담지 않는다**
+ * (시각은 카드가 `formatKickoffTime`으로 그린다).
+ *
+ * ⚠ **요일은 오늘·내일에도 붙인다.** 축구 일정에서 요일은 장식이 아니라 정보이고
+ *   (`formatKickoff`과 같은 판단), 헤딩끼리 형태가 갈리면 목록이 들쭉날쭉해 보인다.
+ * ⚠ `nowMs`가 `null`이면(서버·하이드레이션 직전) 오늘/내일을 판정할 수 없다 → 절대 날짜에
+ *   **연도까지 붙인다.** 형제 함수들과 같은 계약이다 — 모를 때는 붙이는 쪽으로 기운다.
+ * ⚠ **`formatKickoff`을 이걸로 바꾸지 않는다.** 상세는 공유·색인되는 페이지라 "오늘"이
+ *   크롤 시점에 굳어 거짓이 된다(`formatRelativeTime` 주석이 남긴 판단).
+ */
+export function formatMatchDay(iso: string, nowMs: number | null): string {
+  const p = seoulParts(new Date(iso));
+  const suffix = `(${p.weekday})`;
+
+  if (nowMs === null) return `${p.year}년 ${p.month}월 ${p.day}일 ${suffix}`;
+
+  // ⚠ **날짜 차이를 ms로 재지 않는다.** `(kickoff - now) / 86400000`은 "24시간 뒤"를 재는
+  //   것이라 오늘 23시와 내일 01시가 같은 날로 접힌다 — 우리가 세는 것은 **달력 하루**다.
+  const today = seoulDayKey(new Date(nowMs).toISOString());
+  const day = seoulDayKey(iso);
+  if (day === today) return `오늘 ${suffix}`;
+  // 내일은 "오늘 + 하루"의 키와 대조한다 — 월·연 넘김을 Date가 알아서 처리한다
+  if (day === seoulDayKey(new Date(nowMs + 86_400_000).toISOString())) return `내일 ${suffix}`;
+
+  const n = seoulParts(new Date(nowMs));
+  const base = `${p.month}월 ${p.day}일 ${suffix}`;
+  return p.year === n.year ? base : `${p.year}년 ${base}`;
+}
+
+/**
+ * 킥오프의 시:분만 — `"23:00"`.
+ *
+ * 날짜를 헤딩이 갖는 목록 카드용이다. 날짜까지 함께 필요하면 `formatKickoff`을 쓴다.
+ * ⚠ `nowMs`를 받지 않는다 — 연도를 붙일지 정할 일이 없어 기준 시각이 필요 없다.
+ */
+export function formatKickoffTime(iso: string): string {
+  const p = seoulParts(new Date(iso));
+  return `${p.hour}:${p.minute}`;
+}

@@ -4,6 +4,8 @@ import { useState } from "react";
 import {
   type Match,
   type MatchPredictionResult,
+  TeamCrest,
+  isAwaitingResult,
   isMatchInProgress,
   isMatchSettled,
 } from "@/entities/match";
@@ -74,6 +76,16 @@ export function MatchDetailView({
     match !== undefined && match !== null && match.homeScore !== null && match.awayScore !== null;
   /** 판정은 `isMatchInProgress`가 단독으로 소유한다(상한이 필요한 이유는 그 함수 주석에) */
   const inProgress = match != null && nowMs !== null && isMatchInProgress(match, nowMs);
+  /** ⚠ 목록 카드와 **같은 어휘**를 쓴다 — 침묵하면 과거 날짜 + `VS`가 "아직 시작 안 함"으로 읽힌다 */
+  const awaiting = match != null && nowMs !== null && isAwaitingResult(match, nowMs);
+  /*
+   * 승패를 굵기와 잉크 단계로 말한다(`MatchCard`와 같은 규칙).
+   * ⚠ **무승부·미채점(`result === null`)이면 둘 다 false**라 아무도 강조되지 않는다 —
+   *   판정을 따로 두지 않아도 그 성질이 그대로 나온다.
+   * ⚠ 진 쪽에 `ink-mute-2`(#9a9a9a, 대비 2.85:1)를 쓰지 않는다 → `ink-mute`(5.29:1).
+   */
+  const homeWon = match?.result === "home";
+  const awayWon = match?.result === "away";
   /** 예측했고 채점까지 끝났을 때만 적중 여부를 말할 수 있다 */
   const hit =
     match != null && match.myPick !== null && isMatchSettled(match)
@@ -87,8 +99,10 @@ export function MatchDetailView({
       <main className="px-5 pb-16 pt-4">
         {isLoading && (
           <div aria-hidden>
+            {/* ⚠ 골격이 실제 화면과 같아야 한다 — 헤더가 엠블럼(44px) + 이름 두 줄로 높아졌다 */}
             <Skeleton className="h-[15px] w-40" />
-            <Skeleton className="mt-3 h-[34px] w-full" />
+            <Skeleton className="mt-4 h-[78px] w-full" />
+            <Skeleton className="mx-auto mt-2 h-[19px] w-44" />
             <Skeleton className="mt-6 h-[168px] w-full rounded-[14px]" />
           </div>
         )}
@@ -122,7 +136,10 @@ export function MatchDetailView({
                   "결과를 기다리는 중"을 말하는데 상세만 침묵해서, 지난 날짜 + `VS`가
                   "아직 시작 안 함"으로 읽혔다(공유 카드가 본문보다 많이 말하는 상태).
               */}
-              {inProgress && <Pill variant="outline">진행 중</Pill>}
+              {/* ⚠ 진행 중만 `dark`인 것은 위계다 — 취소·결과 대기는 "정보가 없다"이고
+                    이것은 **지금 벌어지는 일**이다(`MatchCard`와 같은 판단). */}
+              {inProgress && <Pill variant="dark">진행 중</Pill>}
+              {awaiting && <Pill variant="outline">결과 대기</Pill>}
               {/*
                 ⚠ **적중/실패를 상세에서도 글자로 말한다.** 목록 카드는 `적중`/`실패`라고
                   적는데 상세는 끝까지 말하지 않아, 같은 사실을 두 화면이 다른 어휘로
@@ -137,21 +154,53 @@ export function MatchDetailView({
               {hit === false && <Pill variant="crimson">실패</Pill>}
             </p>
 
-            {/* 대진이 이 화면의 h1이다 — 크롬 타이틀(SubHeader)과 역할이 다르다 */}
-            <h1 className="mt-1.5 flex items-center gap-3 text-[20px] leading-[1.3] tracking-[-0.4px]">
-              <span className="min-w-0 flex-1 truncate text-right font-semibold text-ink">
-                {match.homeTeam.name}
+            {/*
+              대진이 이 화면의 h1이다 — 크롬 타이틀(SubHeader)과 역할이 다르다.
+
+              ⚠ **목록 카드와 같은 시각 언어를 쓴다**(엠블럼 · 3열 그리드 · 승패 강조).
+                예전엔 `flex-1` + 좌우 정렬 `truncate`라 팀 이름 길이에 따라 중심축이 흔들렸고,
+                긴 정식명("맨체스터 유나이티드")은 잘렸다 — **잘린 팀 이름은 알아볼 수 없다.**
+              ⚠ 여기는 목록과 달리 **정식명**이다(규약). 그래서 엠블럼을 이름 위에 얹어
+                가로 폭을 이름에 전부 내주고, 두 줄로 접히는 것을 허용한다.
+            */}
+            <h1 className="mt-4 grid grid-cols-[1fr_auto_1fr] items-start gap-3">
+              <span className="flex min-w-0 flex-col items-center gap-2.5">
+                <TeamCrest team={match.homeTeam} size={44} />
+                <span
+                  className={cn(
+                    "text-balance text-center text-[15px] leading-[1.35] tracking-[-0.3px]",
+                    homeWon ? "font-bold text-ink" : "font-semibold",
+                    awayWon ? "text-ink-mute" : "text-ink",
+                  )}
+                >
+                  {match.homeTeam.name}
+                </span>
               </span>
-              <span
-                className={cn(
-                  "shrink-0 font-mono tabular-nums",
-                  scored ? "text-[22px] font-bold text-ink" : "text-[13px] text-ink-mute-2",
+
+              {/* ⚠ 높이를 엠블럼(44px)에 맞춰 스코어의 중심이 엠블럼 중심과 맞게 한다 */}
+              <span className="flex h-11 shrink-0 items-center font-mono tabular-nums">
+                {scored ? (
+                  <span className="flex items-center gap-2 text-[28px] font-bold">
+                    <span className={awayWon ? "text-ink-mute" : "text-ink"}>{match.homeScore}</span>
+                    <span className="text-ink-faint">-</span>
+                    <span className={homeWon ? "text-ink-mute" : "text-ink"}>{match.awayScore}</span>
+                  </span>
+                ) : (
+                  <span className="text-[15px] font-medium text-ink-mute-2">VS</span>
                 )}
-              >
-                {scored ? `${match.homeScore} - ${match.awayScore}` : "VS"}
               </span>
-              <span className="min-w-0 flex-1 truncate font-semibold text-ink">
-                {match.awayTeam.name}
+
+              <span className="flex min-w-0 flex-col items-center gap-2.5">
+                <TeamCrest team={match.awayTeam} size={44} />
+                <span
+                  className={cn(
+                    "text-balance text-center text-[15px] leading-[1.35] tracking-[-0.3px]",
+                    awayWon ? "font-bold text-ink" : "font-semibold",
+                    homeWon ? "text-ink-mute" : "text-ink",
+                  )}
+                >
+                  {match.awayTeam.name}
+                </span>
               </span>
             </h1>
 

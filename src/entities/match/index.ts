@@ -22,11 +22,19 @@ export {
 //    작용해서 뒤집기로 합성되지 않는다(그 파일 주석에 실측 사고가 적혀 있다).
 // ⚠ `isMatchSettled`도 올린다 — 상세 화면이 적중/실패를 말하려면 필요하다
 //   (슬라이스 안에서만 쓰이던 동안에는 올리지 않았다).
+// ⚠ `isAwaitingResult`도 뒤집기로 합성되지 않는다 — 목록 카드와 상세가 **같은 어휘**로
+//    `결과 대기`를 말해야 해서 함수 하나가 단독으로 소유한다.
 export {
+  isAwaitingResult,
   isMatchInProgress,
   isMatchOpen,
   isMatchSettled,
   isPredictionResultsOpen,
 } from "./lib/open";
+// ⚠ 날짜 묶음은 **화면 형태가 아니라 도메인 규칙**이다(KST 하루 · 킥오프 정렬 전제) —
+//    목록 뷰가 두 구역에 같은 함수를 쓴다.
+export { groupMatchesByDay } from "./lib/day-group";
 export { MatchCard } from "./ui/match-card";
+// ⚠ 상세도 엠블럼을 그리므로 배럴에 올린다(카드는 같은 슬라이스라 상대 경로로 가져간다).
+export { TeamCrest } from "./ui/team-crest";
 export { PredictionBlock } from "./ui/prediction-block";

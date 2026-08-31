@@ -6,8 +6,9 @@ import {
   MATCH_UPCOMING_LIMIT,
   type MatchListPage,
   MatchCard,
+  groupMatchesByDay,
 } from "@/entities/match";
-import { cn, formatCount } from "@/shared/lib";
+import { cn, formatCount, useNowMs } from "@/shared/lib";
 import { EmptyState, StaleBanner } from "@/shared/ui";
 import { AppBar } from "@/widgets/app-bar";
 import { AuthStatus } from "@/widgets/auth-status";
@@ -27,8 +28,9 @@ interface MatchListViewProps {
    */
   initialUserId?: string;
   /**
-   * 서버가 렌더한 시점의 시각 — 카드의 킥오프 표기가 연도를 붙일지 정한다.
-   * ⚠ 구역 분할에는 더 이상 쓰이지 않는다(조회가 이미 갈라 준다) — 없어도 목록은 그려진다.
+   * 서버가 렌더한 시점의 시각 — **날짜 헤딩의 "오늘"·"내일"** 과 카드의 상태 배지가 이 값을 본다.
+   * ⚠ 구역 분할에는 쓰이지 않는다(조회가 이미 갈라 준다) — 없어도 목록은 그려진다.
+   *   다만 없으면 헤딩이 전부 절대 날짜가 되고, 카드가 `진행 중`·`결과 대기`를 말하지 못한다.
    */
   serverNowMs?: number;
 }
@@ -51,6 +53,12 @@ export function MatchListView({
     initialUserId,
   });
   const { accuracy, truncated: accuracyTruncated } = useMatchAccuracy(initialUserId);
+
+  // ⚠ **서버 시각이 우선이다** — `useNowMs()`는 세션당 한 번 고정되므로 클라 값을 앞에 두면
+  //   낡은 시계가 갓 받은 서버 시각을 이겨 **어제 경기가 "오늘"로 그려진다**
+  //   (`data-and-state.md`에 실측). `??`가 단축평가라 훅은 먼저 무조건 부른다.
+  const clientNowMs = useNowMs();
+  const nowMs = serverNowMs ?? clientNowMs ?? null;
 
   const past = page?.past ?? [];
   const upcoming = page?.upcoming ?? [];
@@ -130,11 +138,25 @@ export function MatchListView({
             <section>
               {/* ⚠ "지난"이 아니라 "최근"이다 — 킥오프가 지났을 뿐 진행 중인 경기가 섞인다 */}
               <h2 className="px-5 pt-4 text-[13px] font-medium text-ink-mute">최근 경기</h2>
-              <ul>
-                {past.map((match) => (
-                  <MatchCard key={match.id} match={match} serverNowMs={serverNowMs} />
-                ))}
-              </ul>
+              {/*
+                ⚠ **날짜는 헤딩이 갖고 카드는 시각만 갖는다.** 예전에는 카드마다
+                  "8월 28일 (금) 13:05"이 통째로 반복돼 이 화면에서 가장 긴 텍스트였다.
+                ⚠ 두 구역이 같은 형태를 쓰지만 **공용 컴포넌트로 빼지 않는다** — 중복이 2회뿐이라
+                  `code-quality.md`의 공용화 기준("3회 이상")에 못 미친다.
+              */}
+              {groupMatchesByDay(past, nowMs).map((group) => (
+                <section key={group.key}>
+                  {/* h1(sr-only) → h2(구역) → h3(날짜) → h4(대진, MatchCard) */}
+                  <h3 className="px-5 pb-2 pt-4 text-[12px] font-semibold tracking-[-0.2px] text-ink">
+                    {group.label}
+                  </h3>
+                  <ul>
+                    {group.matches.map((match) => (
+                      <MatchCard key={match.id} match={match} serverNowMs={serverNowMs} />
+                    ))}
+                  </ul>
+                </section>
+              ))}
               {/*
                 ⚠ **안내는 자기 구역 바로 아래 둔다.** 둘을 페이지 맨 아래에 몰아 두었더니
                   최근 경기 안내가 자기가 설명하는 구역에서 **카드 20장 아래**에 있었고,
@@ -155,11 +177,18 @@ export function MatchListView({
               <h2 className="border-b border-hairline-cool px-5 pb-2 pt-5 text-[13px] font-medium text-ink-mute">
                 다가오는 경기
               </h2>
-              <ul>
-                {upcoming.map((match) => (
-                  <MatchCard key={match.id} match={match} serverNowMs={serverNowMs} />
-                ))}
-              </ul>
+              {groupMatchesByDay(upcoming, nowMs).map((group) => (
+                <section key={group.key}>
+                  <h3 className="px-5 pb-2 pt-4 text-[12px] font-semibold tracking-[-0.2px] text-ink">
+                    {group.label}
+                  </h3>
+                  <ul>
+                    {group.matches.map((match) => (
+                      <MatchCard key={match.id} match={match} serverNowMs={serverNowMs} />
+                    ))}
+                  </ul>
+                </section>
+              ))}
               {upcoming.length >= MATCH_UPCOMING_LIMIT && (
                 <p className="px-5 pb-1 pt-2 text-center text-[12px] text-ink-mute-2">
                   다가오는 경기는 {formatCount(MATCH_UPCOMING_LIMIT)}경기까지만 표시하고 있어요.

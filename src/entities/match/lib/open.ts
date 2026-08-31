@@ -70,3 +70,24 @@ export function isMatchInProgress(
   const elapsed = nowMs - new Date(match.kickoffAt).getTime();
   return elapsed >= 0 && elapsed <= IN_PROGRESS_WINDOW_MS;
 }
+
+/**
+ * **킥오프는 지났는데 결과가 없고, 진행 중 창도 벗어났다** — 화면이 `결과 대기`라고 말하는 자리.
+ *
+ * 여기로 오는 것은 동기화가 **정상이라고 명시한 두 상태**다: 연기(POSTPONED — 새 날짜가
+ * 올 때까지 옛 킥오프를 단 채 대기한다)와, 종료됐지만 스코어를 읽지 못한 경기(`badScores`).
+ *
+ * ⚠ **화면이 침묵하면 거짓말이 된다.** 이 상태의 카드는 과거 날짜에 스코어가 비어 있는데,
+ *   `진행 중` 배지도 붙지 않아 **"아직 시작 안 한 경기"로 읽혔다** — 목록에서 실제로
+ *   그렇게 보였다(스크린샷의 토트넘-맨시티 행).
+ *
+ * ⚠ **뒤집기로 만들지 않는다.** `!isMatchSettled`도 `!isMatchOpen`도 취소된 경기를 함께
+ *   끌고 온다 — `isPredictionResultsOpen`이 같은 이유로 별도 함수인 것과 같다.
+ */
+export function isAwaitingResult(
+  match: Pick<Match, "kickoffAt" | "isVoided" | "result">,
+  nowMs: number,
+): boolean {
+  if (match.isVoided || isMatchSettled(match) || isMatchInProgress(match, nowMs)) return false;
+  return new Date(match.kickoffAt).getTime() <= nowMs;
+}
