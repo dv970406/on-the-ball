@@ -107,7 +107,12 @@ async function fetchJson(path) {
 
 /**
  * ⚠ **fixture 모드가 있는 이유**: 토큰 없이도 쓰기 경로 전체를 돌려볼 수 있어야 한다.
- *   로컬 개발 시드도 이 경로로 만든다 — `db reset` 뒤에 경기가 0건이면 화면을 볼 수 없다.
+ *
+ * ⚠ **개발 데이터를 만드는 용도로는 `db reset`이 낫다.** 픽스처의 킥오프는 **절대 시각**이라
+ *   시간이 지나면 전부 과거가 되어 "다가오는 경기" 구역이 빈다. `supabase/seed.sql`은 같은
+ *   대진을 **`now()` 기준 상대 시각**으로 넣으므로 언제 돌려도 두 구역이 채워진다.
+ *   ⚠ 둘은 `external_id`가 같아서, 픽스처로 동기화하면 **시드의 상대 날짜가 절대 날짜로
+ *     덮인다.** 목록이 갑자기 과거로 쏠렸다면 이걸 의심한다 — `db reset`으로 되돌아온다.
  */
 const payload = fixturePath
   ? JSON.parse(readFileSync(fixturePath, "utf8"))

@@ -360,17 +360,54 @@ insert into public.team (code, name, short_name, external_id) values
   ('tottenham',  '토트넘 홋스퍼',       '토트넘',   '73')
 on conflict (code) do nothing;
 
--- 지난 경기(채점됨 — 홈승·무·원정승 셋) + 다가오는 경기(예측 가능)
+-- ⚠ **킥오프를 KST 자정에 앵커한다.** 목록이 날짜로 묶어 그리므로(`groupMatchesByDay`)
+--   **하루에 여러 경기가 놓이는 모양**이 로컬에서도 재현돼야 한다 — EPL은 토요일에 경기가
+--   몰리는데, 하루 한 경기씩 흩어 두면 날짜 헤딩이 카드 수만큼 생겨 실제와 정반대로 보인다.
+--   `now() - interval '5 days'`류로는 그 배치를 만들 수 없다. 두 경기를 몇 시간 차이로 두어도
+--   **실행 시각이 자정 근처면 날짜 경계를 넘어** 서로 다른 날이 된다.
+-- ⚠ 화면이 KST로 그리므로(`shared/lib/format.ts`의 `TIME_ZONE`) 앵커도 KST여야 한다.
+--   서버 TZ로 자르면 로컬(UTC 컨테이너)과 화면의 하루 경계가 어긋난다.
+with anchor as (
+  select date_trunc('day', now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul' as kst_midnight
+)
+-- 지난 경기(채점됨 — 홈승·무·원정승 셋) + 결과가 없는 두 상태
 insert into public.match
-  (season, matchday, home_team, away_team, kickoff_at, home_score, away_score, finished_at, external_id)
-values
-  ('2025-26', 12, 'arsenal',    'chelsea',    now() - interval '4 days', 2, 0, now() - interval '4 days', '1004'),
-  ('2025-26', 12, 'man-united', 'tottenham',  now() - interval '5 days', 1, 1, now() - interval '5 days', '1005'),
-  ('2025-26', 12, 'chelsea',    'liverpool',  now() - interval '6 days', 0, 3, now() - interval '6 days', '1006')
+  (season, matchday, home_team, away_team, kickoff_at,
+   home_score, away_score, finished_at, voided_at, external_id)
+select
+  '2025-26', m.matchday, m.home_team, m.away_team, a.kst_midnight + m.at,
+  m.home_score, m.away_score,
+  -- 종료 시각은 스코어와 쌍으로만 들어간다(DB CHECK) — 킥오프 2시간 뒤로 둔다
+  case when m.home_score is null then null else a.kst_midnight + m.at + interval '2 hours' end,
+  case when m.voided then a.kst_midnight + m.at + interval '1 hour' end,
+  m.external_id
+from anchor a
+cross join (values
+  -- 같은 날 두 경기 — 홈승·무승부 (날짜 그룹이 실제처럼 여러 장을 담는다)
+  (12, 'arsenal',    'chelsea',    interval '-2 days' + interval '22 hours',            2::smallint,   0::smallint,   false, '1004'),
+  (12, 'man-united', 'tottenham',  interval '-2 days' + interval '19 hours 30 minutes', 1::smallint,   1::smallint,   false, '1005'),
+  -- 그 전날 한 경기 — 원정승
+  (12, 'chelsea',    'liverpool',  interval '-3 days' + interval '21 hours',            0::smallint,   3::smallint,   false, '1006'),
+  -- ⚠ **결과 없이 킥오프만 지난 경기**(연기·스코어 미반영). 카드가 `결과 대기`를 말해야 하는
+  --   자리이고, 침묵하면 과거 날짜 + 빈 스코어가 "아직 시작 안 함"으로 읽힌다.
+  (11, 'tottenham',  'man-city',   interval '-4 days' + interval '13 hours 5 minutes',  null::smallint, null::smallint, false, '1007'),
+  -- 취소된 경기 — `result`가 null이 되어 채점에서 빠진다
+  (11, 'man-united', 'arsenal',    interval '-5 days' + interval '13 hours 5 minutes',  null::smallint, null::smallint, true,  '1008')
+) as m(matchday, home_team, away_team, at, home_score, away_score, voided, external_id)
 on conflict (external_id) do nothing;
 
-insert into public.match (season, matchday, home_team, away_team, kickoff_at, external_id) values
-  ('2025-26', 13, 'liverpool', 'arsenal',    now() + interval '3 days', '1001'),
-  ('2025-26', 13, 'man-city',  'man-united', now() + interval '4 days', '1002'),
-  ('2025-26', 13, 'tottenham', 'chelsea',    now() + interval '5 days', '1003')
+with anchor as (
+  select date_trunc('day', now() at time zone 'Asia/Seoul') at time zone 'Asia/Seoul' as kst_midnight
+)
+-- 다가오는 경기(예측 가능) — 여기도 하루에 두 경기가 놓인다
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, external_id)
+select '2025-26', 13, m.home_team, m.away_team, a.kst_midnight + m.at, m.external_id
+from anchor a
+cross join (values
+  -- ⚠ **내일부터 시작한다.** `+ 23시간`(오늘 밤)으로 두면 자정 직전에 `db reset`을 돌린
+  --   순간 그 경기가 과거가 되어 "다가오는 경기" 구역이 한 장 비어 보인다.
+  ('liverpool', 'arsenal',    interval '1 day'  + interval '23 hours',            '1001'),
+  ('man-city',  'man-united', interval '3 days' + interval '22 hours',            '1002'),
+  ('tottenham', 'chelsea',    interval '3 days' + interval '19 hours 30 minutes', '1003')
+) as m(home_team, away_team, at, external_id)
 on conflict (external_id) do nothing;
