@@ -1,0 +1,32 @@
+{
+  "_comment": [
+    "우리 team.code → API-Football 팀 id. **동기화가 external_id로 팀을 못 찾을 때만** 본다.",
+    "존재 이유는 제공자 전환이다 — football-data에서 옮겨 오면서 external_id가 전부 무효가",
+    "됐는데, 그대로 두면 API 이름으로 새 슬러그가 만들어져(Manchester United → manchester-united)",
+    "team.code가 바뀐다. code가 바뀌면 public/crests/{code}.png와 team-names-ko.json이 통째로",
+    "끊기고, code는 PK라 마이그레이션 없이 되돌릴 수 없다.",
+    "",
+    "⚠ 새 팀(승격)에는 필요 없다 — 동기화가 슬러그를 만들고 다음부터 external_id로 찾는다.",
+    "⚠ 여기 적힌 code가 이미 DB에 있어야 뜻이 있다. 없으면 그냥 무시된다."
+  ],
+  "arsenal": 42,
+  "aston-villa": 66,
+  "bournemouth": 35,
+  "brentford": 55,
+  "brighton-hove": 51,
+  "chelsea": 49,
+  "coventry": 1346,
+  "crystal-palace": 52,
+  "everton": 45,
+  "fulham": 36,
+  "hull-city": 64,
+  "ipswich": 57,
+  "leeds-united": 63,
+  "liverpool": 40,
+  "man-city": 50,
+  "man-united": 33,
+  "newcastle": 34,
+  "nottingham": 65,
+  "sunderland": 746,
+  "tottenham": 47
+}

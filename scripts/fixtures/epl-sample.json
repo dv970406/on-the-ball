@@ -1,301 +1,291 @@
 {
-  "count": 9,
-  "matches": [
+  "_comment": [
+    "API-Football(v3) `/fixtures` 응답 모양의 **수작업 픽스처**다 — 실제 덤프가 아니다.",
+    "키 없이 sync-matches.mjs --fixture 로 쓰기 경로 전체를 돌려보기 위한 것.",
+    "⚠ fixture.id와 teams.*.id는 supabase/seed.sql과 **같은 값**이어야 한다. 다르면",
+    "  fixture로 동기화할 때마다 같은 대진이 두 벌씩 쌓여 목록이 중복으로 보인다.",
+    "⚠ 킥오프가 **절대 시각**이라 시간이 지나면 전부 과거가 된다 — 개발 데이터를 만드는",
+    "  용도로는 `supabase db reset`(상대 시각 시드)이 낫다."
+  ],
+  "results": 9,
+  "response": [
     {
-      "id": 1001,
-      "utcDate": "2026-09-05T11:30:00Z",
-      "status": "TIMED",
-      "matchday": 13,
-      "lastUpdated": "2026-08-29T04:05:05Z",
-      "season": {
-        "id": 1,
-        "startDate": "2025-08-15",
-        "endDate": "2026-05-24",
-        "currentMatchday": 12
-      },
-      "homeTeam": {
-        "id": 64,
-        "name": "Liverpool FC",
-        "shortName": "Liverpool",
-        "tla": "LIV",
-        "crest": "https://crests.football-data.org/64.png"
-      },
-      "awayTeam": {
-        "id": 57,
-        "name": "Arsenal FC",
-        "shortName": "Arsenal",
-        "tla": "ARS",
-        "crest": "https://crests.football-data.org/57.png"
-      },
-      "score": {
-        "fullTime": {
-          "home": null,
-          "away": null
+      "fixture": {
+        "id": 1001,
+        "date": "2026-09-05T11:30:00Z",
+        "status": {
+          "long": "TIMED",
+          "short": "NS",
+          "elapsed": null
         }
+      },
+      "league": {
+        "id": 39,
+        "name": "Premier League",
+        "season": 2026,
+        "round": "Regular Season - 13"
+      },
+      "teams": {
+        "home": {
+          "id": 40,
+          "name": "Liverpool"
+        },
+        "away": {
+          "id": 42,
+          "name": "Arsenal"
+        }
+      },
+      "goals": {
+        "home": null,
+        "away": null
       }
     },
     {
-      "id": 1002,
-      "utcDate": "2026-09-05T14:00:00Z",
-      "status": "SCHEDULED",
-      "matchday": 13,
-      "lastUpdated": "2026-08-29T04:05:05Z",
-      "season": {
-        "id": 1,
-        "startDate": "2025-08-15",
-        "endDate": "2026-05-24",
-        "currentMatchday": 12
-      },
-      "homeTeam": {
-        "id": 65,
-        "name": "Manchester City FC",
-        "shortName": "Man City",
-        "tla": "MCI",
-        "crest": "https://crests.football-data.org/65.png"
-      },
-      "awayTeam": {
-        "id": 66,
-        "name": "Manchester United FC",
-        "shortName": "Man United",
-        "tla": "MUN",
-        "crest": "https://crests.football-data.org/66.png"
-      },
-      "score": {
-        "fullTime": {
-          "home": null,
-          "away": null
+      "fixture": {
+        "id": 1002,
+        "date": "2026-09-05T14:00:00Z",
+        "status": {
+          "long": "SCHEDULED",
+          "short": "NS",
+          "elapsed": null
         }
+      },
+      "league": {
+        "id": 39,
+        "name": "Premier League",
+        "season": 2026,
+        "round": "Regular Season - 13"
+      },
+      "teams": {
+        "home": {
+          "id": 50,
+          "name": "Manchester City"
+        },
+        "away": {
+          "id": 33,
+          "name": "Manchester United"
+        }
+      },
+      "goals": {
+        "home": null,
+        "away": null
       }
     },
     {
-      "id": 1003,
-      "utcDate": "2026-09-06T13:00:00Z",
-      "status": "SCHEDULED",
-      "matchday": 13,
-      "lastUpdated": "2026-08-29T04:05:05Z",
-      "season": {
-        "id": 1,
-        "startDate": "2025-08-15",
-        "endDate": "2026-05-24",
-        "currentMatchday": 12
-      },
-      "homeTeam": {
-        "id": 73,
-        "name": "Tottenham Hotspur FC",
-        "shortName": "Tottenham",
-        "tla": "TOT",
-        "crest": "https://crests.football-data.org/73.png"
-      },
-      "awayTeam": {
-        "id": 61,
-        "name": "Chelsea FC",
-        "shortName": "Chelsea",
-        "tla": "CHE",
-        "crest": "https://crests.football-data.org/61.png"
-      },
-      "score": {
-        "fullTime": {
-          "home": null,
-          "away": null
+      "fixture": {
+        "id": 1003,
+        "date": "2026-09-06T13:00:00Z",
+        "status": {
+          "long": "SCHEDULED",
+          "short": "NS",
+          "elapsed": null
         }
+      },
+      "league": {
+        "id": 39,
+        "name": "Premier League",
+        "season": 2026,
+        "round": "Regular Season - 13"
+      },
+      "teams": {
+        "home": {
+          "id": 47,
+          "name": "Tottenham"
+        },
+        "away": {
+          "id": 49,
+          "name": "Chelsea"
+        }
+      },
+      "goals": {
+        "home": null,
+        "away": null
       }
     },
     {
-      "id": 1004,
-      "utcDate": "2026-08-30T13:00:00Z",
-      "status": "FINISHED",
-      "matchday": 12,
-      "lastUpdated": "2026-08-30T15:00:00Z",
-      "season": {
-        "id": 1,
-        "startDate": "2025-08-15",
-        "endDate": "2026-05-24",
-        "currentMatchday": 12
-      },
-      "homeTeam": {
-        "id": 57,
-        "name": "Arsenal FC",
-        "shortName": "Arsenal",
-        "tla": "ARS",
-        "crest": "https://crests.football-data.org/57.png"
-      },
-      "awayTeam": {
-        "id": 61,
-        "name": "Chelsea FC",
-        "shortName": "Chelsea",
-        "tla": "CHE",
-        "crest": "https://crests.football-data.org/61.png"
-      },
-      "score": {
-        "fullTime": {
-          "home": 2,
-          "away": 0
+      "fixture": {
+        "id": 1004,
+        "date": "2026-08-30T13:00:00Z",
+        "status": {
+          "long": "FINISHED",
+          "short": "FT",
+          "elapsed": 90
         }
+      },
+      "league": {
+        "id": 39,
+        "name": "Premier League",
+        "season": 2026,
+        "round": "Regular Season - 12"
+      },
+      "teams": {
+        "home": {
+          "id": 42,
+          "name": "Arsenal"
+        },
+        "away": {
+          "id": 49,
+          "name": "Chelsea"
+        }
+      },
+      "goals": {
+        "home": 2,
+        "away": 0
       }
     },
     {
-      "id": 1005,
-      "utcDate": "2026-08-29T14:00:00Z",
-      "status": "FINISHED",
-      "matchday": 12,
-      "lastUpdated": "2026-08-29T16:00:00Z",
-      "season": {
-        "id": 1,
-        "startDate": "2025-08-15",
-        "endDate": "2026-05-24",
-        "currentMatchday": 12
-      },
-      "homeTeam": {
-        "id": 66,
-        "name": "Manchester United FC",
-        "shortName": "Man United",
-        "tla": "MUN",
-        "crest": "https://crests.football-data.org/66.png"
-      },
-      "awayTeam": {
-        "id": 73,
-        "name": "Tottenham Hotspur FC",
-        "shortName": "Tottenham",
-        "tla": "TOT",
-        "crest": "https://crests.football-data.org/73.png"
-      },
-      "score": {
-        "fullTime": {
-          "home": 1,
-          "away": 1
+      "fixture": {
+        "id": 1005,
+        "date": "2026-08-29T14:00:00Z",
+        "status": {
+          "long": "FINISHED",
+          "short": "FT",
+          "elapsed": 90
         }
+      },
+      "league": {
+        "id": 39,
+        "name": "Premier League",
+        "season": 2026,
+        "round": "Regular Season - 12"
+      },
+      "teams": {
+        "home": {
+          "id": 33,
+          "name": "Manchester United"
+        },
+        "away": {
+          "id": 47,
+          "name": "Tottenham"
+        }
+      },
+      "goals": {
+        "home": 1,
+        "away": 1
       }
     },
     {
-      "id": 1006,
-      "utcDate": "2026-08-29T11:30:00Z",
-      "status": "FINISHED",
-      "matchday": 12,
-      "lastUpdated": "2026-08-29T13:30:00Z",
-      "season": {
-        "id": 1,
-        "startDate": "2025-08-15",
-        "endDate": "2026-05-24",
-        "currentMatchday": 12
-      },
-      "homeTeam": {
-        "id": 61,
-        "name": "Chelsea FC",
-        "shortName": "Chelsea",
-        "tla": "CHE",
-        "crest": "https://crests.football-data.org/61.png"
-      },
-      "awayTeam": {
-        "id": 64,
-        "name": "Liverpool FC",
-        "shortName": "Liverpool",
-        "tla": "LIV",
-        "crest": "https://crests.football-data.org/64.png"
-      },
-      "score": {
-        "fullTime": {
-          "home": 0,
-          "away": 3
+      "fixture": {
+        "id": 1006,
+        "date": "2026-08-29T11:30:00Z",
+        "status": {
+          "long": "FINISHED",
+          "short": "FT",
+          "elapsed": 90
         }
+      },
+      "league": {
+        "id": 39,
+        "name": "Premier League",
+        "season": 2026,
+        "round": "Regular Season - 12"
+      },
+      "teams": {
+        "home": {
+          "id": 49,
+          "name": "Chelsea"
+        },
+        "away": {
+          "id": 40,
+          "name": "Liverpool"
+        }
+      },
+      "goals": {
+        "home": 0,
+        "away": 3
       }
     },
     {
-      "id": 1007,
-      "utcDate": "2026-08-28T04:05:05Z",
-      "status": "POSTPONED",
-      "matchday": 11,
-      "lastUpdated": "2026-08-29T04:05:05Z",
-      "season": {
-        "id": 1,
-        "startDate": "2025-08-15",
-        "endDate": "2026-05-24",
-        "currentMatchday": 12
-      },
-      "homeTeam": {
-        "id": 73,
-        "name": "Tottenham Hotspur FC",
-        "shortName": "Tottenham",
-        "tla": "TOT",
-        "crest": "https://crests.football-data.org/73.png"
-      },
-      "awayTeam": {
-        "id": 65,
-        "name": "Manchester City FC",
-        "shortName": "Man City",
-        "tla": "MCI",
-        "crest": "https://crests.football-data.org/65.png"
-      },
-      "score": {
-        "fullTime": {
-          "home": null,
-          "away": null
+      "fixture": {
+        "id": 1007,
+        "date": "2026-08-28T04:05:05Z",
+        "status": {
+          "long": "POSTPONED",
+          "short": "PST",
+          "elapsed": null
         }
+      },
+      "league": {
+        "id": 39,
+        "name": "Premier League",
+        "season": 2026,
+        "round": "Regular Season - 11"
+      },
+      "teams": {
+        "home": {
+          "id": 47,
+          "name": "Tottenham"
+        },
+        "away": {
+          "id": 50,
+          "name": "Manchester City"
+        }
+      },
+      "goals": {
+        "home": null,
+        "away": null
       }
     },
     {
-      "id": 1008,
-      "utcDate": "2026-08-27T04:05:05Z",
-      "status": "CANCELLED",
-      "matchday": 11,
-      "lastUpdated": "2026-08-29T04:05:05Z",
-      "season": {
-        "id": 1,
-        "startDate": "2025-08-15",
-        "endDate": "2026-05-24",
-        "currentMatchday": 12
-      },
-      "homeTeam": {
-        "id": 66,
-        "name": "Manchester United FC",
-        "shortName": "Man United",
-        "tla": "MUN",
-        "crest": "https://crests.football-data.org/66.png"
-      },
-      "awayTeam": {
-        "id": 57,
-        "name": "Arsenal FC",
-        "shortName": "Arsenal",
-        "tla": "ARS",
-        "crest": "https://crests.football-data.org/57.png"
-      },
-      "score": {
-        "fullTime": {
-          "home": null,
-          "away": null
+      "fixture": {
+        "id": 1008,
+        "date": "2026-08-27T04:05:05Z",
+        "status": {
+          "long": "CANCELLED",
+          "short": "CANC",
+          "elapsed": null
         }
+      },
+      "league": {
+        "id": 39,
+        "name": "Premier League",
+        "season": 2026,
+        "round": "Regular Season - 11"
+      },
+      "teams": {
+        "home": {
+          "id": 33,
+          "name": "Manchester United"
+        },
+        "away": {
+          "id": 42,
+          "name": "Arsenal"
+        }
+      },
+      "goals": {
+        "home": null,
+        "away": null
       }
     },
     {
-      "id": 1009,
-      "utcDate": "2026-09-05T04:05:05Z",
-      "status": "SCHEDULED",
-      "matchday": null,
-      "lastUpdated": "2026-08-29T04:05:05Z",
-      "season": {
-        "id": 1,
-        "startDate": "2025-08-15",
-        "endDate": "2026-05-24",
-        "currentMatchday": 12
-      },
-      "homeTeam": {
-        "id": 64,
-        "name": "Liverpool FC",
-        "shortName": "Liverpool",
-        "tla": "LIV",
-        "crest": "https://crests.football-data.org/64.png"
-      },
-      "awayTeam": {
-        "id": 65,
-        "name": "Manchester City FC",
-        "shortName": "Man City",
-        "tla": "MCI",
-        "crest": "https://crests.football-data.org/65.png"
-      },
-      "score": {
-        "fullTime": {
-          "home": null,
-          "away": null
+      "fixture": {
+        "id": 1009,
+        "date": "2026-09-05T04:05:05Z",
+        "status": {
+          "long": "SCHEDULED",
+          "short": "NS",
+          "elapsed": null
         }
+      },
+      "league": {
+        "id": 39,
+        "name": "Premier League",
+        "season": 2026,
+        "round": "Final"
+      },
+      "teams": {
+        "home": {
+          "id": 40,
+          "name": "Liverpool"
+        },
+        "away": {
+          "id": 50,
+          "name": "Manchester City"
+        }
+      },
+      "goals": {
+        "home": null,
+        "away": null
       }
     }
   ]

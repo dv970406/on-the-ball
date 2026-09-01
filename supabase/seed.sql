@@ -348,16 +348,17 @@ on conflict do nothing;
 --   구역이 둘 다 채워진다(rls.sql 섹션 31이 같은 이유로 같은 형태를 쓴다).
 -- ⚠ 팀 코드는 동기화 스크립트가 만드는 슬러그와 **같은 값**이라, 나중에 실제 API를 돌려도
 --   `team_pkey`가 충돌하지 않고 이름만 갱신된다(external_id로 찾기 때문).
--- ⚠ `external_id`는 `scripts/fixtures/epl-sample.json`과 **같은 값**이다. 다르게 두면
+-- ⚠ `external_id`는 **API-Football의 팀 id**이고 `scripts/fixtures/epl-sample.json`과
+--   **같은 값**이다. 다르게 두면
 --   fixture로 동기화를 시험할 때마다 같은 대진이 두 벌씩 쌓여 목록이 중복으로 보인다.
 -- ---------------------------------------------------------------------
 insert into public.team (code, name, short_name, external_id) values
-  ('liverpool',  '리버풀',              '리버풀',   '64'),
-  ('arsenal',    '아스날',              '아스날',   '57'),
-  ('chelsea',    '첼시',                '첼시',     '61'),
-  ('man-city',   '맨체스터 시티',       '맨시티',   '65'),
-  ('man-united', '맨체스터 유나이티드', '맨유',     '66'),
-  ('tottenham',  '토트넘 홋스퍼',       '토트넘',   '73')
+  ('liverpool',  '리버풀',              '리버풀',   '40'),
+  ('arsenal',    '아스날',              '아스날',   '42'),
+  ('chelsea',    '첼시',                '첼시',     '49'),
+  ('man-city',   '맨체스터 시티',       '맨시티',   '50'),
+  ('man-united', '맨체스터 유나이티드', '맨유',     '33'),
+  ('tottenham',  '토트넘 홋스퍼',       '토트넘',   '47')
 on conflict (code) do nothing;
 
 -- ⚠ **킥오프를 KST 자정에 앵커한다.** 목록이 날짜로 묶어 그리므로(`groupMatchesByDay`)
