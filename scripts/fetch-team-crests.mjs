@@ -1,14 +1,14 @@
 /**
  * 구단 엠블럼을 내려받아 **줄여서 `public/crests/{team.code}.png`에 커밋한다.**
  *
- *   node scripts/fetch-team-crests.mjs                    # API에서 (FOOTBALL_DATA_TOKEN 필요)
- *   node scripts/fetch-team-crests.mjs --fixture <파일>   # 토큰 없이 저장된 JSON으로
- *   node scripts/fetch-team-crests.mjs --season 2025
+ *   node scripts/fetch-team-crests.mjs                    # API에서 (API_FOOTBALL_KEY 필요)
+ *   node scripts/fetch-team-crests.mjs --fixture <파일>   # 키 없이 저장된 JSON으로
+ *   node scripts/fetch-team-crests.mjs --season 2026
  *
- * ⚠ **왜 제공자 CDN을 직접 걸지 않는가.** 원본이 200×200 PNG(팀당 4~16KB)인데 화면에서
+ * ⚠ **왜 제공자 CDN을 직접 걸지 않는가.** 원본이 큰 PNG인데 화면에서
  *   그리는 크기는 24·44px이라 8배 가까이 과하다. `?width=`·`?w=` 같은 리사이즈 파라미터를
  *   지원하지 않아(전부 원본을 그대로 준다 — 실측) 줄이려면 사본을 두는 수밖에 없다.
- *   20팀 기준 **244KB → 약 97KB(60% 감소)** 가 된다.
+ *   20팀 기준 **1,068KB → 약 85KB(92% 감소)** 가 된다(API-Football 기준 실측).
  *
  * ⚠ **PNG다. AVIF가 아니다.** 같은 조건에서 AVIF가 조금 더 작지만(66% vs 60%) 20팀 기준
  *   14KB 차이뿐이고, 디코드에 실패하는 브라우저에서는 `TeamCrest`의 폴백이 **조용히
@@ -31,9 +31,9 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
+import { flag, loadEnv } from "./lib/sync-db.mjs";
+import { EPL_LEAGUE_ID, createApiFootball } from "./lib/api-football.mjs";
 
-const COMPETITION = "PL";
-const API = "https://api.football-data.org/v4";
 const OUT_DIR = "public/crests";
 
 /**
@@ -57,90 +57,61 @@ const PALETTE_QUALITY = 40;
 
 // ── 인자 ───────────────────────────────────────────────────────────────
 const argv = process.argv.slice(2);
-const flag = (name) => {
-  const i = argv.indexOf(`--${name}`);
-  if (i === -1) return null;
-  const next = argv[i + 1];
-  return next && !next.startsWith("--") ? next : null;
-};
-const fixturePath = flag("fixture");
-const seasonArg = flag("season");
+const fixturePath = flag(argv, "fixture");
+const seasonArg = flag(argv, "season");
 
 // ── 환경 ───────────────────────────────────────────────────────────────
-// ⚠ `sync-matches.mjs`와 같은 형태 — 크론·CI에는 `.env.local`이 없다.
-function loadEnv() {
-  const fromProcess = {
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    token: process.env.FOOTBALL_DATA_TOKEN,
-  };
-  if (fromProcess.url && fromProcess.key) return fromProcess;
-
-  let file;
-  try {
-    file = readFileSync(".env.local", "utf8");
-  } catch {
-    return fromProcess;
-  }
-  const parsed = Object.fromEntries(
-    file
-      .split("\n")
-      .filter((l) => l.includes("=") && !l.trimStart().startsWith("#"))
-      .map((l) => {
-        const i = l.indexOf("=");
-        return [l.slice(0, i).trim(), l.slice(i + 1).trim()];
-      }),
-  );
-  return {
-    url: fromProcess.url ?? parsed.NEXT_PUBLIC_SUPABASE_URL,
-    key: fromProcess.key ?? parsed.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    token: fromProcess.token ?? parsed.FOOTBALL_DATA_TOKEN,
-  };
-}
-
-const { url, key, token } = loadEnv();
+/*
+ * ⚠ **service_role이 아니라 anon 키다.** `team`은 공개 읽기라 충분하고, 이 스크립트는
+ *   DB에 아무것도 쓰지 않는다 — 쓰기 자격증명을 들고 다닐 이유가 없다.
+ */
+const env = loadEnv(["NEXT_PUBLIC_SUPABASE_ANON_KEY", "API_FOOTBALL_KEY"]);
+const url = env.NEXT_PUBLIC_SUPABASE_URL;
+const key = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 if (!url || !key) {
   console.error("NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY가 필요합니다");
   process.exit(1);
 }
 
 // ── 수집 ───────────────────────────────────────────────────────────────
-async function fetchJson(path) {
-  if (!token) {
-    console.error("FOOTBALL_DATA_TOKEN이 필요합니다 (또는 --fixture 로 저장된 JSON을 쓰세요)");
+/*
+ * ⚠ **경기가 아니라 팀 엔드포인트를 쓴다.** 예전 제공자는 경기 응답의 팀에 엠블럼 URL을
+ *   실어 줬지만 API-Football은 팀 목록에만 담는다 — 대신 **요청이 하나로 끝나고**
+ *   경기가 아직 없는 시즌에도 받을 수 있다.
+ */
+const season = Number(seasonArg ?? (new Date().getUTCMonth() >= 6
+  ? new Date().getUTCFullYear()
+  : new Date().getUTCFullYear() - 1));
+
+let apiTeams;
+if (fixturePath) {
+  const parsed = JSON.parse(readFileSync(fixturePath, "utf8"));
+  apiTeams = Array.isArray(parsed?.response) ? parsed.response.map((x) => x.team) : null;
+} else {
+  const api = createApiFootball(env.API_FOOTBALL_KEY);
+  try {
+    const body = await api.get(`/teams?league=${EPL_LEAGUE_ID}&season=${season}`);
+    apiTeams = Array.isArray(body?.response) ? body.response.map((x) => x.team) : null;
+  } catch (e) {
+    console.error(`✗ ${e.message}`);
     process.exit(1);
   }
-  const res = await fetch(`${API}${path}`, { headers: { "X-Auth-Token": token } });
-  if (!res.ok) {
-    console.error(`✗ ${path} — ${res.status} ${await res.text()}`);
-    process.exit(1);
-  }
-  return res.json();
 }
 
-const payload = fixturePath
-  ? JSON.parse(readFileSync(fixturePath, "utf8"))
-  : await fetchJson(
-      `/competitions/${COMPETITION}/matches${seasonArg ? `?season=${seasonArg}` : ""}`,
-    );
-
-// ⚠ `sync-matches.mjs`와 같은 방어 — `{}`나 문자열이 오면 아래 filter가 죽는다.
-const apiMatches = Array.isArray(payload?.matches) ? payload.matches : null;
-if (!apiMatches || apiMatches.length === 0) {
-  console.error("경기 배열을 찾지 못했습니다 — 응답 형태나 시즌을 확인하세요");
+// ⚠ `sync-matches.mjs`와 같은 방어 — `{}`나 문자열이 오면 아래가 죽는다.
+if (!apiTeams || apiTeams.length === 0) {
+  console.error("팀 배열을 찾지 못했습니다 — 응답 형태나 시즌을 확인하세요");
   process.exit(1);
 }
 
-/** API 팀 id → 엠블럼 원본 URL. 경기마다 팀이 되풀이되므로 Map으로 접는다. */
+/** API 팀 id → 엠블럼 원본 URL */
 const crestByApiId = new Map();
-for (const m of apiMatches) {
-  for (const t of [m?.homeTeam, m?.awayTeam]) {
-    if (!t?.id || crestByApiId.has(t.id)) continue;
-    // ⚠ **https만 받는다.** 이 자리는 우리가 fetch하는 주소다 — 스킴이 열려 있으면
-    //   저장된 값 하나로 임의 호스트를 때리게 된다.
-    if (typeof t.crest === "string" && /^https:\/\/\S+$/.test(t.crest.trim())) {
-      crestByApiId.set(t.id, t.crest.trim());
-    }
+for (const t of apiTeams) {
+  if (!t?.id || crestByApiId.has(t.id)) continue;
+  // ⚠ **https만 받는다.** 이 자리는 우리가 fetch하는 주소다 — 스킴이 열려 있으면
+  //   저장된 값 하나로 임의 호스트를 때리게 된다.
+  if (typeof t.logo === "string" && /^https:\/\/\S+$/.test(t.logo.trim())) {
+    crestByApiId.set(t.id, t.logo.trim());
   }
 }
 
