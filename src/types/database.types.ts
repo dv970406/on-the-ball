@@ -68,6 +68,7 @@ export type Database = {
           home_team: string
           id: number
           kickoff_at: string
+          live_minute: number | null
           matchday: number
           result: Database["public"]["Enums"]["match_pick"] | null
           season: string
@@ -82,6 +83,7 @@ export type Database = {
           home_team: string
           id?: never
           kickoff_at: string
+          live_minute?: number | null
           matchday: number
           result?: Database["public"]["Enums"]["match_pick"] | null
           season: string
@@ -96,6 +98,7 @@ export type Database = {
           home_team?: string
           id?: never
           kickoff_at?: string
+          live_minute?: number | null
           matchday?: number
           result?: Database["public"]["Enums"]["match_pick"] | null
           season?: string
@@ -115,6 +118,150 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "team"
             referencedColumns: ["code"]
+          },
+        ]
+      }
+      match_event: {
+        Row: {
+          detail: string | null
+          extra_minute: number | null
+          id: number
+          kind: Database["public"]["Enums"]["match_event_kind"]
+          match_id: number
+          minute: number
+          player_id: number | null
+          related_player_id: number | null
+          side: Database["public"]["Enums"]["match_side"]
+        }
+        Insert: {
+          detail?: string | null
+          extra_minute?: number | null
+          id?: never
+          kind: Database["public"]["Enums"]["match_event_kind"]
+          match_id: number
+          minute: number
+          player_id?: number | null
+          related_player_id?: number | null
+          side: Database["public"]["Enums"]["match_side"]
+        }
+        Update: {
+          detail?: string | null
+          extra_minute?: number | null
+          id?: never
+          kind?: Database["public"]["Enums"]["match_event_kind"]
+          match_id?: number
+          minute?: number
+          player_id?: number | null
+          related_player_id?: number | null
+          side?: Database["public"]["Enums"]["match_side"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_event_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "match"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_event_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "player"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_event_related_player_id_fkey"
+            columns: ["related_player_id"]
+            isOneToOne: false
+            referencedRelation: "player"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_lineup: {
+        Row: {
+          coach_name: string | null
+          created_at: string
+          formation: string | null
+          match_id: number
+          side: Database["public"]["Enums"]["match_side"]
+        }
+        Insert: {
+          coach_name?: string | null
+          created_at?: string
+          formation?: string | null
+          match_id: number
+          side: Database["public"]["Enums"]["match_side"]
+        }
+        Update: {
+          coach_name?: string | null
+          created_at?: string
+          formation?: string | null
+          match_id?: number
+          side?: Database["public"]["Enums"]["match_side"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_lineup_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "match"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      match_lineup_player: {
+        Row: {
+          grid_col: number | null
+          grid_row: number | null
+          match_id: number
+          player_id: number
+          position: string | null
+          rating: number | null
+          role: Database["public"]["Enums"]["lineup_role"]
+          shirt_number: number | null
+          side: Database["public"]["Enums"]["match_side"]
+          sort_order: number
+        }
+        Insert: {
+          grid_col?: number | null
+          grid_row?: number | null
+          match_id: number
+          player_id: number
+          position?: string | null
+          rating?: number | null
+          role: Database["public"]["Enums"]["lineup_role"]
+          shirt_number?: number | null
+          side: Database["public"]["Enums"]["match_side"]
+          sort_order: number
+        }
+        Update: {
+          grid_col?: number | null
+          grid_row?: number | null
+          match_id?: number
+          player_id?: number
+          position?: string | null
+          rating?: number | null
+          role?: Database["public"]["Enums"]["lineup_role"]
+          shirt_number?: number | null
+          side?: Database["public"]["Enums"]["match_side"]
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_lineup_player_match_id_side_fkey"
+            columns: ["match_id", "side"]
+            isOneToOne: false
+            referencedRelation: "match_lineup"
+            referencedColumns: ["match_id", "side"]
+          },
+          {
+            foreignKeyName: "match_lineup_player_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "player"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -156,6 +303,53 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      match_stat: {
+        Row: {
+          match_id: number
+          side: Database["public"]["Enums"]["match_side"]
+          stat_key: string
+          value: number
+        }
+        Insert: {
+          match_id: number
+          side: Database["public"]["Enums"]["match_side"]
+          stat_key: string
+          value: number
+        }
+        Update: {
+          match_id?: number
+          side?: Database["public"]["Enums"]["match_side"]
+          stat_key?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_stat_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "match"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      player: {
+        Row: {
+          external_id: string
+          id: number
+          name: string
+        }
+        Insert: {
+          external_id: string
+          id?: never
+          name: string
+        }
+        Update: {
+          external_id?: string
+          id?: never
+          name?: string
+        }
+        Relationships: []
       }
       post: {
         Row: {
@@ -605,7 +799,10 @@ export type Database = {
       toggle_post_like: { Args: { p_post_id: number }; Returns: boolean }
     }
     Enums: {
+      lineup_role: "start" | "bench"
+      match_event_kind: "goal" | "card" | "substitution"
       match_pick: "home" | "draw" | "away"
+      match_side: "home" | "away"
       post_category: "이적설" | "경기" | "선수" | "유니폼" | "잡담"
       report_reason: "spam" | "abuse" | "sexual" | "false_info" | "etc"
     }
@@ -735,7 +932,10 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      lineup_role: ["start", "bench"],
+      match_event_kind: ["goal", "card", "substitution"],
       match_pick: ["home", "draw", "away"],
+      match_side: ["home", "away"],
       post_category: ["이적설", "경기", "선수", "유니폼", "잡담"],
       report_reason: ["spam", "abuse", "sexual", "false_info", "etc"],
     },

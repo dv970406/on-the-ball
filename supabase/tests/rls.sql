@@ -2075,6 +2075,276 @@ insert into public.match (season, matchday, home_team, away_team, kickoff_at, ex
 values ('2025-26', 5, 'rlstest-b', 'rlstest-c', now() + interval '1 day', 'm-past');
 rollback to s;
 
+\echo ''
+\echo '-- 32. 경기 상세 — player · match_lineup(_player) · match_event · match_stat --'
+\echo '   (31의 rlstest-* 팀과 :m_open / :m_past를 그대로 쓴다)'
+
+savepoint s32seed;
+
+insert into public.player (name, external_id) values ('알파 골키퍼', 'rlstest-p-1') returning id as p1 \gset
+insert into public.player (name, external_id) values ('알파 미드필더', 'rlstest-p-2') returning id as p2 \gset
+insert into public.player (name, external_id) values ('알파 후보', 'rlstest-p-3') returning id as p3 \gset
+insert into public.player (name, external_id) values ('알파 미출전', 'rlstest-p-4') returning id as p4 \gset
+
+insert into public.match_lineup (match_id, side, formation, coach_name)
+values (:m_past, 'home', '4-3-3', '알파 감독');
+insert into public.match_lineup_player (match_id, side, player_id, role, grid_row, grid_col, position, shirt_number, rating, sort_order)
+values (:m_past, 'home', :p1, 'start', 1, 1, 'Goalkeeper', 1, 6.3, 1),
+       (:m_past, 'home', :p2, 'start', 4, 2, 'Midfielder', 8, 7.1, 2);
+insert into public.match_lineup_player (match_id, side, player_id, role, position, shirt_number, sort_order)
+values (:m_past, 'home', :p3, 'bench', 'Attacker', 9, 1),
+       (:m_past, 'home', :p4, 'bench', 'Defender', 5, 2);
+-- ⚠ player_id = 나간 선수(선발), related_player_id = 들어온 선수(벤치)
+insert into public.match_event (match_id, side, kind, minute, player_id, related_player_id, detail)
+values (:m_past, 'home', 'substitution', 60, :p2, :p3, 'Substitution 1');
+insert into public.match_stat (match_id, side, stat_key, value)
+values (:m_past, 'home', 'possession', 39), (:m_past, 'away', 'possession', 61);
+
+\echo ''
+\echo '-- 32a. 앱에는 쓰기 경로가 없다 (team·match과 같은 취급) --'
+
+savepoint s; :login_alice
+\echo '[❌차단] 선수를 직접 만든다 — 쓰기 정책도 grant도 없다'
+insert into public.player (name, external_id) values ('가짜선수', 'fake-p');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 평점 조작 — 다른 사이트와 다른 값이라 더 조작 유인이 있다'
+update public.match_lineup_player set rating = 10 where match_id = :m_past and player_id = :p1;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 라인업을 직접 만든다'
+insert into public.match_lineup (match_id, side, formation) values (:m_open, 'home', '4-4-2');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 사건을 지어낸다 (없던 골을 넣는다)'
+insert into public.match_event (match_id, side, kind, minute, player_id, detail)
+values (:m_past, 'home', 'goal', 90, :p1, 'Normal Goal');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 팀 스탯 조작'
+update public.match_stat set value = 99 where match_id = :m_past and stat_key = 'possession';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 진행 중으로 위조 — 종료된 경기를 라이브로 되돌린다'
+update public.match set live_minute = 45 where id = :m_past;
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[❌차단] 비로그인 쓰기'
+insert into public.player (name, external_id) values ('익명선수', 'anon-p');
+rollback to s;
+
+\echo ''
+\echo '-- 32b. 읽기는 비로그인에게도 열린다 (크롤러가 경기 페이지를 색인한다) --'
+
+savepoint s; :login_anon
+\echo '[t 기대] 라인업·선수·사건·스탯을 비로그인이 전부 읽는다'
+\echo '        ⚠ grant를 빼면 임베딩이 42501로 죽어 경기 상세가 통째로 안 보인다'
+\echo '          (post_poll_vote에서 실측한 함정이다)'
+select (select count(*) from public.match_lineup_player where match_id = :m_past) = 4
+   and (select count(*) from public.match_event         where match_id = :m_past) = 1
+   and (select count(*) from public.match_stat          where match_id = :m_past) = 2
+   and (select count(*) from public.player where external_id like 'rlstest-p-%') = 4
+   as anon_reads_everything;
+rollback to s;
+
+\echo ''
+\echo '-- 32c. 라인업 구조 — 잘못된 라인업이 애초에 성립하지 않는다 --'
+
+savepoint s;
+\echo '[❌차단] 부모 라인업 없이 선수만 — 복합 FK가 막는다'
+\echo '        (match를 직접 참조했다면 포메이션도 감독도 없는 선수 11명이 성립한다)'
+insert into public.match_lineup_player (match_id, side, player_id, role, sort_order)
+values (:m_open, 'away', :p3, 'start', 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 같은 라인업·같은 role에 순서 중복 — 화면이 정렬 기준을 잃는다'
+insert into public.match_lineup_player (match_id, side, player_id, role, sort_order)
+values (:m_past, 'home', :p3, 'start', 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 벤치에 피치 좌표 — 벤치는 피치 위에 없다'
+update public.match_lineup_player set grid_row = 2, grid_col = 2
+ where match_id = :m_past and player_id = :p3;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 좌표를 한쪽만 — 행/열은 쌍으로만 뜻을 갖는다'
+update public.match_lineup_player set grid_col = null where match_id = :m_past and player_id = :p1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 평점 11점 — 0~10 밖'
+update public.match_lineup_player set rating = 11 where match_id = :m_past and player_id = :p1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 포메이션 형식 위반 (동기화 스크립트의 필드 오매핑을 여기서 잡는다)'
+insert into public.match_lineup (match_id, side, formation) values (:m_past, 'away', 'four-four-two');
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 등번호 0 — 범위 밖'
+update public.match_lineup_player set shirt_number = 0 where match_id = :m_past and player_id = :p1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 선수 external_id 중복 — 동기화 재실행이 행을 늘리면 안 된다'
+insert into public.player (name, external_id) values ('중복선수', 'rlstest-p-1');
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 참조 중인 선수 삭제 — cascade로 두면 과거 라인업이 조용히 빈다'
+delete from public.player where id = :p1;
+rollback to s;
+
+savepoint s;
+\echo '[0 / 0 / 0 기대] 경기를 지우면 라인업·사건·스탯이 함께 사라진다 (cascade)'
+delete from public.match where id = :m_past;
+select (select count(*) from public.match_lineup_player where match_id = :m_past) as lineup_players,
+       (select count(*) from public.match_event         where match_id = :m_past) as events,
+       (select count(*) from public.match_stat          where match_id = :m_past) as stats;
+rollback to s;
+
+\echo ''
+\echo '-- 32d. 사건 — 종류마다 채워야 하는 자리가 다르다 --'
+
+savepoint s;
+\echo '[❌차단] 카드에 상대역 — 카드는 혼자 받는다(매핑이 어긋난 신호다)'
+insert into public.match_event (match_id, side, kind, minute, player_id, related_player_id)
+values (:m_past, 'home', 'card', 30, :p1, :p2);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 교체에 한 선수만 — 나간 사람만 있고 들어온 사람이 없다'
+insert into public.match_event (match_id, side, kind, minute, player_id)
+values (:m_past, 'home', 'substitution', 70, :p1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 자기 자신과 교체'
+insert into public.match_event (match_id, side, kind, minute, player_id, related_player_id)
+values (:m_past, 'home', 'substitution', 70, :p1, :p1);
+rollback to s;
+
+savepoint s;
+\echo '[1 기대] 경기 중 재폴링이 같은 사건을 두 번 쌓지 않는다'
+\echo '        ⚠ unique를 nulls not distinct로 두지 않으면 player_id가 비는 사건이'
+\echo '          폴링할 때마다 새 행이 된다(기본값은 null끼리 다르게 본다).'
+insert into public.match_event (match_id, side, kind, minute, player_id, related_player_id, detail)
+values (:m_past, 'home', 'substitution', 60, :p2, :p3, 'Substitution 1') on conflict do nothing;
+insert into public.match_event (match_id, side, kind, minute, detail)
+values (:m_past, 'home', 'card', 30, 'Yellow Card') on conflict do nothing;
+insert into public.match_event (match_id, side, kind, minute, detail)
+values (:m_past, 'home', 'card', 30, 'Yellow Card') on conflict do nothing;
+select count(*) as subst_rows from public.match_event
+ where match_id = :m_past and kind = 'substitution';
+rollback to s;
+
+\echo ''
+\echo '-- 32e. ⚠ 교체의 IN/OUT 방향 — 이 파일에서 가장 조용한 회귀다 --'
+\echo '   제공자는 player=나간 선수, assist=들어온 선수를 준다(실측 9/9). 이름과 반대라'
+\echo '   동기화가 뒤집는데, 뒤집기를 놓치면 화면의 교체 화살표가 통째로 거꾸로 그려진다.'
+\echo '   **빌드도 타입도 잡지 못하고 값이 그럴듯해 리뷰도 놓친다** → 구조로 잡는다:'
+\echo '   들어온 선수는 반드시 그 라인업의 **벤치**에 있다.'
+
+savepoint s;
+\echo '[0 기대] 들어온 선수가 벤치에 없는 교체는 없다'
+select count(*) as wrong_direction
+  from public.match_event e
+  left join public.match_lineup_player lp
+    on (lp.match_id, lp.side, lp.player_id) = (e.match_id, e.side, e.related_player_id)
+   and lp.role = 'bench'
+ where e.kind = 'substitution' and lp.player_id is null;
+
+\echo '[1 기대] 방향을 뒤집어 넣으면 곧바로 걸린다 — **검사가 살아 있다는 증거다**'
+update public.match_event set player_id = :p3, related_player_id = :p2
+ where match_id = :m_past and kind = 'substitution';
+select count(*) as wrong_direction
+  from public.match_event e
+  left join public.match_lineup_player lp
+    on (lp.match_id, lp.side, lp.player_id) = (e.match_id, e.side, e.related_player_id)
+   and lp.role = 'bench'
+ where e.kind = 'substitution' and lp.player_id is null;
+rollback to s;
+
+\echo ''
+\echo '-- 32f. 팀 스탯 --'
+
+savepoint s;
+\echo '[❌차단] 제공자 문자열을 그대로 담는다 — 화면이 라벨맵 키로 쓸 수 없다'
+insert into public.match_stat (match_id, side, stat_key, value)
+values (:m_past, 'home', 'Ball Possession', 39);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 같은 항목을 두 번 (재동기화가 행을 늘리면 안 된다)'
+insert into public.match_stat (match_id, side, stat_key, value)
+values (:m_past, 'home', 'possession', 40);
+rollback to s;
+
+\echo ''
+\echo '-- 32g. 진행 중 — 휴리스틱을 대신하는 컬럼이라 거짓 상태가 없어야 한다 --'
+
+savepoint s;
+\echo '[❌차단] 종료된 경기가 진행 중 (동기화가 종료 시 비우는 것을 제약으로 만든다)'
+update public.match set home_score = 1, away_score = 0, finished_at = now() where id = :m_open;
+update public.match set live_minute = 60 where id = :m_open;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 무효 경기가 진행 중'
+update public.match set voided_at = now(), live_minute = 60 where id = :m_open;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 131분 — 연장·추가시간을 넘는다'
+update public.match set live_minute = 131 where id = :m_open;
+rollback to s;
+
+savepoint s;
+\echo '[t 기대] 진행 중 표시는 정상적으로 붙는다'
+update public.match set live_minute = 63 where id = :m_open;
+select live_minute = 63 as in_progress from public.match where id = :m_open;
+rollback to s;
+
+\echo ''
+\echo '-- 32h. 선발은 정확히 11명이다 — **행 수 제약이라 CHECK로 셀 수 없다** --'
+\echo '   입축구의 "선택지 2개 미만이 0행"과 같은 자리이고, 여기서는 이 질의가 유일한 보증이다.'
+\echo '   ⚠ 검사 대상이 사용자 입력이 아니라 **동기화 스크립트가 쓴 행**이라 성립하는 배치다.'
+
+\echo '[1 기대] 위 시드는 선발이 2명뿐이라 이 질의에 걸린다 — **검사가 살아 있다는 증거다**'
+\echo '        ⚠ 이 줄이 0이 되면 질의가 아무것도 세지 않는다는 뜻이고, 그때 32h는 죽어 있다'
+\echo '          (라벨만 남고 통과하는 검사가 되는 것이 이 파일에서 가장 위험한 실패다).'
+select count(*) as broken_lineups from (
+  select l.match_id, l.side
+    from public.match_lineup l
+    left join public.match_lineup_player lp
+      on (lp.match_id, lp.side) = (l.match_id, l.side) and lp.role = 'start'
+   group by l.match_id, l.side
+  having count(lp.player_id) <> 11
+) t;
+
+rollback to s32seed;
+
+\echo '[0 기대] 동기화가 실제로 넣은 라인업 중 선발이 11명이 아닌 것은 없다'
+\echo '        (시드를 걷어낸 뒤에 센다 — 라인업이 아직 없으면 0이고, 들어오는 순간부터 문다)'
+select count(*) as broken_lineups from (
+  select l.match_id, l.side
+    from public.match_lineup l
+    left join public.match_lineup_player lp
+      on (lp.match_id, lp.side) = (l.match_id, l.side) and lp.role = 'start'
+   group by l.match_id, l.side
+  having count(lp.player_id) <> 11
+) t;
+
 rollback to s31;
 
 rollback;
