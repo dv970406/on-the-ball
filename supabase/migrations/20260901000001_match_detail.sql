@@ -74,10 +74,11 @@ create type public.match_event_kind as enum ('goal', 'card', 'substitution');
 --
 -- ⚠ **사진 URL 컬럼을 두지 않는다 — `external_id`에서 유도한다.**
 --   제공자 CDN의 주소가 `.../players/{external_id}.png`로 결정적이라, 컬럼을 두면 같은
---   사실을 두 곳이 갖게 된다. 구단 엠블럼을 `team.code`에서 유도한 것과 **같은 판단**이고
---   조립 지점도 같은 자리(`@/shared/config`)다.
+--   사실을 두 곳이 갖게 된다. 구단 엠블럼을 `team.code`에서 유도한 것과 같은 판단이다.
+--   ⚠ **거기까지만 같다** — 엠블럼은 우리가 줄인 사본을 커밋해 서빙하고 여기는 제공자 CDN을
+--     그대로 쓴다(조립은 `entities/match/lib/player-photo`가 한다).
 --   ⚠ 초상권·저작권 때문에 **사진 없이도 성립하는 화면**이 전제다(제공자조차 일부 선수의
---     사진이 없다 — 폴백은 `TeamCrest`가 이미 쓰는 형태를 따른다).
+--     사진이 없다 — 폴백은 실루엣이다).
 -- ---------------------------------------------------------------------
 create table public.player (
   id bigint generated always as identity primary key,
@@ -231,6 +232,15 @@ create table public.match_lineup_player (
   -- ⚠ 한 라인업 안에서 순서가 겹치지 않게 한다. `role`을 키에 넣어 선발과 후보가 각자
   --   1번부터 셀 수 있다(`survey_option`의 `sort_order` + unique와 같은 형태).
   unique (match_id, side, role, sort_order),
+
+  /*
+   * ⚠ **한 자리에 두 선수가 설 수 없다.** 순서(`sort_order`)는 구조로 막아 두고 좌표만
+   *   열어 두면 비대칭이다 — 겹치면 피치에서 마커가 통째로 포개져 한 명이 보이지 않는다.
+   * ⚠ **기본 NULL 처리를 그대로 쓴다**(`nulls not distinct`가 아니다). 벤치는 좌표가 전부
+   *   null이라 `nulls not distinct`로 두면 **벤치 두 번째 선수부터 거부된다.**
+   *   Postgres 기본값은 null끼리 다르게 보므로 벤치는 이 제약을 자유롭게 지나간다.
+   */
+  unique (match_id, side, grid_row, grid_col),
 
   foreign key (match_id, side)
     references public.match_lineup (match_id, side) on delete cascade
