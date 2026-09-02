@@ -64,12 +64,22 @@ export function SurveyDetailView({
   // 헤더 라벨은 크롬이자 공유 시트에 실리는 이름이다 — 화면의 h1은 아래 제목이 따로 갖는다.
   // ⚠ titleHidden: 바로 아래에 제목이 있어 라벨을 그리면 두 번 읽힌다(글 상세와 같은 처리).
   const header = <SubHeader title="입축구" titleHidden fallbackHref={ROUTES.surveyList} />;
+  /**
+   * ⚠ **네 분기가 같은 값을 쓴다**(`views/profile`의 `mainClassName`이 선례).
+   *   루트 프레임이 `h-dvh … overflow-hidden`이라 `<main>`이 스스로 스크롤하지 않으면 넘친
+   *   내용에 **닿을 방법이 아예 없다** — 휠도 터치도 먹지 않는다.
+   *   한때 정상 분기만 고쳤는데, 실제로 위험한 것은 **에러 분기**다: `EmptyState`의
+   *   `description`이 DB 에러 원문이라 길어질 수 있어 짧은 뷰포트에서 **"다시 시도" 버튼이
+   *   잘린다** — 복구 수단에 닿지 못하는 상태가 된다.
+   *   분기마다 손으로 적는 형태를 남기면 분기가 하나 늘 때 같은 사고가 반복된다.
+   */
+  const mainClassName = "no-scrollbar min-h-0 flex-1 overflow-y-auto px-5";
 
   if (isLoading) {
     return (
       <>
         {header}
-        <main className="flex flex-col gap-3 px-5 py-6">
+        <main className={`${mainClassName} flex flex-col gap-3 py-6`}>
           <Skeleton className="h-7 w-3/4" />
           <Skeleton className="mt-3 h-11 w-full" />
           <Skeleton className="h-11 w-full" />
@@ -87,7 +97,7 @@ export function SurveyDetailView({
     return (
       <>
         {header}
-        <main className="px-5 py-6">
+        <main className={`${mainClassName} py-6`}>
           <EmptyState
             title="입축구를 불러오지 못했어요"
             description={error.message}
@@ -103,7 +113,7 @@ export function SurveyDetailView({
     return (
       <>
         {header}
-        <main className="px-5 py-6">
+        <main className={`${mainClassName} py-6`}>
           <EmptyState
             title="입축구를 찾을 수 없어요"
             description="삭제되었거나 주소가 잘못됐어요."
@@ -116,7 +126,7 @@ export function SurveyDetailView({
   return (
     <>
       {header}
-      <main className="px-5 pb-10 pt-5">
+      <main className={`${mainClassName} pb-10 pt-5`}>
         <h1 className="text-[19px] font-semibold leading-[1.4] tracking-[-0.4px] text-ink">
           {survey.title}
         </h1>

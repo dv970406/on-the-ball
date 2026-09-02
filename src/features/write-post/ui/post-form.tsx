@@ -130,7 +130,7 @@ export function PostForm({
   return (
     <>
       {/* 프레임이 flex 컬럼이라 `h-full`이 아니라 `min-h-0 flex-1`. `relative`는 sr-only 누출 방지 */}
-      <main className="relative min-h-0 flex-1 overflow-y-auto pb-[calc(140px+env(safe-area-inset-bottom))]">
+      <main className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto pb-[calc(140px+env(safe-area-inset-bottom))]">
         <h1 className="sr-only">{editing ? "글 수정" : "글쓰기"}</h1>
 
         <form onSubmit={handleSubmit}>

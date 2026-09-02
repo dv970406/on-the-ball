@@ -61,7 +61,7 @@ export function ProfileView({ linkPending, errorCode, errorDescription }: Profil
    * ⚠ `relative` — 숨은 파일 input의 `sr-only`(position:absolute)가 프레임까지 새지 않게 한다.
    */
   const mainClassName =
-    "relative min-h-0 flex-1 overflow-y-auto pb-[calc(122px+env(safe-area-inset-bottom))]";
+    "no-scrollbar relative min-h-0 flex-1 overflow-y-auto pb-[calc(122px+env(safe-area-inset-bottom))]";
 
   /*
    * ⚠ **로딩을 화면 전체의 조기 반환으로 두지 않는다.**

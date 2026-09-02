@@ -166,11 +166,22 @@ export function PostDetailView({
     />
   );
 
+  /**
+   * ⚠ **네 분기가 같은 값을 쓴다**(`views/profile`이 선례). 루트 프레임이
+   *   `h-dvh … overflow-hidden`이라 `<main>`이 스스로 스크롤하지 않으면 넘친 내용에
+   *   **닿을 방법이 아예 없다**. 정상 분기만 고쳐 두면 위험한 것은 **에러 분기**다 —
+   *   `EmptyState`의 `description`이 에러 원문이라 길어질 수 있어 짧은 뷰포트에서
+   *   **"다시 시도" 버튼이 잘린다**(복구 수단에 닿지 못한다).
+   * ⚠ `h-full`이 아니라 `min-h-0 flex-1` — SubHeader와 형제라 `h-full`이면 프레임이
+   *   헤더 높이(71px)만큼 넘친다. `relative`는 sr-only가 새어나가지 않게 한다.
+   */
+  const mainClassName = "no-scrollbar relative min-h-0 flex-1 overflow-y-auto";
+
   if (isPending) {
     return (
       <>
         {header()}
-        <main className="flex flex-col gap-3 px-5 py-6">
+        <main className={`${mainClassName} flex flex-col gap-3 px-5 py-6`}>
           <Skeleton className="h-8 w-3/4" />
           <Skeleton className="h-5 w-1/3" />
           <Skeleton className="mt-3 h-40 w-full" />
@@ -190,7 +201,7 @@ export function PostDetailView({
     return (
       <>
         {header()}
-        <main>
+        <main className={mainClassName}>
           <EmptyState
             title="글을 불러오지 못했어요"
             description={error.message}
@@ -205,7 +216,7 @@ export function PostDetailView({
     return (
       <>
         {header()}
-        <main>
+        <main className={mainClassName}>
           <EmptyState
             title="글을 찾을 수 없어요"
             description="삭제되었거나 없는 글이에요."
@@ -242,7 +253,7 @@ export function PostDetailView({
         ⚠ `h-full`이 아니라 `min-h-0 flex-1` — SubHeader와 형제라 `h-full`이면 프레임이
           헤더 높이(71px)만큼 넘친다. `relative`는 sr-only가 새어나가지 않게 한다.
       */}
-      <main className="relative min-h-0 flex-1 overflow-y-auto pb-[calc(84px+env(safe-area-inset-bottom))]">
+      <main className={`${mainClassName} pb-[calc(84px+env(safe-area-inset-bottom))]`}>
         {/* 캐시된 글은 그대로 두고 최신화 실패만 알린다 */}
         {error && (
           <p
