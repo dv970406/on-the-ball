@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import {
+  LineupBench,
+  LineupPitch,
+  StatComparison,
+  buildStatRows,
   type Match,
+  type MatchEvent,
+  type MatchLineup,
+  type MatchStat,
   type MatchPredictionResult,
   TeamCrest,
   isAwaitingResult,
@@ -32,6 +39,15 @@ interface MatchDetailViewProps {
   /** 서버가 미리 조회한 예측 분포 — **킥오프가 지났을 때만** 온다(막대 시프트를 막는다) */
   initialResults?: MatchPredictionResult[];
   /**
+   * 서버가 미리 조회한 확정 라인업.
+   * ⚠ 게이팅이 시각이 아니라 **행의 존재**라 조건 없이 내려온다 — 빈 배열이면 아직 발표 전이다.
+   */
+  initialLineups?: MatchLineup[];
+  /** 서버가 미리 조회한 득점·카드·교체 — 라인업과 같은 규약(`[]`는 "아직 없음") */
+  initialEvents?: MatchEvent[];
+  /** 서버가 미리 조회한 팀 스탯 */
+  initialStats?: MatchStat[];
+  /**
    * 서버가 렌더한 시점의 시각.
    * ⚠ **`MatchPrediction`까지 흘려보내야 한다** — 거기서 마감을 판정하는데 `useNowMs()`는
    *   서버에서 `null`이라, 이 값이 없으면 **킥오프가 지난 경기가 예측 가능한 상태로 SSR된다.**
@@ -49,13 +65,19 @@ export function MatchDetailView({
   initialMatch,
   initialUserId,
   initialResults,
+  initialLineups,
+  initialEvents,
+  initialStats,
   serverNowMs,
 }: MatchDetailViewProps) {
   // 조회·대기 판정은 `model/use-match-detail`이 소유한다
-  const { match, isLoading, error, refetch } = useMatchDetail({
+  const { match, isLoading, error, refetch, detail } = useMatchDetail({
     matchId,
     initialMatch,
     initialUserId,
+    initialLineups,
+    initialEvents,
+    initialStats,
   });
 
   /**
@@ -68,6 +90,23 @@ export function MatchDetailView({
   //   ⚠ `??`는 단축평가라 훅을 뒤에 두면 조건부 호출이 된다 → 먼저 무조건 부른다.
   const clientNowMs = useNowMs();
   const nowMs = serverNowMs ?? clientNowMs ?? null;
+
+  /**
+   * ⚠ **양 팀이 다 있을 때만 피치를 그린다.** 한쪽만 오는 경우가 실제로 있는데(제공자가
+   *   한 팀 시트만 먼저 낸다), 반쪽 피치는 "상대 팀은 아직 안 나왔다"가 아니라 "이 경기는
+   *   11명이 뛴다"로 읽힌다.
+   * ⚠ 조회 실패도 같은 분기로 떨어진다 — 곁다리라 실패해도 본문을 가리지 않는다(훅 주석).
+   */
+  // ⚠ 타입 주석을 붙이지 않는다 — `detail.lineups`가 이미 `MatchLineup[] | undefined`다
+  const home = detail.lineups?.find((l) => l.side === "home");
+  const away = detail.lineups?.find((l) => l.side === "away");
+  /**
+   * 기록 표가 **실제로 그려지는가** — 출처 문구가 이 값을 함께 본다.
+   * ⚠ `stats.length > 0`으로 세면 안 된다. `buildStatRows`가 **양쪽 값이 다 있는 항목만**
+   *   남기므로, 표시 목록에 없는 키만 저장된 경기는 행이 0이라 표가 `null`인데 **출처 문구만
+   *   남는다.** 판정을 같은 함수가 갖게 한다(`code-quality.md` 응집도).
+   */
+  const statRows = detail.stats ? buildStatRows(detail.stats) : [];
 
   const title = match ? `${match.homeTeam.name} vs ${match.awayTeam.name}` : "경기";
   // ⚠ **두 컬럼을 함께 본다** — `MatchCard`와 같은 판정이어야 한다(DB CHECK가 쌍을 강제하지만
@@ -96,7 +135,15 @@ export function MatchDetailView({
     <>
       <SubHeader title={title} titleHidden fallbackHref={ROUTES.matchList} />
 
-      <main className="px-5 pb-16 pt-4">
+      {/*
+        ⚠ **스크롤 영역이 여기 있어야 한다.** 루트 프레임이 `h-dvh … overflow-hidden`이라
+          `<main>`이 스스로 스크롤하지 않으면 넘친 내용에 **닿을 방법이 아예 없다** —
+          휠도 터치도 먹지 않고 `scrollTop`으로만 움직인다(실측). 라인업·기록이 붙기 전에는
+          내용이 프레임에 들어가 증상이 드러나지 않았을 뿐, 없던 문제가 아니다.
+        ⚠ `h-full`이 아니라 `min-h-0 flex-1` — `SubHeader`와 형제라 `h-full`이면 프레임이
+          헤더 높이만큼 넘친다(글 상세가 같은 주석을 갖는다).
+      */}
+      <main className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-5 pb-16 pt-4">
         {isLoading && (
           <div aria-hidden>
             {/* ⚠ 골격이 실제 화면과 같아야 한다 — 헤더가 엠블럼(44px) + 이름 두 줄로 높아졌다 */}
@@ -218,6 +265,50 @@ export function MatchDetailView({
                 serverNowMs={serverNowMs}
               />
             </div>
+
+            {/*
+             * 확정 라인업 — **발표되기 전에는 블록 자체가 없다.**
+             * ⚠ 스켈레톤을 두지 않는다. 라인업은 킥오프 20~40분 전에야 나오고 연기·취소된
+             *   경기에는 영영 오지 않아서, 자리를 잡아 두면 **대부분의 시간에 오지 않을 것을
+             *   기다리는 화면**이 된다(로딩 중 레이아웃이 튀지 않게 하려는 스켈레톤의 목적과
+             *   반대다 — 여기서는 없는 게 정상이라 나타날 때 자라는 편이 맞다).
+             * ⚠ 조회 실패도 조용히 넘긴다 — 곁다리라 본문(대진·예측)을 가리면 안 된다.
+             */}
+            {home && away ? (
+              <>
+                <LineupPitch
+                  home={home}
+                  away={away}
+                  homeTeam={match.homeTeam}
+                  awayTeam={match.awayTeam}
+                  marks={detail.playerMarks}
+                />
+                <LineupBench
+                  home={home}
+                  away={away}
+                  homeTeam={match.homeTeam}
+                  awayTeam={match.awayTeam}
+                  marks={detail.playerMarks}
+                />
+              </>
+            ) : null}
+
+            {/*
+             * 경기 기록 — 라인업과 **독립적으로** 그린다.
+             * ⚠ 라인업 블록 안에 넣지 않는다. 스탯은 킥오프 후에 생기고 라인업은 그 전에
+             *   오므로 둘의 유무가 따로 논다 — 한쪽 조건에 묶으면 라인업이 없는 경기에서
+             *   기록까지 사라진다(연기됐다가 치러진 경기가 실제로 그 모양이다).
+             */}
+            {statRows.length > 0 ? (
+              <StatComparison rows={statRows} homeTeam={match.homeTeam} awayTeam={match.awayTeam} />
+            ) : null}
+
+            {/* 출처 — 평점·스탯이 제공자마다 값이 다르므로 어디 것인지 밝힌다 */}
+            {(home && away) || statRows.length > 0 ? (
+              <p className="mt-4 text-center text-[11px] text-ink-mute-2">
+                라인업·기록 제공: API-Football
+              </p>
+            ) : null}
           </>
         )}
       </main>

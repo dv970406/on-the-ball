@@ -4,13 +4,26 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
 import type {
   Match,
+  MatchEvent,
+  MatchLineup,
   MatchListPage,
   MatchPredictionResult,
+  MatchStat,
   PredictionAccuracy,
 } from "../model/types";
 import { matchKeys } from "./keys";
 import { buildMatchListQueries } from "./list-query";
-import { MATCH_SELECT, buildMatch, buildMatchPredictionResult } from "./mappers";
+import {
+  EVENT_SELECT,
+  LINEUP_SELECT,
+  MATCH_SELECT,
+  STAT_SELECT,
+  buildMatch,
+  buildMatchEvent,
+  buildMatchLineups,
+  buildMatchPredictionResult,
+  buildMatchStat,
+} from "./mappers";
 
 /**
  * 경기 목록 — 지난 며칠 + 다가오는 경기.
@@ -83,6 +96,108 @@ export function useMatchQuery(
         throw new Error(toDbErrorMessage(error));
       }
       return data ? buildMatch(data) : null;
+    },
+    enabled: enabled && Number.isSafeInteger(matchId) && matchId > 0,
+  });
+}
+
+/**
+ * 확정 라인업 — **발표되기 전에는 빈 배열**이다.
+ *
+ * ⚠ **게이팅이 시각이 아니라 행의 존재다.** 라인업은 킥오프 20~40분 전에 도착하는데 그 시각을
+ *   화면이 알 방법이 없고, 연기·취소된 경기에서는 영영 오지 않는다 → "있으면 그린다"가
+ *   유일하게 정직한 판정이다(`isPredictionResultsOpen`처럼 시각으로 가르려 들면 반드시 어긋난다).
+ *
+ * ⚠ **`undefined`와 `[]`가 다른 뜻이다.** `undefined`는 "프리페치하지 않았다"(클라이언트가
+ *   조회한다), `[]`는 "받았는데 아직 발표 전"이다. 하나로 접으면 라인업 없는 경기가 매번
+ *   재조회된다(`usePollQuery`가 같은 이유로 `null`을 정상값으로 둔다).
+ */
+export function useMatchLineupQuery(
+  matchId: number,
+  userId: string | undefined,
+  enabled = true,
+  initialData?: MatchLineup[],
+) {
+  return useQuery<MatchLineup[], Error>({
+    initialData,
+    queryKey: matchKeys.lineup(matchId, userId),
+    queryFn: async () => {
+      const supabase = requireBrowserSupabase();
+      const { data, error } = await supabase
+        .from("match_lineup")
+        .select(LINEUP_SELECT)
+        .eq("match_id", matchId);
+
+      if (error) {
+        console.error("[match] 라인업 조회 실패:", error);
+        throw new Error(toDbErrorMessage(error));
+      }
+      return buildMatchLineups(data ?? []);
+    },
+    enabled: enabled && Number.isSafeInteger(matchId) && matchId > 0,
+  });
+}
+
+/**
+ * 득점·카드·교체 — **경기가 시작해야 생긴다.**
+ *
+ * ⚠ **라인업과 별도 쿼리다**(수명이 다르다 — 그 파일 주석). 게이팅은 여기서도 행의 존재다.
+ * ⚠ 정렬을 DB에 맡긴다 — 같은 분에 여러 건이 있을 때 `id`가 제공자가 준 순서를 담고 있다.
+ */
+export function useMatchEventsQuery(
+  matchId: number,
+  userId: string | undefined,
+  enabled = true,
+  initialData?: MatchEvent[],
+) {
+  return useQuery<MatchEvent[], Error>({
+    initialData,
+    queryKey: matchKeys.events(matchId, userId),
+    queryFn: async () => {
+      const supabase = requireBrowserSupabase();
+      const { data, error } = await supabase
+        .from("match_event")
+        .select(EVENT_SELECT)
+        .eq("match_id", matchId)
+        .order("minute", { ascending: true })
+        .order("id", { ascending: true });
+
+      if (error) {
+        console.error("[match] 사건 조회 실패:", error);
+        throw new Error(toDbErrorMessage(error));
+      }
+      return (data ?? []).map(buildMatchEvent);
+    },
+    enabled: enabled && Number.isSafeInteger(matchId) && matchId > 0,
+  });
+}
+
+/**
+ * 팀 스탯 — **경기가 시작해야 생긴다.**
+ *
+ * ⚠ 게이팅이 여기서도 행의 존재다. 무엇을 어떤 순서로 그릴지는 `lib/stat-rows`가 갖는다.
+ */
+export function useMatchStatsQuery(
+  matchId: number,
+  userId: string | undefined,
+  enabled = true,
+  initialData?: MatchStat[],
+) {
+  return useQuery<MatchStat[], Error>({
+    initialData,
+    queryKey: matchKeys.stats(matchId, userId),
+    queryFn: async () => {
+      const supabase = requireBrowserSupabase();
+      const { data, error } = await supabase
+        .from("match_stat")
+        .select(STAT_SELECT)
+        .eq("match_id", matchId);
+
+      if (error) {
+        console.error("[match] 팀 스탯 조회 실패:", error);
+        throw new Error(toDbErrorMessage(error));
+      }
+      return (data ?? []).map(buildMatchStat);
     },
     enabled: enabled && Number.isSafeInteger(matchId) && matchId > 0,
   });

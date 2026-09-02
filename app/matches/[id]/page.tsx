@@ -9,12 +9,29 @@ import { NOT_FOUND_TITLE, OG_IMAGE, ROUTES } from "@/shared/config";
 // ⚠ 배럴(@/shared/lib)이 아니라 직접 경로 — 배럴은 "use client" 훅을 포함한다.
 import { clamp } from "@/shared/lib/text";
 import { createSupabaseServerClient } from "@/shared/api/supabase-server";
+import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
 // ⚠ 배럴이 아니라 직접 경로 — 매퍼는 "use client"가 없어 서버에서 쓸 수 있다.
-import { MATCH_SELECT, buildMatch, buildMatchPredictionResult } from "@/entities/match/api/mappers";
+import {
+  EVENT_SELECT,
+  LINEUP_SELECT,
+  MATCH_SELECT,
+  STAT_SELECT,
+  buildMatch,
+  buildMatchEvent,
+  buildMatchLineups,
+  buildMatchPredictionResult,
+  buildMatchStat,
+} from "@/entities/match/api/mappers";
 // ⚠ 배럴이 아니라 직접 경로 — `lib/open`에는 "use client"가 없어 서버 안전하다
 //   (`app/posts/[id]/page.tsx`가 `lib/plain-summary`를 같은 형태로 가져온다).
 import { isMatchOpen, isMatchSettled, isPredictionResultsOpen } from "@/entities/match/lib/open";
-import type { Match, MatchPredictionResult } from "@/entities/match/model/types";
+import type {
+  Match,
+  MatchEvent,
+  MatchLineup,
+  MatchPredictionResult,
+  MatchStat,
+} from "@/entities/match/model/types";
 import { MatchDetailView } from "@/views/match-detail";
 
 const FALLBACK_METADATA: Metadata = { title: "승부예측" };
@@ -34,6 +51,18 @@ type MatchHead =
        * 다른 뜻이다.
        */
       results: MatchPredictionResult[] | undefined;
+      /**
+       * 확정 라인업.
+       * ⚠ `undefined`(조회 실패)와 `[]`(받았는데 아직 발표 전)를 가른다 — 하나로 접으면
+       *   라인업 없는 경기가 클라이언트에서 매번 재조회된다.
+       * ⚠ 게이팅이 시각이 아니라 **행의 존재**다(킥오프 20~40분 전에 도착하고, 연기·취소된
+       *   경기에는 영영 오지 않는다) → 조건 없이 쏘고 온 것을 그대로 넘긴다.
+       */
+      lineups: MatchLineup[] | undefined;
+      /** 득점·카드·교체. 라인업과 같은 이유로 `undefined`(실패)와 `[]`(아직 없음)를 가른다 */
+      events: MatchEvent[] | undefined;
+      /** 팀 스탯. 라인업·사건과 같은 규약 */
+      stats: MatchStat[] | undefined;
       /**
        * 이 데이터를 읽은 시각.
        * ⚠ **없으면 킥오프가 지난 경기가 예측 가능한 상태로 SSR된다** — `MatchPrediction`의
@@ -58,18 +87,50 @@ const fetchMatchHead = cache(async (matchId: number): Promise<MatchHead> => {
     const supabase = await createSupabaseServerClient();
     if (!supabase) return { state: "unknown" };
 
+    /*
+     * 라인업·사건·스탯은 **쿠키 클라이언트로 보내지 않는다.**
+     *
+     * ⚠ 세 테이블의 SELECT 정책이 전부 `using (true)`이고 어디에도 `auth.uid()`가 없다 →
+     *   **로그인 여부와 무관하게 응답이 같다.** 그래서 `hasSessionCookie()` 갈림조차 필요
+     *   없이 항상 익명 클라이언트로 보내도 뜻이 달라지지 않고, 그 fetch가 Next Data Cache를
+     *   탄다(`nextjs.md`의 "익명 조회는 캐시한다" — `app/posts/list-page.tsx`가 선례).
+     * ⚠ `ANON_REVALIDATE`가 TanStack `staleTime`과 **같은 값**이라 두 캐시의 나이도 어긋나지
+     *   않는다. 하나를 바꾸면 둘을 함께 바꾼다.
+     * ⚠ **`match`·분포 RPC·`getUser()`는 여기 못 낀다** — `match_prediction` 임베딩이 "내 행만"
+     *   이고 RPC도 사용자별이라 개인화가 섞여 있다(같은 절의 "개인화가 섞인 조회에는 쓰지 않는다").
+     * ⚠ 익명 클라이언트가 없으면(env 미설정) 쿠키 클라이언트로 폴백한다 — 캐시를 못 탈 뿐 뜻은 같다.
+     */
+    const publicDb = createSupabaseAnonClient() ?? supabase;
+
     // ⚠ 쿠키 기반 클라이언트라 `auth.uid()`가 잡힌다 → `match_prediction` 임베딩("내 행만")이
     //   그 사용자 기준으로 채워져 `myPick`이 서버·클라에서 갈리지 않는다.
-    // ⚠ 셋은 서로의 결과를 쓰지 않는다 → **병렬로** 보낸다. 직렬이면 왕복이 그대로 쌓인다.
+    // ⚠ 서로의 결과를 쓰는 조회가 하나도 없다 → **전부 병렬로** 보낸다. 직렬이면 왕복이 쌓인다.
+    //   ⚠ 개수를 적지 않는다 — 한때 "셋은"·"넷째도"라고 적었는데 조회가 늘자 곧바로 거짓이 됐다.
     // ⚠ **분포도 무조건 함께 쏜다.** 게이팅이 UI가 아니라 definer 함수 안에 있어(킥오프 전에는
     //   0행) 조건 없이 쏴도 뜻이 달라지지 않는다 — 쓸지 말지의 판정은 아래에서 킥오프가 갖는다.
     //   조건부로 직렬화하면 **결과를 볼 수 있는 사용자만 TTFB에 왕복이 하나 더** 붙는데,
     //   그건 막대를 SSR로 그리려던 이유와 정면으로 부딪힌다.
-    const [{ data: auth }, { data, error }, { data: resultRows, error: resultsError }] =
-      await Promise.all([
+    const [
+      { data: auth },
+      { data, error },
+      { data: resultRows, error: resultsError },
+      { data: lineupRows, error: lineupError },
+      { data: eventRows, error: eventError },
+      { data: statRows, error: statError },
+    ] = await Promise.all([
       supabase.auth.getUser(),
       supabase.from("match").select(MATCH_SELECT).eq("id", matchId).maybeSingle(),
       supabase.rpc("match_prediction_results", { p_match_id: matchId }),
+      // ⚠ 라인업·사건·스탯도 **같은 Promise.all에** 싣는다 — 직렬로 매달면 그 데이터가 있는
+      //   경기만 TTFB에 왕복이 더 붙는데, 그건 이것들을 SSR로 그리려던 이유와 부딪힌다.
+      publicDb.from("match_lineup").select(LINEUP_SELECT).eq("match_id", matchId),
+      publicDb
+        .from("match_event")
+        .select(EVENT_SELECT)
+        .eq("match_id", matchId)
+        .order("minute", { ascending: true })
+        .order("id", { ascending: true }),
+      publicDb.from("match_stat").select(STAT_SELECT).eq("match_id", matchId),
     ]);
 
     if (error) return { state: "unknown" };
@@ -98,7 +159,21 @@ const fetchMatchHead = cache(async (matchId: number): Promise<MatchHead> => {
         ? undefined
         : (resultRows ?? []).map(buildMatchPredictionResult);
 
-    return { state: "found", match, userId: auth.user?.id, results, nowMs };
+    // ⚠ 곁다리 조회가 실패해도 **본문은 그대로 내보낸다**(`nextjs.md`) — 라인업만 접는다.
+    const lineups = lineupError ? undefined : buildMatchLineups(lineupRows ?? []);
+    const events = eventError ? undefined : (eventRows ?? []).map(buildMatchEvent);
+    const stats = statError ? undefined : (statRows ?? []).map(buildMatchStat);
+
+    return {
+      state: "found",
+      match,
+      userId: auth.user?.id,
+      results,
+      lineups,
+      events,
+      stats,
+      nowMs,
+    };
   } catch (e) {
     // createSupabaseServerClient의 cookies()는 "이 라우트를 동적 렌더로 전환하라"는
     // Next 내부 에러를 throw해서 동작한다. 삼키면 페이지가 스켈레톤 상태로 정적
@@ -170,6 +245,9 @@ export default async function Page(props: PageProps<"/matches/[id]">) {
       initialMatch={head.state === "found" ? head.match : undefined}
       initialUserId={head.state === "found" ? head.userId : undefined}
       initialResults={head.state === "found" ? head.results : undefined}
+      initialLineups={head.state === "found" ? head.lineups : undefined}
+      initialEvents={head.state === "found" ? head.events : undefined}
+      initialStats={head.state === "found" ? head.stats : undefined}
       serverNowMs={head.state === "found" ? head.nowMs : undefined}
     />
   );

@@ -21,6 +21,18 @@ export const matchKeys = {
   results: (id: number, userId: string | undefined) =>
     [...matchKeys.all, "results", id, userScope(userId)] as const,
   /**
+   * ⚠ 라인업은 "나"에 종속되지 않지만(누가 봐도 같다) **같은 스코프를 쓴다.**
+   *   상세 화면의 다른 키들이 전부 스코프돼 있어서, 여기만 빼면 SSR이 내려준 `initialUserId`
+   *   경로가 이 쿼리에만 다르게 흐른다 — 규약을 슬라이스 안에서 갈라 두면 반드시 어긋난다.
+   */
+  lineup: (id: number, userId: string | undefined) =>
+    [...matchKeys.all, "lineup", id, userScope(userId)] as const,
+  /** ⚠ 라인업과 **키를 나눈다** — 사건은 경기 내내 쌓여서 수명이 다르다(그 파일 주석) */
+  events: (id: number, userId: string | undefined) =>
+    [...matchKeys.all, "events", id, userScope(userId)] as const,
+  stats: (id: number, userId: string | undefined) =>
+    [...matchKeys.all, "stats", id, userScope(userId)] as const,
+  /**
    * ⚠ **`userScope`를 쓴다.** 이 키는 비로그인일 때도 **조립되기 때문**이다(조회만 `enabled`로
    *   꺼진다) — `identityKeys`·`profileKeys`처럼 인자가 `string`이라 아예 만들어지지 않는
    *   키와 갈리는 지점이다. 호출부가 `?? ""` 같은 리터럴을 각자 적으면 그 순간 키가 갈린다.

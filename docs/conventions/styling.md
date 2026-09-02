@@ -184,6 +184,7 @@ function cardClassName(peek: boolean) {
 | 도트·아바타·`Pill`·`RatioBar`·워드마크의 볼 | 컨트롤이 아닌 **표시 요소** | `live-dot` · `avatar` · `pill` · `ratio-bar` · `wordmark` · `post-card`의 구분점 · `profile-view`의 아바타 스켈레톤·업로드 스피너 |
 | 바텀시트 **그래버**(36×4px 바) | 누르는 컨트롤이 아니라 **드래그 어포던스** — 아래로 끌면 시트가 따라 내려간다 | `shared/ui/sheet.tsx` |
 | 분할 카드의 **VS 배지** | `aria-hidden` 장식이라 컨트롤이 아니다 — 원이 아니면 성립하지 않는 형태다 | `entities/survey/ui/vs-badge.tsx` |
+| 라인업의 **선수 사진**·**등번호 배지**·**센터서클**·**사건 배지**(득점·교체) | 누르는 컨트롤이 아니라 피치와 선수를 그리는 표시 요소다 — 전부 원이 아니면 성립하지 않는다(사진은 `Avatar`와 같은 얼굴 원이다) | `entities/match/ui/lineup-pitch.tsx` · `player-badges.tsx` · `player-photo.tsx` |
 
 ⚠ 위의 알약 예외 표와 이 "대상이 아닌 것" 표는 **`pnpm check:conventions`가 대조한다** — 목록에 없는 `rounded-full`이 생기면 검사가 실패한다. 그림자·`backdrop-blur` 예외도 같다.
 ⚠ 다만 검사가 대조하는 것은 **파일 경로**이고 행 수가 아니다. 여기에 "세 목록"·"4곳" 같은 **개수를 적지 않는다** — 표에 행을 더하면 그 개수가 곧바로 거짓이 된다.

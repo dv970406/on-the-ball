@@ -55,6 +55,12 @@
 쿠키가 없으므로 색인 대상 렌더는 언제나 익명 렌더이고, 익명 렌더는 모든 익명 요청에 동일하다
 (`auth.uid()`가 null이라 `is_blocked()`는 false, `post_like` 임베딩은 빈 배열) → **캐시 가능하다.**
 
+⚠ **갈림조차 필요 없는 조회도 있다.** 경기 상세의 라인업·사건·팀 스탯은 SELECT 정책이
+전부 `using (true)`이고 `auth.uid()`를 아예 보지 않아 **로그인 여부와 무관하게 응답이 같다**
+→ 쿠키를 확인하지 않고 항상 익명 클라이언트로 보낸다(`app/matches/[id]/page.tsx`).
+같은 요청의 `match`·분포 RPC는 개인화가 섞여 쿠키 클라이언트에 남는다 — **한 페이지 안에서
+두 클라이언트가 공존하는 형태**다.
+
 → `hasSessionCookie()`로 갈라, 세션이 없으면 `createSupabaseAnonClient()`가 조회한다
 (`shared/api/supabase-anon` — fetch가 `next.revalidate`로 Data Cache를 탄다). 선례는
 `app/posts/list-page.tsx`. 비로그인·크롤러의 조회가 캐시 히트에서 DB를 타지 않는다.
@@ -134,7 +140,7 @@ Router Cache는 **URL로만 키가 잡히고 세션은 키에 들어가지 않�
 | `app/surveys/[id]/page.tsx` | 입축구 제목 + 선택지 + **집계** (+ **서버가 본 `userId`**) |
 | `app/posts/list-page.tsx` | 글 목록(말머리·정렬 적용) (+ **서버 시각**) |
 | `app/surveys/page.tsx` | 입축구 목록 (+ `userId` · **서버 시각**) |
-| `app/matches/[id]/page.tsx` | 대진·스코어 + **예측 분포**(킥오프 후에만) (+ `userId` · **서버 시각**) |
+| `app/matches/[id]/page.tsx` | 대진·스코어 + **예측 분포**(킥오프 후에만) + **확정 라인업·사건·팀 스탯** (+ `userId` · **서버 시각**) |
 | `app/matches/page.tsx` | 경기 목록 (+ `userId` · **서버 시각**) |
 
 - **프리페치는 최적화일 뿐이다.** 실패하면 `undefined`를 넘겨 클라이언트 조회 경로로

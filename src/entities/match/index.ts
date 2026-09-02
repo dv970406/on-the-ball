@@ -5,12 +5,23 @@
 //    `Team`·`PredictionAccuracy`는 이 슬라이스 안에서만 쓰여 배럴에서 뺐다 —
 //    `check:conventions`가 이 유형을 **잡지 못하므로**(상대 경로 소비도 "현역"으로 센다)
 //    손으로 지킨다. `entities/survey`가 `SurveyOption`·`SplitCount`를 같은 이유로 뺐다.
-export type { Match, MatchListPage, MatchPick, MatchPredictionResult } from "./model/types";
+export type {
+  Match,
+  MatchEvent,
+  MatchLineup,
+  MatchListPage,
+  MatchPick,
+  MatchPredictionResult,
+  MatchStat,
+} from "./model/types";
 export { matchKeys } from "./api/keys";
 // ⚠ 상한은 서버 안전한 api/mappers에 있다 — 목록 SSR이 같은 값을 써야 한다.
 //    구역별로 갈린 이유는 그 파일 주석에(한 상한이면 지난 경기가 다가오는 경기를 굶긴다).
 export { MATCH_PAST_LIMIT, MATCH_UPCOMING_LIMIT } from "./api/mappers";
 export {
+  useMatchEventsQuery,
+  useMatchStatsQuery,
+  useMatchLineupQuery,
   useMatchListQuery,
   useMatchPredictionResultsQuery,
   useMatchQuery,
@@ -38,3 +49,15 @@ export { MatchCard } from "./ui/match-card";
 // ⚠ 상세도 엠블럼을 그리므로 배럴에 올린다(카드는 같은 슬라이스라 상대 경로로 가져간다).
 export { TeamCrest } from "./ui/team-crest";
 export { PredictionBlock } from "./ui/prediction-block";
+// ⚠ 라인업 UI에는 `"use client"`가 없지만 지금 소비자가 클라이언트 뷰라 클라이언트로 내려간다.
+//    피치 좌표의 좌우 판정은 `lib/pitch-layout`이 단독으로 갖고 배럴에 올리지 않는다
+//    (슬라이스 밖 소비자가 없다 — `MATCH_PICKS`를 뺀 것과 같은 이유).
+export { LineupPitch } from "./ui/lineup-pitch";
+export { LineupBench } from "./ui/lineup-bench";
+// ⚠ 득점·카드·교체 판정을 이 함수가 단독으로 갖는다 — 피치와 후보 명단이 같은 값을 읽어야
+//    한다. `kind === "goal"`이 곧 득점이 아니라는 것(실축·VAR 취소)이 여기 들어 있다.
+export { buildPlayerMarks } from "./lib/player-marks";
+// ⚠ 무엇을 어떤 순서로 그릴지는 **우리 편집 결정**이라 DB가 아니라 `lib/stat-rows`가 갖는다.
+// ⚠ 조립을 뷰가 부른다 — "그릴 게 있는가"를 표와 출처 문구가 **같은 함수**로 판정해야 한다
+export { buildStatRows } from "./lib/stat-rows";
+export { StatComparison } from "./ui/stat-comparison";

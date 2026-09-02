@@ -108,6 +108,11 @@ const STYLE_ALLOWED = {
     "src/shared/ui/sheet.tsx",
     // "대상이 아닌 것" — 분할 카드의 VS 배지(aria-hidden 장식, 컨트롤이 아니다)
     "src/entities/survey/ui/vs-badge.tsx",
+    // 등번호 원·센터서클·사건 배지 — 컨트롤이 아니라 피치와 선수를 그리는 표시 요소다
+    // (전부 원이 아니면 성립하지 않는 형태다)
+    "src/entities/match/ui/lineup-pitch.tsx",
+    "src/entities/match/ui/player-badges.tsx",
+    "src/entities/match/ui/player-photo.tsx",
   ],
   // 그림자는 "떠 있는 레이어"만 — resting 카드·목록·헤더는 flat + 1px 헤어라인
   "shadow-": [

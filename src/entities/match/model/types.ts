@@ -31,6 +31,101 @@ export const MATCH_PICK_LABEL: Record<MatchPick, string> = {
   away: "원정 승",
 };
 
+/** 'home' | 'away' — DB enum에서 생성된 타입이라 손으로 적지 않는다 */
+export type MatchSide = Database["public"]["Enums"]["match_side"];
+
+/** 'start' | 'bench' */
+export type LineupRole = Database["public"]["Enums"]["lineup_role"];
+
+export type PlayerRow = Database["public"]["Tables"]["player"]["Row"];
+export type MatchLineupRow = Database["public"]["Tables"]["match_lineup"]["Row"];
+export type MatchLineupPlayerRow = Database["public"]["Tables"]["match_lineup_player"]["Row"];
+
+export interface LineupPlayer {
+  playerId: PlayerRow["id"];
+  /**
+   * 제공자 선수 id — **사진 URL이 여기서 유도된다**(`playerPhotoUrl`).
+   * ⚠ 사진 주소를 저장하지 않는 이유는 주소가 이 값에서 결정적으로 나오기 때문이다
+   *   (엠블럼을 `team.code`에서 유도한 것과 같은 판단 — 다만 엠블럼은 사본을 커밋하고
+   *   여기는 핫링크라 자산의 성격은 반대다. 사유는 `lib/player-photo`).
+   */
+  externalId: PlayerRow["external_id"];
+  /**
+   * ⚠ **한국어다**(`team.name`과 같은 규약) — 화면에서 옮기지 않는다.
+   *   표기는 `scripts/player-names-ko.json`이 갖고, 없는 선수만 영문 풀네임으로 폴백한다.
+   */
+  name: PlayerRow["name"];
+  shirtNumber: MatchLineupPlayerRow["shirt_number"];
+  /** 'G' · 'D' · 'M' · 'F' — 제공자 표기라 **닫힌 집합이 아니다**(enum이 아닌 이유) */
+  position: MatchLineupPlayerRow["position"];
+  /**
+   * 평점.
+   * ⚠ **`null`이 "0점"이 아니라 "출전하지 않음"이다.** 미출전 후보에게 0.0을 그리면
+   *   화면이 최악의 평점을 말하는 셈이 된다(동기화가 실제로 그렇게 저장한 적이 있다 —
+   *   `Number(null)`이 0이고 범위 검사 0~10도 그걸 통과시켰다).
+   * ⚠ 다른 사이트의 평점과 **값이 다르다**(같은 경기 같은 선수에서 최대 3.4점 차 실측).
+   *   화면이 출처를 밝혀야 하고, 다른 곳 숫자와 맞추려 들면 안 된다.
+   */
+  rating: number | null;
+  /**
+   * 피치 좌표(행:열). **선발만 갖는다** — 벤치는 피치 위에 없어 DB CHECK가 null을 강제한다.
+   * ⚠ 열은 **그 팀의 왼쪽부터** 1씩 는다(양 팀 모두 — 실측). 뷰어 기준 좌우는
+   *   공격 방향에 따라 갈리므로 `lib/pitch-layout`이 단독으로 판정한다.
+   */
+  gridRow: MatchLineupPlayerRow["grid_row"];
+  gridCol: MatchLineupPlayerRow["grid_col"];
+}
+
+/** 'goal' | 'card' | 'substitution' */
+export type MatchEventKind = Database["public"]["Enums"]["match_event_kind"];
+
+export type MatchEventRow = Database["public"]["Tables"]["match_event"]["Row"];
+
+export interface MatchEvent {
+  id: MatchEventRow["id"];
+  side: MatchSide;
+  kind: MatchEventKind;
+  minute: MatchEventRow["minute"];
+  /** 추가시간(45+2의 2). ⚠ 분과 합치지 않는다 — 전반 추가시간과 후반 2분이 구분되지 않는다 */
+  extraMinute: MatchEventRow["extra_minute"];
+  /**
+   * 사건의 주체. 종류마다 뜻이 다르다 —
+   *   goal → 득점자 · card → 카드를 받은 선수 · substitution → **나간 선수**
+   * ⚠ **`null`일 수 있다.** 제공자가 선수를 특정하지 못하는 사건이 있고, 특히 **VAR로 취소된
+   *   페널티에 선수 없는 골 이벤트가 딸려 온다**(실측: 최종 0-1인 경기에 골 이벤트가 2건).
+   *   그래서 골 이벤트 수를 스코어로 삼으면 안 된다 — 화면은 **선수에 붙일 수 있는 것만** 그린다.
+   */
+  playerId: MatchEventRow["player_id"];
+  playerName: string | null;
+  /** goal → 도움 · substitution → **들어온 선수** · card → 없다 */
+  relatedPlayerId: MatchEventRow["related_player_id"];
+  relatedPlayerName: string | null;
+  /** 'Normal Goal'·'Own Goal'·'Penalty'·'Missed Penalty'·'Yellow Card'·'Red Card' 등 제공자 원문 */
+  detail: MatchEventRow["detail"];
+}
+
+export type MatchStatRow = Database["public"]["Tables"]["match_stat"]["Row"];
+
+export interface MatchStat {
+  side: MatchSide;
+  /** 우리 슬러그(`possession`·`expected_goals`…) — 제공자 문자열이 아니다 */
+  statKey: MatchStatRow["stat_key"];
+  /**
+   * ⚠ **행이 없는 것과 0은 다르다.** 없으면 "그 항목을 받지 못했다"이고 0은 실제로 0이다
+   *   (제공자가 퇴장 0을 null로 주므로 동기화가 아는 카운터만 0으로 접는다).
+   */
+  value: number;
+}
+
+export interface MatchLineup {
+  side: MatchSide;
+  /** "4-2-3-1". ⚠ nullable — 제공자가 라인업은 주면서 포메이션을 비우는 경기가 있다 */
+  formation: MatchLineupRow["formation"];
+  coachName: MatchLineupRow["coach_name"];
+  starters: LineupPlayer[];
+  bench: LineupPlayer[];
+}
+
 export interface Team {
   code: TeamRow["code"];
   name: TeamRow["name"];
