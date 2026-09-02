@@ -7,7 +7,7 @@
  *   node scripts/sync-matches.mjs --remote           # 원격 프로젝트에 쓴다 (명시적일 때만)
  *
  * ⚠ **라인업·사건·스탯은 여기서 하지 않는다** — 주기가 다르다(여기는 하루 한두 번,
- *   저쪽은 킥오프 전후 3분 간격) → `scripts/sync-match-detail.mjs`.
+ *   저쪽은 킥오프 직전·종료 직후 5분 간격) → `scripts/sync-match-detail.mjs`.
  *
  * ⚠ **`team`·`match`에는 정책도 grant도 없다.** 앱에는 쓰기 경로가 아예 없고 유일한 writer가
  *   여기다 → 이 기능이 늘리는 사용자 쓰기 표면은 `match_prediction` 하나뿐이다.
