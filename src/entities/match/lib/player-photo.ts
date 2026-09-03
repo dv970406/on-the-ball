@@ -1,3 +1,5 @@
+import { env } from "@/shared/config";
+
 /**
  * 제공자 미디어 CDN — 선수·감독 사진이 여기 산다.
  * ⚠ **우리 스토리지가 아니다.** `publicStorageUrl`(supabase 공개 버킷)과 성격이 다르므로
@@ -34,6 +36,10 @@ const MEDIA_ORIGIN = `${PHOTO_ORIGIN}/football`;
  *   **공개 배포 전에 확인이 필요한 항목**이라는 사실을 여기 남긴다.
  */
 export function playerPhotoUrl(externalId: string | null | undefined): string | null {
+  // ⚠ **권리 스위치가 여기 있다**(`env.showPlayerPhotos`, 기본 꺼짐). 호출부가 각자 판정하면
+  //   새 호출부가 생길 때마다 빠뜨릴 수 있어, 주소를 만드는 유일한 자리가 소유한다.
+  //   끄면 `PlayerPhoto`가 이미 가진 실루엣 폴백으로 자연스럽게 떨어진다.
+  if (!env.showPlayerPhotos) return null;
   // ⚠ 숫자만 받는다 — 이 값이 그대로 URL 경로가 되므로 형태를 좁혀 두지 않으면
   //   저장된 값 하나로 임의 경로를 만들 수 있다(동기화가 넣는 값이지만 방어는 여기 둔다).
   if (!externalId || !/^[0-9]+$/.test(externalId)) return null;

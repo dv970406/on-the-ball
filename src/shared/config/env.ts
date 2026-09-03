@@ -16,6 +16,20 @@ export const env = {
    *   값이 잡히지 않고 조용히 localhost가 나가므로, 반드시 빌드 환경에 넣어야 한다.
    */
   siteUrl: resolveSiteUrl(),
+  /**
+   * 선수 사진을 **실제로 그릴 것인가**.
+   *
+   * ⚠ **기본이 꺼짐인 것이 이 플래그의 요점이다.** 제공자는 사진의 권리자가 아니고
+   *   ("identification and descriptive purposes"로 제공할 뿐 게시 라이선스를 주지 않는다),
+   *   권리는 **사진 저작권(촬영 에이전시)과 선수의 초상·퍼블리시티권 두 겹**으로 걸린다.
+   *   그래서 값이 없는 환경 — 즉 **새로 만든 배포 환경** — 은 자동으로 안 그리는 쪽이 된다.
+   *   켜는 것은 언제나 명시적인 행위여야 한다.
+   * ⚠ 끄면 화면이 깨지는 게 아니라 `PlayerPhoto`가 **실루엣으로 떨어진다** — 이미 있는
+   *   폴백 경로라, 이 플래그는 UI를 되돌리는 것이 아니라 분기 하나를 닫는 일이다.
+   * ⚠ 판정을 호출부가 각자 하지 않는다 — 사진 주소를 만드는 `playerPhotoUrl`이 이 값을
+   *   보고 `null`을 돌려준다(호출부가 기억해야 하는 방어는 방어가 아니다).
+   */
+  showPlayerPhotos: process.env.NEXT_PUBLIC_SHOW_PLAYER_PHOTOS === "true",
 };
 
 /** 스킴이 빠진 값이 흔해서 붙여준다 — `new URL("example.com")`은 그대로 두면 throw한다 */

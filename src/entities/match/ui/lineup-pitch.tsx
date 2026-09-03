@@ -1,4 +1,5 @@
 import { preconnect } from "react-dom";
+import { env } from "@/shared/config";
 import { cn } from "@/shared/lib/cn";
 import { buildPitchSpots } from "../lib/pitch-layout";
 import { PHOTO_ORIGIN } from "../lib/player-photo";
@@ -45,7 +46,8 @@ export function LineupPitch({ home, away, homeTeam, awayTeam, marks }: LineupPit
    *   (콜드 165ms)가 통째로 붙는다(실측) — 스크롤한 순간 빈 원이 그만큼 남는다.
    * ⚠ **라인업이 실제로 그려질 때만 부른다.** 사진이 없는 화면에서 열면 쓰지 않을 연결이다.
    */
-  preconnect(PHOTO_ORIGIN);
+  // ⚠ 사진을 끈 설정에서는 그 호스트로 요청이 하나도 나가지 않는다 — 미리 연결할 이유도 없다
+  if (env.showPlayerPhotos) preconnect(PHOTO_ORIGIN);
 
   return (
     <section className="mt-6" aria-labelledby="lineup-heading">
