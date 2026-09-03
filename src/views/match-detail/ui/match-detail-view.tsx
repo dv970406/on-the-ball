@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   LineupBench,
   LineupPitch,
@@ -22,6 +22,14 @@ import { cn, formatKickoff, useNowMs } from "@/shared/lib";
 import { EmptyState, Pill, SignInDialog, Skeleton, StaleBanner } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
 import { useMatchDetail } from "../model/use-match-detail";
+import {
+  MatchSectionTabs,
+  type MatchSection,
+  type MatchSectionId,
+  sectionPanelId,
+  sectionTabId,
+} from "./match-section-tabs";
+import { useScrolledPast } from "./use-scrolled-past";
 
 interface MatchDetailViewProps {
   matchId: number;
@@ -85,6 +93,37 @@ export function MatchDetailView({
    * 액션 컴포넌트 안에 두면 스크롤 영역 기준으로 떠서 화면 밖에 뜬다).
    */
   const [askSignIn, setAskSignIn] = useState(false);
+  /**
+   * 사용자가 **직접 고른** 탭. 기본값을 여기 담지 않는 이유가 있다 —
+   * 그릴 수 있는 구역은 데이터가 도착하면서 늘어나므로(라인업은 킥오프 직전, 기록은 그 뒤),
+   * `useState(초기탭)`으로 굳히면 나중에 계산이 달라져도 반영할 길이 없다.
+   * → 고른 적이 없으면(`null`) 아래에서 매번 기본값을 계산한다.
+   */
+  const [pickedSection, setPickedSection] = useState<MatchSectionId | null>(null);
+  /** 대진(`h1`)이 위로 밀려났는가 — 고정 바의 스코어 요약이 이 값으로 켜진다 */
+  const { ref: heroEndRef, node: heroEndNode, past: heroGone } = useScrolledPast();
+  const mainRef = useRef<HTMLElement>(null);
+
+  /**
+   * 탭을 바꾸면 **새 구역의 처음부터** 보게 한다.
+   *
+   * ⚠ 스크롤 위치는 탭이 바뀌어도 그대로 남는다 — 라인업을 끝까지 내려 보다가 기록으로
+   *   옮기면 표 한가운데에 떨어진다(내용이 짧으면 브라우저가 맨 위로 당겨 버려서 이번에는
+   *   반대로 튄다). 두 경우 모두 "내가 어디에 있는지"를 잃는다.
+   * ⚠ **맨 위로 보내지 않는다.** 탭바가 있는 자리(대진 바로 아래)까지만 되감으면 탭이 화면
+   *   상단에 남아 방금 고른 것이 무엇인지 보인다 — 그 위로 더 올리면 탭이 화면 밖으로 나간다.
+   * ⚠ 이미 그보다 위에 있으면 건드리지 않는다(대진을 보고 있는 사람을 밀어내지 않는다).
+   */
+  const handleSectionChange = (id: MatchSectionId) => {
+    setPickedSection(id);
+    const main = mainRef.current;
+    const heroEnd = heroEndNode.current;
+    if (!main || !heroEnd) return;
+    // offsetTop은 위치 지정 조상 기준이라 쓰지 않는다 — 스크롤 컨테이너 기준으로 직접 잰다
+    const heroBottom =
+      heroEnd.getBoundingClientRect().top - main.getBoundingClientRect().top + main.scrollTop;
+    if (main.scrollTop > heroBottom) main.scrollTop = heroBottom;
+  };
   // ⚠ **서버 시각이 우선이다** — `useNowMs()`는 모듈 스코프에 세션당 한 번 고정된다
   //   (사유는 `use-now.ts`·`data-and-state.md`). 클라 값을 앞에 두면 낡은 시계가 이긴다.
   //   ⚠ `??`는 단축평가라 훅을 뒤에 두면 조건부 호출이 된다 → 먼저 무조건 부른다.
@@ -107,6 +146,32 @@ export function MatchDetailView({
    *   남는다.** 판정을 같은 함수가 갖게 한다(`code-quality.md` 응집도).
    */
   const statRows = detail.stats ? buildStatRows(detail.stats) : [];
+
+  /**
+   * 탭으로 가르는 구역 — **라인업과 기록뿐이다.**
+   *
+   * ⚠ **예측은 탭에 넣지 않는다.** 이 화면의 유일한 *행동*이라 무엇을 보고 있든 자리를
+   *   지켜야 한다 — 탭 뒤에 숨기면 "여기서 무엇을 할 수 있는가"가 화면에서 사라지고,
+   *   킥오프 전에 들어온 사람이 예측하려고 한 번 더 눌러야 한다.
+   *   라인업·기록은 **읽는 것**이라 서로 배타적으로 봐도 잃는 것이 없다.
+   * ⚠ **빈 탭을 만들지 않는다.** 라인업은 킥오프 20~40분 전에야 오고 기록은 그 뒤에 생기며,
+   *   연기·취소된 경기에는 영영 오지 않는다 — 자리를 잡아 두면 대부분의 시간에 "눌러도
+   *   아무것도 없는 탭"이 된다(스켈레톤을 두지 않은 것과 같은 판단).
+   */
+  const sections: MatchSection[] = [
+    ...(home && away ? [{ id: "lineup" as const, label: "라인업" }] : []),
+    ...(statRows.length > 0 ? [{ id: "stats" as const, label: "기록" }] : []),
+  ];
+  /**
+   * ⚠ 구역이 **둘일 때만** 탭바를 그린다. 하나뿐이면 고를 것이 없어 탭이 장식이 되고,
+   *   0개(라인업 발표 전)면 그릴 것 자체가 없다.
+   */
+  const tabbed = sections.length > 1;
+  // ⚠ 고른 탭이 사라질 수 있다(리페치로 기록이 비는 경우) → 목록에 없으면 첫 구역으로 되돌린다
+  const activeSection =
+    pickedSection !== null && sections.some((s) => s.id === pickedSection)
+      ? pickedSection
+      : sections[0]?.id;
 
   const title = match ? `${match.homeTeam.name} vs ${match.awayTeam.name}` : "경기";
   // ⚠ **두 컬럼을 함께 본다** — `MatchCard`와 같은 판정이어야 한다(DB CHECK가 쌍을 강제하지만
@@ -143,9 +208,17 @@ export function MatchDetailView({
         ⚠ `h-full`이 아니라 `min-h-0 flex-1` — `SubHeader`와 형제라 `h-full`이면 프레임이
           헤더 높이만큼 넘친다(글 상세가 같은 주석을 갖는다).
       */}
-      <main className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-5 pb-16 pt-4">
+      {/*
+        ⚠ **`pt-*`를 두지 않는다 — 고정 바가 화면 top에 붙지 못한다.** sticky 요소는 자기
+          컨테이닝 블록(= 이 `<main>`의 **콘텐츠 박스**)을 벗어나지 못하므로, 위쪽 패딩이
+          곧 고정 바가 멈추는 하한선이 된다. `pt-4`였을 때 정확히 16px 틈이 생겨 그리로
+          라인업이 지나가 보였다(실측 — 음수 마진으로는 해결되지 않는다. 마진이 sticky
+          제약 사각형도 같이 넓혀 상쇄된다).
+        → 위쪽 여백은 **각 분기의 첫 요소**가 진다.
+      */}
+      <main ref={mainRef} className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-5 pb-16">
         {isLoading && (
-          <div aria-hidden>
+          <div aria-hidden className="pt-4">
             {/* ⚠ 골격이 실제 화면과 같아야 한다 — 헤더가 엠블럼(44px) + 이름 두 줄로 높아졌다 */}
             <Skeleton className="h-[15px] w-40" />
             <Skeleton className="mt-4 h-[78px] w-full" />
@@ -157,15 +230,21 @@ export function MatchDetailView({
         {/* ⚠ 에러 화면은 **보여줄 데이터가 없을 때만** 띄운다 */}
         {error && !match && (
           <EmptyState
+            className="pt-4"
             title="경기를 불러오지 못했어요"
             description={error.message}
             onRetry={() => refetch()}
           />
         )}
-        {error && match && <StaleBanner noun="경기" onRetry={() => refetch()} />}
+        {error && match && (
+          <div className="pt-4">
+            <StaleBanner noun="경기" onRetry={() => refetch()} />
+          </div>
+        )}
 
         {match === null && (
           <EmptyState
+            className="pt-4"
             title="경기를 찾을 수 없어요"
             description="일정이 바뀌었거나 삭제된 경기예요."
           />
@@ -173,7 +252,8 @@ export function MatchDetailView({
 
         {match && (
           <>
-            <p className="flex items-center gap-2 text-[12px] text-ink-mute-2">
+            {/* ⚠ 위쪽 여백을 여기가 진다 — `<main>`이 패딩을 가지면 고정 바가 뜬다(위 주석) */}
+            <p className="flex items-center gap-2 pt-4 text-[12px] text-ink-mute-2">
               <span className="font-mono uppercase tracking-[0.4px]">
                 {match.season} · {match.matchday}R
               </span>
@@ -256,6 +336,16 @@ export function MatchDetailView({
               {" 킥오프"}
             </p>
 
+            {/* 대진의 끝 — 고정 바가 이 표식으로 "스코어를 다시 그려야 하는가"를 안다 */}
+            <div ref={heroEndRef} aria-hidden className="h-px" />
+
+            {/*
+             * 승부예측 — **탭 밖에 고정으로 둔다**(위 `sections` 주석). 라인업·기록을 보러 온
+             * 사람에게도 이 화면의 행동이 계속 보여야 한다.
+             * ⚠ 아래 여백은 **고정 바의 `pt-*`가 진다** — 여기에 `mb-*`를 더하면 고정되기
+             *   전에는 그 둘이 합쳐져 탭이 멀어지고, 고정된 뒤에는 마진이 사라져 여백이
+             *   갑자기 줄어든다(마진은 스크롤과 함께 밀려 올라가기 때문이다).
+             */}
             <div className="mt-6">
               <MatchPrediction
                 match={match}
@@ -267,6 +357,67 @@ export function MatchDetailView({
             </div>
 
             {/*
+             * 구역 전환 탭 + 고정 스코어.
+             *
+             * ⚠ **한 페이지에 다 쌓지 않는 이유가 측정치다.** 예측·라인업·후보·기록을 이어
+             *   두면 총 스크롤이 1,934px(폰에서 약 3화면)이라, 라인업을 보다가 스코어를
+             *   확인하려면 매번 맨 위로 올라가야 했다.
+             * ⚠ **탭은 내용을 감추지 않는다.** 두 패널을 전부 렌더하고 `hidden`으로만 가리므로
+             *   초기 HTML에는 그대로 실린다 — 이 라우트는 색인 대상이라 SSR로 본문까지
+             *   그리기로 한 결정(`nextjs.md`)을 탭이 되돌리면 안 된다.
+             *   ⚠ 그래서 패널에 `flex`·`grid` 같은 display 유틸을 얹지 않는다 — 작성자
+             *     스타일이 UA의 `[hidden] { display: none }`을 이겨 **가린 패널이 그대로 보인다.**
+             * ⚠ 패널은 **포커스를 받을 수 있어야 한다**(`tabIndex=0`) — 안에 포커스 가능한
+             *   요소가 하나도 없어서(라인업·기록은 읽기 전용이다) 키보드 사용자가 탭을 고른
+             *   뒤 그 내용으로 들어갈 방법이 없다(WAI-ARIA 탭 패턴).
+             *   ⚠ 그래서 **`outline-none`을 붙이지 않는다.** 이 저장소의 `outline-none`은
+             *     전부 입력창(자체 `focus:` 표시가 있다)이거나 `tabIndex=-1` 컨테이너인데,
+             *     여기는 Tab으로 **닿는** 요소라 지우면 포커스가 어디 있는지 보이지 않는다.
+             * ⚠ 고정 바는 `-mx-5 px-5`로 좌우 패딩을 뚫는다 — 아래로 지나가는 내용이 바 옆에
+             *   비쳐 보이지 않게 배경이 폭을 다 덮어야 한다.
+             * ⚠⚠ **위쪽 여백은 `mt-*`가 아니라 `pt-*`로 준다.** sticky가 멈추는 자리는
+             *   스크롤포트를 **그 요소의 마진만큼 안쪽으로 좁힌 사각형**이라, `mt-4`는 곧
+             *   "16px 아래에 붙는다"가 되고 그 틈으로 라인업이 지나가 보인다(실측).
+             *   패딩은 테두리 상자 **안쪽**이라 배경이 덮으므로 같은 여백을 주면서도
+             *   `top-0`에 딱 붙는다 — 여백이 필요하면 이 `pt-*`를 키운다.
+             */}
+            {tabbed && (
+              <div className="sticky top-0 z-10 -mx-5 border-b border-hairline-cool bg-canvas px-5 pt-3">
+                {/*
+                  스코어 요약 — 대진이 보이는 동안에는 같은 정보를 두 번 그리지 않는다.
+                  ⚠ **자리는 늘 차지하고 투명도만 바꾼다.** 나타날 때 높이가 변하면 고정 바가
+                    커지면서 아래 내용이 그만큼 밀린다(고정 요소도 흐름에 자리를 갖는다).
+                  ⚠ `aria-hidden` — 같은 사실을 `h1`이 이미 갖고 있어 낭독이 겹친다.
+                */}
+                <p
+                  aria-hidden
+                  className={cn(
+                    "flex h-6 items-center justify-center gap-1.5 text-[13px] transition-opacity duration-150 ease-otb",
+                    heroGone ? "opacity-100" : "opacity-0",
+                  )}
+                >
+                  <TeamCrest team={match.homeTeam} size={16} />
+                  <span className={homeWon ? "font-semibold text-ink" : "text-ink-mute"}>
+                    {match.homeTeam.shortName}
+                  </span>
+                  <span className="font-mono font-bold tabular-nums text-ink">
+                    {scored ? `${match.homeScore} - ${match.awayScore}` : "VS"}
+                  </span>
+                  <span className={awayWon ? "font-semibold text-ink" : "text-ink-mute"}>
+                    {match.awayTeam.shortName}
+                  </span>
+                  <TeamCrest team={match.awayTeam} size={16} />
+                </p>
+
+                <MatchSectionTabs
+                  sections={sections}
+                  active={activeSection}
+                  onChange={handleSectionChange}
+                />
+              </div>
+            )}
+
+            {/*
              * 확정 라인업 — **발표되기 전에는 블록 자체가 없다.**
              * ⚠ 스켈레톤을 두지 않는다. 라인업은 킥오프 20~40분 전에야 나오고 연기·취소된
              *   경기에는 영영 오지 않아서, 자리를 잡아 두면 **대부분의 시간에 오지 않을 것을
@@ -275,7 +426,13 @@ export function MatchDetailView({
              * ⚠ 조회 실패도 조용히 넘긴다 — 곁다리라 본문(대진·예측)을 가리면 안 된다.
              */}
             {home && away ? (
-              <>
+              <div
+                id={sectionPanelId("lineup")}
+                role={tabbed ? "tabpanel" : undefined}
+                aria-labelledby={tabbed ? sectionTabId("lineup") : undefined}
+                tabIndex={tabbed ? 0 : undefined}
+                hidden={tabbed && activeSection !== "lineup"}
+              >
                 <LineupPitch
                   home={home}
                   away={away}
@@ -290,7 +447,7 @@ export function MatchDetailView({
                   awayTeam={match.awayTeam}
                   marks={detail.playerMarks}
                 />
-              </>
+              </div>
             ) : null}
 
             {/*
@@ -300,11 +457,27 @@ export function MatchDetailView({
              *   기록까지 사라진다(연기됐다가 치러진 경기가 실제로 그 모양이다).
              */}
             {statRows.length > 0 ? (
-              <StatComparison rows={statRows} homeTeam={match.homeTeam} awayTeam={match.awayTeam} />
+              <div
+                id={sectionPanelId("stats")}
+                role={tabbed ? "tabpanel" : undefined}
+                aria-labelledby={tabbed ? sectionTabId("stats") : undefined}
+                tabIndex={tabbed ? 0 : undefined}
+                hidden={tabbed && activeSection !== "stats"}
+              >
+                <StatComparison
+                  rows={statRows}
+                  homeTeam={match.homeTeam}
+                  awayTeam={match.awayTeam}
+                />
+              </div>
             ) : null}
 
-            {/* 출처 — 평점·스탯이 제공자마다 값이 다르므로 어디 것인지 밝힌다 */}
-            {(home && away) || statRows.length > 0 ? (
+            {/*
+              출처 — 평점·스탯이 제공자마다 값이 다르므로 어디 것인지 밝힌다.
+              ⚠ **예측 분포는 여기 해당하지 않는다.** 그건 우리 사용자들이 만든 데이터라
+                남의 출처를 붙이면 거짓이 된다 — 그래서 라인업·기록이 하나라도 있을 때만이다.
+            */}
+            {sections.length > 0 ? (
               <p className="mt-4 text-center text-[11px] text-ink-mute-2">
                 라인업·기록 제공: API-Football
               </p>
