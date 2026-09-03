@@ -61,11 +61,12 @@ export function PredictionBlock({
   /**
    * 팀을 아는 자리에서는 이름을 쓴다 — "홈"보다 "맨유"가 읽힌다.
    *
-   * ⚠ **"승"을 붙이지 않는다.** 세 줄이 `아스날 / 무승부 / 첼시`로 나란히 놓이면 그 자체가
-   *   1X2 보기라 팀 이름만으로 뜻이 완성된다 — "승"은 세 줄 중 둘에만 붙는 접미사라
+   * ⚠ **"승"을 붙이지 않는다.** 세 칸이 `아스날 / 무승부 / 첼시`로 나란히 놓이면 그 자체가
+   *   1X2 보기라 팀 이름만으로 뜻이 완성된다 — "승"은 세 칸 중 둘에만 붙는 접미사라
    *   정보가 아니라 반복이고, 좁은 행에서 이름이 잘릴 폭을 먼저 먹는다.
-   * ⚠ **정식명이 아니라 약칭이다** — 버튼 세 개가 세로로 쌓이는 자리다. 사유와 폴백 규약은
-   *   `Team.shortName`(`model/types.ts`) 주석이 갖는다.
+   * ⚠ **정식명이 아니라 약칭이다** — 버튼 세 개가 **한 줄에 나란히** 놓여 각 칸이 화면 폭의
+   *   1/3뿐이다. 세로로 쌓였을 때보다 폭이 더 좁아 약칭이 아니면 곧바로 잘린다.
+   *   사유와 폴백 규약은 `Team.shortName`(`model/types.ts`) 주석이 갖는다.
    */
   const labelOf = (pick: MatchPick) =>
     pick === "home"
@@ -83,7 +84,14 @@ export function PredictionBlock({
       aria-label="승부예측"
       className="rounded-[14px] border border-hairline-cool bg-canvas-soft px-4 py-4"
     >
-      <ul className="flex flex-col gap-2">
+      {/*
+       * ⚠ **1행 3열이다 — 세로로 쌓지 않는다.** 세 줄이면 예측 블록 하나가 160px을 먹어
+       *   대진·스코어와 라인업 사이를 갈라놓았다(상세 화면이 이미 길다). 가로로 놓으면
+       *   60px로 줄고, 무엇보다 **1X2 보기의 관습적인 형태**라 세 선택지가 서로의 대안이라는
+       *   것이 배치만으로 읽힌다.
+       * ⚠ 칸 폭이 화면의 1/3이라 **라벨은 약칭이어야 한다**(위 `labelOf` 주석).
+       */}
+      <ul className="grid grid-cols-3 gap-2">
         {MATCH_PICKS.map((pick) => {
           const mine = match.myPick === pick;
           // ⚠ `result`가 무효 경기에서도 null이라는 규약은 `isMatchSettled`가 소유한다
@@ -93,7 +101,7 @@ export function PredictionBlock({
           const ratio = total > 0 ? count / total : 0;
 
           return (
-            <li key={pick}>
+            <li key={pick} className="min-w-0">
               <button
                 type="button"
                 aria-pressed={signInRequired ? undefined : mine}
@@ -101,7 +109,7 @@ export function PredictionBlock({
                 disabled={!onPick || locked}
                 onClick={onPick ? () => onPick(pick) : undefined}
                 className={cn(
-                  "w-full rounded-sm border px-3 py-2.5 text-left",
+                  "w-full rounded-sm border px-2 py-2.5 text-center",
                   "transition-colors duration-150 ease-otb",
                   mine ? "border-ink" : "border-hairline-cool",
                   /*
@@ -117,22 +125,23 @@ export function PredictionBlock({
                   onPick && !locked ? "active:border-ink" : "disabled:opacity-100",
                 )}
               >
-                <span className="flex items-baseline gap-2">
+                <span className="flex flex-col items-center gap-1">
                   <span
                     className={cn(
-                      "min-w-0 flex-1 truncate text-[14px]",
+                      "w-full truncate text-[14px] leading-[1.3]",
                       mine ? "font-semibold text-ink" : "text-ink-secondary",
                     )}
                   >
                     {labelOf(pick)}
                   </span>
                   {/*
-                    ⚠ **화면에서 뗀 "승"을 낭독에는 남긴다.** 눈으로는 세 줄이 나란히 놓여
+                    ⚠ **화면에서 뗀 "승"을 낭독에는 남긴다.** 눈으로는 세 칸이 나란히 놓여
                       `아스날 / 무승부 / 첼시`가 1X2 보기로 읽히지만, 스크린리더는 버튼을
                       **하나씩** 읽으므로 "아스날"만으로는 무엇을 고르는 것인지 알 수 없다.
                       `aria-label`로 덮지 않고 `sr-only`를 덧붙이는 형태다(`code-quality.md`).
                   */}
-                  {pick !== "draw" && <span className="sr-only"> 승</span>}
+                  {/* ⚠ 뒤에 퍼센트가 바로 붙는다 — 공백이 없으면 "빌라 승0%"로 이어져 읽힌다 */}
+                  {pick !== "draw" && <span className="sr-only"> 승 </span>}
                   {mine && <span className="sr-only">— 내가 고른 예측</span>}
                   {/*
                     ⚠ **실제로 일어난 쪽은 눈에 보여야 한다.** 전에는 `sr-only` + 잉크 막대뿐이었는데,
@@ -146,16 +155,24 @@ export function PredictionBlock({
                       이겼으면 아스날 줄에 배지가 붙는데, 거기에 `적중`이라고 쓰면 거짓말이 된다.
                       내 예측의 성패는 상세 메타 줄과 목록 카드의 `적중`/`실패`가 따로 진다.
                   */}
-                  {correct && (
-                    <span className="shrink-0 rounded-xs bg-ink px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
-                      결과
-                    </span>
-                  )}
                   {signInRequired && <span className="sr-only"> (로그인 필요)</span>}
-                  {results && (
-                    <span className="shrink-0 font-mono text-[12px] tabular-nums text-ink-mute">
-                      {Math.round(ratio * 100)}%
-                      <span className="sr-only"> ({formatCount(count)}명)</span>
+                  {/*
+                    ⚠ 배지와 퍼센트를 **한 줄로 묶는다.** 칸 폭이 1/3이라 라벨과 나란히 두면
+                      셋 중 하나가 잘린다 — 라벨이 위, 이 줄이 아래다.
+                  */}
+                  {(correct || results) && (
+                    <span className="flex max-w-full items-center gap-1">
+                      {correct && (
+                        <span className="shrink-0 rounded-xs bg-ink px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
+                          결과
+                        </span>
+                      )}
+                      {results && (
+                        <span className="shrink-0 font-mono text-[12px] tabular-nums text-ink-mute">
+                          {Math.round(ratio * 100)}%
+                          <span className="sr-only"> ({formatCount(count)}명)</span>
+                        </span>
+                      )}
                     </span>
                   )}
                 </span>
