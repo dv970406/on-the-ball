@@ -78,6 +78,13 @@ export function PredictionBlock({
   const awaitingResults = results === null && resultsPending === true;
   // ⚠ `open === null`은 "아직 판정 전"이다 — false로 접으면 첫 프레임에 멀쩡한 경기가 잠긴다
   const locked = open === false;
+  /*
+   * ⚠ **세 칸이 함께** 띠 자리를 잡는다. 결과 칸에만 띠를 그리면 그 칸만 높아지는데,
+   *   막대가 버튼 **밖**에 있어(아래 주석) 나머지 두 칸의 막대까지 위로 어긋난다.
+   *   채점 전에는 아무 칸도 자리를 잡지 않으므로 예측 중인 화면은 그대로다.
+   * ⚠ `result`가 무효 경기에서도 null이라는 규약은 `isMatchSettled`가 소유한다.
+   */
+  const settled = isMatchSettled(match);
 
   return (
     <section
@@ -94,8 +101,7 @@ export function PredictionBlock({
       <ul className="grid grid-cols-3 gap-2">
         {MATCH_PICKS.map((pick) => {
           const mine = match.myPick === pick;
-          // ⚠ `result`가 무효 경기에서도 null이라는 규약은 `isMatchSettled`가 소유한다
-          const correct = isMatchSettled(match) && match.result === pick;
+          const correct = settled && match.result === pick;
           const count = countOf(pick);
           // 0으로 나누지 않는다 — 분포가 열렸는데 총 0건인 순간이 실제로 있다
           const ratio = total > 0 ? count / total : 0;
@@ -126,6 +132,37 @@ export function PredictionBlock({
                 )}
               >
                 <span className="flex flex-col items-center gap-1">
+                  {/*
+                    ⚠ **실제로 일어난 쪽은 눈에 보여야 한다.** 전에는 `sr-only` + 잉크 막대뿐이었는데,
+                      아무도 안 고른 쪽이 결과면 막대 폭이 **0%라 사라져** 화면에 아무 표시가
+                      없었다(실측: 빗나간 사람에게 잉크 막대가 둘 뜨고 어느 쪽이 결과인지
+                      구분되지 않았다). `styling.md`의 "색이 정보를 혼자 지지 않는다" 그대로
+                      **글자로** 표시한다.
+
+                    ⚠ **`적중`이라고 쓰지 않는다.** 이 띠는 "내가 맞췄나"가 아니라
+                      **"이 일이 실제로 일어났다"** 를 뜻한다 — 내가 무승부를 골랐는데 아스날이
+                      이겼으면 아스날 칸에 띠가 붙는데, 거기에 `적중`이라고 쓰면 거짓말이 된다.
+                      내 예측의 성패는 상세 메타 줄과 목록 카드의 `적중`/`실패`가 따로 진다.
+
+                    ⚠ **퍼센트 옆의 배지가 아니라 칸 폭을 통째로 쓰는 띠다.** 칸 폭이 화면의
+                      1/3(≈110px)이라 배지와 `%`를 한 줄에 두면 서로의 폭을 먹었다 — 띠는
+                      경쟁할 상대가 없어 문구를 `실제 결과`로 온전히 담는다.
+                    ⚠ 안쪽 라운드는 **5px**이다(버튼 6px − 테두리 1px). `rounded-sm`을 그대로
+                      쓰면 모서리에 흰 틈이 보인다.
+                    ⚠ 결과가 아닌 칸은 `invisible`이라 접근성 트리에서도 빠진다 — `aria-hidden`을
+                      따로 붙이지 않는다.
+                  */}
+                  {settled && (
+                    <span
+                      className={cn(
+                        "-mx-2 -mt-2.5 self-stretch rounded-t-[5px] px-1 py-0.5",
+                        "text-[10px] font-medium leading-[1.4]",
+                        correct ? "bg-ink text-white" : "invisible",
+                      )}
+                    >
+                      실제 결과
+                    </span>
+                  )}
                   <span
                     className={cn(
                       "w-full truncate text-[14px] leading-[1.3]",
@@ -143,36 +180,11 @@ export function PredictionBlock({
                   {/* ⚠ 뒤에 퍼센트가 바로 붙는다 — 공백이 없으면 "빌라 승0%"로 이어져 읽힌다 */}
                   {pick !== "draw" && <span className="sr-only"> 승 </span>}
                   {mine && <span className="sr-only">— 내가 고른 예측</span>}
-                  {/*
-                    ⚠ **실제로 일어난 쪽은 눈에 보여야 한다.** 전에는 `sr-only` + 잉크 막대뿐이었는데,
-                      아무도 안 고른 쪽이 결과면 막대 폭이 **0%라 사라져** 화면에 아무 표시가
-                      없었다(실측: 빗나간 사람에게 잉크 막대가 둘 뜨고 어느 쪽이 결과인지
-                      구분되지 않았다). `styling.md`의 "색이 정보를 혼자 지지 않는다" 그대로
-                      **글자로** 표시한다.
-
-                    ⚠ **`적중`이라고 쓰지 않는다.** 이 배지는 "내가 맞췄나"가 아니라
-                      **"이 일이 실제로 일어났다"** 를 뜻한다 — 내가 무승부를 골랐는데 아스날이
-                      이겼으면 아스날 줄에 배지가 붙는데, 거기에 `적중`이라고 쓰면 거짓말이 된다.
-                      내 예측의 성패는 상세 메타 줄과 목록 카드의 `적중`/`실패`가 따로 진다.
-                  */}
                   {signInRequired && <span className="sr-only"> (로그인 필요)</span>}
-                  {/*
-                    ⚠ 배지와 퍼센트를 **한 줄로 묶는다.** 칸 폭이 1/3이라 라벨과 나란히 두면
-                      셋 중 하나가 잘린다 — 라벨이 위, 이 줄이 아래다.
-                  */}
-                  {(correct || results) && (
-                    <span className="flex max-w-full items-center gap-1">
-                      {correct && (
-                        <span className="shrink-0 rounded-xs bg-ink px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
-                          결과
-                        </span>
-                      )}
-                      {results && (
-                        <span className="shrink-0 font-mono text-[12px] tabular-nums text-ink-mute">
-                          {Math.round(ratio * 100)}%
-                          <span className="sr-only"> ({formatCount(count)}명)</span>
-                        </span>
-                      )}
+                  {results && (
+                    <span className="font-mono text-[12px] tabular-nums text-ink-mute">
+                      {Math.round(ratio * 100)}%
+                      <span className="sr-only"> ({formatCount(count)}명)</span>
                     </span>
                   )}
                 </span>
@@ -185,7 +197,7 @@ export function PredictionBlock({
                   segments={[
                     // 실제 결과는 잉크로 진하게 — 내 예측(경계선)과 다른 축으로 구분된다
                     // ⚠ `correct || mine`으로 두면 **한 채널에 두 뜻**이 실려 빗나간 사람에게
-                    //   진한 막대가 둘 뜬다 — 실제 결과는 위 `결과` 배지가 지고, 막대는 내 예측만 진다.
+                    //   진한 막대가 둘 뜬다 — 실제 결과는 위 `실제 결과` 띠가 지고, 막대는 내 예측만 진다.
                     { ratio, color: mine ? COLOR.ink : COLOR.hairlineStrong },
                   ]}
                 />
