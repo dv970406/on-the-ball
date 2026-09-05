@@ -1,8 +1,9 @@
 "use client";
 
+import { Check } from "lucide-react";
 import { COLOR } from "@/shared/config";
 import { cn, formatCount } from "@/shared/lib";
-import { RatioBar, Skeleton } from "@/shared/ui";
+import { Icon, RatioBar, Skeleton } from "@/shared/ui";
 import { isMatchSettled } from "../lib/open";
 import type { Match, MatchPick, MatchPredictionResult } from "../model/types";
 import { MATCH_PICKS, MATCH_PICK_LABEL } from "../model/types";
@@ -37,12 +38,13 @@ interface PredictionBlockProps {
  * 프레젠테이션 전용이다 — 세션도 뮤테이션도 모른다(`PollBlock`과 같은 자리).
  * 세션 3분기와 실제 예측은 `features/predict-match`의 `MatchPrediction`이 갖는다.
  *
- * ⚠ **에메랄드를 쓰지 않는다.** 선택지는 **카드당 3개**라 목록에서 카드 수의 세 배로 늘어난다 —
- *   "한 뷰포트당 컬러 이벤트 1개"가 그만큼 깨진다. 잉크 래더로 **명도**만 쓴다
- *   (`PollBlock`이 같은 이유로 같은 선택을 했다).
- *   ⚠ `MatchCard`의 "적중" 배지가 에메랄드인 것과 반대 결론이 아니다 — 그쪽은 **예측했고
- *     채점까지 끝난 카드에만 최대 1개**이고, `styling.md`의 에메랄드 자리 표에 등재된
- *     `Pill`을 경유하며, 글자를 담아 "색이 정보를 혼자 지지 않는다"도 만족한다.
+ * ⚠ **선택지 자체에는 에메랄드를 쓰지 않는다.** 선택지는 **카드당 3개**라 목록에서 카드 수의
+ *   세 배로 늘어난다 — "한 뷰포트당 컬러 이벤트 1개"가 그만큼 깨진다. 잉크 래더로 **명도**만
+ *   쓴다(`PollBlock`이 같은 이유로 같은 선택을 했다).
+ *   ⚠ **예외는 결과 띠 하나다** — 채점이 끝난 뒤 **결과 칸에만 1개**라 셋으로 늘어나지 않는다.
+ *     `MatchCard`의 "적중" 배지가 에메랄드인 것과 같은 논리다(그쪽도 예측했고 채점까지 끝난
+ *     카드에만 최대 1개다). 둘 다 `styling.md`의 에메랄드 자리 표에 등재돼 있고, 색이 아니라
+ *     **형태**(체크 아이콘 · 글자)가 정보를 진다.
  *
  * ⚠ `role="radiogroup"`을 쓰지 않는다 — 화살표 키 이동을 약속하는 롤인데 구현하지 않는다.
  */
@@ -136,31 +138,47 @@ export function PredictionBlock({
                     ⚠ **실제로 일어난 쪽은 눈에 보여야 한다.** 전에는 `sr-only` + 잉크 막대뿐이었는데,
                       아무도 안 고른 쪽이 결과면 막대 폭이 **0%라 사라져** 화면에 아무 표시가
                       없었다(실측: 빗나간 사람에게 잉크 막대가 둘 뜨고 어느 쪽이 결과인지
-                      구분되지 않았다). `styling.md`의 "색이 정보를 혼자 지지 않는다" 그대로
-                      **글자로** 표시한다.
+                      구분되지 않았다).
+
+                    ⚠ **글자가 아니라 체크 아이콘이다.** `실제 결과`라는 문구는 칸 폭(화면의
+                      1/3 ≈110px)을 거의 다 먹으면서도 "무엇의 결과인지"를 설명하지 못했다 —
+                      결과 칸을 가리키는 데 필요한 것은 **어느 칸인가** 하나뿐이라 형태로 족하다.
+                      `styling.md`의 "색이 정보를 혼자 지지 않는다"는 그 형태(체크)가 진다.
+                    ⚠ **낭독에는 문장을 남긴다.** 아이콘만 두면 스크린리더에게 이 띠가
+                      존재하지 않는 것과 같다 — `sr-only`가 뜻을 온전히 담는다.
 
                     ⚠ **`적중`이라고 쓰지 않는다.** 이 띠는 "내가 맞췄나"가 아니라
                       **"이 일이 실제로 일어났다"** 를 뜻한다 — 내가 무승부를 골랐는데 아스날이
                       이겼으면 아스날 칸에 띠가 붙는데, 거기에 `적중`이라고 쓰면 거짓말이 된다.
                       내 예측의 성패는 상세 메타 줄과 목록 카드의 `적중`/`실패`가 따로 진다.
 
-                    ⚠ **퍼센트 옆의 배지가 아니라 칸 폭을 통째로 쓰는 띠다.** 칸 폭이 화면의
-                      1/3(≈110px)이라 배지와 `%`를 한 줄에 두면 서로의 폭을 먹었다 — 띠는
-                      경쟁할 상대가 없어 문구를 `실제 결과`로 온전히 담는다.
+                    ⚠ **에메랄드다 — 이 화면에서 유일한 예외 자리다.** 바로 위 블록 주석이
+                      선택지에 에메랄드를 쓰지 않는다고 못박는데, 이 띠는 **채점이 끝난 뒤
+                      결과 칸에만 최대 1개**라 카드 수만큼 늘어나는 그 셈에 들어가지 않는다
+                      (`MatchCard`의 적중 배지와 같은 논리). `styling.md`의 에메랄드 자리 표와
+                      `check-conventions.mjs`에 함께 등재돼 있다.
+                    ⚠ 아이콘 색은 **`text-on-primary`** 다 — 에메랄드 위 흰색은 금지다.
+
+                    ⚠ **퍼센트 옆의 배지가 아니라 칸 폭을 통째로 쓰는 띠다.** 배지와 `%`를 한 줄에
+                      두면 좁은 칸에서 서로의 폭을 먹었다.
                     ⚠ 안쪽 라운드는 **5px**이다(버튼 6px − 테두리 1px). `rounded-sm`을 그대로
                       쓰면 모서리에 흰 틈이 보인다.
+                    ⚠ 세로 여백이 `py-[3px]`인 것은 아이콘 12px과 합쳐 **18px**로 글자 시절의
+                      높이를 그대로 잇기 위해서다(세 칸이 함께 자리를 잡으므로 높이가 바뀌면
+                      블록 전체가 밀린다).
                     ⚠ 결과가 아닌 칸은 `invisible`이라 접근성 트리에서도 빠진다 — `aria-hidden`을
                       따로 붙이지 않는다.
                   */}
                   {settled && (
                     <span
                       className={cn(
-                        "-mx-2 -mt-2.5 self-stretch rounded-t-[5px] px-1 py-0.5",
-                        "text-[10px] font-medium leading-[1.4]",
-                        correct ? "bg-ink text-white" : "invisible",
+                        "-mx-2 -mt-2.5 flex items-center justify-center self-stretch",
+                        "rounded-t-[5px] px-1 py-[3px]",
+                        correct ? "bg-primary text-on-primary" : "invisible",
                       )}
                     >
-                      실제 결과
+                      <Icon as={Check} size={12} />
+                      <span className="sr-only">실제 경기 결과</span>
                     </span>
                   )}
                   <span

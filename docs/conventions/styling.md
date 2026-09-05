@@ -108,6 +108,7 @@ function cardClassName(peek: boolean) {
     | `entities/comment/ui/comment-item.tsx` | "내 댓글" 배지 |
     | `entities/survey/ui/vs-badge.tsx` | 분할 카드의 VS 배지 |
     | `views/match-detail/ui/match-detail-view.tsx` | 승부예측 상세의 "적중" 배지 — 한 화면에 1개 |
+    | `entities/match/ui/prediction-block.tsx` | 승부예측 **결과 띠** — 채점이 끝난 뒤 **결과 칸에만 1개**. 같은 블록의 선택지 3개에는 쓰지 않는 것과 갈리는 지점이고, 체크 아이콘이 형태를 지어 "색이 정보를 혼자 지지 않는다"도 만족한다 |
     | `entities/match/ui/match-card.tsx` | 승부예측 "적중" 배지 — **예측했고 채점까지 끝난 카드에만 1개**. 선택지(카드당 3개)에 에메랄드를 쓰지 않는 것과 갈리는 지점이고, 글자를 담아 "색이 정보를 혼자 지지 않는다"도 만족한다 |
     | `views/post-detail/ui/comment-section.tsx` | 댓글 수 |
     | `widgets/bottom-tab-bar/ui/bottom-tab-bar.tsx` | 활성 탭 아이콘 |

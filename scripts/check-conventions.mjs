@@ -134,6 +134,8 @@ const STYLE_ALLOWED = {
     "src/shared/ui/pill.tsx", // green 배지
     "src/shared/ui/live-dot.tsx", // primary 도트
     "src/entities/survey/ui/vs-badge.tsx", // 분할 카드의 VS 배지
+    // 승부예측의 결과 띠 — 채점 뒤 결과 칸에만 1개(선택지 3개에는 쓰지 않는다)
+    "src/entities/match/ui/prediction-block.tsx",
   ],
   /*
    * ⚠ **에메랄드는 리터럴로만 오지 않는다.** `Pill variant="green"`은 `bg-primary`를
