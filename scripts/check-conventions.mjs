@@ -84,6 +84,22 @@ const DOCUMENTED_UNUSED = new Map([
   ["PostDraft", "PostForm의 입력 타입 — validatePost와 한 쌍"],
 ]);
 
+/**
+ * Route Handler 금지의 **예외 목록**. 사유를 하나하나 적는다.
+ *
+ * 금지의 근거는 "중간 검증층 없이 RLS가 방어선"인데(`api-and-db.md`), 아래 경로는
+ * 데이터 접근이 아니라 **외부 API를 서버 비밀로 부르는 자리**라 그 근거가 닿지 않는다.
+ *
+ * ⚠ **양방향으로 본다** — 목록에 없는 route.ts가 나타나면 실패하고, 목록에 있는데 파일이
+ *   사라져도 실패한다(그래야 목록이 죽지 않는다). 다른 화이트리스트와 같은 장치다.
+ */
+const ROUTE_HANDLER_ALLOWED = new Map([
+  [
+    "app/api/admin/sync-matches/route.ts",
+    "경기 일정 동기화 — API-Football 키와 service_role이 서버 전용이라 브라우저가 부를 수 없다",
+  ],
+]);
+
 /** styling.md가 못박은 예외 위치. 여기 없는 파일에 나타나면 실패한다. */
 const STYLE_ALLOWED = {
   "rounded-full": [
@@ -432,8 +448,21 @@ for (const f of files) {
     fail("banned-api", `${r}: 연산자 \`void\` — 붙여도 실패를 잡아주지 않는다(code-quality.md)`);
 }
 
-if (files.some((f) => /^app\/.*\/route\.tsx?$/.test(rel(f))))
-  fail("banned-api", "app/**/route.ts — Route Handler를 두지 않는다(클라이언트가 supabase를 직접 호출한다)");
+const routeFiles = files.map(rel).filter((r) => /^app\/.*\/route\.tsx?$/.test(r));
+for (const r of routeFiles) {
+  if (!ROUTE_HANDLER_ALLOWED.has(r)) {
+    fail(
+      "banned-api",
+      `${r} — Route Handler를 두지 않는다(클라이언트가 supabase를 직접 호출한다). ` +
+        "예외는 ROUTE_HANDLER_ALLOWED에 사유를 적는다",
+    );
+  }
+}
+for (const r of ROUTE_HANDLER_ALLOWED.keys()) {
+  if (!routeFiles.includes(r)) {
+    fail("banned-api", `${r}가 ROUTE_HANDLER_ALLOWED에 있는데 파일이 없다 — 목록을 정리한다`);
+  }
+}
 if (existsSync(p("src/pages")))
   fail("banned-api", "src/pages — Next Pages Router로 오감지된다. src/views를 쓴다");
 
