@@ -39,4 +39,18 @@ export const matchKeys = {
    */
   accuracy: (userId: string | undefined) =>
     [...matchKeys.all, "accuracy", userScope(userId)] as const,
+  /**
+   * 어드민 목록·단건.
+   *
+   * ⚠ **`userScope`를 붙이지 않고 대신 `admin` 조각으로 가른다.** 이 캐시는 "나"에 종속된
+   *   값이 아니라 **관리자에게만 행이 오는** 값이다. 일반 키와 섞이면 관리자가 로그아웃한 뒤
+   *   남은 캐시가 일반 목록으로 새고, 유저 전환 시 `removeQueries({type:"inactive"})`가
+   *   지우기 전 한 프레임 노출된다.
+   * ⚠ `deleted`를 키에 담는다 — 필터가 URL(`?deleted=1`)이 소유하므로 값마다 캐시가 갈린다.
+   */
+  adminLists: () => [...matchKeys.all, "admin", "list"] as const,
+  adminList: (deleted: boolean | null) => [...matchKeys.adminLists(), deleted] as const,
+  adminDetail: (id: number) => [...matchKeys.all, "admin", "detail", id] as const,
+  /** 팀 선택 목록 — 어드민 폼이 쓴다. 키 조립은 호출부가 아니라 이 파일이 소유한다 */
+  teams: () => [...matchKeys.all, "teams"] as const,
 } as const;

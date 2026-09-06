@@ -61,3 +61,11 @@ export { buildPlayerMarks } from "./lib/player-marks";
 // ⚠ 조립을 뷰가 부른다 — "그릴 게 있는가"를 표와 출처 문구가 **같은 함수**로 판정해야 한다
 export { buildStatRows } from "./lib/stat-rows";
 export { StatComparison } from "./ui/stat-comparison";
+
+// 어드민 백오피스 — 삭제된 경기까지 보는 경로다(정책이 아니라 definer RPC를 지난다)
+// ⚠ `AdminMatch` 타입은 올리지 않는다 — 슬라이스 밖 호출부가 0이다(훅의 반환을 그대로 쓴다).
+export {
+  useAdminMatchListQuery,
+  useAdminMatchQuery,
+  useTeamListQuery,
+} from "./api/admin-queries";

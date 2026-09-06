@@ -1,5 +1,6 @@
 import { toPlainSummary } from "../lib/plain-summary";
 import type {
+  AdminPostListItem,
   PostDetail,
   PostLikeRow,
   PostListItem,
@@ -120,4 +121,59 @@ export function buildPostDetail(row: PostSelectRow): PostDetail {
 /** 수정된 글인지 — created_at과 updated_at이 다르면 수정됨 (트리거가 서버 시각으로 찍는다) */
 export function isEdited(post: Pick<PostListItem, "createdAt" | "updatedAt">) {
   return post.updatedAt !== post.createdAt;
+}
+
+/*
+ * 어드민 목록·관리 화면용 select·매퍼.
+ *
+ * ⚠ **`api/queries.ts`가 아니라 여기 있다.** 그 파일은 `"use client"`라 서버가 import할 수
+ *   없는데, "snake_case ↔ camelCase 매핑은 `api/mappers.ts`(순수·서버 안전)에서"가 규약이다
+ *   (`ADMIN_MATCH_SELECT`가 `entities/match`에서 같은 자리에 있다). 지금은 서버 소비자가
+ *   없지만 형태가 갈리면 다음 사람이 어느 쪽을 따를지 알 수 없다.
+ */
+export const ADMIN_POST_LIMIT = 100;
+const ADMIN_EXCERPT_MAX = 120;
+
+/**
+ * ⚠ **임베딩 경로를 컬럼명으로 못박는다** — `post → profiles`는 `author_id` 직접 FK와
+ *   `post_like` 경유 두 경로가 있어 그냥 `profiles(nickname)`이면 PGRST201이다.
+ * ⚠ 조각을 `+`로 잇지 않는다(리터럴 타입이 넓어지면 추론이 깨진다).
+ */
+const ADMIN_POST_BASE =
+  "id, author_id, category, title, like_count, comment_count, view_count, created_at, updated_at, deleted_at, author:author_id(nickname)";
+export const ADMIN_POST_LIST_SELECT = `${ADMIN_POST_BASE}, excerpt` as const;
+export const ADMIN_POST_DETAIL_SELECT = `${ADMIN_POST_BASE}, excerpt, content` as const;
+
+export interface AdminPostRow {
+  id: number;
+  author_id: string;
+  category: AdminPostListItem["category"];
+  title: string;
+  excerpt: string;
+  like_count: number;
+  comment_count: number;
+  view_count: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  author: { nickname: string } | null;
+}
+
+export function buildAdminPostListItem(row: AdminPostRow): AdminPostListItem {
+  return {
+    id: row.id,
+    authorId: row.author_id,
+    // ⚠ FK가 not null이라 항상 오지만 생성 타입이 nullable이다 — 여기서 throw하면
+    //   프로필 하나가 이상할 때 목록 전체가 죽는다(buildTeam과 같은 판단).
+    authorNickname: row.author?.nickname ?? "알 수 없음",
+    category: row.category,
+    title: row.title,
+    excerpt: toPlainSummary(row.excerpt ?? "", ADMIN_EXCERPT_MAX),
+    likeCount: row.like_count,
+    commentCount: row.comment_count,
+    viewCount: row.view_count,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    deletedAt: row.deleted_at,
+  };
 }

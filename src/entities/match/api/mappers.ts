@@ -1,4 +1,5 @@
 import type {
+  AdminMatch,
   LineupPlayer,
   LineupRole,
   Match,
@@ -68,6 +69,17 @@ const TEAM_COLUMNS = "code, name, short_name";
 export const MATCH_SELECT =
   `id, season, matchday, kickoff_at, home_score, away_score, result, voided_at, home:team!home_team(${TEAM_COLUMNS}), away:team!away_team(${TEAM_COLUMNS}), match_prediction(pick)` as const;
 
+/**
+ * 어드민 목록·수정용 select.
+ *
+ * ⚠ `match_prediction` 임베딩을 **일부러 뺐다** — 어드민 화면은 "내 예측"을 그리지 않는데
+ *   그 임베딩은 행마다 정책 평가를 태운다. 대신 `deleted_at`·`admin_locked_at`·`external_id`가
+ *   들어온다(어드민 조회 경로에만 오는 값들이다).
+ * ⚠ 조각을 `+`로 잇지 않는다 — 리터럴 타입이 `string`으로 넓어지면 추론이 통째로 깨진다.
+ */
+export const ADMIN_MATCH_SELECT =
+  `id, season, matchday, kickoff_at, home_score, away_score, result, voided_at, deleted_at, admin_locked_at, external_id, home:team!home_team(${TEAM_COLUMNS}), away:team!away_team(${TEAM_COLUMNS})` as const;
+
 type TeamSelectRow = Pick<TeamRow, "code" | "name" | "short_name">;
 
 /** MATCH_SELECT가 돌려주는 행 — 컬럼 타입은 생성 타입에서 뽑는다 */
@@ -110,6 +122,41 @@ export function buildMatch(row: MatchSelectRow): Match {
     result: row.result,
     isVoided: row.voided_at !== null,
     myPick: row.match_prediction?.[0]?.pick ?? null,
+  };
+}
+
+/** ADMIN_MATCH_SELECT가 돌려주는 행 */
+export interface AdminMatchSelectRow {
+  id: MatchRow["id"];
+  season: MatchRow["season"];
+  matchday: MatchRow["matchday"];
+  kickoff_at: MatchRow["kickoff_at"];
+  home_score: MatchRow["home_score"];
+  away_score: MatchRow["away_score"];
+  result: MatchRow["result"];
+  voided_at: MatchRow["voided_at"];
+  deleted_at: MatchRow["deleted_at"];
+  admin_locked_at: MatchRow["admin_locked_at"];
+  external_id: MatchRow["external_id"];
+  home: TeamSelectRow | null;
+  away: TeamSelectRow | null;
+}
+
+export function buildAdminMatch(row: AdminMatchSelectRow): AdminMatch {
+  return {
+    id: row.id,
+    season: row.season,
+    matchday: row.matchday,
+    homeTeam: buildTeam(row.home),
+    awayTeam: buildTeam(row.away),
+    kickoffAt: row.kickoff_at,
+    homeScore: row.home_score,
+    awayScore: row.away_score,
+    result: row.result,
+    isVoided: row.voided_at !== null,
+    deletedAt: row.deleted_at,
+    adminLockedAt: row.admin_locked_at,
+    externalId: row.external_id,
   };
 }
 

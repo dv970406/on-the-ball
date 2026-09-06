@@ -164,3 +164,30 @@ export interface PostDetail extends Omit<PostListItem, "excerpt"> {
    */
   authorAvatarPath: ProfileRow["avatar_path"];
 }
+
+/**
+ * 어드민 목록 한 줄.
+ *
+ * ⚠ **`PostListItem`을 확장하지 않는다.** 그쪽은 `isLiked`(내 좋아요 임베딩)와 파생 표시를
+ *   담는데 어드민 화면은 그걸 그리지 않는다 — 확장으로 두면 쓰지도 않는 임베딩을 select에
+ *   끌고 다니게 된다.
+ */
+export interface AdminPostListItem {
+  id: PostRow["id"];
+  authorId: PostRow["author_id"];
+  authorNickname: string;
+  category: PostRow["category"];
+  title: PostRow["title"];
+  excerpt: string;
+  likeCount: PostRow["like_count"];
+  commentCount: PostRow["comment_count"];
+  viewCount: PostRow["view_count"];
+  createdAt: PostRow["created_at"];
+  updatedAt: PostRow["updated_at"];
+  deletedAt: PostRow["deleted_at"];
+}
+
+/** 어드민 관리 화면이 보는 글 — 본문 원문이 함께 온다(읽기 전용으로 렌더한다) */
+export interface AdminPostDetail extends AdminPostListItem {
+  content: PostRow["content"];
+}

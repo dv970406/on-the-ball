@@ -21,3 +21,9 @@ export { isSurveyOpen } from "./lib/open";
 export { SurveyBlock } from "./ui/survey-block";
 export { SplitCard } from "./ui/split-card";
 export { SurveyCard } from "./ui/survey-card";
+
+// 어드민 백오피스
+// ⚠ `SurveyOption`·`AdminSurveyDetail`은 올리지 않는다 — 슬라이스 밖 호출부가 0이다
+//   (훅의 반환을 그대로 쓴다). `check:conventions`는 상대 경로 소비를 "현역"으로 세어
+//   이 유형을 **잡지 못하므로** 손으로 지킨다.
+export { useAdminSurveyListQuery, useAdminSurveyQuery } from "./api/admin-queries";

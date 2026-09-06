@@ -22,4 +22,8 @@ export const surveyKeys = {
     [...surveyKeys.details(), id, userScope(userId)] as const,
   results: (id: number, userId: string | undefined) =>
     [...surveyKeys.all, "results", id, userScope(userId)] as const,
+  /** 어드민 목록·단건 — 사유는 `matchKeys.adminLists` 주석과 같다 */
+  adminLists: () => [...surveyKeys.all, "admin", "list"] as const,
+  adminList: (deleted: boolean | null) => [...surveyKeys.adminLists(), deleted] as const,
+  adminDetail: (id: number) => [...surveyKeys.all, "admin", "detail", id] as const,
 } as const;

@@ -29,6 +29,24 @@ export interface SurveyOption {
   textColor: SurveyOptionRow["text_color"];
 }
 
+/**
+ * 어드민 목록·수정 화면이 보는 문항.
+ *
+ * ⚠ **`Survey`를 확장하지 않는다.** `Survey.myOptionId`는 `survey_vote` 임베딩("내 행만")에서
+ *   오는데 어드민 화면은 "내 참여"를 그리지 않는다.
+ * ⚠ **`options`가 여기 없다.** 삭제된 문항의 선택지는 `survey_option_select_alive` 정책이
+ *   감춰 임베딩으로는 빈 배열이 온다 — 목록에서 선택지 수를 세면 삭제된 문항만 0이 되어
+ *   화면이 거짓말을 한다. 선택지는 수정 화면이 `admin_survey_option_list`로 따로 받는다.
+ */
+export interface AdminSurvey {
+  id: SurveyRow["id"];
+  title: SurveyRow["title"];
+  closesAt: SurveyRow["closes_at"];
+  createdAt: SurveyRow["created_at"];
+  updatedAt: SurveyRow["updated_at"];
+  deletedAt: SurveyRow["deleted_at"];
+}
+
 export interface Survey {
   id: SurveyRow["id"];
   title: SurveyRow["title"];

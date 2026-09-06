@@ -36,3 +36,7 @@ export { toPlainSummary } from "./lib/plain-summary";
 export { isHotPost, HOT_LIKE_THRESHOLD, HOT_WINDOW_MS } from "./lib/hot";
 export { usePostListQuery, usePostQuery } from "./api/queries";
 export { PostCard } from "./ui/post-card";
+
+// 어드민 백오피스 — 삭제된 글·차단한 작성자의 글까지 본다
+// ⚠ `AdminPostDetail`·`AdminPostListItem`은 올리지 않는다(슬라이스 밖 호출부가 0이다)
+export { useAdminPostListQuery, useAdminPostQuery } from "./api/admin-queries";

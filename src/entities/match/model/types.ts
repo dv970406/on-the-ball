@@ -168,6 +168,37 @@ export interface Match {
   myPick: MatchPick | null;
 }
 
+/**
+ * 어드민 목록·수정 화면이 보는 경기.
+ *
+ * ⚠ **`Match`를 확장하지 않는다.** `Match.myPick`은 `match_prediction` 임베딩("내 행만")에서
+ *   오는 값인데 어드민 화면은 "내 예측"을 그리지 않는다 — 확장으로 두면 그 임베딩을 쓰지도
+ *   않으면서 select 문자열에 끌고 다니게 된다.
+ * ⚠ `deletedAt`·`adminLockedAt`은 **어드민 조회 경로에만 실린다**. 일반 조회는 정책이
+ *   삭제된 행을 아예 걸러 내므로 그 값을 볼 일이 없다.
+ */
+export interface AdminMatch {
+  id: MatchRow["id"];
+  season: MatchRow["season"];
+  matchday: MatchRow["matchday"];
+  homeTeam: Team;
+  awayTeam: Team;
+  kickoffAt: MatchRow["kickoff_at"];
+  homeScore: MatchRow["home_score"];
+  awayScore: MatchRow["away_score"];
+  result: MatchRow["result"];
+  isVoided: boolean;
+  /** 소프트 삭제 시각 — `voided_at`(실제 경기 취소)과 **뜻이 다르다** */
+  deletedAt: MatchRow["deleted_at"];
+  /**
+   * 동기화 잠금 시각.
+   * ⚠ 이 값이 없으면 `scripts/sync-matches.mjs`가 다음 실행에서 스코어·킥오프를 통째로
+   *   덮어써 어드민 수정이 **조용히 원복된다**. 화면이 이 상태를 반드시 보여줘야 한다.
+   */
+  adminLockedAt: MatchRow["admin_locked_at"];
+  externalId: MatchRow["external_id"];
+}
+
 /** `match_prediction_results` RPC의 행 */
 export interface MatchPredictionResult {
   pick: MatchPick;

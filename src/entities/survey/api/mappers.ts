@@ -1,4 +1,5 @@
 import type {
+  AdminSurvey,
   Survey,
   SurveyOption,
   SurveyListItem,
@@ -112,4 +113,35 @@ export function buildSurvey(row: SurveySelectRow): Survey {
 /** `survey_results` RPC의 행 → 도메인 */
 export function buildSurveyResult(row: { option_id: number; vote_count: number }): SurveyResult {
   return { optionId: row.option_id, voteCount: row.vote_count };
+}
+
+/*
+ * 어드민 목록·수정 화면용 select·매퍼.
+ *
+ * ⚠ **`api/queries.ts`·`api/admin-queries.ts`가 아니라 여기 있다.** 그 파일들은
+ *   `"use client"`라 서버가 import할 수 없는데, "매핑은 `api/mappers.ts`(순수·서버 안전)에서"가
+ *   규약이다(`ADMIN_MATCH_SELECT`가 `entities/match`에서 같은 자리에 있다).
+ */
+export const ADMIN_SURVEY_LIMIT = 100;
+export const ADMIN_SURVEY_SELECT =
+  "id, title, closes_at, created_at, updated_at, deleted_at" as const;
+export const ADMIN_OPTION_SELECT =
+  "id, label, sort_order, subtitle, image_path, bg_color, text_color" as const;
+
+export function buildAdminSurvey(row: {
+  id: number;
+  title: string;
+  closes_at: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}): AdminSurvey {
+  return {
+    id: row.id,
+    title: row.title,
+    closesAt: row.closes_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    deletedAt: row.deleted_at,
+  };
 }

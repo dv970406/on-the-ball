@@ -14,4 +14,8 @@ export const postKeys = {
   list: (filters: PostListFilters) => [...postKeys.lists(), filters] as const,
   details: () => [...postKeys.all, "detail"] as const,
   detail: (id: number) => [...postKeys.details(), id] as const,
+  /** 어드민 목록·단건 — 사유는 `matchKeys.adminLists` 주석과 같다 */
+  adminLists: () => [...postKeys.all, "admin", "list"] as const,
+  adminList: (deleted: boolean | null) => [...postKeys.adminLists(), deleted] as const,
+  adminDetail: (id: number) => [...postKeys.all, "admin", "detail", id] as const,
 } as const;
