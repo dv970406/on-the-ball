@@ -9,13 +9,13 @@
 - `app` — FSD app 레이어: `providers`(QueryClient + AuthProvider), `fonts`, `styles/globals.css`
 - `views` — 화면 조립. ⚠ **`pages` 금지** (Next Pages Router로 오감지됨 → 반드시 `views`)
   post-list / post-detail / post-write / post-edit / survey-list / survey-detail /
-  match-list / match-detail / sign-in / profile /
+  match-list / match-detail / notice-list / notice-detail / sign-in / profile /
   admin-match-list / admin-match-edit / admin-survey-list / admin-survey-form /
   admin-post-list / admin-post-manage / admin-notice-list / admin-notice-form
   ⚠ 어드민의 **등록·수정이 한 슬라이스**인 것(`admin-*-form`)은 취향이 아니다 — `views`끼리는
   import할 수 없어 폼을 공유하려면 `mode` prop 형태여야 한다(`PostForm`과 같은 판단).
 - `widgets` — app-bar / bottom-tab-bar / sub-header / tab-scroll-area / auth-shell / auth-status /
-  admin-shell
+  notice-banner / admin-shell
 - `features` — 사용자 액션 1개 = 슬라이스 1개
   sign-in(소셜 OAuth) / sign-out / link-identity / update-profile /
   write-post / delete-post / write-comment / delete-comment / toggle-post-like / view-post /
@@ -67,7 +67,7 @@ shared ← entities ← features ← widgets ← views
 - `@/shared/api` — 클라이언트 안전 모듈만 노출. 서버 전용은 **직접 경로**로 import: `@/shared/api/supabase-server`(`next/headers` 의존) · `@/shared/api/supabase-anon`(Next Data Cache 의존).
 - `@/shared/lib` — `"use client"` 훅(`useScrollRestore`·`useNowMs`·`useToast`·`useFocusTrap`·`useNextParam`) 포함. **서버에서는 순수 함수를 직접 경로로 import**: `@/shared/lib/cn`·`format`·`post-id`·`text`·`query-scope`. 위 나열이 곧 `shared/lib`의 화이트리스트이고 **단일 소스는 `src/shared/lib/index.ts` 말미의 주석**이다.
   - ⚠ **`"use client"`를 붙이지 않은 `shared/ui` 컴포넌트도 서버 소비자다.** 배럴을 거치면 서버 렌더 여지를 잃는다 — `markdown`·`empty-state`·`avatar`·`pill`·`skeleton`과 클래스 함수들(`button-class`·`action-chip-class`·`chip-class`)이 `@/shared/lib/cn` 직접 경로를 쓰는 이유다(사유는 `empty-state.tsx` 주석에).
-- `@/entities/post`·`@/entities/comment`·`@/entities/profile`·`@/entities/survey` — `"use client"` 쿼리 훅·UI 포함. **서버는 `model/types`·`api/mappers`·`api/keys`·`api/list-query`를 직접 import**. post의 순수 헬퍼도 마찬가지다 — `app/posts/[id]/page.tsx`가 `@/entities/post/lib/plain-summary`를 직접 경로로 가져와 `og:description`을 만든다.
+- `@/entities/post`·`@/entities/comment`·`@/entities/profile`·`@/entities/survey`·`@/entities/notice` — `"use client"` 쿼리 훅·UI 포함. **서버는 `model/types`·`api/mappers`·`api/keys`·`api/list-query`를 직접 import**. post의 순수 헬퍼도 마찬가지다 — `app/posts/[id]/page.tsx`가 `@/entities/post/lib/plain-summary`를 직접 경로로 가져와 `og:description`을 만든다.
 - `@/entities/session` — 배럴이 zustand 스토어·Provider·가드를 재export(전부 클라이언트). 순수 함수 `toAuthErrorMessage`는 `lib/auth-error-message`에, 쿼리 키는 `api/keys`에 따로 있다.
 - `@/features/sign-in` — 배럴이 `"use client"` 훅(`useOAuthSignIn`)을 포함한다. **서버가 쓰는 순수 함수 `hasPkceVerifier`는 `@/features/sign-in/lib/pkce-verifier` 직접 경로**로 가져간다(`app/(auth)/sign-in/page.tsx`가 선례). features 레이어에도 같은 예외가 성립한다는 뜻이다 — 배럴이 클라이언트 훅을 담고 있으면 서버 소비자는 직접 경로를 쓴다.
 - 선례: `app/posts/[id]/page.tsx`는 **`"use client"`를 담은 배럴을 하나도 거치지 않는다.** 서버 안전 모듈은 전부 직접 경로로 가져오고, 배럴을 쓰는 곳은 순수 상수만 담은 `@/shared/config`와 서버가 **렌더**하는 뷰(`@/views/post-detail`)뿐이다(렌더는 합법 — 아래 절 참고).

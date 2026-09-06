@@ -202,8 +202,14 @@
 - ⚠ RPC도 upsert도 쓰지 않는다 — 사유는 `cast-poll-vote`와 같다(upsert는 `match_id` UPDATE 권한을 요구해 "취소 불가"를 뚫는다).
 
 ## `@/entities/notice`
-- `useAdminNoticeListQuery(deleted)` / `useAdminNoticeQuery(id)` / `noticeKeys` / `Notice` · `NoticeType` / `NOTICE_TYPES` / `noticeVisibility(notice, nowMs)` / `NOTICE_LIST_LIMIT`.
-- ⚠ **읽는 화면이 아직 없다.** 조회 훅이 전부 어드민용이고 테이블이 아니라 `admin_notice_list` RPC를 부른다 — `notice_select_live` 정책이 예약·만료·삭제된 공지를 감추기 때문이다.
+- `useNoticeListQuery(initialData)` / `useNoticeQuery(id, initialData)` / `useBannerNoticeQuery(initialData)` / `useAdminNoticeListQuery(deleted)` / `useAdminNoticeQuery(id)` / `noticeKeys` / `Notice` · `NoticeListItem` · `NoticeType` / `NOTICE_TYPES` / `noticeVisibility(notice, nowMs)`.
+- **`buildNoticeListQuery(supabase)` / `buildBannerNoticeQuery(supabase)`** — 목록·배너 조립의 단일 소스(`api/list-query.ts` — 서버 안전). 훅과 SSR 페이지가 **같은 함수**를 부른다(`buildPostListQuery`와 같은 규약).
+  - ⚠ 목록 정렬은 **필독 먼저, 그다음 최신순**이다. `notice_type` enum의 정의 순서(`'필독','공지'`)가 곧 오름차순이라 값을 더하거나 순서를 바꾸면 이 정렬이 함께 움직인다.
+  - ⚠ 배너는 `'필독'`만 본다 — 화면 최상단의 가장 비싼 자리라 "반드시 읽어야 하는 것"만 올린다.
+- ⚠ **목록·배너 select에는 `body`가 없다**(`NOTICE_LIST_SELECT` ↔ `NOTICE_SELECT`). 본문이 20,000자까지 갈 수 있어 목록 50건이면 응답이 그대로 부푼다 — `POST_LIST_SELECT` ↔ `POST_DETAIL_SELECT`와 같은 판단이다.
+- ⚠ **예약·만료·삭제를 훅이 거르지 않는다.** `notice_select_live` 정책이 단독으로 갖는다 — 필터를 조회마다 반복하면 한 곳만 빠뜨려도 발표 전 공지가 샌다(소프트 삭제·차단과 같은 자리).
+- ⚠ 어드민 조회만 테이블이 아니라 `admin_notice_list` RPC를 부른다 — 정책이 감춘 행을 봐야 하기 때문이다.
+- ⚠ `useBannerNoticeQuery`의 `initialData`는 **`null`과 `undefined`가 다른 뜻이다** — `null`은 "필독 공지가 없다"(조회 끝), `undefined`는 "프리페치 안 함"이다. 하나로 접으면 공지가 없는 사이트에서 목록을 열 때마다 조회가 한 번 더 나간다.
 - ⚠ `noticeVisibility`는 **`nowMs`를 인자로 받는다**(`isSurveyOpen`·`isMatchOpen`과 같은 형태·같은 이유). `null`은 "아직 판정 전"이고 `"closed"`로 접으면 첫 프레임에 멀쩡한 공지가 끝난 것으로 보인다.
 - ⚠ 키에 `userScope`를 붙이지 않는다(공지에는 "나"에 종속된 값이 없다). 대신 어드민 목록을 `admin` 조각으로 갈라 로그아웃 뒤 남은 캐시가 일반 목록으로 새지 않게 한다.
 
@@ -301,5 +307,6 @@
 - `SubHeader` — 상세·작성·수정 화면 상단(뒤로가기 + 공유).
 - `TabScrollArea` — 목록 스크롤 영역(`<main>` 제공 + 스크롤 복원).
 - `AuthShell` — 인증 화면의 공통 껍데기.
+- **`NoticeBanner`** — 피드 최상단의 한 줄 공지 배너(최신 **필독** 하나). 없으면 **아무것도 그리지 않는다** — 빈 띠가 첫 화면의 가장 값진 세로 공간을 먹지 않게. ⚠ 조회 실패도 조용히 넘긴다(화면의 본문이 아니라 덧붙는 안내라, 에러 박스를 얹으면 정작 읽으러 온 목록 위에 뜬다). ⚠ 자리는 **말머리 레일 위**다 — 아래로 내리면 공지가 그 말머리에 속한 것으로 읽힌다.
 - `AuthStatus` — **비로그인일 때의 로그인 링크**만 그린다(로그인 상태에서는 `null`). ⚠ 라벨이 "로그인"이라 `SignInDialog`를 거치지 않고 곧바로 이동한다 — 목적지가 라벨에 적혀 있어 한 단계 더 묻는 것이 방해다(`CommentBar`의 로그인 버튼도 같다).
   ⚠ 계정 관련 동작(닉네임 표시·로그아웃)을 여기 되넣지 않는다 — 프로필 화면과 두 곳으로 갈린다. 프로필 진입은 하단 탭바가 상시 제공하고, **로그아웃은 `views/profile`이 단독으로 갖는다.**
