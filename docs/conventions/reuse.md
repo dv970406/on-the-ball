@@ -49,6 +49,9 @@
   - ⚠ **"현재 시각"이 아니다.** 값이 **모듈 스코프에 세션당 한 번** 고정되어(앱을 처음 연 화면에서 굳는다) SPA 세션 내내 그대로다 — `useSyncExternalStore` 계약상 스냅샷이 매번 달라지면 무한 렌더가 되기 때문이다(그 훅 주석).
   - ⚠ **그래서 서버 시각이 있으면 그쪽이 우선이다** — `serverNowMs ?? useNowMs()`. 순서를 뒤집으면 낡은 클라 시계가 갓 받은 서버 시각을 이겨 **마감된 것이 진행 중으로 보인다**(`data-and-state.md`에 실측).
   렌더 중 `Date.now()`를 부르지 않기 위한 훅이다. **시간에 따라 달라지는 표시(HOT 배지 등)는 이걸로 판정한다** — `null`인 첫 렌더에서는 그 표시를 그리지 않으면 서버·클라 출력이 같아진다. 선례: `entities/post`의 `isHotPost(post, nowMs)`.
+- **`useQueryNowMs(dataUpdatedAt)`** — **서버 프리페치가 없는 화면**의 기준 시각. 규약은 `serverNowMs ?? useNowMs()`인데 그 앞자리가 비는 화면(어드민 목록 전부)에서는 세션 고정 시계가 유일한 기준이 되어 **방금 만든 것이 과거 시계로 판정된다** — "지금부터" 노출되는 공지를 등록하고 목록으로 돌아오면 `예정`으로 그려졌다(실측). TanStack Query의 `dataUpdatedAt`(그 데이터를 받은 순간)을 쓰면 등록·수정 후의 무효화가 곧 리페치라 판정이 함께 따라온다. ⚠ 데이터가 없으면 `0`이라 그때만 `useNowMs()`로 떨어진다.
+- **`resizeToWebp(file)` / `IMAGE_TARGET_BYTES`** — 이미지를 **비율을 유지한 채** webp로 줄인다(결과는 항상 500KB 이하). ⚠ **승격된 함수다** — `features/write-post`에 있었고 그 주석이 "세 번째 이미지 기능이 생기면 올린다"고 예고했다(어드민 입축구 배경이 그 세 번째이고, features끼리는 import할 수 없어 승격 말고 길이 없다). ⚠ `resizeToAvatar`(정사각 crop)는 **함께 올리지 않았다** — 본문·배경 사진을 그렇게 자르면 내용이 날아가 형태가 같지 않다. ⚠ 받는 형식·원본 상한(`ACCEPTED_IMAGE_TYPES`·`MAX_SOURCE_BYTES`)은 **기능마다 다르므로** 각 feature가 갖는다(본문은 움직이는 GIF를 받고 입축구 배경은 안 받는다).
+- **`toKstInputValue(iso)` / `fromKstInputValue(value)`** — `<input type="datetime-local">` ↔ ISO. ⚠ **양방향을 KST로 못박는다** — `datetime-local`에는 타임존이 없어 `new Date(value)`로 파싱하면 **브라우저 로컬 시간대**로 해석되는데, 화면은 전부 KST로 그린다(`format.ts`의 `TIME_ZONE`). 해외에서 접속한 관리자가 킥오프를 넣으면 표기와 몇 시간씩 어긋난다. ⚠ 승부예측(킥오프)·입축구(마감)·공지(노출 기간) 셋이 쓰므로 `shared`에 있다.
 - `useScrollRestore` / `clearScrollRestore` — 목록 스크롤 위치 저장/복원 (`clearScrollRestore`는 목록을 처음부터 보여야 할 때 저장분을 버린다)
 - `useFocusTrap` — 오버레이(`Dialog`·`Sheet`) 안에 포커스를 가둔다. ⚠ 초기 포커스는 **`preventScroll: true`** 로 준다 — 화면 밖에서 올라오는 시트에 그냥 `focus()`하면 브라우저가 `overflow-hidden`인 430px 프레임을 스크롤시켜 **되돌릴 수 없게** 화면이 밀린다(실측)
 - `useToast` / `useToastStore` — 토스트 발행. **표시 영역(`ToastViewport`)은 `@/shared/ui`에 있고 루트에 하나만 둔다** — 상태와 UI가 레이어를 달리한다
@@ -198,6 +201,21 @@
 - ⚠ **집계 캐시를 건드리지 않는다 — 투표·입축구와 갈리는 지점이다.** 저쪽은 참여하는 순간 결과가 열려 낙관적으로 막대를 밀어야 하지만, 여기는 **마감 시점과 공개 시점이 같은 킥오프**라 예측할 수 있는 동안 분포가 반드시 닫혀 있다 — 밀 막대가 애초에 없다. 같은 이유로 적중률 캐시도 건드리지 않는다(채점은 킥오프 뒤다).
 - ⚠ RPC도 upsert도 쓰지 않는다 — 사유는 `cast-poll-vote`와 같다(upsert는 `match_id` UPDATE 권한을 요구해 "취소 불가"를 뚫는다).
 
+## `@/entities/notice`
+- `useAdminNoticeListQuery(deleted)` / `useAdminNoticeQuery(id)` / `noticeKeys` / `Notice` · `NoticeType` / `NOTICE_TYPES` / `noticeVisibility(notice, nowMs)` / `NOTICE_LIST_LIMIT`.
+- ⚠ **읽는 화면이 아직 없다.** 조회 훅이 전부 어드민용이고 테이블이 아니라 `admin_notice_list` RPC를 부른다 — `notice_select_live` 정책이 예약·만료·삭제된 공지를 감추기 때문이다.
+- ⚠ `noticeVisibility`는 **`nowMs`를 인자로 받는다**(`isSurveyOpen`·`isMatchOpen`과 같은 형태·같은 이유). `null`은 "아직 판정 전"이고 `"closed"`로 접으면 첫 프레임에 멀쩡한 공지가 끝난 것으로 보인다.
+- ⚠ 키에 `userScope`를 붙이지 않는다(공지에는 "나"에 종속된 값이 없다). 대신 어드민 목록을 `admin` 조각으로 갈라 로그아웃 뒤 남은 캐시가 일반 목록으로 새지 않게 한다.
+
+## 어드민 백오피스 (`@/features/admin-*`)
+- `admin-match` — `MatchForm` · `useUpdateMatch`/`useUnlockMatch`/`useDeleteMatch`/`useRestoreMatch`/`useSyncMatches`.
+- `admin-survey` — `SurveyForm` · `useCreateSurvey`/`useUpdateSurvey`/`useSetSurveyOptions`/`useEditSurveyOption`/`useDeleteSurvey`/`useRestoreSurvey` · `useSurveyImageUpload`/`useSurveyImageCleanup`.
+- `admin-post` — `extractImageUrls` · `useStripPostImages`/`useMaskPost`/`useUnmaskPost`/`useAdminDeletePost`/`useAdminRestorePost`/`useEditPostPoll`.
+- `admin-notice` — `NoticeForm` · `useCreateNotice`/`useUpdateNotice`/`useDeleteNotice`/`useRestoreNotice`.
+- ⚠ **jsonb 인자를 만드는 직렬화 함수를 features가 단독으로 소유한다.** 생성 타입이 `Json`이라 키 오타(`bgColor` vs `bg_color`)를 컴파일러가 잡아주지 못한다 — `database.types.ts`의 보증이 여기서만 사라지는 자리다.
+- ⚠ **버려진 배경 파일은 "빼기"가 아니라 저장이 지운다**(`useSurveyImageCleanup`). 버튼을 누른 순간 지우면 저장하지 않고 떠났을 때 **경로는 남고 파일이 없는** 면이 되어 카드가 통째로 투명해진다 → DB가 그 경로를 실제로 버린 뒤에 정리한다.
+- ⚠ **중복 실행 가드가 features에 없다.** 성공의 부수효과(이동 목적지·문구)가 화면의 결정이라 뮤테이션을 조립하는 뷰의 `model/`이 갖는다. 목록의 항목별 삭제·복구는 `useDuplicateGuard`가 아니라 **Set + `mutateAsync().finally()`** 형태다(`useBlockRemoval` 선례).
+
 ## `@/entities/block`
 - `useBlockedUsersQuery(userId)` / `blockKeys` / `BlockedUser` — 내가 차단한 사람 목록. (select 문자열과 매퍼는 슬라이스 내부다 — 배럴에 올리면 호출부가 0인 export가 되어 `check:conventions`가 막는다.)
 - ⚠ **`entities/profile`에 얹지 않고 별도 슬라이스다.** 얹으면 그 슬라이스가 "프로필 + 차단" 두 도메인을 떠안는다(`entities/poll`을 `entities/post`에서 뗀 것과 같은 판단). entities끼리 import할 수 없는 것은 걸림돌이 아니다 — 행 타입은 각 슬라이스가 `@/types/database.types`에서 직접 뽑는 것이 이미 관례다.
@@ -234,7 +252,7 @@
 - **`OAUTH_PROVIDERS` / `OAUTH_PROVIDER_LABEL`** — 지원 소셜 프로바이더의 단일 소스. `supabase/config.toml`의 `[auth.external.*]`와 갈리면 안 된다. ⚠ `shared`에 있는 이유는 로그인(`features/sign-in`)과 계정 연결(`features/link-identity`)이 같은 목록을 써야 하는데 features끼리는 import할 수 없어서다.
 - **`avatarUrl(path)` / `AVATAR_BUCKET`** — 아바타 **경로** → 공개 URL. ⚠ DB에는 전체 URL이 아니라 경로만 저장한다(호스트가 환경마다 다르다: 로컬 `127.0.0.1:64321` ↔ 원격 `*.supabase.co`). 조립은 이 함수 한 곳에서만. `shared`에 있는 이유는 `OAUTH_PROVIDERS`와 같다 — entities 셋이 함께 쓴다. 버킷명 문자열도 여기서 가져다 쓴다(`features/update-profile`이 선례).
 - **`publicStorageUrl(bucket, path)`** — 공개 버킷 경로 → URL 조립의 **단일 소스**. 새 공개 버킷이 생기면 여기에 붙인다(버킷별 함수는 이 함수를 감싸기만 한다).
-- **`surveyImageUrl(path)`** — 입축구 면 배경 경로 → URL. ⚠ 버킷명 상수는 **배럴에 없다**(TS 호출부가 0이라 올리지 않았다) — 필요하면 `@/shared/config/survey-image` 직접 경로. ⚠ 이 버킷은 **쓰기 정책이 없다**(운영진 문항과 같은 취급) — 파일은 `scripts/upload-survey-images.mjs`가 service_role로 올린다.
+- **`surveyImageUrl(path)` / `SURVEY_IMAGE_BUCKET`** — 입축구 면 배경 경로 → URL. ⚠ 버킷명 상수는 한때 배럴에 없었다(TS 호출부가 0이었다) — 어드민의 배경 업로드가 생기면서 올렸다(`AVATAR_BUCKET`·`POST_IMAGE_BUCKET`과 같은 이유). ⚠ 이 버킷의 쓰기는 **관리자에게만 열려 있다**(`survey_images_*_admin` 정책) — 어드민 화면의 배경 업로드가 그 경로이고, `scripts/upload-survey-images.mjs`(service_role) 경로도 그대로 살아 있다.
 - **`postImageUrl(path)` / `POST_IMAGE_BUCKET`** — 본문 이미지 경로 → 공개 URL.
   ⚠ **아바타와 달리 결과(전체 URL)가 그대로 `post.content`에 들어간다.** 본문은 사용자가 외부 주소도 적을 수 있는 자유 텍스트라 경로 규약을 강제할 자리가 없다 — 사유는 `api-and-db.md`의 "본문 이미지는 URL을 본문에 담는다" 절에 있다.
   ⚠ 조립 자체는 `publicStorageUrl`이 한다. **이 함수만 결과(전체 URL)가 DB에 들어간다** — 본문은 자유 텍스트라 경로 규약을 강제할 자리가 없다.

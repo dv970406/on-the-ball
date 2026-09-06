@@ -3,6 +3,16 @@
 ## 데이터 접근 경로
 
 - **클라이언트가 supabase를 직접 호출한다.** Route Handler(`app/api/*`)를 두지 않는다.
+  - ⚠ **예외는 `app/api/admin/sync-matches/route.ts` 하나다.** 금지의 근거는 "중간 검증층 없이
+    RLS가 방어선"인데, 그 자리는 데이터 접근이 아니라 **외부 API(API-Football)를 서버
+    비밀로 부르는 곳**이라 근거가 닿지 않는다(키를 브라우저에 내려보낼 수 없다).
+    목록은 `scripts/check-conventions.mjs`의 `ROUTE_HANDLER_ALLOWED`가 **양방향으로**
+    대조한다 — 목록 밖 route.ts도, 목록에만 있고 사라진 파일도 실패다.
+  - ⚠ 그 핸들러의 순서가 곧 방어다: Origin 검사 → `getUser()` → `rpc("is_admin")` →
+    **그 뒤에야** service_role 클라이언트 생성. service_role로 관리자 확인을 하면 세션이
+    없어 "누가 요청했는가"를 본문에서 받아야 하는데 그건 위조된다(definer RPC가 유저 id를
+    인자로 받지 않는 것과 같은 함정). `SUPABASE_SERVICE_ROLE_KEY`는 **`shared/config/env`에
+    넣지 않는다** — 그 모듈은 클라이언트 번들에 실린다.
 - 단 컴포넌트가 supabase를 직접 만지지 않는다. **모든 접근은 `entities/*/api`의 TanStack Query 훅을 경유**한다. 이유는 raw fetch를 금지했던 것과 같다 — 중복 제거·캐싱·로딩/에러 상태를 잃지 않기 위해서다. 게다가 낙관적 업데이트가 queryKey를 전제로 한다.
 - 브라우저 클라이언트는 `requireBrowserSupabase()`(`@/shared/api`)로 얻는다. 모든 호출부가 같은 null 가드를 반복하지 않도록 한 곳에서 한국어 에러로 바꾼다.
 - 브라우저 클라이언트는 **`@supabase/ssr`의 `createBrowserClient`(쿠키 저장)** 를 쓴다. `@supabase/supabase-js`의 `createClient`(localStorage)로 바꾸면 `proxy.ts`가 쿠키를 못 읽어 **서버 토큰 리프레시가 통째로 죽고**(오래 비운 뒤 돌아온 사용자가 조용히 로그아웃된다) SSR이 세션을 보지 못해 개인화도 사라진다.
@@ -352,8 +362,11 @@ end if;
   폴더의 파일을 가리킨다. 폴더를 `[0-9]+`로 두면 `..`가 애초에 들어오지 못한다.
 - ⚠ **`bg_color`를 대체하지 않는다.** 이미지가 뜨기 전·실패했을 때 깔릴 배경이 필요하고,
   분할 카드 판별자도 여전히 색이다 → 이미지만 있고 색이 없는 문항은 카드로 그려지지 않는다.
-- ⚠ **쓰기 정책이 없는 버킷이다.** 문항 자체를 마이그레이션이 넣는 것과 같은 취급이라
-  앱에는 업로드 경로가 없다 — 파일은 `scripts/upload-survey-images.mjs`가 service_role로 올린다.
+- ⚠ **쓰기는 관리자에게만 열려 있다**(`survey_images_insert/update/delete_admin`). 한동안
+  정책이 아예 없어 앱에 업로드 경로가 없었고, 어드민 화면이 생기면서 그 자리가 열렸다 —
+  `scripts/upload-survey-images.mjs`(service_role) 경로는 그대로 살아 있다.
+  ⚠ 경로 형태(`{survey_id}/{파일}`)는 여전히 `image_path`의 CHECK가 강제한다 — 정책은
+  "관리자인가"만 본다.
   ⚠ 새 키 형식(`sb_secret_…`)은 JWT가 아니라서 **`apikey` 헤더를 함께** 보내야 한다
   (Authorization만 주면 storage가 JWT로 파싱하려다 `Invalid Compact JWS`로 죽는다).
 - ⚠ 크기·타입의 **실제 방어선은 버킷 설정**이다(`rls.sql` 섹션 30c-2가 값까지 대조한다).
@@ -447,11 +460,18 @@ end if;
 | 투표 질문 | 100 | 1,000 | `POLL_QUESTION_LIMIT` | `validatePoll` |
 | 투표 선택지 | 40 | 400 | `POLL_OPTION_LIMIT` | `validatePoll` |
 | 본문 | — (도입 안 함) | 20,000 | `CONTENT_MAX` (단일) | `validatePost` |
+| 입축구 제목 | 100 | 1,000 | `SURVEY_TITLE_LIMIT` | `validateSurvey` |
+| 입축구 선택지·부제 | 40 | 400 | `SURVEY_LABEL_LIMIT`·`SURVEY_SUBTITLE_LIMIT` | `validateSurvey` |
+| 공지 제목 | 120 | 1,200 | `NOTICE_TITLE_LIMIT` | `validateNotice` |
+| 공지 본문 | — (도입 안 함) | 20,000 | `NOTICE_BODY_MAX` (단일) | `validateNotice` |
 
-⚠ **이 표는 "클라이언트가 쓰는 컬럼"만 담는다.** 입축구(`survey.title`·`survey_option.label`·
-`subtitle`)에는 쓰기 정책도 grant도 없어(문항은 마이그레이션이 넣는다) 겹쳐 걸 화면 한도가
-애초에 없다 — 표에서 빠진 것은 누락이 아니라 대상이 아니어서다. 그런 컬럼은 DB CHECK만 둔다.
-⚠ 반대로 **클라이언트 쓰기 경로가 새로 열리면 그 순간 이 표의 대상이 된다.**
+⚠ **이 표는 "클라이언트가 쓰는 컬럼"만 담는다.** 쓰기 경로가 없는 컬럼은 DB CHECK만 둔다.
+⚠ **클라이언트 쓰기 경로가 새로 열리면 그 순간 이 표의 대상이 된다** — 입축구가 실제로 그랬다.
+한동안 문항을 마이그레이션만 넣어서 겹쳐 걸 화면 한도가 없었는데, 어드민 화면이 생기면서
+`survey.title`·`survey_option.label`·`subtitle`이 이 표로 들어왔다(공지도 같은 이유로 함께).
+⚠ 어드민 전용 화면이라고 예외가 아니다 — 한도를 안 걸면 DB의 23514가 나가고
+`toDbErrorMessage`가 "입력값이 허용 범위를 벗어났어요."로 접어 **어느 칸이 문제인지
+말하지 못한다.** 화면 한도는 그 문구를 "N자까지예요"로 만드는 장치다.
 
 ⚠ **검증은 features 슬라이스가 소유하고 뷰는 문구만 받는다.** 세 슬라이스가 같은 형태를
 지켜야 한다 — 한 슬라이스만 한도 상수를 배럴로 내보내고 뷰가 분기를 직접 짜면 형태가 갈린다.
@@ -494,7 +514,13 @@ end if;
 | **집계 읽기** | `post_poll_results` (`stable`) | 이 표에서 **쓰기가 아닌** 둘 중 하나다. 개별 표는 RLS로 "내 행만"인데 집계는 그 경계를 넘어야 한다 — 그리고 **투표한 사람에게만** 돌려준다(결과 게이팅을 UI가 아니라 여기서 건다). ⚠ definer라 정책이 닿지 않으므로 **`post_is_alive`를 함수 안에서 직접 확인**한다 |
 | 정책 헬퍼 | `match_is_open` (`stable`) | `match_prediction`의 insert·update 정책이 공유하는 **킥오프 판정**. SELECT에는 걸지 않는다 — 마감돼도 자기 예측은 봐야 한다(`survey_is_open`과 같은 형태). anon에는 열지 않는다(부르는 정책이 전부 `to authenticated`) |
 | **집계 읽기** | `match_prediction_results` (`stable`) | ⚠ **`voided_at`을 보지 않는다** — 취소된 경기도 킥오프가 지났으면 집계가 열린다(`match_is_open`은 보는데 여기는 안 본다). 던져진 예측은 실재했으므로 분포는 사실이고, 다만 `result`가 null이라 **채점에서만 빠진다** — 의도된 비대칭이다. 승부예측판 집계인데 **게이팅 축이 다르다** — 위 둘은 "참여했는가"로 가르지만 이건 **킥오프가 지났는가**로 가른다. 마감 전 공개는 다수파 추종으로 적중률을 오염시키고, 마감 후 비공개는 이 기능의 콘텐츠를 잠그는 셈이다. 그래서 **anon에도 EXECUTE가 열린 유일한 집계 함수**다 |
-| **집계 읽기** | `survey_results` (`stable`) | 입축구판 `post_poll_results`. 게이팅도 같다. ⚠ **`post_is_alive` 대응물이 없다** — 입축구에는 소프트 삭제되는 부모가 없어 확인할 것이 없기 때문이다. authenticated 전용이라 아래 anon 화이트리스트에는 들어가지 않는다 |
+| **집계 읽기** | `survey_results` (`stable`) | 입축구판 `post_poll_results`. 게이팅도 같다. ⚠ 삭제된 문항은 **함수 안에서 직접 거른다**(definer라 정책이 닿지 않는다 — `post_poll_results`가 `post_is_alive`를 부르는 자리와 같다). authenticated 전용이라 아래 anon 화이트리스트에는 들어가지 않는다 |
+| 정책 헬퍼 | `match_is_alive` (`stable`) | `match_lineup`·`match_lineup_player`·`match_event`·`match_stat`의 SELECT 정책이 공유하는 **부모 생존 판정**. anon에 열려 있다(크롤러가 경기 상세를 색인한다) |
+| 정책 헬퍼 | `survey_is_alive` (`stable`) | `survey_option`의 SELECT 정책이 쓰는 부모 생존 판정. anon에 열려 있다 |
+| 정책 헬퍼 | `post_is_masked` (`stable`) | `post_update_own`이 쓰는 **가림 잠금**. 이게 없으면 작성자가 가려진 자기 글의 본문을 곧바로 다시 써 넣는다 — 그리고 그 상태에서 관리자가 되돌리면 **작성자가 새로 쓴 글이 지워지고 문제 원문이 다시 게시된다**(실측). anon에는 열지 않는다(부르는 정책이 `to authenticated`) |
+| 권한 판정 | `is_admin` (`stable`) | 관리자 여부. **인자를 받지 않는다**(`auth.uid()`로 확정). anon에는 열지 않는다 — **어떤 RLS 정책도 이 함수를 부르지 않기 때문**이다 |
+| **어드민 조회** | `admin_match_list` · `admin_survey_list` · `admin_survey_option_list` · `admin_post_list` · `admin_notice_list` · `admin_survey_vote_count` (`stable`, `language sql`) | 정책이 감춘 행(삭제·예약·차단)을 어드민에게만 돌려준다. **비관리자에게는 예외가 아니라 0행**이다. ⚠ **`language sql`이어야 한다** — plpgsql은 인라인되지 않아 PostgREST가 붙인 `order/limit`이 전체를 물질화한 뒤 적용된다(결과는 정확하고 느리기만 해서 아무 검사도 못 잡는다) |
+| **어드민 쓰기** | `admin_update_match` · `admin_unlock_match` · `admin_soft_delete_match` · `admin_restore_match` · `admin_create_survey` · `admin_update_survey` · `admin_set_survey_options` · `admin_edit_survey_option` · `admin_soft_delete_survey` · `admin_restore_survey` · `admin_create_notice` · `admin_update_notice` · `admin_soft_delete_notice` · `admin_restore_notice` · `admin_strip_post_images` · `admin_mask_post` · `admin_unmask_post` · `admin_soft_delete_post` · `admin_restore_post` · `admin_edit_post_poll` | 첫 줄이 `is_admin()` 확인이고 아니면 **P0001 한국어**다. 아래 "어드민 쓰기는 전부 RPC를 지난다" 절 참고 |
 
 ⚠ **RLS를 우회하는 definer는 "그 함수가 유일한 경로"일 때 가장 강하다.**
 `create_post_with_poll`이 그 예다. 처음엔 원자성만 노리고 invoker로 두고 `post_poll`·`post_poll_option`에
@@ -519,8 +545,8 @@ end if;
 - **유저 id를 인자로 받지 않는다.** `security definer`는 RLS를 우회하므로 유저를 클라이언트가 넘기면 남의 명의로 조작할 수 있다. 함수 안에서 `auth.uid()`로 확정한다 — PostgREST가 access token을 검증해 `request.jwt.claims`에 심어둔 값이라 위조가 불가능하다. `security definer`가 바꾸는 것은 "무엇을 할 수 있는가"(권한)이지 "누가 호출했는가"(세션 컨텍스트)가 아니다.
 - **`set search_path = ''` + `public.` 접두사.** 호출자가 search_path를 조작해 다른 스키마의 동명 테이블을 붙잡게 만드는 권한 상승을 막는다.
 - **`revoke execute from public, anon`.** 함수는 기본적으로 PUBLIC에 EXECUTE가 부여된다 — 그대로 두면 비로그인도 호출한다.
-  - ⚠ **anon에 EXECUTE가 열린 함수는 전부 6개**이고, 그게 `rls.sql` 섹션 17d의 화이트리스트다.
-    definer는 그중 넷뿐이니 "definer 4개"로만 세면 안 된다.
+  - ⚠ **anon에 EXECUTE가 열린 함수는 전부 8개**이고, 그게 `rls.sql` 섹션 17d의 화이트리스트다.
+    definer는 그중 여섯뿐이니 "definer 6개"로만 세면 안 된다.
 
     | 함수 | definer? | 왜 열려 있나 |
     |---|:---:|---|
@@ -530,10 +556,98 @@ end if;
     | `is_blocked` | ✅ | 〃 — `post`의 select 정책에 `to` 절이 없어 비로그인 조회도 이 함수를 지난다. **닫으면 목록·상세가 통째로 42501로 죽는다.** anon은 `auth.uid()`가 null이라 항상 false를 받아 아무것도 감춰지지 않는다 |
     | `has_visible_char` | — | **CHECK 제약 평가** — 닫으면 그 테이블의 쓰기가 전부 42501로 죽는다 |
     | `normalize_nickname` | — | 〃 (CHECK + before-write 트리거) |
+    | `match_is_alive` | ✅ | 라인업·사건·스탯의 select 정책이 부르는 **부모 생존 판정**. 그 정책들에 `to` 절이 없어 비로그인 조회도 지난다 — 닫으면 크롤러의 경기 상세가 통째로 42501로 죽는다. 입력한 id의 생존 여부만 돌려주는데 그건 `match`를 직접 조회해도 알 수 있는 사실이다 |
+    | `survey_is_alive` | ✅ | 〃 — `survey_option`의 select 정책이 부른다 |
+
+    ⚠ **`is_admin`은 이 표에 없다.** 어떤 RLS 정책도 그 함수를 부르지 않기 때문이다 —
+    어드민 조회조차 definer RPC를 지나므로 anon에 열 이유가 없다(아래 어드민 절).
 
   - ⚠ **쓰기 예외는 `increment_post_view` 하나뿐이다.** "anon은 어디에도 쓸 수 없다"는 전제가 여기서만 깨진다. 조회는 비로그인이 대부분이라 authenticated 전용으로 두면 숫자가 의미를 잃기 때문이다.
   - 대가로 **`view_count`는 curl 루프로 부풀릴 수 있는 대략치**다 — 트리거가 단독 관리하는 `like_count`·`comment_count`와 **신뢰 수준이 다르다.** 이 차이는 컬럼 주석에도 적혀 있다. 정확도가 필요해지면 `(post_id, viewer_hash, viewed_on)` 로그 테이블이 필요하다.
 - **에러 코드 규약**: 우리가 의도적으로 띄우는 한국어 메시지는 **`P0001`** 로 던진다(`toDbErrorMessage`가 그대로 노출한다). `42501`은 Postgres 자신의 영어 권한 거부용으로 남겨둔다.
+
+### 어드민 쓰기는 **전부 definer RPC를 지난다** — 테이블 grant를 열지 않는다
+
+`match`·`survey`·`survey_option`·`notice`·`post`에 어드민용 정책도 grant도 **한 줄도** 두지
+않는다. 근거가 넷이다.
+
+1. **원자성.** 정책은 문장 단위 스냅샷 판정이라 "표가 0건일 때만 선택지 변경"을 지키지 못한다 —
+   어드민이 선택지를 끼워 넣는 순간 다른 사용자의 투표가 동시에 커밋되면 둘 다 통과한다.
+   `post_poll`에서 실제로 뚫렸던 "진행 중인 투표에 선택지 끼워 넣기"와 같은 구멍이다.
+2. **행 수 불변식.** "선택지 2~4개"는 CHECK로 셀 수 없어 `rls.sql` 섹션 30의 "0행" 질의가
+   대신 지키는데, 그게 성립하는 근거는 **"입력이 우리가 쓴 마이그레이션뿐"** 이다.
+   어드민이 런타임에 지울 수 있게 되면 그 전제가 사라진다 → 여러 행을 한 번에 바꾸는
+   함수만이 이걸 다시 **구조**로 만든다.
+3. **거부 사유.** 정책 위반은 영어 42501 하나다. "표가 이미 있어 선택지 개수를 바꿀 수
+   없어요"는 P0001로만 말할 수 있다.
+4. **기존 검사가 살아남는다.** `seed.sql`이 alice를 관리자로 만들어 `rls.sql` 섹션
+   1·3·30a·31a의 `[❌차단]`이 **관리자 컨텍스트에서 돈다** — 그것들이 그대로 통과하는 것이
+   곧 "어드민 쓰기가 테이블 DML을 쓰지 않는다"의 증거다.
+   ⚠ 그 검사가 뒤집히면 **alice→bob으로 고치지 말고** 왜 테이블 권한이 열렸는지를 먼저 본다.
+
+**조회도 마찬가지로 RPC다.** SELECT 정책에 `or public.is_admin()`을 얹지 않는다:
+
+- 정책에 definer 호출을 하나 더 더하는 것은 `is_blocked`로 인기순이 **8.7ms → 151.6ms(17배)**
+  로 뛴 실측을 다시 사는 일이다.
+- 더 중요한 건 **관리자의 화면만 조용히 오염된다**는 것이다. 조회 훅에는 `deleted_at` 필터가
+  없으므로(정책에 맡기는 것이 이 프로젝트의 규약이다) 관리자가 `/matches`·`/posts`를 열면
+  삭제한 항목이 그냥 섞여 보이고, `useMyAccuracyQuery`의 `match!inner` 때문에 **관리자의
+  적중률만 다른 분모로** 계산된다. 빌드도 린트도 `rls.sql`도 잡지 못한다.
+
+⚠ **`profiles.is_admin`은 아무에게도 SELECT를 열지 않는다.** 누가 관리자인지는 계정 탈취의
+표적을 특정해 주는 값이다 → `grant select (id, nickname, created_at, avatar_path)`로 좁혔다.
+대가로 **profiles에 컬럼을 더할 때 이 목록도 함께 늘려야 하고**, 잊으면 그 컬럼만 조용히
+42501이 된다(17a는 SELECT를 보지 않는다) → `rls.sql` 33b가 목록을 전수 대조한다.
+
+### 본문 가리기 — **작성자의 수정 권한에서 그 글만 뺀다**
+
+`admin_mask_post`는 본문을 안내 문구로 바꾸고 원본을 `post_moderation`에 보관한다. 그런데
+`post_update_own`이 `author_id`만 보면 **작성자가 곧바로 다시 써 넣을 수 있어** 이 기능이
+사실상 아무 일도 하지 않는다(실측). → 정책에 `not public.post_is_masked(id)`를 더해
+**가려진 동안에는 작성자도 못 고치게** 한다. 되돌리면 다시 고칠 수 있다.
+
+⚠ **가리기는 `title`을 다루지 않는다.** 제목이 문제면 글 자체를 지우는 것이 이 화면의 계약이다.
+
+⚠ **어드민의 본문 조치는 "수정됨"을 남기지 않는다.** `post_touch_updated_at`의 WHEN 절이
+`content`를 포함해서, 그냥 두면 이미지 제거·가리기가 `updated_at`을 밀어 **작성자가 고친 적
+없는 글에 "수정됨"이 붙고 되돌려도 그 표시는 돌아오지 않는다**(`app/sitemap.ts`의
+`lastModified`도 이 컬럼을 읽는다). → 세 RPC가 `admin_set_post_content`를 거치고, 그 함수가
+**두 번째 UPDATE로 `updated_at`을 되돌린다**(트리거가 BEFORE라 같은 문장에서는 덮인다.
+그 두 번째 문장은 title·content를 건드리지 않아 WHEN 절이 발화하지 않는다).
+`match`·`survey`·`notice`의 트리거를 WHEN으로 좁힌 것과 같은 목적이다.
+
+### ⚠ 선택지 묶음 교체의 경합은 **`for update`가 닫는다** — 사후 재검사가 아니다
+
+`admin_set_survey_options`는 표가 0건일 때만 통과한다. 그런데 "지우고 넣은 뒤 다시 센다"로는
+막을 수 없다 — `survey_vote → survey_option` FK가 `on delete cascade`라 **그 delete가 경합으로
+들어온 표를 함께 지우고**, 재검사는 자기가 지운 증거를 찾다가 0을 본다(두 세션으로 실측:
+교체가 예외 없이 성공하고 사용자의 표가 사라졌다).
+
+→ 세기 **전에** `select … from survey_option … for update`로 잠근다. `survey_vote` insert가
+참조 행에 `for key share`를 잡으므로 이 잠금과 충돌한다 — 미커밋 투표가 있으면 기다렸다가
+그 표를 세게 되고, 반대로 우리가 먼저 잠그면 투표가 23503으로 거부된다(표가 조용히
+사라지는 대신 투표한 사람이 사실을 알게 된다).
+
+⚠ **이 회귀는 `rls.sql`이 잡지 못한다** — 두 세션이 필요한데 그 파일은 한 트랜잭션이다.
+섹션 33f 머리말이 그 한계를 적어 두었다.
+
+### `deleted_at` · `voided_at` · `admin_locked_at` — 셋의 뜻이 다르다
+
+| | `voided_at` | `deleted_at` | `admin_locked_at` |
+|---|---|---|---|
+| 뜻 | 경기가 실제 취소·몰수됐다(세상의 사실) | 우리 DB의 이 행이 잘못됐다(운영 판단) | 어드민이 손댔으니 동기화가 건드리지 마라 |
+| 소유자 | `sync-matches.mjs`의 `matchState()` | 어드민 | 어드민 |
+| 화면 | **보인다**("취소") | 안 보인다 | 보인다(잠금 표시) |
+| 동기화 | 매 실행이 덮어쓴다 | **보존된다**(payload에 없다) | **그 행을 통째로 건너뛴다** |
+
+🔴 **`admin_locked_at`이 없으면 어드민 수정이 조용히 원복된다.** `toRow()`가 만드는 payload에
+season·matchday·팀·kickoff_at·스코어·finished_at·voided_at이 전부 들어 있기 때문이다 —
+화면은 "저장됐어요"라 말하고 몇 시간 뒤 값이 돌아온다. `sync-matches.mjs`와
+`sync-match-detail.mjs` **둘 다** 이 컬럼을 존중해야 한다(후자는 `deleted_at`도 함께 본다 —
+service_role이라 RLS가 걸리지 않아 감춘 경기에 API 예산을 태운다).
+
+⚠ **`result` 생성식에 `deleted_at`을 넣지 않는다.** 생성식 변경은 컬럼 drop/add(전 테이블
+rewrite)를 부르는데, 행 자체가 안 보이면 채점에서 이미 빠지므로 얻는 것이 없다.
 
 ### 투표에는 왜 쓰기 RPC도, 카운터 트리거도 없는가
 
@@ -748,6 +862,7 @@ RLS 술어가 security-barrier 서브쿼리 안으로 들어가 바깥의 `fk = 
 | — 섹션 18은 **INSERT 시점 위조**를 검사 | 섹션 1이 UPDATE만 보고 있어서, `grant insert` 목록이 넓어지는 회귀(카운터·타임스탬프 동봉)를 못 잡았다 |
 | — 시드 INSERT는 반드시 `begin;` **아래**에 | 위에 두면 오토커밋으로 새어나가 실행할 때마다 행이 쌓인다(실제로 그랬다) |
 | — 시각 비교 검사는 시드를 과거로 밀 것 | `now()`는 **트랜잭션 시작 시각**이라 한 트랜잭션 안에서 insert의 default와 트리거의 값이 같아진다 → "수정하면 updated_at이 바뀐다"를 증명할 수 없다 |
+| — 섹션 33은 **관리자·어드민 백오피스**를 검사 | 33a 비관리자·비로그인이 어드민 RPC에 닿지 못하는지(조회는 **0행**, 쓰기는 **P0001**, anon은 EXECUTE 자체가 없음). ⚠ `:login_anon`이 claims를 비우지 않으므로 `is_admin()` 판정 검사는 **claims까지 비운다**. 33b 자가 승격 차단 + **`profiles`의 SELECT 가능 컬럼 목록 전수 대조**(컬럼을 더할 때 grant를 잊으면 그 컬럼만 조용히 42501이 되는데 17a는 SELECT를 보지 않는다). 33c 삭제하면 **관리자 자신의 일반 조회에서도 사라지는지**(이 설계의 핵심 성질 — 정책에 `or is_admin()`을 얹었다면 관리자만 다른 화면을 본다). 33d 자식(라인업·사건·스탯·선택지)이 부모의 삭제에 함께 묶이는지. 33e definer 누수(**anon에 열린 `match_prediction_results`가 삭제된 경기에 0행**). 33f 입축구 편집 규칙(표 0건일 때만 개수 변경 · 색 쌍/전무 · 정규형 중복이 **23505가 아니라 P0001**). 33g 피드(이미지만 빠지고 본문은 남는지 · 두 번 가려도 **최초 원본**이 보관되는지 · `post_moderation`을 아무도 못 읽는지 · 투표 개수 변경 거부). 33h 공지(노출 기간 밖이 anon에게 0행이고 어드민 조회에는 보이는지). 33i `updated_at` WHEN 절(삭제·복구·`live_minute`은 안 움직이고 스코어 정정은 움직인다 — ⚠ **시드를 과거로 밀 것**). 33j 수정하면 **동기화 잠금이 반드시 남는지**, 그리고 **킥오프 전 경기에 스코어를 넣거나 채점된 경기의 킥오프를 미래로 미는 것이 막히는지**(둘 다 `match_is_open`이 킥오프만 보므로 "결과가 뜬 채 예측이 열리는" 상태를 만든다 — 동기화는 만들 수 없고 어드민 경로가 생기면서 처음 도달 가능해졌다). ⚠ 33은 이번에 **실제로 뚫렸던 경로들**을 회귀로 못박는다: 한 칸 편집이 문항 전체 색 불변식을 깨는 것 · stale한 선택지 id가 다른 문항을 고치는 것 · **같은 id를 여러 번** 넣어 "정확히 일치"를 우회하는 것(내부 임시 라벨 `#id`가 사용자 화면에 남았다) · 숫자가 아닌 id · 없는 id의 조용한 삭제 성공 · **가려진 글을 작성자가 다시 쓰는 것** · 괄호가 든 URL에서 본문이 깨지는 것 · 어드민 조치가 "수정됨"을 남기는 것. ⚠ **경합만은 못 잡는다**(두 세션이 필요하다) |
 | `supabase/tests/concurrency.sh` | 좋아요 동시성 — N명 동시 클릭 후 `like_count == count(post_like)` |
 | **`supabase/seed.sql`** | `db reset`이 **자동 실행**한다 — 계정(alice/bob)·글·댓글·좋아요. ⚠ 시드가 없으면 마이그레이션을 고칠 때마다 reset이 개발 데이터를 통째로 날린다. 닉네임을 명시적으로 고정하는 이유는 랜덤 배정이면 섹션 13의 유일성 검사가 부딪힐 상대를 잃어 **조용히 무의미해지기** 때문이다 |
 | **`supabase/tests/run-rls.sh`** | rls.sql을 돌리고 **양방향으로** 대조한다 — ① 기대하지 않은 ERROR ② **차단 기대인데 통과한 것**. ②를 안 보면 로그가 깨끗한 채로 검사가 죽어 있다(실제로 2건이 그랬다) |

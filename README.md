@@ -32,6 +32,8 @@
 > 데이터 접근에 Route Handler를 두지 않고 **브라우저가 Supabase를 직접 호출**합니다.
 > 그래서 **RLS와 컬럼 권한이 유일한 방어선**이며, 마이그레이션이 곧 보안 설계입니다 —
 > 자세한 규칙은 [`docs/conventions/api-and-db.md`](docs/conventions/api-and-db.md).
+> 예외는 어드민의 경기 일정 동기화 하나뿐인데, 그건 데이터 접근이 아니라 **외부 API를
+> 서버 비밀로 부르는 자리**입니다(검사가 목록을 양방향으로 대조합니다).
 
 <details>
 <summary>v1(밸런스·랭킹·유니폼·TMI·퀴즈) 청산 기록</summary>
@@ -146,14 +148,16 @@ app/                     # Next.js 라우팅 전용 (view만 마운트)
 ├── posts/               #   목록(list-page.tsx 공유) · category/[slug] · new · [id] · [id]/edit
 ├── surveys/             #   목록 · [id] (운영진 문항 — 사용자가 만드는 화면이 없다)
 ├── profile/             #   닉네임·사진 수정 + 계정 연결. 계정 연결의 복귀 지점
+├── admin-you-can-not-access/  # 어드민 백오피스 (layout이 is_admin()으로 판정 → 아니면 404)
+├── api/admin/sync-matches/    # ⚠ 유일한 Route Handler — 외부 API를 서버 비밀로 부르는 자리
 └── sitemap.ts / robots.ts  #   색인 신호 (Next 특수 파일이라 "route.ts 금지"에 걸리지 않는다)
-proxy.ts                 # 세션 쿠키 리프레시 + 낙관적 라우트 가드 (Next 16의 middleware)
+proxy.ts                 # 세션 쿠키 리프레시 (Next 16의 middleware). 라우트 가드는 없다
 src/
 ├── app/                 # providers(QueryClient + AuthProvider), fonts, globals.css
 ├── views/               # 화면 조립 (⚠ pages 금지)
-├── widgets/             # app-bar · bottom-tab-bar · sub-header · tab-scroll-area · auth-shell · auth-status
+├── widgets/             # app-bar · bottom-tab-bar · sub-header · tab-scroll-area · auth-shell · auth-status · admin-shell
 ├── features/            # 사용자 액션 1개 = 슬라이스 1개
-├── entities/            # session · post · comment · profile · poll · survey · block
+├── entities/            # session · post · comment · profile · poll · survey · match · block · notice
 ├── shared/              # ui / api / lib / config
 └── types/               # database.types.ts (supabase 생성 — 손으로 고치지 않는다)
 supabase/
