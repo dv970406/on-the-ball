@@ -4,13 +4,9 @@ import { useCallback, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { requireBrowserSupabase } from "@/shared/api";
 import { POST_IMAGE_BUCKET, postImageUrl } from "@/shared/config";
-import { useToast } from "@/shared/lib";
+import { resizeToWebp, useToast } from "@/shared/lib";
 import { animatedGifToWebp } from "../lib/gif-to-webp";
-import {
-  ACCEPTED_IMAGE_TYPES,
-  MAX_SOURCE_BYTES,
-  resizeToPostImage,
-} from "../lib/resize-post-image";
+import { ACCEPTED_IMAGE_TYPES, MAX_SOURCE_BYTES } from "../lib/resize-post-image";
 
 /**
  * 본문 이미지 업로드 — 성공하면 공개 URL을 돌려준다.
@@ -41,7 +37,7 @@ export function useUploadPostImage(userId: string | undefined) {
         throw new Error("이미지가 너무 커요. 20MB 이하로 올려 주세요.");
       }
 
-      // 결과는 항상 webp이고 TARGET_BYTES 이하다 — 못 맞추면 변환기가 한국어로 던진다
+      // 결과는 항상 webp이고 IMAGE_TARGET_BYTES 이하다 — 못 맞추면 변환기가 한국어로 던진다
       const blob = await toWebp(file);
 
       // ⚠ 경로는 `{userId}/{uuid}.webp` 두 세그먼트 — Storage 정책이 첫 폴더로 소유자를 판정한다.
@@ -104,9 +100,9 @@ export function useUploadPostImage(userId: string | undefined) {
  *   브라우저(Safari·Firefox)에서는 사실대로 알리고 멈춘다.
  */
 async function toWebp(file: File): Promise<Blob> {
-  if (!(await looksLikeGif(file))) return resizeToPostImage(file);
+  if (!(await looksLikeGif(file))) return resizeToWebp(file);
   // 정지 GIF면 null — 일반 경로가 더 작고 단순하다
-  return (await animatedGifToWebp(file)) ?? resizeToPostImage(file);
+  return (await animatedGifToWebp(file)) ?? resizeToWebp(file);
 }
 
 /**

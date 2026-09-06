@@ -1,4 +1,7 @@
-import { hasVisibleChar, lengthOverflow, normalizeNickname, type TextLimit } from "@/shared/lib";
+import { hasVisibleChar, lengthOverflow, normalizeNickname } from "@/shared/lib";
+// ⚠ 한도는 **엔티티가 소유한다** — 어드민의 투표 문구 편집이 같은 값을 써야 하는데
+//   features끼리는 import할 수 없다(사유는 `entities/poll/model/types.ts` 주석).
+import { POLL_OPTION_LIMIT, POLL_QUESTION_LIMIT } from "@/entities/poll";
 
 /**
  * 투표 입력 검증 — **작성 전용**이다(투표는 생성 시 고정이라 수정 화면에 입력이 없다).
@@ -6,12 +9,6 @@ import { hasVisibleChar, lengthOverflow, normalizeNickname, type TextLimit } fro
  * 길이 규약은 제목·댓글과 같다: 화면은 그래핌, DB는 코드포인트 K=10배.
  * 짝이 되는 마이그레이션은 `20260817000003_poll.sql`이다.
  */
-
-/** 질문 — 화면 100그래핌 / DB 1,000코드포인트(`poll.question` CHECK와 같은 값) */
-export const POLL_QUESTION_LIMIT: TextLimit = { grapheme: 100, codePoint: 1000 };
-
-/** 선택지 — 화면 40그래핌 / DB 400코드포인트(`post_poll_option.label` CHECK와 같은 값) */
-export const POLL_OPTION_LIMIT: TextLimit = { grapheme: 40, codePoint: 400 };
 
 /** DB의 `sort_order between 1 and 4`·`create_post_with_poll`의 P0001과 같은 값 */
 export const POLL_OPTION_MIN = 2;

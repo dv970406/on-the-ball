@@ -33,6 +33,32 @@ export const ROUTES = {
   signIn: "/sign-in",
   // 프로필 — 닉네임·사진 수정과 로그인 수단 연결
   profile: "/profile",
+
+  /**
+   * 어드민 백오피스.
+   *
+   * ⚠ **`activeTabHref`에 넣지 않는다.** 어드민은 하단 탭바를 쓰지 않고 자기 셸의 상단
+   *   세그먼트 레일로 이동한다 — `null`을 받아야 탭바가 안 그려지고 토스트도 제자리에 온다.
+   * ⚠ 경로를 감추는 것은 방어가 아니다(실제 차단은 `is_admin()`이 하는 definer RPC다).
+   *   다만 화면·메타데이터가 존재를 드러내지 않게 `robots: { index: false }`와
+   *   서버 `notFound()` 가드를 함께 둔다 — `robots.txt`에는 **적지 않는다**(적는 순간 공개다).
+   */
+  adminMatchList: "/admin-you-can-not-access/matches",
+  adminMatch: (id: number | string) => `/admin-you-can-not-access/matches/${id}`,
+  adminSurveyList: "/admin-you-can-not-access/surveys",
+  adminSurveyNew: "/admin-you-can-not-access/surveys/new",
+  adminSurvey: (id: number | string) => `/admin-you-can-not-access/surveys/${id}`,
+  adminPostList: "/admin-you-can-not-access/posts",
+  adminPost: (id: number | string) => `/admin-you-can-not-access/posts/${id}`,
+  adminNoticeList: "/admin-you-can-not-access/notices",
+  adminNoticeNew: "/admin-you-can-not-access/notices/new",
+  adminNotice: (id: number | string) => `/admin-you-can-not-access/notices/${id}`,
+
+  /**
+   * 어드민 동기화 엔드포인트 — **이 앱의 유일한 Route Handler**다.
+   * ⚠ 경로 문자열을 호출부에 하드코딩하지 않는 것은 화면 경로와 같은 이유다.
+   */
+  adminSyncMatches: "/api/admin/sync-matches",
 } as const;
 
 /**

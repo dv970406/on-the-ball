@@ -1,4 +1,4 @@
-import { TARGET_BYTES } from "./resize-post-image";
+import { IMAGE_TARGET_BYTES } from "@/shared/lib";
 import { muxAnimatedWebp, type WebpFrame } from "./webp-mux";
 
 /**
@@ -86,7 +86,7 @@ export async function animatedGifToWebp(file: File): Promise<Blob | null> {
 
     for (const rung of LADDER) {
       const blob = await encodeAnimation(frames, width, height, loopCount, rung);
-      if (blob.size <= TARGET_BYTES) return blob;
+      if (blob.size <= IMAGE_TARGET_BYTES) return blob;
       smallest = blob;
     }
     console.error("[post] GIF를 목표 용량으로 줄이지 못함:", smallest?.size);

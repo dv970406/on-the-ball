@@ -45,3 +45,20 @@ function getServerSnapshot(): number | null {
 export function useNowMs(): number | null {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
+
+/**
+ * 조회 결과를 받은 시각을 기준 시각으로 삼는다 — **프리페치가 없는 클라이언트 전용 화면용.**
+ *
+ * ⚠ 규약은 `serverNowMs ?? useNowMs()`인데(`data-and-state.md`), 서버가 시각을 내려주지
+ *   않는 화면에는 그 앞자리가 비어 있다. 그러면 `useNowMs()`의 세션 고정값이 유일한
+ *   기준이 되어 **방금 만든 것이 과거 시계로 판정된다** — 어드민에서 "지금부터" 노출되는
+ *   공지를 등록하고 목록으로 돌아오면 `예정`으로 그려졌다(실측).
+ * ⚠ `dataUpdatedAt`은 TanStack Query가 그 데이터를 **받은 순간**이라 리페치마다 새로
+ *   찍힌다. 등록·수정 후 무효화가 곧 리페치이므로 판정이 함께 따라온다.
+ * ⚠ 데이터가 아직 없으면 `0`이다 — 그때만 세션 시계로 떨어진다.
+ *   `??`가 아니라 `> 0` 비교인 이유이고, 훅은 조건 없이 먼저 부른다.
+ */
+export function useQueryNowMs(dataUpdatedAt: number): number | null {
+  const clientNowMs = useNowMs();
+  return dataUpdatedAt > 0 ? dataUpdatedAt : clientNowMs;
+}

@@ -1,4 +1,11 @@
 export { cn } from "./cn";
+// ⚠ **승격된 함수다.** `features/write-post`에 있던 것을 세 번째 소비자(어드민 입축구
+//   배경)가 생기면서 올렸다 — features끼리는 import할 수 없어 이 자리가 강제된다.
+//   `resizeToAvatar`(정사각 crop)는 형태가 달라 함께 올리지 않았다.
+export { IMAGE_TARGET_BYTES, resizeToWebp } from "./resize-image";
+// ⚠ `datetime-local` ↔ ISO를 **KST로 못박는** 변환기. 승부예측·입축구·공지 셋이 쓴다 —
+//   브라우저 로컬 시간대로 파싱하면 해외 접속 시 화면 표기와 몇 시간씩 어긋난다.
+export { fromKstInputValue, toKstInputValue } from "./kst-datetime";
 export { useScrollRestore, clearScrollRestore } from "./use-scroll-restore";
 // ⚠ `formatMatchDay`·`seoulDayKey`는 **여기 올리지 않는다** — 유일한 소비자가 서버 안전
 //    모듈(`entities/match/lib/day-group.ts`)이라 `@/shared/lib/format` 직접 경로로 가져간다.
@@ -10,7 +17,7 @@ export {
   formatKickoffTime,
   formatRelativeTime,
 } from "./format";
-export { useNowMs } from "./use-now";
+export { useNowMs, useQueryNowMs } from "./use-now";
 export { useFocusTrap } from "./use-focus-trap";
 export { useToast, useToastStore } from "./toast-store";
 export { parsePostId } from "./post-id";
