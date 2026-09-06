@@ -47,9 +47,13 @@ function readBudget(headers) {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export function createApiFootball(key, { minDayRemaining = 3 } = {}) {
+  /*
+   * ⚠ **process.exit이 아니라 throw다.** 이 모듈은 CLI 말고 Next Route Handler
+   *   (`app/api/admin/sync-matches`)도 부른다 — 거기서 exit하면 **서버 프로세스가 통째로
+   *   죽는다**(dev에서는 `next dev`가 끝난다). 종료는 호출부(CLI)가 결정한다.
+   */
   if (!key) {
-    console.error("API_FOOTBALL_KEY가 필요합니다 (또는 --fixture 로 저장된 JSON을 쓰세요)");
-    process.exit(1);
+    throw new Error("API_FOOTBALL_KEY가 필요합니다 (또는 --fixture 로 저장된 JSON을 쓰세요).");
   }
 
   /** 마지막 응답이 알려준 예산 — 호출부가 로그에 쓴다 */

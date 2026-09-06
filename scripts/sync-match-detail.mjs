@@ -120,17 +120,30 @@ if (onlyMatch) {
   // ⚠ 단건 지정은 상태 판정을 건너뛴다 — 사람이 명시적으로 부른 것이라 강제 갱신이 맞다.
   const { data, error } = await supabase
     .from("match")
-    .select("id, external_id, kickoff_at")
+    .select("id, external_id, kickoff_at, deleted_at")
     .eq("external_id", onlyMatch);
   if (error) {
     console.error("✗ 대상 경기 조회 실패:", error.message);
     process.exit(1);
   }
-  candidates = data;
+  /*
+   * ⚠ 기본 분기와 **같은 필터를 적용한다.** `--match`로 지정해도 감춘 경기에는 제공자 API
+   *   예산을 태우지 않는다(에러가 나지 않아 아무도 눈치채지 못하는 종류다).
+   */
+  candidates = data.filter((m) => m.deleted_at === null);
+  if (candidates.length < data.length) {
+    console.log(`  감춘 경기 ${data.length - candidates.length}건은 건너뜁니다`);
+  }
 } else {
   const { data, error } = await supabase
     .from("match")
     .select("id, external_id, kickoff_at, finished_at, voided_at")
+    /*
+     * ⚠ **어드민이 감춘 경기는 대상에서 뺀다.** service_role이라 RLS가 걸리지 않아
+     *   그냥 두면 화면에 보이지도 않는 경기에 **제공자 API 예산을 태운다** — 에러가 나지
+     *   않아 아무도 눈치채지 못하는 종류다(무료 한도는 하루 100회다).
+     */
+    .is("deleted_at", null)
     .gte("kickoff_at", new Date(now - min(windowHours * 60)).toISOString())
     .lte("kickoff_at", new Date(now + min(LINEUP_LEAD_MINUTES)).toISOString())
     .order("kickoff_at", { ascending: true });
@@ -562,14 +575,32 @@ for (let i = 0; i < externals.length; i += 500) {
 }
 
 // 5-2. 경기 상태 — ⚠ upsert가 아니라 UPDATE다. 없는 경기를 만들지 않는다.
+/*
+ * ⚠ **어드민이 잠근 경기는 스코어·상태를 덮지 않는다.** 이 UPDATE의 patch에는
+ *   home_score·away_score·finished_at·voided_at·live_minute이 들어 있어, 잠금을 무시하면
+ *   `sync-matches.mjs`와 똑같은 사고가 여기서 다시 난다(어드민 수정이 조용히 원복된다).
+ */
 let matchOk = 0;
+let matchLocked = 0;
 for (const u of matchUpdates) {
   const { id, ...patch } = u;
-  const { error } = await supabase.from("match").update(patch).eq("id", id);
+  const { data: updated, error } = await supabase
+    .from("match")
+    .update(patch)
+    .eq("id", id)
+    .is("admin_locked_at", null)
+    // ⚠ **영향 행 수를 받아 본다.** 잠금으로 0행이 지나가도 에러가 아니라서, 안 보면
+    //   로그의 "경기 상태 N건"이 **건너뛴 것을 성공으로 센다**(조용한 거짓말이다).
+    .select("id");
   if (error) {
     console.error(`✗ 경기 ${id} 상태 갱신 실패: ${error.message}`);
     failures += 1;
+  } else if ((updated ?? []).length === 0) {
+    matchLocked += 1;
   } else matchOk += 1;
+}
+if (matchLocked > 0) {
+  console.log(`  어드민이 잠근 경기 ${matchLocked}건은 상태를 덮지 않았습니다`);
 }
 console.log(`✓ 경기 상태 ${matchOk}건`);
 

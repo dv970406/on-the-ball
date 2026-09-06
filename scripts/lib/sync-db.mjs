@@ -89,14 +89,25 @@ export function isSystemic(error, status) {
  *   그 성질에 기대고 있다 — 나눠 보내면 읽는 사람에게 **선수가 6명뿐인 라인업**이 보인다.
  *   행 단위 폴백은 그 원자성을 포기하는 대신 전량 손실을 막는 거래다.
  */
-export async function upsertRows(supabase, table, rows, options = {}) {
+/**
+ * @param {object} runtime  CLI와 Route Handler가 갈리는 값들.
+ *   - `log`: 로그 채널. **핸들러는 배열 수집기를 넣는다** — 이 스크립트의 운영 정보
+ *     (한국어 표기 없는 팀 · 스코어를 못 읽은 경기)가 전부 console.warn에 있어서,
+ *     삼키면 화면이 "성공"만 말한다.
+ *   - `rowFallbackLimit`: 일괄 실패 뒤 **행 단위로 재시도할 최대 건수**.
+ *     ⚠ 서버리스에서 이 값이 없으면 380행을 하나씩 왕복해 어떤 시간 상한이든 넘긴다 —
+ *     타임아웃은 **부분 적용 + 응답 없음**이라 무엇이 저장됐는지 알 길이 없다.
+ */
+export async function upsertRows(supabase, table, rows, options = {}, runtime = {}) {
+  const log = runtime.log ?? console;
+  const rowFallbackLimit = runtime.rowFallbackLimit ?? Infinity;
   if (rows.length === 0) return { saved: [], failed: [], aborted: false, skipped: [] };
 
   const { error, status } = await supabase.from(table).upsert(rows, options);
   if (!error) return { saved: rows, failed: [], aborted: false, skipped: [] };
 
   if (isSystemic(error, status)) {
-    console.error(
+    log.error(
       `✗ ${table} 계통적 실패(${error.code || `HTTP ${status}`}) — 행 단위 재시도를 건너뜁니다`,
     );
     return {
@@ -107,10 +118,17 @@ export async function upsertRows(supabase, table, rows, options = {}) {
     };
   }
 
-  console.warn(`⚠ ${table} 일괄 저장 실패(${error.message}) — 행 단위로 다시 시도합니다`);
+  log.warn(`⚠ ${table} 일괄 저장 실패(${error.message}) — 행 단위로 다시 시도합니다`);
   const saved = [];
   const failed = [];
   for (const [i, row] of rows.entries()) {
+    // ⚠ 상한을 넘으면 **남은 행을 시도조차 하지 않았다고 보고한다.** 조용히 끝내면
+    //   무엇을 잃었는지 로그에 흔적이 없다(aborted와 같은 취급이다).
+    if (i >= rowFallbackLimit) {
+      const skipped = rows.slice(i);
+      log.error(`✗ 행 단위 재시도 상한(${rowFallbackLimit})에 걸려 ${skipped.length}건을 남깁니다`);
+      return { saved, failed, aborted: true, skipped };
+    }
     const { error: rowErr, status: rowStatus } = await supabase.from(table).upsert([row], options);
     if (!rowErr) {
       saved.push(row);
@@ -120,7 +138,7 @@ export async function upsertRows(supabase, table, rows, options = {}) {
     // ⚠ 중단은 **에러의 성격**으로만 판정한다(개수가 아니다 — 사유는 위 주석).
     if (isSystemic(rowErr, rowStatus)) {
       const skipped = rows.slice(i + 1);
-      console.error(
+      log.error(
         `✗ 계통적 실패(${rowErr.code || `HTTP ${rowStatus}`})로 중단합니다 — 남은 ${skipped.length}건은 시도하지 않았습니다`,
       );
       return { saved, failed, aborted: true, skipped };
