@@ -7,6 +7,9 @@ import { createSupabaseServerClient, hasSessionCookie } from "@/shared/api/supab
 //   쿼리 조립과 매퍼를 클라이언트 훅과 **공유해야** 프리페치가 같은 목록을 만든다.
 import { buildPostListQuery } from "@/entities/post/api/list-query";
 import { buildPostListItem } from "@/entities/post/api/mappers";
+import { buildBannerNoticeQuery } from "@/entities/notice/api/list-query";
+import { buildNoticeListItem } from "@/entities/notice/api/mappers";
+import type { NoticeListItem } from "@/entities/notice/model/types";
 import type { PostCategory, PostListFilters, PostListPage, PostSort } from "@/entities/post/model/types";
 import { POST_CATEGORY_SLUG, parsePostSort } from "@/entities/post/model/types";
 import { OG_IMAGE, ROUTES, env } from "@/shared/config";
@@ -22,6 +25,13 @@ import { PostListView } from "@/views/post-list";
 interface ListPage {
   /** 프리페치 결과 — 실패하면 undefined를 넘겨 클라이언트 조회로 폴백한다(nextjs.md) */
   data?: PostListPage;
+  /**
+   * 최상단 배너에 그릴 최신 **필독** 공지.
+   * ⚠ **`null`과 `undefined`가 다른 뜻이다** — `null`은 "필독 공지가 없다"(조회는 끝났다),
+   *   `undefined`는 "프리페치를 안 했다"이다. 하나로 접으면 공지가 없는 상태에서 목록을
+   *   열 때마다 클라이언트 조회가 한 번씩 더 나간다(글 상세의 투표와 같은 규약).
+   */
+  notice?: NoticeListItem | null;
   /**
    * 이 목록을 읽은 시각.
    * ⚠ 렌더 본문이 아니라 여기서 찍는다 — `react-hooks/purity`가 서버 컴포넌트에서도
@@ -55,10 +65,29 @@ export const fetchPostList = cache(
         : createSupabaseAnonClient();
       if (!supabase) return { nowMs: Date.now() };
 
-      const { data, error } = await buildPostListQuery(supabase, filters);
-      if (error) return { nowMs: Date.now() };
+      /*
+       * ⚠ 둘은 서로의 결과를 쓰지 않는다 → **병렬로** 보낸다(직렬이면 왕복이 그대로 쌓인다).
+       * ⚠ 공지 조회가 실패해도 **목록은 그대로 내보낸다** — 곁다리 조회의 실패로 본문을
+       *   클라이언트 조회로 미루지 않는다(글 상세의 댓글·투표와 같은 규약).
+       */
+      const [{ data, error }, banner] = await Promise.all([
+        buildPostListQuery(supabase, filters),
+        buildBannerNoticeQuery(supabase),
+      ]);
 
-      return { data: { items: (data ?? []).map(buildPostListItem) }, nowMs: Date.now() };
+      const notice = banner.error
+        ? undefined
+        : banner.data
+          ? buildNoticeListItem(banner.data)
+          : null;
+
+      if (error) return { notice, nowMs: Date.now() };
+
+      return {
+        data: { items: (data ?? []).map(buildPostListItem) },
+        notice,
+        nowMs: Date.now(),
+      };
     } catch (e) {
       // cookies()는 "이 라우트를 동적 렌더로 전환하라"는 Next 내부 에러를 throw해서 동작한다.
       // 삼키면 페이지가 스켈레톤 상태로 정적 프리렌더되어 조용히 망가지므로 반드시 되던진다.
@@ -114,6 +143,14 @@ export function listMetadata(category: PostCategory | null): Metadata {
 /** 두 라우트가 같은 화면을 그린다 */
 export async function renderPostList(category: PostCategory | null, rawSort: string | undefined) {
   const sort = parsePostSort(rawSort);
-  const { data, nowMs } = await fetchPostList(category, sort);
-  return <PostListView category={category} sort={sort} initialData={data} serverNowMs={nowMs} />;
+  const { data, notice, nowMs } = await fetchPostList(category, sort);
+  return (
+    <PostListView
+      category={category}
+      sort={sort}
+      initialData={data}
+      initialNotice={notice}
+      serverNowMs={nowMs}
+    />
+  );
 }

@@ -22,16 +22,26 @@ const _NOTICE_TYPES_EXHAUSTIVE: Exclude<NoticeType, (typeof NOTICE_TYPES)[number
   ? true
   : never = true;
 
-export interface Notice {
+/**
+ * 목록·배너가 쓰는 형태 — **본문이 없다.**
+ *
+ * ⚠ `body`는 20,000자까지 갈 수 있어 목록 50건이면 그대로 응답이 부풀고, 피드 최상단
+ *   배너는 제목 한 줄만 그리는데 본문을 통째로 받는 셈이 된다 → select를 갈랐다
+ *   (`POST_LIST_SELECT` ↔ `POST_DETAIL_SELECT`와 같은 판단).
+ */
+export interface NoticeListItem {
   id: NoticeRow["id"];
   type: NoticeType;
   title: NoticeRow["title"];
-  body: NoticeRow["body"];
   opensAt: NoticeRow["opens_at"];
   /** null이면 무기한 */
   closesAt: NoticeRow["closes_at"];
   createdAt: NoticeRow["created_at"];
   updatedAt: NoticeRow["updated_at"];
+}
+
+export interface Notice extends NoticeListItem {
+  body: NoticeRow["body"];
   /** 소프트 삭제 시각. 일반 조회에는 애초에 오지 않고 어드민 조회에만 실린다 */
   deletedAt: NoticeRow["deleted_at"];
 }

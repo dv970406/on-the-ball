@@ -15,6 +15,7 @@ import {
 	type PostSort,
 	usePostListQuery,
 } from "@/entities/post";
+import type { NoticeListItem } from "@/entities/notice";
 import { useSessionStore } from "@/entities/session";
 import { ROUTES } from "@/shared/config";
 import { cn, formatCount } from "@/shared/lib";
@@ -22,6 +23,7 @@ import { EmptyState, Icon, SignInDialog, StaleBanner, chipClassName } from "@/sh
 import { AppBar } from "@/widgets/app-bar";
 import { AuthStatus } from "@/widgets/auth-status";
 import { BottomTabBar } from "@/widgets/bottom-tab-bar";
+import { NoticeBanner } from "@/widgets/notice-banner";
 import { TabScrollArea } from "@/widgets/tab-scroll-area";
 import { PostListSkeleton } from "./post-list-skeleton";
 
@@ -31,6 +33,11 @@ interface PostListViewProps {
 	sort: PostSort;
 	/** 서버 프리페치 결과. 실패하면 undefined가 오고 클라이언트가 조회한다 */
 	initialData?: PostListPage;
+	/**
+	 * 최상단 배너에 그릴 최신 필독 공지.
+	 * ⚠ `null`("공지가 없다")과 `undefined`("프리페치 안 함")를 하나로 접지 않는다.
+	 */
+	initialNotice?: NoticeListItem | null;
 	/** 서버가 렌더한 시점의 시각 — HOT 배지·상대시각이 첫 프레임부터 그려지게 한다 */
 	serverNowMs?: number;
 }
@@ -45,7 +52,13 @@ interface PostListViewProps {
  * ⚠ 선택 표시는 `aria-pressed`가 아니라 **`aria-current="page"`** 다 — 토글 버튼의 상태가
  *   아니라 "지금 이 링크의 페이지에 있다"이기 때문이다.
  */
-export function PostListView({ category, sort, initialData, serverNowMs }: PostListViewProps) {
+export function PostListView({
+	category,
+	sort,
+	initialData,
+	initialNotice,
+	serverNowMs,
+}: PostListViewProps) {
 	const { data, isPending, isPlaceholderData, error, refetch } = usePostListQuery(
 		{ category, sort },
 		initialData,
@@ -84,6 +97,13 @@ export function PostListView({ category, sort, initialData, serverNowMs }: PostL
           ⚠ 다만 **말머리별 페이지에서는 이 제목이 그 페이지의 주제**라 SEO상 의미가 있다.
         */}
 				<h1 className="sr-only">{category === null ? "커뮤니티" : `${category} 글`}</h1>
+
+				{/*
+          공지 배너 — 최신 **필독** 공지 한 줄. 없으면 아무것도 그리지 않는다.
+          ⚠ 말머리 레일 **위**다. 레일 아래로 내리면 말머리를 바꿀 때마다 배너가 자리를
+            옮기는 것처럼 읽히고, 공지가 그 말머리에 속한 것으로 오해된다.
+        */}
+				<NoticeBanner initialNotice={initialNotice} />
 
 				{/*
           말머리 레일 — 가로 스크롤, 스크롤바 숨김.

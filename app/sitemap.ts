@@ -32,6 +32,7 @@ function staticEntries(now: Date): MetadataRoute.Sitemap {
     { url: url(ROUTES.postList), lastModified: now },
     { url: url(ROUTES.surveyList), lastModified: now },
     { url: url(ROUTES.matchList), lastModified: now },
+    { url: url(ROUTES.noticeList), lastModified: now },
     ...POST_CATEGORIES.map((category) => ({
       url: url(ROUTES.postCategory(POST_CATEGORY_SLUG[category])),
       lastModified: now,
@@ -51,7 +52,7 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
     const supabase = await createSupabaseServerClient();
     if (!supabase) return statics;
 
-    const [posts, surveys, matches] = await Promise.all([
+    const [posts, surveys, matches, notices] = await Promise.all([
       supabase
         .from("post")
         .select("id, updated_at")
@@ -71,6 +72,13 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
         .select("id, finished_at")
         .order("id", { ascending: false })
         .limit(URL_LIMIT),
+      supabase
+        .from("notice")
+        // ⚠ 예약·만료·삭제는 `notice_select_live` 정책이 거른다 — 크롤러는 쿠키가 없어
+        //   공개분만 나온다(필터를 여기서 다시 짜면 정책과 갈릴 자리가 생긴다).
+        .select("id, updated_at")
+        .order("id", { ascending: false })
+        .limit(URL_LIMIT),
     ]);
 
     return [
@@ -88,6 +96,12 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
         // 결과가 없으면 lastModified를 생략한다 — 없는 값을 now()로 채우면 사이트맵을 부를
         // 때마다 "방금 바뀌었다"는 거짓 신호가 나간다
         ...(match.finished_at ? { lastModified: new Date(match.finished_at) } : {}),
+      })),
+      ...(notices.data ?? []).map((notice) => ({
+        url: url(ROUTES.notice(notice.id)),
+        // ⚠ `opens_at`이 아니라 `updated_at`이다 — 예약 공지의 `opens_at`은 **미래 시각**이라
+        //   입축구의 `closes_at`과 같은 함정이다(정책이 감춰 여기 오지 않더라도 규약은 같다).
+        lastModified: new Date(notice.updated_at),
       })),
     ];
   } catch (e) {

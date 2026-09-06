@@ -9,6 +9,10 @@
 export const noticeKeys = {
   all: ["notice"] as const,
   lists: () => [...noticeKeys.all, "list"] as const,
+  list: () => [...noticeKeys.lists()] as const,
+  /** 피드 최상단 배너 — 가장 최신 '필독' 하나 */
+  banner: () => [...noticeKeys.all, "banner"] as const,
+  detail: (id: number) => [...noticeKeys.all, "detail", id] as const,
   adminLists: () => [...noticeKeys.all, "admin", "list"] as const,
   /** deleted: null=전부 / true=삭제됨 / false=살아 있는 것 */
   adminList: (deleted: boolean | null) => [...noticeKeys.adminLists(), deleted] as const,

@@ -2,9 +2,84 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
-import { NOTICE_LIST_LIMIT, NOTICE_SELECT, buildNotice } from "./mappers";
+import { NOTICE_LIST_LIMIT, NOTICE_SELECT, buildNotice, buildNoticeListItem } from "./mappers";
+import { buildBannerNoticeQuery, buildNoticeListQuery } from "./list-query";
 import { noticeKeys } from "./keys";
-import type { Notice } from "../model/types";
+import type { Notice, NoticeListItem } from "../model/types";
+
+/**
+ * 공지 목록 — 필독이 먼저, 그다음 최신순.
+ *
+ * ⚠ 조립은 `buildNoticeListQuery`가 단독으로 소유한다(SSR 페이지가 같은 함수를 부른다).
+ * ⚠ 노출 기간·삭제는 `notice_select_live` 정책이 거른다 — 훅에 필터를 두지 않는다.
+ */
+export function useNoticeListQuery(initialData?: NoticeListItem[]) {
+  return useQuery<NoticeListItem[], Error>({
+    initialData,
+    queryKey: noticeKeys.list(),
+    queryFn: async () => {
+      const supabase = requireBrowserSupabase();
+      const { data, error } = await buildNoticeListQuery(supabase);
+
+      if (error) {
+        console.error("[notice] 목록 조회 실패:", error);
+        throw new Error(toDbErrorMessage(error));
+      }
+      return (data ?? []).map(buildNoticeListItem);
+    },
+  });
+}
+
+/**
+ * 공지 단건.
+ *
+ * ⚠ 0행이 정상이다(없는 id · 노출 기간 밖) → `maybeSingle()`. 화면은 `null`을 404로 읽는다.
+ */
+export function useNoticeQuery(noticeId: number, initialData?: Notice) {
+  return useQuery<Notice | null, Error>({
+    initialData,
+    queryKey: noticeKeys.detail(noticeId),
+    queryFn: async () => {
+      const supabase = requireBrowserSupabase();
+      const { data, error } = await supabase
+        .from("notice")
+        .select(NOTICE_SELECT)
+        .eq("id", noticeId)
+        .maybeSingle();
+
+      if (error) {
+        console.error("[notice] 단건 조회 실패:", error);
+        throw new Error(toDbErrorMessage(error));
+      }
+      return data ? buildNotice(data) : null;
+    },
+    enabled: Number.isSafeInteger(noticeId) && noticeId > 0,
+  });
+}
+
+/**
+ * 피드 최상단 배너용 — 가장 최신 '필독' 하나.
+ *
+ * ⚠ `initialData`에 **`null`을 넘길 수 있어야 한다**(= "공지가 없다"). `undefined`는
+ *   "프리페치를 안 했다"는 다른 뜻이라, 하나로 접으면 필독 공지가 없는 사이트에서
+ *   목록 화면을 열 때마다 조회가 한 번씩 더 나간다(투표의 `null`/`undefined`와 같은 규약).
+ */
+export function useBannerNoticeQuery(initialData?: NoticeListItem | null) {
+  return useQuery<NoticeListItem | null, Error>({
+    initialData,
+    queryKey: noticeKeys.banner(),
+    queryFn: async () => {
+      const supabase = requireBrowserSupabase();
+      const { data, error } = await buildBannerNoticeQuery(supabase);
+
+      if (error) {
+        console.error("[notice] 배너 조회 실패:", error);
+        throw new Error(toDbErrorMessage(error));
+      }
+      return data ? buildNoticeListItem(data) : null;
+    },
+  });
+}
 
 /**
  * 어드민 공지 목록.

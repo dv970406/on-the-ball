@@ -16,6 +16,13 @@ export const ROUTES = {
    */
   postCategory: (slug: string) => `/posts/category/${slug}`,
 
+  /**
+   * 공지사항 — 운영진이 등록하고 사용자는 읽기만 한다(작성·수정 화면은 어드민에 있다).
+   * ⚠ `activeTabHref`에 넣지 않는다 — 하단 탭바에 공지 탭이 없어 서브헤더 화면이다.
+   */
+  noticeList: "/notices",
+  notice: (id: number | string) => `/notices/${id}`,
+
   // 입축구 — 운영진이 등록하는 전 유저 대상 문항. 사용자가 만드는 화면이 없어 new/edit가 없다
   surveyList: "/surveys",
   survey: (id: number | string) => `/surveys/${id}`,
