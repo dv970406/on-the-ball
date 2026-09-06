@@ -403,23 +403,37 @@ select p.id, p.like_count, coalesce(l.cnt,0) as actual_likes,
 \echo '   revoke를 한 번만 잊어도 즉시 구멍이 된다 — 손으로 반복하는 규칙은 언젠가 빠진다)'
 reset role;
 
-\echo '-- 17a. RLS가 꺼졌거나 anon/authenticated에 쓰기 권한이 남은 테이블'
+\echo '-- 17a. RLS가 꺼졌거나 anon에 쓰기 권한이 남은 테이블'
+\echo '   ⚠ **has_table_privilege만으로는 부족하다.** 컬럼 단위 grant는 그 함수가 false를'
+\echo '     돌려준다(실측: post에 grant insert (author_id, title, content, category)가 있는데도'
+\echo '     has_table_privilege(...,INSERT)는 f). 그래서 has_any_column_privilege를 함께 본다 —'
+\echo '     안 그러면 "revoke를 한 번만 잊어도 즉시 걸린다"는 이 검사의 선언이 컬럼 grant에'
+\echo '     대해서는 거짓이 된다.'
+\echo '   ⚠ DELETE는 컬럼 단위 권한이 아니라 has_any_column_privilege가 거부한다'
+\echo '     (unrecognized privilege type) → 그쪽만 has_table_privilege로 본다.'
+\echo '   ⚠ authenticated의 INSERT/UPDATE는 여기서 세지 않는다 — 정상 기능이 그걸로 돈다.'
+\echo '     대신 **DELETE와 TRUNCATE**를 본다(comment·user_block만 정당한 DELETE 대상이다).'
 select c.relname,
-       c.relrowsecurity                                   as rls_on,
-       has_table_privilege('anon', c.oid, 'INSERT')       as anon_insert,
-       has_table_privilege('anon', c.oid, 'UPDATE')       as anon_update,
-       has_table_privilege('anon', c.oid, 'DELETE')       as anon_delete,
-       has_table_privilege('anon', c.oid, 'TRUNCATE')     as anon_truncate,
-       has_table_privilege('authenticated', c.oid, 'TRUNCATE') as auth_truncate
+       c.relrowsecurity                                          as rls_on,
+       has_any_column_privilege('anon', c.oid, 'INSERT')         as anon_insert,
+       has_any_column_privilege('anon', c.oid, 'UPDATE')         as anon_update,
+       has_table_privilege('anon', c.oid, 'DELETE')              as anon_delete,
+       has_table_privilege('anon', c.oid, 'TRUNCATE')            as anon_truncate,
+       has_table_privilege('authenticated', c.oid, 'DELETE')     as auth_delete,
+       has_table_privilege('authenticated', c.oid, 'TRUNCATE')   as auth_truncate
   from pg_class c
   join pg_namespace n on n.oid = c.relnamespace
  where n.nspname = 'public' and c.relkind = 'r'
    and (not c.relrowsecurity
-        or has_table_privilege('anon', c.oid, 'INSERT')
-        or has_table_privilege('anon', c.oid, 'UPDATE')
+        or has_any_column_privilege('anon', c.oid, 'INSERT')
+        or has_any_column_privilege('anon', c.oid, 'UPDATE')
         or has_table_privilege('anon', c.oid, 'DELETE')
         or has_table_privilege('anon', c.oid, 'TRUNCATE')
-        or has_table_privilege('authenticated', c.oid, 'TRUNCATE'));
+        or has_table_privilege('authenticated', c.oid, 'TRUNCATE')
+        -- comment만 정당하다(자기 댓글 삭제). user_block은 DELETE 정책이 있지만
+        -- grant도 테이블 단위라 여기 걸리므로 함께 예외로 둔다.
+        or (has_table_privilege('authenticated', c.oid, 'DELETE')
+            and c.relname not in ('comment', 'user_block')));
 
 \echo '-- 17b. RLS는 켜졌는데 정책이 하나도 없는 테이블 (전면 차단이 의도인지 확인 필요)'
 select c.relname
@@ -446,13 +460,20 @@ select p.proname
 \echo '        match_prediction_results(승부예측 집계 — 게이팅 축이 "참여"가 아니라 "킥오프"라,'
 \echo '        마감 후에는 비로그인에게도 열어야 한다. "커뮤니티의 68%가 이렇게 봤다"가 이 기능의'
 \echo '        콘텐츠 자체이고 크롤러도 그것을 본다. 킥오프 전에는 누구에게나 0행이다)'
+\echo '        match_is_alive·survey_is_alive(부모 생존 판정 — 라인업·사건·스탯·선택지의 SELECT'
+\echo '        정책에 `to` 절이 없어 비로그인 조회도 이 함수를 지난다. 닫으면 경기 상세와'
+\echo '        입축구가 통째로 42501로 죽는다. 입력한 id의 생존 여부만 돌려주는데 그건'
+\echo '        match·survey를 직접 조회해도 알 수 있는 사실이라 새는 정보가 없다)'
+\echo '   ⚠ **is_admin은 여기 없다.** 어떤 RLS 정책도 그 함수를 부르지 않기 때문이다 —'
+\echo '     어드민 조회조차 definer RPC를 지나므로 anon에 열 이유가 없다.'
 select p.proname
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
  where n.nspname = 'public'
    and has_function_privilege('anon', p.oid, 'EXECUTE')
    and p.proname not in ('post_is_alive', 'has_visible_char', 'normalize_nickname',
                          'increment_post_view', 'is_blocked',
-                         'match_prediction_results');
+                         'match_prediction_results',
+                         'match_is_alive', 'survey_is_alive');
 
 -- ---------------------------------------------------------------------
 \echo ''
@@ -1723,13 +1744,23 @@ insert into public.survey_option (survey_id, label, sort_order, image_path)
 values (:sid2, '정상', 3, '4/messi.png');
 rollback to s;
 
-savepoint s; :login_alice
-\echo '[❌차단] 로그인 유저가 survey-images에 업로드 — 쓰기 정책이 없다'
-insert into storage.objects (bucket_id, name, owner) values ('survey-images', '4/hack.png', :'alice');
+savepoint s; :login_bob
+\echo '[❌차단] 비관리자가 survey-images에 업로드 — 쓰기 정책은 관리자에게만 열려 있다'
+insert into storage.objects (bucket_id, name, owner) values ('survey-images', '4/hack.png', :'bob');
 rollback to s;
 
-\echo '    ⚠ **버킷 설정 자체가 방어선이다.** 이 버킷에는 쓰기 정책이 없어 앱에서 올릴 수'
-\echo '      없지만, service_role로 도는 배포 스크립트는 이 값만 통과하면 무엇이든 올린다.'
+savepoint s; :login_anon
+\echo '[❌차단] 비로그인이 survey-images에 업로드'
+insert into storage.objects (bucket_id, name, owner) values ('survey-images', '4/hack.png', null);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[성공] 관리자는 올릴 수 있다 — 어드민 화면이 쓰는 경로다(20260906000003)'
+insert into storage.objects (bucket_id, name, owner) values ('survey-images', '4/ok.png', :'alice');
+rollback to s;
+
+\echo '    ⚠ **버킷 설정 자체가 방어선이다.** 앱에서 올릴 수 있는 것은 관리자뿐이지만,'
+\echo '      service_role로 도는 배포 스크립트는 이 값만 통과하면 무엇이든 올린다.'
 \echo '      정책만 검사하면 크기·타입이 조용히 넓어져도 아무도 모른다(24c와 같은 이유).'
 \echo '[t/1048576/t 기대] 공개 · 1MiB 상한 · webp/jpeg/png만'
 select public                                                   as is_public,
@@ -2346,6 +2377,670 @@ select count(*) as broken_lineups from (
 ) t;
 
 rollback to s31;
+
+-- =====================================================================
+\echo ''
+\echo '=== 33. 관리자 · 어드민 백오피스 (20260906000001~5) ==='
+\echo '  ⚠ **seed가 alice를 관리자로 만든다.** 그래서 섹션 1·3·30a·31a의 [❌차단]들이'
+\echo '    관리자 컨텍스트에서 도는데, 그것들이 여전히 통과하는 것 자체가'
+\echo '    **"어드민 쓰기는 테이블 DML을 쓰지 않는다"의 증거**다. 그 검사가 뒤집히면'
+\echo '    alice→bob으로 고치지 말고 왜 테이블 권한이 열렸는지를 먼저 본다.'
+savepoint s33;
+
+\echo ''
+\echo '-- 33a. 비관리자·비로그인은 어드민 RPC에 닿지 못한다 --'
+\echo '   조회는 0행(예외가 아니다 — survey_results의 게이팅과 같은 형태),'
+\echo '   쓰기는 P0001 한국어(정책이었다면 영어 42501뿐이라 사유를 말할 수 없다).'
+
+savepoint s; :login_bob
+\echo '[0/0/0/0 기대] bob의 어드민 조회 — 전부 빈 결과'
+select (select count(*) from public.admin_match_list(null))  as m,
+       (select count(*) from public.admin_survey_list(null)) as s,
+       (select count(*) from public.admin_post_list(null))   as p,
+       (select count(*) from public.admin_notice_list(null)) as n;
+rollback to s;
+
+savepoint s; :login_bob
+\echo '[❌차단] bob이 글을 지운다'
+select public.admin_soft_delete_post(:pid);
+rollback to s;
+savepoint s; :login_bob
+\echo '[❌차단] bob이 글 본문을 가린다'
+select public.admin_mask_post(:pid, '아무 사유');
+rollback to s;
+savepoint s; :login_bob
+\echo '[❌차단] bob이 본문 이미지를 걷어낸다'
+select public.admin_strip_post_images(:pid, null);
+rollback to s;
+savepoint s; :login_bob
+\echo '[❌차단] bob이 공지를 만든다'
+select public.admin_create_notice('공지', '제목', '내용', now(), null);
+rollback to s;
+savepoint s; :login_bob
+\echo '[❌차단] bob이 입축구를 만든다'
+select public.admin_create_survey('제목', '[{"label":"a"},{"label":"b"}]'::jsonb);
+rollback to s;
+savepoint s; :login_bob
+\echo '[❌차단] bob이 경기를 수정한다'
+select public.admin_update_match(1::bigint, '2025-26', 1::smallint, 'a', 'b', now(), null::smallint, null::smallint, false);
+rollback to s;
+
+\echo '   ⚠ **:login_anon은 role만 바꾸고 claims를 그대로 둔다** — 앞선 :login_alice의 sub가'
+\echo '     남아 auth.uid()가 계속 alice를 가리킨다. is_admin()은 auth.uid()로 판정하므로'
+\echo '     여기서는 claims까지 비워야 진짜 비로그인이 된다(섹션 28이 실측으로 겪은 함정).'
+savepoint s;
+select set_config('request.jwt.claims', null, true);
+:login_anon
+\echo '[❌차단] 비로그인은 EXECUTE 자체가 없다 (조회 RPC)'
+select count(*) from public.admin_match_list(null);
+rollback to s;
+savepoint s;
+select set_config('request.jwt.claims', null, true);
+:login_anon
+\echo '[❌차단] 비로그인은 EXECUTE 자체가 없다 (쓰기 RPC)'
+select public.admin_soft_delete_post(:pid);
+rollback to s;
+
+\echo ''
+\echo '-- 33b. 자가 승격 차단 · profiles 노출 컬럼 --'
+
+savepoint s; :login_alice
+\echo '[❌차단] 관리자라도 is_admin 컬럼은 못 읽는다 (grant 목록 밖)'
+select is_admin from public.profiles where id = :'alice';
+rollback to s;
+savepoint s; :login_bob
+\echo '[❌차단] 스스로를 관리자로 올린다'
+update public.profiles set is_admin = true where id = :'bob';
+rollback to s;
+savepoint s; :login_bob
+\echo '[❌차단] 남을 관리자로 올린다'
+update public.profiles set is_admin = true where id = :'alice';
+rollback to s;
+
+\echo '   ⚠ 이 검사가 없으면 profiles에 컬럼을 더할 때 grant를 빠뜨려도 아무도 모른다'
+\echo '     (17a는 SELECT를 보지 않는다). 목록이 늘거나 줄면 여기서 갈린다.'
+\echo '[0 기대] anon·authenticated가 SELECT할 수 있는 profiles 컬럼이 화이트리스트와 정확히 같다'
+select count(*) from (
+  select c.column_name
+    from information_schema.columns c
+   where c.table_schema = 'public' and c.table_name = 'profiles'
+     and (has_column_privilege('anon',          'public.profiles', c.column_name, 'SELECT')
+       or has_column_privilege('authenticated', 'public.profiles', c.column_name, 'SELECT'))
+  except
+  select unnest(array['id', 'nickname', 'created_at', 'avatar_path'])
+) t;
+\echo '[0 기대] 그 반대 방향 — 화이트리스트에 있는데 못 읽는 컬럼'
+select count(*) from (
+  select unnest(array['id', 'nickname', 'created_at', 'avatar_path']) as column_name
+  except
+  select c.column_name
+    from information_schema.columns c
+   where c.table_schema = 'public' and c.table_name = 'profiles'
+     and has_column_privilege('authenticated', 'public.profiles', c.column_name, 'SELECT')
+) t;
+
+\echo ''
+\echo '-- 33c. 소프트 삭제와 복구 — **관리자의 일반 조회도 함께 감춰진다** --'
+\echo '   이 성질이 이 설계의 핵심이다. 정책에 `or is_admin()`을 얹었다면 관리자만'
+\echo '   /matches·/posts에서 삭제된 항목을 보게 되고, useMyAccuracyQuery의 match!inner'
+\echo '   때문에 관리자의 적중률만 다른 분모로 계산된다 — 아무 검사도 잡지 못한다.'
+
+savepoint s; :login_alice
+\echo '[❌차단] 없는 id를 지운다 — 조용히 성공하면 "삭제했어요"가 거짓말이 된다'
+select public.admin_soft_delete_post(999999::bigint);
+rollback to s;
+savepoint s; :login_alice
+\echo '[❌차단] 없는 id를 되돌린다'
+select public.admin_restore_match(999999::bigint);
+rollback to s;
+
+savepoint s; :login_alice
+select public.admin_soft_delete_post(:pid);
+\echo '[0 기대] 관리자 자신의 일반 조회에서도 사라진다'
+select count(*) from public.post where id = :pid;
+\echo '[1 기대] 어드민 조회에는 있다'
+select count(*) from public.admin_post_list(true) where id = :pid;
+select public.admin_restore_post(:pid);
+\echo '[1 기대] 복구하면 돌아온다'
+select count(*) from public.post where id = :pid;
+rollback to s;
+
+savepoint s;
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, external_id)
+select '2025-26', 5, t1.code, t2.code, now() + interval '2 days', 'rls-admin-1'
+  from (select code from public.team order by code limit 1) t1,
+       (select code from public.team order by code desc limit 1) t2
+returning id as amid \gset
+:login_alice
+select public.admin_soft_delete_match(:amid);
+reset role;
+\echo '[0/0/0 기대] 비로그인에게 경기·라인업 부모가 함께 사라진다'
+select set_config('request.jwt.claims', null, true);
+set local role anon;
+select (select count(*) from public.match where id = :amid) as m,
+       (select count(*) from public.match_lineup where match_id = :amid) as l,
+       (select count(*) from public.match_event  where match_id = :amid) as e;
+rollback to s;
+
+\echo ''
+\echo '-- 33d. 자식은 부모의 삭제에 함께 묶인다 --'
+\echo '   화면 경로는 404라 아무도 눈치채지 못하고 REST로만 샌다(comment가 실제로 그랬다).'
+savepoint s;
+-- 라인업·사건·스탯이 달린 경기를 만든다
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, external_id)
+select '2025-26', 6, t1.code, t2.code, now() - interval '2 days', 'rls-admin-2'
+  from (select code from public.team order by code limit 1) t1,
+       (select code from public.team order by code desc limit 1) t2
+returning id as cmid \gset
+insert into public.match_lineup (match_id, side, formation) values (:cmid, 'home', '4-4-2');
+insert into public.player (name, external_id) values ('검사선수', 'rls-admin-p1') returning id as apl \gset
+insert into public.match_lineup_player (match_id, side, player_id, role, sort_order, grid_row, grid_col)
+values (:cmid, 'home', :apl, 'start', 1, 1, 1);
+insert into public.match_event (match_id, side, kind, minute, player_id) values (:cmid, 'home', 'goal', 10, :apl);
+insert into public.match_stat (match_id, side, stat_key, value) values (:cmid, 'home', 'shots', 12);
+
+set local role anon;
+\echo '[1/1/1/1 기대] 삭제 전에는 비로그인도 다 읽는다 (크롤러가 경기 상세를 색인한다)'
+select (select count(*) from public.match_lineup where match_id = :cmid) as lineup,
+       (select count(*) from public.match_lineup_player where match_id = :cmid) as players,
+       (select count(*) from public.match_event where match_id = :cmid) as events,
+       (select count(*) from public.match_stat where match_id = :cmid) as stats;
+reset role;
+
+:login_alice
+select public.admin_soft_delete_match(:cmid);
+reset role;
+select set_config('request.jwt.claims', null, true);
+set local role anon;
+\echo '[0/0/0/0 기대] 삭제 후에는 자식도 전부 사라진다'
+select (select count(*) from public.match_lineup where match_id = :cmid) as lineup,
+       (select count(*) from public.match_lineup_player where match_id = :cmid) as players,
+       (select count(*) from public.match_event where match_id = :cmid) as events,
+       (select count(*) from public.match_stat where match_id = :cmid) as stats;
+rollback to s;
+
+savepoint s;
+insert into public.survey (title) values ('삭제될 입축구') returning id as dsid \gset
+insert into public.survey_option (survey_id, label, sort_order) values (:dsid, '가', 1), (:dsid, '나', 2);
+set local role anon;
+\echo '[2 기대] 삭제 전 선택지'
+select count(*) from public.survey_option where survey_id = :dsid;
+reset role;
+:login_alice
+select public.admin_soft_delete_survey(:dsid);
+reset role;
+select set_config('request.jwt.claims', null, true);
+set local role anon;
+\echo '[0/0 기대] 삭제 후에는 문항도 선택지도 사라진다'
+select (select count(*) from public.survey where id = :dsid) as s,
+       (select count(*) from public.survey_option where survey_id = :dsid) as o;
+rollback to s;
+
+\echo ''
+\echo '-- 33e. definer 함수 누수 — RLS가 닿지 않는 자리다 --'
+\echo '   ⚠ match_prediction_results는 anon에 열려 있다. deleted_at을 빠뜨리면 id를 훑는'
+\echo '     것만으로 "삭제된 경기 중 예측이 있던 것"이 식별된다 — post_poll_results가'
+\echo '     post_is_alive를 빠뜨려 삭제된 글이 새던 사고와 같은 클래스다.'
+savepoint s;
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, external_id)
+select '2025-26', 7, t1.code, t2.code, now() - interval '1 day', 'rls-admin-3'
+  from (select code from public.team order by code limit 1) t1,
+       (select code from public.team order by code desc limit 1) t2
+returning id as emid \gset
+insert into public.match_prediction (match_id, user_id, pick) values (:emid, :'bob', 'home');
+set local role anon;
+\echo '[1 기대] 삭제 전에는 분포가 열려 있다 (킥오프가 지났다)'
+select count(*) from public.match_prediction_results(:emid);
+reset role;
+:login_alice
+select public.admin_soft_delete_match(:emid);
+reset role;
+select set_config('request.jwt.claims', null, true);
+set local role anon;
+\echo '[0 기대] 삭제 후에는 비로그인에게도 0행이다'
+select count(*) from public.match_prediction_results(:emid);
+rollback to s;
+
+savepoint s;
+insert into public.survey (title) values ('결과 게이팅 검사') returning id as gsid \gset
+insert into public.survey_option (survey_id, label, sort_order) values (:gsid, '가', 1), (:gsid, '나', 2);
+select id as gopt from public.survey_option where survey_id = :gsid and sort_order = 1 \gset
+insert into public.survey_vote (survey_id, user_id, option_id) values (:gsid, :'bob', :gopt);
+:login_bob
+\echo '[1/t 기대] 삭제 전 — 참여자에게 결과가 열리고 진행 중이다'
+select (select count(*) from public.survey_results(:gsid)) as results,
+       public.survey_is_open(:gsid) as is_open;
+reset role;
+:login_alice
+select public.admin_soft_delete_survey(:gsid);
+reset role;
+:login_bob
+\echo '[0/f 기대] 삭제 후 — 참여자에게도 결과가 닫히고 마감 판정도 뒤집힌다'
+select (select count(*) from public.survey_results(:gsid)) as results,
+       public.survey_is_open(:gsid) as is_open;
+rollback to s;
+
+\echo ''
+\echo '-- 33f. 입축구 편집 규칙 — 개수는 표가 0건일 때만 --'
+\echo '   ⚠ **경합은 이 파일이 증명하지 못한다.** 표가 들어오는 것과 선택지를 지우는 것이'
+\echo '     겹치는 창은 두 세션이 있어야 재현되는데 여기는 한 트랜잭션이다.'
+\echo '     그 창은 admin_set_survey_options 안의 `for update`가 닫는다 —'
+\echo '     사후 재검사로는 막을 수 없다(FK가 on delete cascade라 표를 함께 지운다).
+savepoint s;
+insert into public.survey (title) values ('편집 규칙 검사') returning id as fsid \gset
+insert into public.survey_option (survey_id, label, sort_order) values (:fsid, '가', 1), (:fsid, '나', 2);
+
+:login_alice
+\echo '[성공] 표가 0건이면 선택지 묶음을 통째로 바꾼다 (개수 변경 포함)'
+select public.admin_set_survey_options(:fsid, '[{"label":"하나"},{"label":"둘"},{"label":"셋"}]'::jsonb);
+\echo '[3 기대] 실제로 3개가 됐다'
+select count(*) from public.admin_survey_option_list(:fsid);
+rollback to s;
+
+savepoint s;
+insert into public.survey (title) values ('편집 규칙 검사2') returning id as f2sid \gset
+insert into public.survey_option (survey_id, label, sort_order) values (:f2sid, '가', 1), (:f2sid, '나', 2);
+select id as f2opt from public.survey_option where survey_id = :f2sid and sort_order = 1 \gset
+insert into public.survey_vote (survey_id, user_id, option_id) values (:f2sid, :'bob', :f2opt);
+
+savepoint s2; :login_alice
+\echo '[❌차단] 표가 있으면 선택지 묶음 교체가 막힌다'
+select public.admin_set_survey_options(:f2sid, '[{"label":"a"},{"label":"b"}]'::jsonb);
+rollback to s2;
+
+savepoint s2; :login_alice
+\echo '[성공] 표가 있어도 한 칸의 문구는 고칠 수 있다 (개수만 못 바꾼다)'
+\echo '   ⚠ 이 문항은 색이 **전무**하다 — 한 칸에만 색을 넣으면 "전부이거나 전무"를 깨므로'
+\echo '     거부되는 것이 맞다(아래 색 불변식 검사가 그 방향을 따로 본다).'
+select public.admin_edit_survey_option(:f2opt, :f2sid, '고친 가', '부제도 된다');
+rollback to s2;
+
+\echo '   ⚠ 아래 둘은 **한 칸 편집이 문항 전체 불변식을 깨는** 경로다. 생성·묶음 교체는'
+\echo '     admin_validate_survey_options가 막는데 한때 이 함수만 그 검증을 지나지 않았다.'
+savepoint s2; :login_alice
+select public.admin_create_survey('색 불변식 검사',
+  '[{"label":"가","bgColor":"#111111","textColor":"#ffffff"},
+    {"label":"나","bgColor":"#222222","textColor":"#ffffff"},
+    {"label":"다","bgColor":"#333333","textColor":"#ffffff"}]'::jsonb) as csid2 \gset
+select id as copt3 from public.admin_survey_option_list(:csid2) order by sort_order limit 1 \gset
+\echo '[❌차단] 한 칸의 색만 지운다 — splitCount가 분할 카드를 포기해 카드 모양이 통째로 바뀐다'
+select public.admin_edit_survey_option(:copt3, :csid2, '가');
+rollback to s2;
+
+savepoint s2; :login_alice
+\echo '[❌차단] 다른 문항의 선택지를 고친다 (stale한 id가 조용히 남의 문항을 건드리면 안 된다)'
+select public.admin_edit_survey_option(:f2opt, :fsid, '엉뚱한 문항');
+rollback to s2;
+
+savepoint s2; :login_alice
+\echo '[❌차단] 선택지 1개'
+select public.admin_set_survey_options(:f2sid, '[{"label":"a"}]'::jsonb);
+rollback to s2;
+savepoint s2; :login_alice
+\echo '[❌차단] 선택지 5개'
+select public.admin_set_survey_options(:f2sid, '[{"label":"a"},{"label":"b"},{"label":"c"},{"label":"d"},{"label":"e"}]'::jsonb);
+rollback to s2;
+savepoint s2; :login_alice
+\echo '[❌차단] 색이 한쪽만 (bg만 있고 text가 없다)'
+select public.admin_create_survey('x', '[{"label":"a","bgColor":"#111111"},{"label":"b","bgColor":"#222222","textColor":"#ffffff"}]'::jsonb);
+rollback to s2;
+savepoint s2; :login_alice
+\echo '[❌차단] 색이 일부 선택지에만 (splitCount가 분할 카드를 포기한다)'
+select public.admin_create_survey('x', '[{"label":"a","bgColor":"#111111","textColor":"#ffffff"},{"label":"b"}]'::jsonb);
+rollback to s2;
+savepoint s2; :login_alice
+\echo '[❌차단] 정규형이 같은 라벨 — 23505가 아니라 P0001이어야 한다'
+\echo '   (23505를 그대로 내보내면 toDbErrorMessage가 닉네임 문구인'
+\echo '    "이미 사용 중인 값이에요."로 접어 뜻이 어긋난다)'
+select public.admin_create_survey('x', '[{"label":"찬성"},{"label":"찬성 "}]'::jsonb);
+rollback to s2;
+
+savepoint s2; :login_alice
+\echo '[P0001 기대] 위 중복 거부의 **에러 코드**를 직접 찍는다 — 라벨만으로는 갈리지 않는다'
+do $do$
+begin
+  perform public.admin_create_survey('x', '[{"label":"찬성"},{"label":"찬성 "}]'::jsonb);
+  raise notice '거부되지 않았다 (검사가 죽었다)';
+exception when others then
+  raise notice 'sqlstate=%', sqlstate;
+end $do$;
+rollback to s2;
+rollback to s;
+
+\echo ''
+\echo '-- 33g. 피드 — 본문을 **자유 편집하지 않는다** --'
+\echo '   admin_strip_post_images·admin_mask_post 어느 것도 content를 인자로 받지 않는다.'
+\echo '   그것이 "어드민이 남의 글을 고쳐 쓰지 않는다"의 유일한 구조적 보증이다.'
+savepoint s;
+insert into public.post (author_id, title, content, category)
+values (:'bob', '이미지 글', E'앞\n\n![a](http://h/x/a.webp)\n\n뒤', '잡담')
+returning id as gpid \gset
+insert into public.post (author_id, title, content, category)
+values (:'bob', '이미지뿐', '![a](http://h/x/only.webp)', '잡담')
+returning id as gpid2 \gset
+
+:login_alice
+\echo '[1건 기대] 지정한 URL만 걷어낸다'
+select array_length(public.admin_strip_post_images(:gpid, array['http://h/x/a.webp']), 1);
+reset role;
+\echo '[f 기대] 본문에 이미지 마크다운이 남지 않았다'
+select content like '%![%' from public.post where id = :gpid;
+\echo '[t 기대] 글자는 남아 있다 (본문을 통째로 지우지 않는다)'
+select public.has_visible_char(content) from public.post where id = :gpid;
+
+savepoint s2; :login_alice
+\echo '[❌차단] 이미지를 빼면 본문이 비는 글 — 영어 23514 대신 사유를 말한다'
+select public.admin_strip_post_images(:gpid2, null);
+rollback to s2;
+
+:login_alice
+select public.admin_mask_post(:gpid, '광고');
+select public.admin_mask_post(:gpid, '두 번째');
+reset role;
+\echo '[t 기대] 두 번 가려도 보관된 원본은 **최초 것**이다'
+select original_content like '%![a](http://h/x/a.webp)%' or original_content like '앞%'
+  from public.post_moderation where post_id = :gpid;
+
+savepoint s2; :login_bob
+\echo '[❌차단] 원본 보관 테이블은 아무도 읽을 수 없다'
+select count(*) from public.post_moderation;
+rollback to s2;
+savepoint s2; :login_alice
+\echo '[❌차단] 관리자도 테이블로는 못 읽는다 (RPC만이 경로다)'
+select count(*) from public.post_moderation;
+rollback to s2;
+
+:login_alice
+select public.admin_unmask_post(:gpid);
+reset role;
+\echo '[0 기대] 되돌리면 보관 행이 사라진다'
+select count(*) from public.post_moderation where post_id = :gpid;
+rollback to s;
+
+savepoint s;
+select post_id as ppid33 from public.post_poll limit 1 \gset
+select count(*) as pcnt33 from public.post_poll_option where post_id = :ppid33 \gset
+savepoint s2; :login_alice
+\echo '[❌차단] 투표 선택지를 하나 뺀다 — 개수는 못 바꾼다'
+select public.admin_edit_post_poll(:ppid33, '질문',
+  (select coalesce(json_agg(json_build_object('id', id, 'label', label))::jsonb, '[]'::jsonb)
+     from (select id, label from public.post_poll_option where post_id = :ppid33 order by sort_order limit 1) t));
+rollback to s2;
+savepoint s2; :login_alice
+\echo '[❌차단] 남의 글의 선택지 id를 섞어 넣는다'
+select public.admin_edit_post_poll(:ppid33, '질문', '[{"id":-1,"label":"a"},{"id":-2,"label":"b"},{"id":-3,"label":"c"}]'::jsonb);
+rollback to s2;
+
+savepoint s2; :login_alice
+\echo '[❌차단] **같은 id를 여러 번** 넣는다 — 개수와 멤버십만 보면 통과해서,'
+\echo '        되돌려지지 않은 칸에 내부 임시 라벨(#id)이 사용자 화면에 남았다(실측)'
+select public.admin_edit_post_poll(:ppid33, '질문',
+  (select jsonb_agg(jsonb_build_object('id', t.id, 'label', '새' || t.n))
+     from (select (select min(id) from public.post_poll_option where post_id = :ppid33) as id,
+                  generate_series(1, (select count(*) from public.post_poll_option where post_id = :ppid33)::int) as n) t));
+rollback to s2;
+
+savepoint s2; :login_alice
+\echo '[❌차단] 숫자가 아닌 선택지 id — 캐스트가 먼저 터지면 22P02라 사유를 말하지 못한다'
+select public.admin_edit_post_poll(:ppid33, '질문', '[{"id":"abc","label":"a"}]'::jsonb);
+rollback to s2;
+rollback to s;
+
+\echo ''
+\echo '   -- 가리기는 **작성자가 되돌릴 수 없어야** 뜻이 있다 --'
+\echo '   ⚠ 한때 post_update_own이 author_id만 보아 작성자가 곧바로 본문을 다시 써 넣었다.'
+\echo '     더 나쁜 것은 그 다음이다 — 그 상태에서 관리자가 되돌리면 **작성자가 새로 쓴 글이'
+\echo '     지워지고 문제 원문이 다시 게시된다.**'
+savepoint s;
+insert into public.post (author_id, title, content, category)
+values (:'bob', '가릴 글', '문제가 되는 원문입니다', '잡담')
+returning id as mpid \gset
+
+:login_alice
+select public.admin_mask_post(:mpid, '사유1');
+reset role;
+
+savepoint s2; :login_bob
+\echo '[UPDATE 0 기대] 작성자가 가려진 자기 글의 본문을 다시 쓴다 — 정책의 using이'
+\echo '                필터로 동작하므로 에러가 아니라 조용히 0행이다(섹션 1과 같은 형태)'
+update public.post set content = '원래 하려던 말 그대로 다시 씁니다.' where id = :mpid;
+rollback to s2;
+
+:login_alice
+select public.admin_mask_post(:mpid, '사유2');
+reset role;
+\echo '[t/t 기대] 두 번 가려도 **원본은 최초 것**, 사유는 최신 것 (한때 화면과 기록이 갈렸다)'
+select original_content = '문제가 되는 원문입니다' as original_kept,
+       reason = '사유2'                            as reason_latest
+  from public.post_moderation where post_id = :mpid;
+
+:login_alice
+select public.admin_unmask_post(:mpid);
+reset role;
+savepoint s2; :login_bob
+\echo '[UPDATE 1 기대] 되돌린 뒤에는 작성자가 다시 고칠 수 있다'
+update public.post set content = '이제는 고칠 수 있다' where id = :mpid;
+rollback to s2;
+rollback to s;
+
+\echo ''
+\echo '   -- 본문 이미지 제거는 **URL 안의 괄호**에서 본문을 깨뜨리면 안 된다 --'
+\echo '   ⚠ `([^)]*)`는 첫 `)`에서 멈춘다. 본문은 외부 주소를 직접 적을 수 있는 자유 텍스트라'
+\echo '     `…/b(1).png` 같은 주소가 실제로 들어오고, 그때 잔여물이 남의 글에 남았다(실측).'
+savepoint s;
+insert into public.post (author_id, title, content, category)
+values (:'bob', '괄호 URL', E'앞글\n\n![a](http://x/a.png)\n\n![b](http://x/b(1).png)\n\n뒷글', '잡담')
+returning id as rpid \gset
+
+:login_alice
+\echo '[1 기대] 괄호가 든 URL을 **지정해서** 지운다 (한때 조용한 no-op이었다)'
+select array_length(public.admin_strip_post_images(:rpid, array['http://x/b(1).png']), 1);
+\echo '[f/t 기대] 그 이미지만 빠지고 잔여물이 남지 않는다'
+select content like '%b(1)%' as still_there, content like '%![a](http://x/a.png)%' as other_kept
+  from public.post where id = :rpid;
+\echo '[f 기대] 전부 제거해도 `.png)` 같은 잔여물이 남지 않는다'
+select public.admin_strip_post_images(:rpid, null);
+select content like '%.png)%' as leftover from public.post where id = :rpid;
+reset role;
+
+\echo '[t 기대] 어드민의 본문 조치는 **"수정됨"을 남기지 않는다** (작성자가 고친 것이 아니다)'
+select created_at = updated_at as not_edited from public.post where id = :rpid;
+rollback to s;
+
+\echo ''
+\echo '-- 33h. 공지 — 노출 기간을 정책이 소유한다 --'
+savepoint s;
+insert into public.notice (type, title, body, opens_at, closes_at) values
+  ('공지', '예정된 공지', '내용', now() + interval '3 days', null),
+  ('공지', '만료된 공지', '내용', now() - interval '10 days', now() - interval '1 day'),
+  ('필독', '노출 중 공지', '내용', now() - interval '1 hour', null);
+
+set local role anon;
+\echo '[t/f/f 기대] 비로그인에게는 노출 중인 것만 보인다'
+select (select count(*) > 0 from public.notice where title = '노출 중 공지') as live,
+       (select count(*) > 0 from public.notice where title = '예정된 공지') as scheduled,
+       (select count(*) > 0 from public.notice where title = '만료된 공지') as expired;
+reset role;
+
+:login_alice
+\echo '[t/t/t 기대] 어드민 조회에는 셋 다 보인다 — 예약 공지를 확인할 유일한 경로다'
+select (select count(*) > 0 from public.admin_notice_list(null) where title = '노출 중 공지') as live,
+       (select count(*) > 0 from public.admin_notice_list(null) where title = '예정된 공지') as scheduled,
+       (select count(*) > 0 from public.admin_notice_list(null) where title = '만료된 공지') as expired;
+reset role;
+
+savepoint s2; :login_alice
+\echo '[❌차단] 노출 종료가 시작보다 앞선다'
+select public.admin_create_notice('공지', '제목', '내용', now(), now() - interval '1 day');
+rollback to s2;
+savepoint s2; :login_alice
+\echo '[❌차단] 보이는 글자가 없는 제목 (제로폭 문자)'
+select public.admin_create_notice('공지', E'​', '내용', now(), null);
+rollback to s2;
+savepoint s2; :login_bob
+\echo '[❌차단] 비관리자가 테이블에 직접 쓴다 — 정책도 grant도 없다'
+insert into public.notice (type, title, body) values ('공지', 'x', 'y');
+rollback to s2;
+savepoint s2; :login_alice
+\echo '[❌차단] 관리자도 테이블에 직접 쓸 수 없다 (RPC가 유일 경로다)'
+insert into public.notice (type, title, body) values ('공지', 'x', 'y');
+rollback to s2;
+rollback to s;
+
+\echo ''
+\echo '-- 33i. updated_at의 WHEN 절 — 동기화가 전 경기를 흔들면 안 된다 --'
+\echo '   ⚠ 조건 없이 걸면 sync-matches.mjs 한 번에 380행이 갱신된다. sitemap이 이 값을'
+\echo '     lastModified로 쓰기 시작하는 순간 "전 경기가 방금 바뀌었다"는 거짓 신호가 나간다.'
+\echo '   ⚠ **시드를 과거로 민다** — now()가 트랜잭션 시작 시각이라 기본값으로 두면'
+\echo '     insert의 now()와 트리거의 now()가 같아져 아무것도 증명하지 못한다.'
+savepoint s;
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, external_id, updated_at)
+select '2025-26', 8, t1.code, t2.code, now() + interval '3 days', 'rls-admin-4', now() - interval '1 day'
+  from (select code from public.team order by code limit 1) t1,
+       (select code from public.team order by code desc limit 1) t2
+returning id as imid \gset
+
+:login_alice
+select public.admin_soft_delete_match(:imid);
+select public.admin_restore_match(:imid);
+reset role;
+\echo '[f 기대] 삭제·복구는 "수정됨"을 유발하지 않는다'
+select updated_at > now() - interval '1 minute' from public.match where id = :imid;
+
+update public.match set live_minute = 33 where id = :imid;
+\echo '[f 기대] 라이브 분만 바뀌어도 마찬가지다'
+select updated_at > now() - interval '1 minute' from public.match where id = :imid;
+
+-- ⚠ live_minute을 함께 비운다 — match_live_minute_not_ended가 종료된 경기에
+--   진행 분이 남는 것을 막는다(동기화도 종료 시 같이 비운다).
+update public.match set home_score = 1, away_score = 0, finished_at = now(), live_minute = null
+ where id = :imid;
+\echo '[t 기대] 스코어 정정은 갱신한다'
+select updated_at > now() - interval '1 minute' from public.match where id = :imid;
+rollback to s;
+
+\echo ''
+\echo '-- 33j. 동기화 잠금 — 어드민 수정이 다음 동기화에 원복되지 않는다 --'
+\echo '   ⚠ 스크립트가 실제로 이 컬럼을 보는지는 SQL로 증명할 수 없다(그건 fixture 재생으로'
+\echo '     확인한다). 여기서는 **수정이 잠금을 반드시 남긴다**는 계약만 지킨다 — 그게'
+\echo '     깨지면 스크립트가 아무리 옳아도 원복이 다시 일어난다.'
+savepoint s;
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, external_id)
+select '2025-26', 9, t1.code, t2.code, now() + interval '4 days', 'rls-admin-5'
+  from (select code from public.team order by code limit 1) t1,
+       (select code from public.team order by code desc limit 1) t2
+returning id as jmid \gset
+
+:login_alice
+select public.admin_update_match(:jmid, '2025-26', 9::smallint,
+  (select code from public.team order by code limit 1),
+  (select code from public.team order by code desc limit 1),
+  now() + interval '5 days', null::smallint, null::smallint, false);
+reset role;
+\echo '[t 기대] 수정하면 잠금이 함께 찍힌다'
+select admin_locked_at is not null from public.match where id = :jmid;
+
+:login_alice
+select public.admin_unlock_match(:jmid);
+reset role;
+\echo '[f 기대] 해제하면 다시 동기화가 관리한다'
+select admin_locked_at is not null from public.match where id = :jmid;
+
+savepoint s2; :login_alice
+\echo '[❌차단] 같은 팀끼리 맞붙이기'
+select public.admin_update_match(:jmid, '2025-26', 9::smallint, 'liverpool', 'liverpool',
+  now(), null::smallint, null::smallint, false);
+rollback to s2;
+\echo '   ⚠ 아래가 이 함수에서 가장 조용한 사고다 — `match_is_open`은 킥오프만 보므로'
+\echo '     미래 경기에 스코어를 넣으면 **결과가 뜬 채 예측이 열린다**(적중률이 오염된다).'
+\echo '     동기화는 이 상태를 만들 수 없다(제공자가 킥오프 전에 최종 스코어를 주지 않는다) —'
+\echo '     어드민 경로가 생기면서 처음 도달 가능해진 상태다.'
+savepoint s2; :login_alice
+\echo '[❌차단] 킥오프 전 경기에 스코어를 넣는다'
+select public.admin_update_match(:jmid, '2025-26', 9::smallint,
+  (select code from public.team order by code limit 1),
+  (select code from public.team order by code desc limit 1),
+  now() + interval '10 days', 2::smallint, 0::smallint, false);
+rollback to s2;
+
+savepoint s2; :login_alice
+\echo '[❌차단] 채점이 끝난 경기의 킥오프를 미래로 밀어 예측을 다시 연다'
+select public.admin_update_match(:jmid, '2025-26', 9::smallint,
+  (select code from public.team order by code limit 1),
+  (select code from public.team order by code desc limit 1),
+  now() + interval '10 days', 1::smallint, 1::smallint, false);
+rollback to s2;
+
+savepoint s2; :login_alice
+\echo '[❌차단] 한쪽 스코어만 넣기 (finished_at과 쌍으로 묶인 CHECK를 함수가 대신 설명한다)'
+select public.admin_update_match(:jmid, '2025-26', 9::smallint,
+  (select code from public.team order by code limit 1),
+  (select code from public.team order by code desc limit 1),
+  now(), 1::smallint, null::smallint, false);
+rollback to s2;
+rollback to s;
+
+\echo ''
+\echo '-- 33k. Storage — 삭제 정책만으로는 파일이 지워지지 않는다 --'
+\echo '   ⚠⚠ 실측 사고: 어드민의 본문 이미지 제거가 **HTTP 200 + 빈 배열**로 지나가고'
+\echo '     파일은 그대로 남았다. Storage는 지우기 전에 그 객체 행을 **읽어야** 하는데'
+\echo '     `post_images_select_own`이 "자기 폴더만"이라 관리자에게는 남의 파일이 보이지'
+\echo '     않았다 — DELETE 정책은 멀쩡했고 에러도 나지 않았다.'
+\echo '   → 그래서 **SELECT와 DELETE를 한 쌍으로** 본다. 삭제 자체는 여기서 재현할 수 없다'
+\echo '     (storage.protect_delete()가 SQL 직접 삭제를 막는다 — 실제 삭제는 Storage API가'
+\echo '     하고, 그 API가 지우기 전에 거치는 것이 아래 SELECT다).'
+savepoint s;
+insert into storage.objects (bucket_id, name, owner)
+values ('post-images', :'bob' || '/k.webp', :'bob');
+
+:login_alice
+\echo '[1 기대] 관리자는 남의 폴더 파일을 **볼 수 있다** (없으면 삭제가 0행으로 지나간다)'
+select count(*) from storage.objects
+ where bucket_id = 'post-images' and name = :'bob' || '/k.webp';
+reset role;
+
+:login_bob
+\echo '[1 기대] 본인 파일은 본인에게도 보인다 (관리자 정책이 기존 정책을 대체하지 않았다)'
+select count(*) from storage.objects
+ where bucket_id = 'post-images' and name = :'bob' || '/k.webp';
+reset role;
+rollback to s;
+
+savepoint s;
+insert into storage.objects (bucket_id, name, owner)
+values ('post-images', :'alice' || '/k2.webp', :'alice');
+:login_bob
+\echo '[0 기대] 일반 사용자에게는 여전히 자기 폴더만 보인다 (관리자 정책이 넓어지지 않았다)'
+select count(*) from storage.objects
+ where bucket_id = 'post-images' and name = :'alice' || '/k2.webp';
+reset role;
+rollback to s;
+
+savepoint s;
+insert into storage.objects (bucket_id, name, owner)
+values ('survey-images', '4/k.webp', null);
+:login_alice
+\echo '[1 기대] 입축구 배경도 관리자가 읽는다 — 지우려면 먼저 보여야 한다'
+select count(*) from storage.objects where bucket_id = 'survey-images' and name = '4/k.webp';
+reset role;
+:login_bob
+\echo '[1 기대] ⚠ 여기는 **누구나 읽는다**(`survey_images_select_all`) — post-images와 갈린다.'
+\echo '   그래서 이 버킷에서는 그 사고가 애초에 일어나지 않았다. 목록·상세가 이 파일들을'
+\echo '   공개 URL로 그리므로 읽기를 좁힐 이유도 없다 — 좁히는 순간 면 배경이 통째로 깨진다.'
+select count(*) from storage.objects where bucket_id = 'survey-images' and name = '4/k.webp';
+reset role;
+rollback to s;
+
+\echo '[t t t 기대] 읽기와 지우기 정책이 **둘 다** 있다 — 하나만 있으면 위 사고가 재현된다'
+select
+  exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects'
+           and policyname = 'post_images_select_admin' and cmd = 'SELECT')  as post_select,
+  exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects'
+           and policyname = 'post_images_delete_admin' and cmd = 'DELETE')  as post_delete,
+  exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects'
+           and policyname = 'survey_images_delete_admin' and cmd = 'DELETE') as survey_delete;
+
+rollback to s33;
 
 rollback;
 \echo ''

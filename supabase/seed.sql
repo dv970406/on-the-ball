@@ -67,6 +67,15 @@ update public.profiles set nickname = 'alice' where id = '11111111-1111-4111-811
 update public.profiles set nickname = 'bob'   where id = '22222222-2222-4222-8222-222222222222';
 update public.profiles set nickname = 'carol' where id = '33333333-3333-4333-8333-333333333333';
 
+-- alice를 관리자로 — `rls.sql` 섹션 33이 이것을 전제한다.
+--
+-- ⚠ **alice여야 한다.** 섹션 1·3·30a·31a의 `[❌차단]` 검사들이 alice로 도는데,
+--   그 검사들이 관리자 컨텍스트에서 통과하는 것이 곧 "어드민 쓰기가 테이블 DML을
+--   쓰지 않는다"는 증거다. bob으로 옮기면 그 증거가 사라지고, 30b·31b의 참여
+--   검사가 관리자 컨텍스트에서 돌아 뜻도 흐려진다.
+update public.profiles set is_admin = true
+ where id = '11111111-1111-4111-8111-111111111111';
+
 -- ---------------------------------------------------------------------
 -- 2. 글 — 말머리 5종(이적설·경기·선수·유니폼·잡담)을 모두 덮는다
 --
@@ -412,3 +421,53 @@ cross join (values
   ('tottenham', 'chelsea',    interval '3 days' + interval '19 hours 30 minutes', '1003')
 ) as m(home_team, away_team, at, external_id)
 on conflict (external_id) do nothing;
+
+-- ---------------------------------------------------------------------
+-- 어드민 백오피스가 밟는 상태들 (20260906000002~4)
+--
+-- ⚠ 삭제된 행이 없으면 어드민 목록의 '삭제됨' 필터와 '되돌리기'를 로컬에서
+--   확인할 방법이 없다. 시드는 개발 데이터를 지키는 것이 목적이므로 화면이
+--   가진 상태를 전부 덮는다.
+-- ⚠ **`voided_at`(취소)과 `deleted_at`(감춤)은 다른 것이다.** 위 시드에 이미
+--   취소된 경기(1008)가 있고, 여기서 감추는 것은 **다른 경기**다 — 둘이 한
+--   화면에 함께 있어야 그 차이가 눈에 보인다.
+-- ---------------------------------------------------------------------
+update public.match set deleted_at = now() - interval '1 day'
+ where external_id = '1003';
+
+update public.survey set deleted_at = now() - interval '2 days'
+ where id = (select min(id) from public.survey);
+
+-- ---------------------------------------------------------------------
+-- 공지 — 노출 중 · 예정 · 만료 · 삭제됨 넷을 모두 덮는다
+--
+-- ⚠ 예정·만료는 `notice_select_live` 정책이 감춘다 → 일반 조회로는 1건만
+--   보이고 admin_notice_list로는 넷이 다 보이는 것이 정상이다.
+-- ⚠ 시각을 리터럴로 박지 않는다(now() 기준 상대값).
+-- ---------------------------------------------------------------------
+insert into public.notice (type, title, body, opens_at, closes_at) values
+  ('필독',
+   '커뮤니티 이용 규칙 안내',
+   E'온더볼을 이용해 주셔서 고맙습니다.\n\n' ||
+   E'- 상대를 향한 비방·욕설은 삭제됩니다\n' ||
+   E'- 같은 내용을 반복해 올리면 제한될 수 있어요\n\n' ||
+   E'즐거운 축구 이야기 부탁드립니다.',
+   now() - interval '10 days', null),
+
+  ('공지',
+   '겨울 이적시장 특집 입축구가 열립니다',
+   E'다음 주 월요일부터 이적시장 관련 입축구가 순차적으로 올라옵니다.\n\n많은 참여 부탁드려요.',
+   now() + interval '3 days', now() + interval '17 days'),
+
+  ('공지',
+   '서버 점검 완료 안내',
+   E'지난 주말 예정되어 있던 점검이 모두 끝났습니다. 이용에 불편을 드려 죄송합니다.',
+   now() - interval '20 days', now() - interval '13 days'),
+
+  ('공지',
+   '잘못 올라간 공지 (삭제 상태)',
+   E'어드민 목록의 삭제됨 필터와 되돌리기를 확인하기 위한 시드입니다.',
+   now() - interval '5 days', null);
+
+update public.notice set deleted_at = now() - interval '4 days'
+ where title = '잘못 올라간 공지 (삭제 상태)';

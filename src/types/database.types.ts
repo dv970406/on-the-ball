@@ -60,8 +60,10 @@ export type Database = {
       }
       match: {
         Row: {
+          admin_locked_at: string | null
           away_score: number | null
           away_team: string
+          deleted_at: string | null
           external_id: string
           finished_at: string | null
           home_score: number | null
@@ -72,11 +74,14 @@ export type Database = {
           matchday: number
           result: Database["public"]["Enums"]["match_pick"] | null
           season: string
+          updated_at: string
           voided_at: string | null
         }
         Insert: {
+          admin_locked_at?: string | null
           away_score?: number | null
           away_team: string
+          deleted_at?: string | null
           external_id: string
           finished_at?: string | null
           home_score?: number | null
@@ -87,11 +92,14 @@ export type Database = {
           matchday: number
           result?: Database["public"]["Enums"]["match_pick"] | null
           season: string
+          updated_at?: string
           voided_at?: string | null
         }
         Update: {
+          admin_locked_at?: string | null
           away_score?: number | null
           away_team?: string
+          deleted_at?: string | null
           external_id?: string
           finished_at?: string | null
           home_score?: number | null
@@ -102,6 +110,7 @@ export type Database = {
           matchday?: number
           result?: Database["public"]["Enums"]["match_pick"] | null
           season?: string
+          updated_at?: string
           voided_at?: string | null
         }
         Relationships: [
@@ -333,6 +342,42 @@ export type Database = {
           },
         ]
       }
+      notice: {
+        Row: {
+          body: string
+          closes_at: string | null
+          created_at: string
+          deleted_at: string | null
+          id: number
+          opens_at: string
+          title: string
+          type: Database["public"]["Enums"]["notice_type"]
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          closes_at?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: never
+          opens_at?: string
+          title: string
+          type?: Database["public"]["Enums"]["notice_type"]
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          closes_at?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: never
+          opens_at?: string
+          title?: string
+          type?: Database["public"]["Enums"]["notice_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       player: {
         Row: {
           external_id: string
@@ -433,6 +478,35 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_moderation: {
+        Row: {
+          masked_at: string
+          original_content: string
+          post_id: number
+          reason: string | null
+        }
+        Insert: {
+          masked_at?: string
+          original_content: string
+          post_id: number
+          reason?: string | null
+        }
+        Update: {
+          masked_at?: string
+          original_content?: string
+          post_id?: number
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_moderation_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: true
+            referencedRelation: "post"
             referencedColumns: ["id"]
           },
         ]
@@ -576,18 +650,21 @@ export type Database = {
           avatar_path: string | null
           created_at: string
           id: string
+          is_admin: boolean
           nickname: string
         }
         Insert: {
           avatar_path?: string | null
           created_at?: string
           id: string
+          is_admin?: boolean
           nickname: string
         }
         Update: {
           avatar_path?: string | null
           created_at?: string
           id?: string
+          is_admin?: boolean
           nickname?: string
         }
         Relationships: []
@@ -596,20 +673,26 @@ export type Database = {
         Row: {
           closes_at: string
           created_at: string
+          deleted_at: string | null
           id: number
           title: string
+          updated_at: string
         }
         Insert: {
           closes_at?: string
           created_at?: string
+          deleted_at?: string | null
           id?: never
           title: string
+          updated_at?: string
         }
         Update: {
           closes_at?: string
           created_at?: string
+          deleted_at?: string | null
           id?: never
           title?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -756,6 +839,205 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_create_notice: {
+        Args: {
+          p_body: string
+          p_closes_at?: string
+          p_opens_at?: string
+          p_title: string
+          p_type: Database["public"]["Enums"]["notice_type"]
+        }
+        Returns: number
+      }
+      admin_create_survey: {
+        Args: { p_closes_at?: string; p_options: Json; p_title: string }
+        Returns: number
+      }
+      admin_edit_post_poll: {
+        Args: { p_options: Json; p_post_id: number; p_question: string }
+        Returns: undefined
+      }
+      admin_edit_survey_option: {
+        Args: {
+          p_bg_color?: string
+          p_image_path?: string
+          p_label: string
+          p_option_id: number
+          p_subtitle?: string
+          p_survey_id: number
+          p_text_color?: string
+        }
+        Returns: undefined
+      }
+      admin_mask_post: {
+        Args: { p_post_id: number; p_reason?: string }
+        Returns: undefined
+      }
+      admin_match_list: {
+        Args: { p_deleted?: boolean }
+        Returns: {
+          admin_locked_at: string | null
+          away_score: number | null
+          away_team: string
+          deleted_at: string | null
+          external_id: string
+          finished_at: string | null
+          home_score: number | null
+          home_team: string
+          id: number
+          kickoff_at: string
+          live_minute: number | null
+          matchday: number
+          result: Database["public"]["Enums"]["match_pick"] | null
+          season: string
+          updated_at: string
+          voided_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "match"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      admin_notice_list: {
+        Args: { p_deleted?: boolean }
+        Returns: {
+          body: string
+          closes_at: string | null
+          created_at: string
+          deleted_at: string | null
+          id: number
+          opens_at: string
+          title: string
+          type: Database["public"]["Enums"]["notice_type"]
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "notice"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      admin_post_list: {
+        Args: { p_deleted?: boolean }
+        Returns: {
+          author_id: string
+          category: Database["public"]["Enums"]["post_category"]
+          comment_count: number
+          content: string
+          created_at: string
+          deleted_at: string | null
+          excerpt: string
+          id: number
+          like_count: number
+          title: string
+          updated_at: string
+          view_count: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "post"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      admin_restore_match: { Args: { p_id: number }; Returns: undefined }
+      admin_restore_notice: { Args: { p_id: number }; Returns: undefined }
+      admin_restore_post: { Args: { p_id: number }; Returns: undefined }
+      admin_restore_survey: { Args: { p_id: number }; Returns: undefined }
+      admin_set_post_content: {
+        Args: { p_content: string; p_post_id: number }
+        Returns: undefined
+      }
+      admin_set_survey_options: {
+        Args: { p_options: Json; p_survey_id: number }
+        Returns: undefined
+      }
+      admin_soft_delete_match: { Args: { p_id: number }; Returns: undefined }
+      admin_soft_delete_notice: { Args: { p_id: number }; Returns: undefined }
+      admin_soft_delete_post: { Args: { p_id: number }; Returns: undefined }
+      admin_soft_delete_survey: { Args: { p_id: number }; Returns: undefined }
+      admin_strip_post_images: {
+        Args: { p_post_id: number; p_urls?: string[] }
+        Returns: string[]
+      }
+      admin_survey_list: {
+        Args: { p_deleted?: boolean }
+        Returns: {
+          closes_at: string
+          created_at: string
+          deleted_at: string | null
+          id: number
+          title: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "survey"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      admin_survey_option_list: {
+        Args: { p_survey_id: number }
+        Returns: {
+          bg_color: string | null
+          id: number
+          image_path: string | null
+          label: string
+          sort_order: number
+          subtitle: string | null
+          survey_id: number
+          text_color: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "survey_option"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      admin_survey_vote_count: {
+        Args: { p_survey_id: number }
+        Returns: number
+      }
+      admin_unlock_match: { Args: { p_id: number }; Returns: undefined }
+      admin_unmask_post: { Args: { p_post_id: number }; Returns: undefined }
+      admin_update_match: {
+        Args: {
+          p_away_score?: number
+          p_away_team: string
+          p_home_score?: number
+          p_home_team: string
+          p_id: number
+          p_kickoff_at: string
+          p_matchday: number
+          p_season: string
+          p_voided?: boolean
+        }
+        Returns: undefined
+      }
+      admin_update_notice: {
+        Args: {
+          p_body: string
+          p_closes_at?: string
+          p_id: number
+          p_opens_at?: string
+          p_title: string
+          p_type: Database["public"]["Enums"]["notice_type"]
+        }
+        Returns: undefined
+      }
+      admin_update_survey: {
+        Args: { p_closes_at?: string; p_id: number; p_title: string }
+        Returns: undefined
+      }
+      admin_validate_survey_options: {
+        Args: { p_options: Json }
+        Returns: undefined
+      }
       create_post_with_poll: {
         Args: {
           p_category: Database["public"]["Enums"]["post_category"]
@@ -768,7 +1050,9 @@ export type Database = {
       }
       has_visible_char: { Args: { p_text: string }; Returns: boolean }
       increment_post_view: { Args: { p_post_id: number }; Returns: undefined }
+      is_admin: { Args: never; Returns: boolean }
       is_blocked: { Args: { p_user_id: string }; Returns: boolean }
+      match_is_alive: { Args: { p_match_id: number }; Returns: boolean }
       match_is_open: { Args: { p_match_id: number }; Returns: boolean }
       match_prediction_results: {
         Args: { p_match_id: number }
@@ -779,6 +1063,7 @@ export type Database = {
       }
       normalize_nickname: { Args: { p_text: string }; Returns: string }
       post_is_alive: { Args: { p_id: number }; Returns: boolean }
+      post_is_masked: { Args: { p_post_id: number }; Returns: boolean }
       post_poll_results: {
         Args: { p_post_id: number }
         Returns: {
@@ -788,6 +1073,7 @@ export type Database = {
       }
       random_nickname: { Args: never; Returns: string }
       soft_delete_post: { Args: { p_post_id: number }; Returns: undefined }
+      survey_is_alive: { Args: { p_survey_id: number }; Returns: boolean }
       survey_is_open: { Args: { p_survey_id: number }; Returns: boolean }
       survey_results: {
         Args: { p_survey_id: number }
@@ -803,6 +1089,7 @@ export type Database = {
       match_event_kind: "goal" | "card" | "substitution"
       match_pick: "home" | "draw" | "away"
       match_side: "home" | "away"
+      notice_type: "필독" | "공지"
       post_category: "이적설" | "경기" | "선수" | "유니폼" | "잡담"
       report_reason: "spam" | "abuse" | "sexual" | "false_info" | "etc"
     }
@@ -936,6 +1223,7 @@ export const Constants = {
       match_event_kind: ["goal", "card", "substitution"],
       match_pick: ["home", "draw", "away"],
       match_side: ["home", "away"],
+      notice_type: ["필독", "공지"],
       post_category: ["이적설", "경기", "선수", "유니폼", "잡담"],
       report_reason: ["spam", "abuse", "sexual", "false_info", "etc"],
     },
