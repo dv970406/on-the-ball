@@ -1,23 +1,24 @@
 import { postImageUrl } from "@/shared/config";
+// ⚠ 패턴의 단일 소스는 `entities/post`가 갖는다 — 서버 안전한 순수 모듈이라 직접 경로다.
+import { IMAGE_MARKDOWN_SOURCE } from "@/entities/post/lib/plain-summary";
 
 /**
  * 본문 마크다운에서 이미지 URL을 뽑는다.
  *
- * ⚠ **DB의 `admin_strip_post_images`와 같은 정규식이다.** 한쪽만 고치면 화면이 보여준
- *   목록과 실제로 지워지는 대상이 갈린다.
- * ⚠ **URL 안의 괄호를 한 겹 허용한다.** `([^)]*)`는 첫 `)`에서 멈추는데, 본문은 사용자가
- *   외부 주소를 직접 적을 수 있는 자유 텍스트라 `…/b(1).png` 같은 주소가 실제로 들어온다
- *   (위키미디어가 대표적). 잘린 캡처를 그대로 넘기면 제거가 조용한 no-op이 되거나
- *   본문에 잔여물이 남는다. CommonMark도 균형 잡힌 괄호를 URL로 인정한다.
+ * ⚠ **DB의 `admin_strip_post_images`와 같은 정규식이어야 한다.** 한쪽만 고치면 화면이
+ *   보여준 목록과 실제로 지워지는 대상이 갈린다 — 그래서 패턴은 `IMAGE_MARKDOWN_SOURCE`가
+ *   단독으로 갖고(사유는 그 주석에), 여기서는 플래그만 붙여 쓴다.
  * ⚠ 본문은 자유 텍스트라 **외부 이미지 주소도 들어올 수 있다** — 여기서는 전부 보여주고,
  *   Storage 삭제는 우리 버킷 것만 한다(아래 `toStoragePath`).
  */
-const IMAGE_RE = /!\[[^\]]*\]\(((?:[^()]|\([^()]*\))*)\)/g;
+const IMAGE_RE = new RegExp(IMAGE_MARKDOWN_SOURCE, "g");
 
 export function extractImageUrls(content: string): string[] {
   const urls: string[] = [];
   for (const match of content.matchAll(IMAGE_RE)) {
-    if (match[1]) urls.push(match[1]);
+    // `[1]` 꺾쇠 안 / `[2]` 맨 주소 — 둘 중 하나만 채워진다
+    const url = match[1] ?? match[2];
+    if (url) urls.push(url);
   }
   // 같은 사진이 두 번 박힌 본문도 있다 — 목록은 한 줄로 보여주고 제거는 한 번에 된다
   return [...new Set(urls)];

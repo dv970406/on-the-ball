@@ -993,6 +993,36 @@ select excerpt like '%본문 첫 문장입니다.%' as body_survived,
 rollback to s;
 
 \echo ''
+\echo '    ⚠ **패턴의 사본이 넷이다** — 이 생성식 · admin_strip_post_images · JS 두 곳'
+\echo '      (IMAGE_MARKDOWN_SOURCE). 한때 둘만 균형 괄호로 하드닝돼 있었고 그 둘도 제목을'
+\echo '      URL에 붙여 캡처했다. 아래 세 형태가 그 갈림을 다시 잡는다.'
+savepoint s; :login_alice
+\echo '[t/t/t 기대] 괄호 든 주소 · 제목 붙은 주소 · 꺾쇠로 감싼 주소 전부 잔여물이 없다'
+insert into public.post (author_id, title, content, category) values
+ (:'alice', '괄호 주소', E'![a](https://x/b(1).png)\n\n본문 첫 문장입니다.', '잡담'),
+ (:'alice', '제목 주소', E'![a](https://x/1.webp "캡션")\n\n본문 첫 문장입니다.', '잡담'),
+ (:'alice', '꺾쇠 주소', E'![a](<https://x/b (1).png>)\n\n본문 첫 문장입니다.', '잡담');
+select
+  (select excerpt not like '%png%' and excerpt like '%본문 첫 문장%'
+     from public.post where title = '괄호 주소') as paren_clean,
+  (select excerpt not like '%webp%' and excerpt not like '%캡션%' and excerpt like '%본문 첫 문장%'
+     from public.post where title = '제목 주소') as title_clean,
+  (select excerpt not like '%png%' and excerpt like '%본문 첫 문장%'
+     from public.post where title = '꺾쇠 주소') as angle_clean;
+rollback to s;
+
+\echo ''
+\echo '    ⚠ 제거가 돌려주는 URL에 **제목이 붙으면 안 된다** — 붙으면 그 값이 경로 검사를'
+\echo '      통과해 존재하지 않는 키를 지우려 들고, 본문에서만 사라지고 파일은 남는다.'
+savepoint s; :login_alice
+insert into public.post (author_id, title, content, category)
+values (:'alice', '제목 제거', E'![a](https://x/1.webp "캡션")\n\n본문', '잡담')
+returning id as sid \gset
+\echo '[t 기대] 제목을 뗀 URL **하나만** 돌려준다(제목이 붙어 오면 f)'
+select public.admin_strip_post_images(:sid) = array['https://x/1.webp'] as url_without_title;
+rollback to s;
+
+\echo ''
 \echo '=== 27. 투표 (20260817000003) ==='
 \echo '    설계 요약: 득표수 컬럼도 트리거도 없다(post_poll_results가 그때그때 센다).'
 \echo '    개별 표는 "내 행만" SELECT라 남의 표가 구조적으로 새지 않고,'
