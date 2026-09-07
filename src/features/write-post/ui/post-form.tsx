@@ -105,6 +105,16 @@ export function PostForm({
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    /*
+     * ⚠ **업로드 중에는 제출하지 않는다.** 마크다운은 업로드 `onSuccess`에서 본문에 꽂히므로,
+     *   그전에 제출하면 ① 사용자가 붙인 사진이 **글에 들어가지 않고**(토스트는 "작성을
+     *   완료했어요"라고 말한다) ② 성공 후 화면이 언마운트되어 `discardUploads`가 도는
+     *   취소 경로를 지나지 않아 그 파일이 **영구 고아**로 남는다.
+     *   취소 버튼이 같은 이유로 이미 `image.isPending`을 본다(아래 `disabled`).
+     * ⚠ 잠그지 않고 **그냥 돌아간다** — 아직 아무 뮤테이션도 시작하지 않았으므로
+     *   호출부의 중복 가드를 잠그면 풀 사람이 없다(`data-and-state.md`).
+     */
+    if (image.isPending) return;
     // 검증에 실패하면 호출부까지 가지 않는다 → 그쪽 가드도 잠기지 않아 고쳐서 다시 누를 수 있다
     const input = validate();
     // ⚠ 두 검증을 **모두** 돌린 뒤 판정한다. `if (!input) return`으로 먼저 빠져나가면
@@ -164,8 +174,11 @@ export function PostForm({
               {/* 이 화면의 유일한 컬러 이벤트 */}
               <button
                 type="submit"
-                disabled={!status.ready || isPending}
-                className={buttonClassName({ size: "sm", disabled: !status.ready || isPending })}
+                disabled={!status.ready || isPending || image.isPending}
+                className={buttonClassName({
+                  size: "sm",
+                  disabled: !status.ready || isPending || image.isPending,
+                })}
               >
                 {editing ? "수정 완료" : "등록"}
               </button>
