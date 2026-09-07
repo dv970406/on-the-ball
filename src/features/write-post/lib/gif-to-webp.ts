@@ -55,7 +55,19 @@ interface RawFrame {
  *   파일 전체를 두 번 복사했다(7.5MB GIF에서 15MB 복사). 닫는 것도 잊고 있었다.
  */
 export async function animatedGifToWebp(file: File): Promise<Blob | null> {
-  // 이 브라우저가 GIF 프레임을 낱장으로 꺼낼 수 있는가
+  const bytes = new Uint8Array(await file.arrayBuffer());
+
+  /*
+   * ⚠⚠ **움직이는지 먼저 본다 — `ImageDecoder` 유무보다 앞이다.**
+   *   한때 순서가 반대라, 프레임이 하나뿐인 GIF(로고·스크린샷)도 `ImageDecoder`가 없는
+   *   브라우저에서 "움직이는 이미지를 올릴 수 없어요"로 **전부 거부**됐다. 잃을 움직임이
+   *   없는 파일이라 그 안내는 사유부터 틀렸고, 판정이 확장자가 아니라 매직바이트라
+   *   `.png`로 바꿔도 같은 경로를 타서 **빠져나갈 방법이 없었다.**
+   *   프레임 수는 바이트만으로 셀 수 있으므로(아래 `isAnimatedGif`) 디코더가 필요 없다.
+   */
+  if (!isAnimatedGif(bytes)) return null;
+
+  // 여기부터는 진짜 움직이는 GIF다 — 낱장으로 꺼낼 수 없으면 사실대로 알리고 멈춘다
   if (typeof ImageDecoder === "undefined") {
     throw new Error("이 브라우저에서는 움직이는 이미지를 올릴 수 없어요. 사진으로 올려 주세요.");
   }
@@ -64,7 +76,7 @@ export async function animatedGifToWebp(file: File): Promise<Blob | null> {
   let frames: RawFrame[] = [];
   try {
     try {
-      decoder = new ImageDecoder({ data: await file.arrayBuffer(), type: "image/gif" });
+      decoder = new ImageDecoder({ data: bytes, type: "image/gif" });
       await decoder.tracks.ready;
       await decoder.completed;
     } catch (e) {
@@ -73,7 +85,8 @@ export async function animatedGifToWebp(file: File): Promise<Blob | null> {
     }
 
     const track = decoder.tracks.selectedTrack;
-    // 프레임이 하나면 애니메이션 컨테이너를 씌울 이유가 없다 — 일반 경로가 더 작고 단순하다
+    // ⚠ 위 `isAnimatedGif`가 이미 걸렀지만 남겨 둔다 — 바이트 판정과 디코더가 프레임 수를
+    //   다르게 볼 수 있고(잘린 파일 등), 그때도 애니메이션 컨테이너를 씌울 이유는 없다.
     if (!track || track.frameCount <= 1) return null;
 
     frames = await decodeFrames(decoder, track.frameCount);
@@ -190,4 +203,60 @@ async function encodeAnimation(
   }
 
   return muxAnimatedWebp(encoded, width, height, loopCount);
+}
+
+/**
+ * GIF 바이트에 **이미지가 둘 이상 들어 있는가** — 디코더 없이 판정한다.
+ *
+ * ⚠ `0x2C`(이미지 구분자)를 그냥 세면 안 된다. 그 값은 압축 데이터·색상표 안에도 나온다 →
+ *   블록 구조를 실제로 걸어야 한다: 헤더(6) + 논리 화면 기술자(7) + [전역 색상표] 뒤로
+ *   `0x21`(확장, 서브블록 체인) · `0x2C`(이미지) · `0x3B`(끝)이 이어진다.
+ * ⚠ **두 번째 이미지를 만나는 순간 끝낸다** — 큰 GIF에서 전체를 훑을 이유가 없다.
+ * ⚠ 형태를 알 수 없으면(잘린 파일 등) **`true`로 기운다.** 애니메이션으로 보고 디코더
+ *   경로를 태우면 거기서 정직한 에러가 나지만, 정지로 단정하면 움직임이 조용히 사라진다.
+ */
+function isAnimatedGif(bytes: Uint8Array): boolean {
+  const colorTableSize = (packed: number) => (packed & 0x80 ? 3 * 2 ** ((packed & 7) + 1) : 0);
+
+  let i = 6; // 헤더 "GIF89a"
+  if (bytes.length < 13) return true;
+  i += 4; // 논리 화면 폭·높이
+  const lsdPacked = bytes[i];
+  i += 3; // packed + 배경색 + 종횡비
+  i += colorTableSize(lsdPacked); // 전역 색상표
+
+  /** 서브블록 체인(길이 바이트 + 데이터, 0으로 끝)을 건너뛴다 */
+  const skipSubBlocks = () => {
+    while (i < bytes.length) {
+      const len = bytes[i];
+      i += 1;
+      if (len === 0) return;
+      i += len;
+    }
+  };
+
+  let images = 0;
+  while (i < bytes.length) {
+    const marker = bytes[i];
+    i += 1;
+    if (marker === 0x3b) return false; // 트레일러 — 여기까지 이미지가 하나뿐이었다
+    if (marker === 0x21) {
+      i += 1; // 확장 라벨
+      skipSubBlocks();
+      continue;
+    }
+    if (marker === 0x2c) {
+      images += 1;
+      if (images > 1) return true;
+      i += 8; // left·top·width·height
+      const packed = bytes[i];
+      i += 1;
+      i += colorTableSize(packed); // 지역 색상표
+      i += 1; // LZW 최소 코드 크기
+      skipSubBlocks();
+      continue;
+    }
+    return true; // 모르는 바이트 — 판정하지 않고 디코더에 맡긴다
+  }
+  return images > 1;
 }
