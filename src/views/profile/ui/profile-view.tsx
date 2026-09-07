@@ -19,6 +19,9 @@ interface ProfileViewProps {
   /** 계정 연결에서 돌아왔는지 — 서버가 판정해 내려준다(app/profile/page.tsx 주석 참고) */
   linkPending: boolean;
   /** 프로바이더가 거부한 경우 (`?error=`) */
+  /** 프로바이더가 거부한 경우의 **상위 분류** (`?error=`) */
+  errorKind: string | null;
+  /** 그 실패의 **구체 코드** (`?error_code=`) — 한국어 문구가 여기에 붙는다 */
   errorCode: string | null;
   errorDescription: string | null;
 }
@@ -33,12 +36,17 @@ interface ProfileViewProps {
  *   돌아온다 → `/sign-in`과 같은 세 가지를 처리한다(nextjs.md): 교환 중 대기 표시, 상한,
  *   프로바이더의 `?error=`. 판정은 `use-link-return`이 갖는다.
  */
-export function ProfileView({ linkPending, errorCode, errorDescription }: ProfileViewProps) {
+export function ProfileView({
+  linkPending,
+  errorKind,
+  errorCode,
+  errorDescription,
+}: ProfileViewProps) {
   const user = useSessionStore((s) => s.user);
   const profile = useProfileQuery(user?.id);
   const nickname = useNicknameForm(user?.id, profile.data?.nickname);
   const avatar = useAvatarUpload(user?.id);
-  const link = useLinkReturn(linkPending, errorCode, errorDescription);
+  const link = useLinkReturn(linkPending, errorKind, errorCode, errorDescription);
   /**
    * ⚠ 중복 실행 가드를 두지 않는다 — 로그아웃은 행을 남기지도 지우지도 않아 연타해도
    *   결과가 같다(`data-and-state.md`의 가드 판정 기준). `disabled`로 족하다.

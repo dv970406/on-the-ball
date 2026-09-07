@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { authErrorMessageFor } from "@/entities/session";
 
 /** 교환 결과가 반영되기를 기다릴 상한 — `/sign-in`의 EXCHANGE_TIMEOUT_MS와 같은 취지 */
 const LINK_EXCHANGE_TIMEOUT_MS = 8000;
@@ -21,11 +22,21 @@ function hasCodeParamOnServer() {
  * 계정 연결에서 돌아왔을 때 프로바이더가 돌려준 실패 사유.
  * ⚠ 원문은 영어다. 동의 취소(access_denied)가 대부분이라 그것만 따로 옮기고 나머지는 원문을
  *   함께 보여준다 — 삼키면 지원 문의에 아무 단서도 남지 않는다.
- * ⚠ `views/sign-in`에 같은 모양의 함수가 있지만 **공용화하지 않는다.** 사용처가 2회이고
- *   문구가 서로 다르다(로그인 vs 연결) — code-quality.md의 "중복 3회 이상일 때만 공용화".
+ * ⚠ **구체 코드(`error_code`)를 먼저 본다.** `linkIdentity`는 authorize URL만 받아 오므로
+ *   `identity_already_exists`가 **뮤테이션 에러로는 올라올 수 없고** 콜백 리다이렉트의
+ *   `error_code`로만 온다 — 그 코드를 안 읽으면 표에 준비된 한국어("이미 다른 계정에 연결된
+ *   로그인 수단이에요…")가 도달할 길이 아예 없다.
+ * ⚠ 폴백 문구는 `views/sign-in`과 **공용화하지 않는다**(로그인 vs 연결로 다르다).
+ *   공유하는 것은 코드 표 하나뿐이고 그건 `entities/session`이 소유한다.
  */
-function toLinkErrorMessage(code: string, description: string | null): string {
-  if (code === "access_denied") return "계정 연결을 취소했어요.";
+function toLinkErrorMessage(
+  kind: string,
+  code: string | null,
+  description: string | null,
+): string {
+  const known = authErrorMessageFor(code);
+  if (known) return known;
+  if (kind === "access_denied") return "계정 연결을 취소했어요.";
   return description ? `계정을 연결하지 못했어요. (${description})` : "계정을 연결하지 못했어요.";
 }
 
@@ -47,6 +58,7 @@ function toLinkErrorMessage(code: string, description: string | null): string {
  */
 export function useLinkReturn(
   linkPending: boolean,
+  errorKind: string | null,
   errorCode: string | null,
   errorDescription: string | null,
 ) {
@@ -63,6 +75,10 @@ export function useLinkReturn(
     /** "계정을 연결하는 중이에요…" 배너를 띄울지 */
     linking: linkPending && codeInUrl && !exchangeTimedOut,
     /** 프로바이더가 거부한 사유 (없으면 null) */
-    errorMessage: errorCode ? toLinkErrorMessage(errorCode, errorDescription) : null,
+    // ⚠ 둘 중 하나라도 있으면 프로바이더가 실패를 돌려준 것이다
+    errorMessage:
+      errorKind || errorCode
+        ? toLinkErrorMessage(errorKind ?? "", errorCode, errorDescription)
+        : null,
   };
 }

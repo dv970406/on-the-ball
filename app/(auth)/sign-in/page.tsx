@@ -33,7 +33,10 @@ export default async function Page(props: PageProps<"/sign-in">) {
       hasCode={first(params.code) !== null}
       // 교환이 성립할 수 없는 복귀(다른 브라우저·새로고침 등)를 상한 없이 즉시 판정한다
       canExchange={hasPkceVerifier(jar.getAll().map((cookie) => cookie.name))}
-      errorCode={first(params.error)}
+      // ⚠ **둘 다 내린다.** `error`는 상위 분류(access_denied·server_error)라 뭉뚱그려져 있고,
+      //   재시도로 절대 안 풀리는 실패(identity_already_exists 등)는 `error_code`에만 있다.
+      errorKind={first(params.error)}
+      errorCode={first(params.error_code)}
       errorDescription={first(params.error_description)}
     />
   );

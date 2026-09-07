@@ -12,7 +12,9 @@ interface SignInViewProps {
 	hasCode: boolean;
 	/** PKCE verifier가 남아 있는지. false면 교환이 성립할 수 없으므로 기다리지 않는다 */
 	canExchange: boolean;
-	/** 프로바이더가 거부한 경우 (`?error=`) */
+	/** 프로바이더가 거부한 경우의 **상위 분류** (`?error=` — access_denied·server_error 등) */
+	errorKind: string | null;
+	/** 그 실패의 **구체 코드** (`?error_code=`) — 한국어 문구가 여기에 붙는다 */
 	errorCode: string | null;
 	errorDescription: string | null;
 }
@@ -25,10 +27,11 @@ interface SignInViewProps {
 export function SignInView({
 	hasCode,
 	canExchange,
+	errorKind,
 	errorCode,
 	errorDescription,
 }: SignInViewProps) {
-	const flow = useSignInFlow(hasCode, canExchange, errorCode, errorDescription);
+	const flow = useSignInFlow(hasCode, canExchange, errorKind, errorCode, errorDescription);
 
 	if (flow.waiting) {
 		return (

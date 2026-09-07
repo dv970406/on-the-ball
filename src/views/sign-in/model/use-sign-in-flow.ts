@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useNextParam } from "@/shared/lib";
-import { useLastAuthProvider } from "@/entities/session";
+import { authErrorMessageFor, useLastAuthProvider } from "@/entities/session";
 import { useOAuthSignIn } from "@/features/sign-in";
 
 /**
@@ -16,11 +16,21 @@ const EXCHANGE_TIMEOUT_MS = 8000;
  * 프로바이더가 실패를 돌려준 경우의 문구.
  * ⚠ 원문은 영어다. 사용자가 동의를 취소한 경우(access_denied)가 대부분이라 그것만 따로 옮기고,
  *   나머지는 원문을 함께 보여준다 — 삼키면 지원 문의에 아무 단서도 남지 않는다.
- * ⚠ `views/profile`에 같은 모양의 함수가 있지만 **공용화하지 않는다.** 사용처가 2회이고
- *   문구가 서로 다르다(로그인 vs 연결) — code-quality.md의 "중복 3회 이상일 때만 공용화".
+ * ⚠ **구체 코드(`error_code`)를 먼저 본다.** 상위 분류(`error`)는 access_denied·server_error로
+ *   뭉뚱그려져 있어, 재시도로 절대 풀리지 않는 실패(이미 다른 계정에 연결된 수단 등)를
+ *   "로그인을 취소했어요"나 영어 원문으로 내보냈다 — 표에 한국어가 준비돼 있는데도.
+ * ⚠ 폴백 문구는 `views/profile`과 **공용화하지 않는다.** 사용처가 2회이고 문구가 서로 다르다
+ *   (로그인 vs 연결) — code-quality.md의 "중복 3회 이상일 때만 공용화". 공유하는 것은
+ *   코드 표 하나뿐이고 그건 `entities/session`이 소유한다.
  */
-function toOAuthErrorMessage(code: string, description: string | null): string {
-  if (code === "access_denied") return "로그인을 취소했어요.";
+function toOAuthErrorMessage(
+  kind: string,
+  code: string | null,
+  description: string | null,
+): string {
+  const known = authErrorMessageFor(code);
+  if (known) return known;
+  if (kind === "access_denied") return "로그인을 취소했어요.";
   return description ? `로그인하지 못했어요. (${description})` : "로그인하지 못했어요.";
 }
 
@@ -36,6 +46,7 @@ function toOAuthErrorMessage(code: string, description: string | null): string {
 export function useSignInFlow(
   hasCode: boolean,
   canExchange: boolean,
+  errorKind: string | null,
   errorCode: string | null,
   errorDescription: string | null,
 ) {
@@ -92,7 +103,11 @@ export function useSignInFlow(
      */
     waiting: hasCode && !exchangeFailed,
     errorMessage:
-      (errorCode ? toOAuthErrorMessage(errorCode, errorDescription) : null) ??
+      // ⚠ `error`(상위 분류)만 없고 `error_code`만 오는 경우도 받는다 — 둘 중 하나라도
+      //   있으면 프로바이더가 실패를 돌려준 것이다.
+      (errorKind || errorCode
+        ? toOAuthErrorMessage(errorKind ?? "", errorCode, errorDescription)
+        : null) ??
       (exchangeFailed ? "로그인을 마치지 못했어요. 다시 시도해 주세요." : null) ??
       oauth.error?.message ??
       null,

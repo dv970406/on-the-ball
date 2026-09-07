@@ -9,7 +9,7 @@
 export { useSessionStore } from "./model/session-store";
 export { AuthProvider } from "./model/auth-provider";
 export { AuthRequired, GuestOnly } from "./model/guards";
-export { toAuthErrorMessage } from "./lib/auth-error-message";
+export { authErrorMessageFor, toAuthErrorMessage } from "./lib/auth-error-message";
 export { clearSignOutIntent, markSignOutIntent } from "./lib/sign-out-intent";
 // ⚠ 순수 함수(read/remember)는 올리지 않는다 — 쓰는 쪽이 이 슬라이스 안뿐이고,
 //   읽기는 "렌더 중 호출 금지"라는 함정을 훅이 감싸서 내보낸다.

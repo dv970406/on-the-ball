@@ -25,7 +25,9 @@ export default async function Page(props: PageProps<"/profile">) {
         // 코드 교환은 createBrowserClient의 detectSessionInUrl이 한다.
         // 성공하면 SIGNED_IN → 캐시 무효화 → 연결 목록이 갱신되므로 배너는 저절로 사라진다.
         linkPending={first(params.code) !== null}
-        errorCode={first(params.error)}
+        // ⚠ `error`는 상위 분류, `error_code`가 구체 사유다 — 둘 다 내려야 한국어 문구가 붙는다
+        errorKind={first(params.error)}
+        errorCode={first(params.error_code)}
         errorDescription={first(params.error_description)}
       />
     </AuthRequired>

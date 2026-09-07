@@ -72,9 +72,23 @@ const AUTH_ERROR_MESSAGE: Record<string, string> = {
   over_request_rate_limit: "요청이 너무 많아요. 잠시 후 다시 시도해 주세요.",
 };
 
+/**
+ * 코드 하나를 문구로 — 모르는 코드면 `null`.
+ *
+ * ⚠ **OAuth 복귀 화면이 이걸 쓴다.** 프로바이더에서 돌아오는 실패는 예외 객체가 아니라
+ *   **URL의 `error_code`** 로 오므로 `toAuthErrorMessage(error)`로는 닿을 수 없다 —
+ *   그래서 위 표가 `identity_already_exists`·`bad_oauth_state` 같은 문구를 갖고 있는데도
+ *   화면에는 영어 원문이 나갔다. 표는 하나로 두고 입구만 둘로 연다.
+ * ⚠ `null`을 돌려주는 것이 계약이다 — 호출부가 자기 맥락에 맞는 폴백을 갖는다
+ *   (로그인은 "로그인하지 못했어요", 연결은 "계정을 연결하지 못했어요").
+ */
+export function authErrorMessageFor(code: string | null | undefined): string | null {
+  return (code && AUTH_ERROR_MESSAGE[code]) || null;
+}
+
 export function toAuthErrorMessage(error: unknown): string {
-  if (error instanceof AuthError && error.code) {
-    const message = AUTH_ERROR_MESSAGE[error.code];
+  if (error instanceof AuthError) {
+    const message = authErrorMessageFor(error.code);
     if (message) return message;
   }
   return "요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.";
