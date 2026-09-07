@@ -202,7 +202,13 @@ export function MatchListView({
               참이라, 최근 경기만 있으면 이 기능의 **핵심 행동(예측)이 아무 설명 없이 사라진
               화면**이 됐다 — 덜 로드된 건지 더 스크롤해야 하는지 알 수 없었다(실측).
           */}
-          {!isEmpty && upcoming.length === 0 && (
+          {/*
+            ⚠ **`page`가 없을 때는 말하지 않는다.** `isEmpty`는 `page !== undefined`를 요구하는데
+              이 줄이 그 가드를 빠뜨려, 프리페치가 실패해 클라이언트 조회를 기다리는 동안
+              스켈레톤 아래에, 조회가 실패했을 때는 "경기를 불러오지 못했어요" **바로 아래에**
+              "일정이 아직 없어요"가 함께 떴다 — 에러 안내와 정면으로 모순되는 사실 주장이다.
+          */}
+          {page !== undefined && !isEmpty && upcoming.length === 0 && (
             <p className="px-5 pb-2 pt-5 text-center text-[12px] text-ink-mute-2">
               다음 라운드 일정이 아직 없어요. 올라오면 여기에 뜹니다.
             </p>
