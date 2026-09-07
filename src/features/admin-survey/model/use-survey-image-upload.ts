@@ -18,7 +18,11 @@ const MAX_SOURCE_BYTES = 20 * 1000 * 1000;
  *   (`survey_option.image_path`의 CHECK가 그 형태를 강제한다) — 등록 화면은 이미지 칸을
  *   잠그고, 저장한 뒤 수정 화면에서 올린다.
  * ⚠ 아바타와 달리 **미리 지울 대상이 없다**(1문항:N장) → 롤백 절차가 필요 없다.
- *   대신 교체하면 옛 파일이 남으므로 성공 직후 지운다(best-effort).
+ * ⚠⚠ **옛 파일을 여기서 지우지 않는다.** 업로드가 끝난 시점의 `survey_option.image_path`는
+ *   아직 옛 경로다 — 새 경로는 로컬 초안에만 들어가고 DB 반영은 저장이 해야 한다. 여기서
+ *   지우면 저장하지 않고 화면을 떠났을 때 **경로는 있는데 파일이 없는** 면이 남아 카드가
+ *   통째로 투명해진다. "빼기"를 지연시킨 이유(`useSurveyImageCleanup`)와 같고, 교체로
+ *   참조가 끊긴 파일은 `use-survey-submit`이 저장 성공 뒤 `serverImagePaths`에서 정리한다.
  * ⚠ 리사이즈는 승격된 `resizeToWebp`를 쓴다 — 비율 유지 + 용량 사다리라 본문 이미지와
  *   성격이 같다(아바타의 정사각 crop과는 다르다).
  * ⚠ **뮤테이션 객체를 통째로 내보내지 않는다** — 호출부가 필요한 것만 좁혀 준다
@@ -28,9 +32,7 @@ export function useSurveyImageUpload(surveyId: number) {
   const toast = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
   /** 어느 칸을 바꾸는 중인가 — 파일 대화상자는 비동기라 열기 직전에 담아 둔다 */
-  const target = useRef<{ previousPath: string | null; onUploaded: (path: string) => void } | null>(
-    null,
-  );
+  const target = useRef<((path: string) => void) | null>(null);
   const [error, setError] = useState<Error | null>(null);
 
   const mutation = useMutation({
@@ -55,18 +57,9 @@ export function useSurveyImageUpload(surveyId: number) {
         throw new Error("이미지를 올리지 못했어요. 잠시 후 다시 시도해 주세요.");
       }
 
-      const previousPath = target.current?.previousPath ?? null;
-      if (previousPath) {
-        const { error: removeError } = await supabase.storage
-          .from(SURVEY_IMAGE_BUCKET)
-          .remove([previousPath]);
-        // 실패해도 알리지 않는다 — 새 경로는 이미 유효하고 사용자가 할 수 있는 일이 없다
-        if (removeError) console.error("[admin-survey] 옛 배경 정리 실패:", removeError);
-      }
-
       return path;
     },
-    onSuccess: (path) => target.current?.onUploaded(path),
+    onSuccess: (path) => target.current?.(path),
     onError: (e) => {
       setError(e);
       toast(e.message);
@@ -87,9 +80,9 @@ export function useSurveyImageUpload(surveyId: number) {
 
   return {
     inputProps: { ref: inputRef, type: "file" as const, accept: ACCEPTED.join(","), onChange },
-    /** 파일 대화상자를 연다 — 어느 칸인지와 옛 경로를 함께 넘긴다 */
-    openFor: (previousPath: string | null, onUploaded: (path: string) => void) => {
-      target.current = { previousPath, onUploaded };
+    /** 파일 대화상자를 연다 — 결과를 받을 칸만 넘긴다(옛 경로는 저장이 정리한다) */
+    openFor: (onUploaded: (path: string) => void) => {
+      target.current = onUploaded;
       inputRef.current?.click();
     },
     isPending: mutation.isPending,

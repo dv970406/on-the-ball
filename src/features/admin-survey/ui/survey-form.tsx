@@ -189,7 +189,7 @@ export function SurveyForm({
                     size="sm"
                     disabled={imageUpload.isPending}
                     onClick={() =>
-                      imageUpload.openFor(option.imagePath || null, (path) =>
+                      imageUpload.openFor((path) =>
                         patchOption(index, { imagePath: path }),
                       )
                     }
