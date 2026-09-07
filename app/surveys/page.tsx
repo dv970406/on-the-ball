@@ -5,9 +5,11 @@ import { ROUTES } from "@/shared/config";
 import { createSupabaseServerClient } from "@/shared/api/supabase-server";
 // ⚠ 배럴이 아니라 직접 경로 — 매퍼는 "use client"가 없어 서버에서 쓸 수 있다.
 //   select 문자열·빌더·상한을 클라이언트 훅과 **공유해야** 같은 목록이 나온다.
-import { buildSurveyListItem } from "@/entities/survey/api/mappers";
+import { buildSurveyListItem, buildSurveyResult } from "@/entities/survey/api/mappers";
 import { buildSurveyListQuery } from "@/entities/survey/api/list-query";
-import type { SurveyListItem } from "@/entities/survey/model/types";
+// ⚠ 마감 판정은 이 함수가 단독으로 소유한다 — 서버가 조건을 다시 짜면 클라이언트와 갈린다
+import { isSurveyOpen } from "@/entities/survey/lib/open";
+import type { SurveyListItem, SurveyResult } from "@/entities/survey/model/types";
 import { SurveyListView } from "@/views/survey-list";
 
 export const metadata: Metadata = {
@@ -20,6 +22,14 @@ export const metadata: Metadata = {
 
 interface SurveyList {
   items?: SurveyListItem[];
+  /**
+   * 참여한 **진행 중** 문항의 집계 — 문항 id로 찾는다.
+   *
+   * ⚠ **참여했을 때만 담는다.** `undefined`(담기지 않음)와 `[]`(열렸는데 0표)는 다른 뜻이라,
+   *   미참여자에게 오는 0행을 `[]`로 넣으면 결과 패널이 열려 버린다(상세와 같은 규약).
+   * ⚠ 마감된 문항은 담지 않는다 — 목록에서 `SurveyCard`(링크 한 줄)로 그려져 집계를 쓰지 않는다.
+   */
+  results?: Record<number, SurveyResult[]>;
   userId: string | undefined;
   /**
    * 이 목록을 읽은 시각.
@@ -45,11 +55,37 @@ const fetchSurveyList = cache(async (): Promise<SurveyList> => {
     ]);
 
     if (error) return { userId: auth.user?.id, nowMs: Date.now() };
-    return {
-      items: (data ?? []).map(buildSurveyListItem),
-      userId: auth.user?.id,
-      nowMs: Date.now(),
-    };
+
+    const nowMs = Date.now();
+    const items = (data ?? []).map(buildSurveyListItem);
+
+    /*
+     * ⚠ **참여한 문항의 집계도 서버가 그린다.** 없으면 `SurveyVote`가 결과 막대를 스켈레톤으로
+     *   그렸다가 하이드레이션 직후 늘려서 카드가 밀린다 — `nextjs.md`의 "사용자별 상태도 끝까지
+     *   서버가 그려야 시프트가 안 생긴다"가 상세에만 적용돼 있던 자리다.
+     * ⚠ **목록을 받은 뒤라 왕복이 하나 늘지만, 비로그인·미참여자에게는 늘지 않는다** —
+     *   `answered`가 비면 조회 자체를 하지 않는다(크롤러가 받는 경로가 그쪽이다).
+     * ⚠ 마감 판정을 여기서 다시 짜지 않는다 — `isSurveyOpen`이 단독으로 소유한다.
+     */
+    const answered = items.filter(
+      (survey) => survey.myOptionId !== null && isSurveyOpen(survey, nowMs),
+    );
+    let results: Record<number, SurveyResult[]> | undefined;
+    if (answered.length > 0) {
+      const rows = await Promise.all(
+        answered.map((survey) => supabase.rpc("survey_results", { p_survey_id: survey.id })),
+      );
+      results = {};
+      answered.forEach((survey, index) => {
+        // ⚠ 실패한 문항은 **담지 않는다** — `[]`로 접으면 "열렸는데 0표"라는 거짓이 되고,
+        //   담지 않으면 그 카드만 클라이언트 조회로 폴백한다(상세와 같은 판단).
+        const { data: rowsForSurvey, error: resultsError } = rows[index];
+        if (resultsError) return;
+        results![survey.id] = (rowsForSurvey ?? []).map(buildSurveyResult);
+      });
+    }
+
+    return { items, results, userId: auth.user?.id, nowMs };
   } catch (e) {
     // cookies()가 던지는 프레임워크 내부 에러를 삼키면 페이지가 스켈레톤 상태로 정적
     // 프리렌더되어 조용히 망가진다.
@@ -60,10 +96,11 @@ const fetchSurveyList = cache(async (): Promise<SurveyList> => {
 });
 
 export default async function Page() {
-  const { items, userId, nowMs } = await fetchSurveyList();
+  const { items, results, userId, nowMs } = await fetchSurveyList();
   return (
     <SurveyListView
       initialSurveys={items ? { items } : undefined}
+      initialResults={results}
       initialUserId={userId}
       serverNowMs={nowMs}
     />

@@ -1,6 +1,6 @@
 "use client";
 
-import { type SurveyListItem } from "@/entities/survey";
+import { type SurveyListItem, type SurveyResult } from "@/entities/survey";
 import { SurveyVote } from "@/features/cast-survey-vote";
 
 /**
@@ -15,6 +15,8 @@ import { SurveyVote } from "@/features/cast-survey-vote";
 interface SurveyOpenItemProps {
   survey: SurveyListItem;
   onSignInRequired: () => void;
+  /** 서버가 미리 조회한 집계 — 참여했을 때만 온다(막대가 스켈레톤에서 늘어나는 시프트를 막는다) */
+  initialResults?: SurveyResult[];
   /** 서버가 본 로그인 사용자 — 집계 쿼리 키가 userId로 스코프된다(`SurveyVote` 주석) */
   initialUserId?: string;
   /** 서버가 렌더한 시점의 시각 — 마감 판정이 여기 걸려 있다(〃) */
@@ -24,6 +26,7 @@ interface SurveyOpenItemProps {
 export function SurveyOpenItem({
   survey,
   onSignInRequired,
+  initialResults,
   initialUserId,
   serverNowMs,
 }: SurveyOpenItemProps) {
@@ -39,6 +42,7 @@ export function SurveyOpenItem({
         <SurveyVote
           survey={survey}
           onSignInRequired={onSignInRequired}
+          initialResults={initialResults}
           initialUserId={initialUserId}
           serverNowMs={serverNowMs}
         />

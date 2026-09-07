@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { ClipboardList } from "lucide-react";
-import { SURVEY_LIST_LIMIT, type SurveyListPage, SurveyCard } from "@/entities/survey";
+import { SURVEY_LIST_LIMIT, type SurveyListPage, type SurveyResult, SurveyCard } from "@/entities/survey";
 import { cn, formatCount } from "@/shared/lib";
 import { EmptyState, SignInDialog, StaleBanner } from "@/shared/ui";
 import { AppBar } from "@/widgets/app-bar";
@@ -26,6 +26,11 @@ interface SurveyListViewProps {
   /** 서버 프리페치 결과 — 실패하면 undefined가 오고 클라이언트가 조회한다 */
   initialSurveys?: SurveyListPage;
   /**
+   * 서버가 미리 조회한 집계 — **참여한 진행 중 문항만** 담겨 온다(문항 id로 찾는다).
+   * ⚠ 없는 id는 `undefined`가 되어 그 카드만 클라이언트 조회로 폴백한다.
+   */
+  initialResults?: Record<number, SurveyResult[]>;
+  /**
    * 서버가 본 로그인 사용자.
    * ⚠ **이게 없으면 프리페치가 무의미해진다** — `surveyKeys.list`가 userId로 스코프돼 있어
    *   복원 전 `undefined` 키로 찾으면 서버가 채운 캐시에 닿지 못하고 다시 조회한다.
@@ -41,6 +46,7 @@ interface SurveyListViewProps {
 
 export function SurveyListView({
   initialSurveys,
+  initialResults,
   initialUserId,
   serverNowMs,
 }: SurveyListViewProps) {
@@ -104,6 +110,7 @@ export function SurveyListView({
                   key={survey.id}
                   survey={survey}
                   onSignInRequired={() => setAskSignIn(true)}
+                  initialResults={initialResults?.[survey.id]}
                   initialUserId={initialUserId}
                   serverNowMs={serverNowMs}
                 />

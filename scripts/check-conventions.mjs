@@ -39,6 +39,8 @@ const DEEP_IMPORT_ALLOWED = new Set([
   "@/shared/lib/query-scope",
   "@/entities/post/api/list-query",
   "@/entities/survey/api/list-query",
+  // 목록 SSR이 "진행 중 + 참여함"을 가려 집계를 함께 그린다 — 판정은 이 함수가 단독 소유
+  "@/entities/survey/lib/open",
   "@/entities/comment/api/list-query",
   "@/entities/match/api/list-query",
   "@/entities/notice/api/list-query",
