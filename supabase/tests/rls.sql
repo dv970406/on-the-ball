@@ -809,7 +809,7 @@ update public.profiles set created_at = now() where id = :'alice';
 rollback to s;
 
 savepoint s;
-\echo '[t 기대] 랜덤 닉네임이 배정되는가 — 프로바이더 표시 이름을 더 이상 읽지 않는다'
+\echo '[t/t 기대] 랜덤 닉네임이 배정되는가 — 프로바이더 표시 이름을 더 이상 읽지 않는다'
 insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data,
                         encrypted_password, created_at, updated_at)
 values ('00000000-0000-0000-0000-0000000000fd', '00000000-0000-0000-0000-000000000000',
@@ -821,6 +821,16 @@ rollback to s;
 
 \echo ''
 \echo '--- 24b. 아바타 스토리지 정책 (남의 폴더에 못 올린다)'
+\echo '    ⚠ **버킷 설정 자체가 방어선이다** — 24c와 같은 이유다. 클라이언트 리사이즈는'
+\echo '      UX일 뿐 우회 가능하고, 크기·타입을 실제로 막는 것은 file_size_limit과'
+\echo '      allowed_mime_types다. 정책만 검사하면 이 값이 조용히 넓어져도 아무도 모른다.'
+\echo '[t/2097152/t 기대] public · 2MiB 상한 · webp/jpeg/png만'
+select public                                                   as is_public,
+       file_size_limit,
+       allowed_mime_types @> array['image/webp','image/jpeg','image/png']
+         and array_length(allowed_mime_types, 1) = 3             as mime_exact
+  from storage.buckets where id = 'avatars';
+
 savepoint s; :login_alice
 \echo '[❌차단] bob 폴더에 업로드'
 insert into storage.objects (bucket_id, name, owner)
@@ -880,13 +890,18 @@ rollback to s;
 \echo '    ⚠ 열거(list)를 열어 두면 "URL을 알면 본다"가 "uuid만 알면 전수 조회된다"로 바뀐다.'
 \echo '      이 앱은 업로드를 먼저 하고 본문에 넣으므로 **게시하지 않은 사진**이 버킷에 남는다.'
 \echo '      공개 URL 서빙은 정책을 타지 않아 본문 이미지는 그대로 보인다(실측).'
+\echo '    ⚠ **뷰어는 비관리자여야 한다.** 시드가 alice를 관리자로 만들고(seed.sql)'
+\echo '      `post_images_select_admin`이 관리자에게 버킷 전체 열거를 허용하므로, alice로'
+\echo '      조회하면 이 검사는 `post_images_select_own`이 어떻든 항상 1을 낸다 —'
+\echo '      라벨만 남고 아무것도 지키지 않는 검사가 된다. 그래서 피해자를 alice로 두고'
+\echo '      bob이 조회한다. 관리자가 보는 것은 33k가 따로 검사한다.'
 savepoint s;
 insert into storage.objects (bucket_id, name, owner)
-values ('post-images', :'bob' || '/victim.webp', :'bob');
-:login_alice
+values ('post-images', :'alice' || '/victim.webp', :'alice');
+:login_bob
 \echo '[0행 기대] 남의 본문 이미지는 열거되지 않는다'
 select count(*) as others_files from storage.objects
- where bucket_id = 'post-images' and name like :'bob' || '/%';
+ where bucket_id = 'post-images' and name like :'alice' || '/%';
 rollback to s;
 
 \echo ''
@@ -966,7 +981,7 @@ rollback to s;
 \echo '    공개 URL 한 줄이 150자 안팎이라, 지우지 않으면 사진으로 시작하는 글의'
 \echo '    발췌 300자가 통째로 URL이 되어 목록 카드가 빈다.'
 savepoint s; :login_alice
-\echo '[t 기대] 사진으로 시작하는 글도 본문이 발췌에 남는다'
+\echo '[t/t 기대] 사진으로 시작하는 글도 본문이 발췌에 남는다 (본문 남음 / URL 빠짐)'
 insert into public.post (author_id, title, content, category)
 values (:'alice', '사진 글',
         '![](http://127.0.0.1:64321/storage/v1/object/public/post-images/'
@@ -1189,7 +1204,7 @@ rollback to s;
 \echo '      사실이 유일한 방어다. 그 목록이 넓어지는 회귀를 여기서 잡는다(섹션 18과 같은 취지).'
 savepoint s; :login_bob
 select public.create_post_with_poll('잡담', '위조 시도', '본문', '질문', array['a','b']) as fid \gset
-\echo '[bob / 0 / 0 / t 기대] 작성자는 호출자로 확정되고 카운터·시각을 실을 자리가 없다'
+\echo '[t / 0 / 0 / t 기대] 작성자가 호출자(bob)로 확정되고 카운터·시각을 실을 자리가 없다'
 select author_id = :'bob' as author_is_caller, like_count, comment_count,
        created_at = updated_at as not_edited
   from public.post where id = :fid;
@@ -1208,7 +1223,9 @@ rollback to s;
 savepoint s; :login_alice
 select public.create_post_with_poll('잡담', '제목', '본문', '질문',
   array[' 찬성 ', U&'\BC18'||U&'\00A0'||U&'\B300']) as nid \gset
-\echo '[찬성 / 반대 기대] 저장되는 값이 정규형이라 화면 문구와 갈리지 않는다'
+\echo '    ⚠ NBSP는 **지워지는 것이 아니라 보통 공백으로 접힌다** — 두 번째 값이 '\''반 대'\''인'
+\echo '      이유다. 라벨에 '\''반대'\''라고 적으면 함수의 계약을 잘못 옮기는 것이 된다.'
+\echo '[찬성 / 반 대 기대] 저장되는 값이 정규형이라 화면 문구와 갈리지 않는다'
 select label from public.post_poll_option where post_id = :nid order by sort_order;
 rollback to s;
 
