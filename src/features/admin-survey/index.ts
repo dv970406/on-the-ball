@@ -6,6 +6,7 @@ export {
   useCreateSurvey,
   useDeleteSurvey,
   useEditSurveyOption,
+  useInvalidateSurveys,
   useRestoreSurvey,
   useSetSurveyOptions,
   useUpdateSurvey,

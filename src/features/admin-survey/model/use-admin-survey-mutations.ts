@@ -28,6 +28,21 @@ function invalidate(queryClient: ReturnType<typeof useQueryClient>) {
   return queryClient.invalidateQueries({ queryKey: surveyKeys.all });
 }
 
+/**
+ * 수정 경로의 무효화 — **여러 뮤테이션이 끝난 뒤 한 번만** 돈다.
+ *
+ * ⚠⚠ 수정은 제목·마감 저장 → 선택지 저장 → 배경 정리가 **한 단위**다. 각 뮤테이션이 스스로
+ *   무효화하면 첫 리페치가 `survey.updatedAt`을 바꾸고, 그 값을 `key`로 쓰는 폼이
+ *   **선택지 저장 전에 리마운트되어** 관리자가 방금 친 라벨·색이 서버의 옛 값으로 되돌아간다.
+ *   이어지는 저장이 실패하면 그 입력은 화면에서 이미 사라진 뒤다(실측 가능한 경로:
+ *   라벨 두 개를 서로 맞바꾸면 unique 제약에 걸려 두 번째 저장이 P0001로 죽는다).
+ *   → 무효화는 **조립하는 쪽**(`views/admin-survey-form`의 `model/`)이 마지막에 한 번 부른다.
+ */
+export function useInvalidateSurveys() {
+  const queryClient = useQueryClient();
+  return () => invalidate(queryClient);
+}
+
 export function useCreateSurvey() {
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -57,7 +72,6 @@ export function useCreateSurvey() {
 }
 
 export function useUpdateSurvey(surveyId: number) {
-  const queryClient = useQueryClient();
   const toast = useToast();
 
   return useMutation({
@@ -78,7 +92,8 @@ export function useUpdateSurvey(surveyId: number) {
         throw new Error(toDbErrorMessage(error));
       }
     },
-    onSuccess: () => invalidate(queryClient),
+    // ⚠ 여기서 무효화하지 않는다 — 수정은 여러 뮤테이션이 한 단위라
+    //   조립부가 끝에 한 번 부른다(`useInvalidateSurveys` 주석 참고).
     onError: (error) => toast(error.message),
   });
 }
@@ -90,7 +105,6 @@ export function useUpdateSurvey(surveyId: number) {
  *   검사가 한다(정책은 스냅샷이라 "지금 0건"을 본 뒤에도 표가 들어올 창이 남는다).
  */
 export function useSetSurveyOptions(surveyId: number) {
-  const queryClient = useQueryClient();
   const toast = useToast();
 
   return useMutation({
@@ -105,7 +119,8 @@ export function useSetSurveyOptions(surveyId: number) {
         throw new Error(toDbErrorMessage(error));
       }
     },
-    onSuccess: () => invalidate(queryClient),
+    // ⚠ 여기서 무효화하지 않는다 — 수정은 여러 뮤테이션이 한 단위라
+    //   조립부가 끝에 한 번 부른다(`useInvalidateSurveys` 주석 참고).
     onError: (error) => toast(error.message),
   });
 }
@@ -117,7 +132,6 @@ export function useSetSurveyOptions(surveyId: number) {
  *   선택지 id가 에러가 아니라 **다른 문항의 선택지를 조용히 고친다**(실측).
  */
 export function useEditSurveyOption(surveyId: number) {
-  const queryClient = useQueryClient();
   const toast = useToast();
 
   return useMutation({
@@ -137,7 +151,8 @@ export function useEditSurveyOption(surveyId: number) {
         throw new Error(toDbErrorMessage(error));
       }
     },
-    onSuccess: () => invalidate(queryClient),
+    // ⚠ 여기서 무효화하지 않는다 — 수정은 여러 뮤테이션이 한 단위라
+    //   조립부가 끝에 한 번 부른다(`useInvalidateSurveys` 주석 참고).
     onError: (error) => toast(error.message),
   });
 }

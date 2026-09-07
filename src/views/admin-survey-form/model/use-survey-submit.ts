@@ -7,6 +7,7 @@ import {
   type SurveyInput,
   useCreateSurvey,
   useEditSurveyOption,
+  useInvalidateSurveys,
   useSetSurveyOptions,
   useSurveyImageCleanup,
   useUpdateSurvey,
@@ -54,6 +55,7 @@ export function useSurveyUpdate(surveyId: number, optionsLocked: boolean, server
   const cleanupImages = useSurveyImageCleanup();
   const setOptions = useSetSurveyOptions(surveyId);
   const editOption = useEditSurveyOption(surveyId);
+  const invalidateSurveys = useInvalidateSurveys();
   const guard = useDuplicateGuard(update);
   const toast = useToast();
 
@@ -84,6 +86,15 @@ export function useSurveyUpdate(surveyId: number, optionsLocked: boolean, server
                */
               const kept = new Set(value.options.map((option) => option.imagePath));
               await cleanupImages(serverImagePaths.filter((path) => !kept.has(path)));
+              /*
+               * ⚠⚠ **무효화는 여기, 한 번만.** 각 뮤테이션이 스스로 무효화하면 첫 리페치가
+               *   `survey.updatedAt`을 바꾸고, 그 값을 `key`로 쓰는 폼이 **선택지 저장 전에
+               *   리마운트되어** 방금 친 라벨·색이 서버의 옛 값으로 되돌아간다. 이어지는
+               *   저장이 실패하면 그 입력은 화면에서 이미 사라진 뒤다.
+               * ⚠ 실패 경로에서는 부르지 않는다(catch로 빠진다) — 저장되지 않은 입력을
+               *   서버 값으로 덮지 않아야 관리자가 고쳐서 다시 누를 수 있다.
+               */
+              await invalidateSurveys();
               toast("입축구를 저장했어요");
             } catch {
               // 문구는 각 훅의 onError가 이미 보냈다
