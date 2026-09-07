@@ -148,7 +148,14 @@ export async function POST(request: Request): Promise<Response> {
     /*
      * ⚠ **부분 실패를 HTTP 상태로 접지 않는다.** 207 같은 코드로 표현하면 fetch 래퍼가
      *   삼켜 "성공"으로 보인다 — 200 + 명시 필드로 두고 화면이 그 필드를 읽어 알린다.
-     *   계통적 실패(`aborted`)만 502다("환경 문제라 남은 행도 전부 실패한다"의 뜻이다).
+     *
+     * ⚠⚠ **`aborted`도 200이다.** 한때 이것만 502로 냈는데, 그 코드가 곧 "환경 문제라 남은
+     *   행도 전부 실패했다"는 뜻이 아니다 — `upsertRows`는 **행 단위 재시도 상한을 넘겼을
+     *   때도** `aborted`를 켜고, 그때는 이미 저장된 행이 있다(`saved > 0`, 나머지는 `skipped`).
+     *   502로 내보내면 클라이언트가 `body.error`만 찾다가 payload를 통째로 버려
+     *   "50건 저장, 330건 미시도"가 화면에 **한 글자도 닿지 않고** 고정 문구로 접힌다.
+     *   목록 무효화도 일어나지 않아 방금 저장된 행이 화면에 반영되지 않는다.
+     *   → 계통적 실패는 아래 `catch`가 502로 낸다(그쪽은 payload 자체가 없다).
      */
     const payload = {
       season: `${season}-${String((season + 1) % 100).padStart(2, "0")}`,
@@ -158,7 +165,7 @@ export async function POST(request: Request): Promise<Response> {
       warnings,
       durationMs: Date.now() - startedAt,
     };
-    return json(result.matches.aborted ? 502 : 200, payload);
+    return json(200, payload);
   } catch (e) {
     console.error("[api/admin/sync-matches] 동기화 실패:", e);
     return json(502, { error: (e as Error).message || "일정을 가져오지 못했어요." });

@@ -49,8 +49,19 @@ export function AdminMatchListView({ deleted }: { deleted: boolean }) {
             <p>
               {sync.result.season} · 경기 {sync.result.matches.saved}건 저장
               {sync.result.matches.locked > 0 && ` · 잠금 ${sync.result.matches.locked}건 건너뜀`}
+              {sync.result.matches.skipped > 0 && ` · 미시도 ${sync.result.matches.skipped}건`}
               {sync.result.matches.failed > 0 && ` · 실패 ${sync.result.matches.failed}건`}
             </p>
+            {/*
+              ⚠ **중단은 반드시 말한다.** `aborted`는 계통적 실패일 수도, 행 단위 재시도
+                상한을 넘긴 것일 수도 있다 — 어느 쪽이든 **일정이 다 들어오지 않은 상태**라
+                관리자가 다시 눌러야 하는데, 위 숫자만 보면 성공으로 읽힌다.
+            */}
+            {sync.result.matches.aborted && (
+              <p className="text-crimson">
+                중단됐어요 — 일정이 다 들어오지 않았습니다. 다시 눌러 주세요.
+              </p>
+            )}
             {/* ⚠ 경고를 삼키지 않는다 — 한국어 표기 없는 팀·스코어를 못 읽은 경기가 여기로 온다 */}
             {sync.result.warnings.map((warning) => (
               <p key={warning} className="text-crimson">
