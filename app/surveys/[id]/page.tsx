@@ -69,11 +69,16 @@ const fetchSurveyHead = cache(async (surveyId: number): Promise<SurveyHead> => {
     //   `myOptionId`를 보고 직렬로 매달았는데, 게이팅이 UI가 아니라 definer 함수 안에 있어
     //   (미참여자는 0행) 무조건 쏴도 뜻이 달라지지 않는다. 목록에서 바로 투표하고 들어오는
     //   화면이라 **참여자 비율이 높아** 그 한 왕복이 그대로 체감되던 자리다.
-    const [{ data: auth }, { data, error }, { data: resultRows }] = await Promise.all([
-      supabase.auth.getUser(),
-      supabase.from("survey").select(SURVEY_SELECT).eq("id", surveyId).maybeSingle(),
-      supabase.rpc("survey_results", { p_survey_id: surveyId }),
-    ]);
+    // ⚠ **집계 조회의 `error`도 받는다.** supabase-js는 실패해도 reject하지 않으므로
+    //   `?? []`로 접으면 **실패가 "열렸는데 0표"로 굳는다** — 참여자에게 자기 표까지 0표인
+    //   결과 패널이 SSR되고, `initialData`가 fresh로 앉아 그 방문 내내 교정되지 않는다
+    //   (같은 결함을 이미 고쳐 둔 선례: `app/matches/[id]/page.tsx`).
+    const [{ data: auth }, { data, error }, { data: resultRows, error: resultsError }] =
+      await Promise.all([
+        supabase.auth.getUser(),
+        supabase.from("survey").select(SURVEY_SELECT).eq("id", surveyId).maybeSingle(),
+        supabase.rpc("survey_results", { p_survey_id: surveyId }),
+      ]);
 
     if (error) return { state: "unknown" };
     if (!data) return { state: "missing" };
@@ -84,7 +89,9 @@ const fetchSurveyHead = cache(async (surveyId: number): Promise<SurveyHead> => {
     //   미참여자에게 오는 0행을 `[]`로 접으면 결과 패널이 열려 버린다.
     //   ⚠ 이걸 서버가 그리지 않으면 참여자의 막대가 스켈레톤에서 늘어나며 시프트한다.
     const results =
-      survey.myOptionId !== null ? (resultRows ?? []).map(buildSurveyResult) : undefined;
+      !resultsError && survey.myOptionId !== null
+        ? (resultRows ?? []).map(buildSurveyResult)
+        : undefined;
 
     return { state: "found", survey, userId: auth.user?.id, results, nowMs: Date.now() };
   } catch (e) {

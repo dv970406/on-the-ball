@@ -40,9 +40,17 @@ type PostHead =
   | {
       state: "found";
       post: PostDetail;
-      comments: Comment[];
-      /** ⚠ `null`은 "투표가 없는 글"이다 — "조회하지 않음"(undefined)과 뜻이 다르다 */
-      poll: Poll | null;
+      /**
+       * ⚠ **조회가 실패하면 `undefined`다** — `[]`("댓글이 0건")와 뜻이 다르다.
+       *   `[]`로 접으면 `loadedCount`가 0이 되어 화면이 "표시되지 않은 댓글 N개"라는
+       *   **차단 탓으로 단정하는 거짓 안내**를 띄운다(차단한 사람이 없어도).
+       */
+      comments: Comment[] | undefined;
+      /**
+       * ⚠ `null`은 "투표가 없는 글"이다 — "조회하지 않음"(undefined)과 뜻이 다르다.
+       *   조회가 실패했을 때 `null`로 접으면 투표가 있는 글에서 블록이 통째로 사라진다.
+       */
+      poll: Poll | null | undefined;
       /**
        * 투표 집계. **참여했을 때만 채운다** — `undefined`면 클라이언트가 쿼리를 켜지 않고,
        * `PollBlock`은 그걸 "아직 볼 수 없다"로 읽는다.
@@ -104,25 +112,38 @@ const fetchPostHead = cache(async (postId: number): Promise<PostHead> => {
     //   게이팅은 UI가 아니라 definer 함수 안에 있어(미참여자·투표 없는 글 모두 0행) 무조건
     //   쏴도 뜻이 달라지지 않는다 — 쓸지 말지의 판정은 아래에서 `myOptionId`가 그대로 갖는다.
     //   대가는 투표 없는 글에도 RPC가 1건 나가는 것인데, 병렬이라 TTFB에는 더해지지 않는다.
-    const [{ data: auth }, { data, error }, { data: rows }, { data: pollRow }, { data: resultRows }] =
-      await Promise.all([
-        supabase.auth.getUser(),
-        supabase.from("post").select(POST_DETAIL_SELECT).eq("id", postId).maybeSingle(),
-        buildCommentListQuery(supabase, postId),
-        supabase.from("post_poll").select(POLL_SELECT).eq("post_id", postId).maybeSingle(),
-        supabase.rpc("post_poll_results", { p_post_id: postId }),
-      ]);
+    // ⚠ **곁다리 조회의 `error`도 받는다.** supabase-js는 실패해도 reject하지 않고
+    //   `{ data: null, error }`를 주므로, `?? []`로 접으면 **실패가 "확실히 없음"으로
+    //   굳는다.** 그 값이 `initialData`로 내려가면 `Date.now()`로 스탬프되어 fresh가 되고,
+    //   `staleTime: 30s` + `refetchOnWindowFocus: false`라 그 방문 내내 리페치가 나가지
+    //   않는다(선례와 실측: `app/matches/[id]/page.tsx`).
+    const [
+      { data: auth },
+      { data, error },
+      { data: rows, error: commentsError },
+      { data: pollRow, error: pollError },
+      { data: resultRows, error: resultsError },
+    ] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase.from("post").select(POST_DETAIL_SELECT).eq("id", postId).maybeSingle(),
+      buildCommentListQuery(supabase, postId),
+      supabase.from("post_poll").select(POLL_SELECT).eq("post_id", postId).maybeSingle(),
+      supabase.rpc("post_poll_results", { p_post_id: postId }),
+    ]);
 
     if (error) return { state: "unknown" };
     if (!data) return { state: "missing" };
 
-    const poll = pollRow ? buildPoll(pollRow) : null;
+    // ⚠ 곁다리 조회가 실패해도 **본문은 그대로 내보낸다**(`nextjs.md`) — 그 조각만 접는다.
+    const poll = pollError ? undefined : pollRow ? buildPoll(pollRow) : null;
 
     // ⚠ **참여했을 때만 넘긴다.** `undefined`(조회 안 함)와 `[]`(열렸는데 0표)는 **다른 뜻**이라,
     //   미참여자에게 오는 0행을 `[]`로 접으면 결과 패널이 열려 버린다.
     //   ⚠ 이걸 서버가 그리지 않으면 참여한 사용자의 막대가 스켈레톤에서 늘어나며 시프트한다.
     const pollResults =
-      poll && poll.myOptionId !== null ? (resultRows ?? []).map(buildPollResult) : undefined;
+      !resultsError && poll && poll.myOptionId !== null
+        ? (resultRows ?? []).map(buildPollResult)
+        : undefined;
 
     return {
       state: "found",
@@ -132,7 +153,7 @@ const fetchPostHead = cache(async (postId: number): Promise<PostHead> => {
       userId: auth.user?.id,
       nowMs: Date.now(),
       // 화면에는 오래된 순으로 보이지만 최신 것부터 잘라 온다(훅과 같은 이유·같은 순서)
-      comments: (rows ?? []).map(buildComment).reverse(),
+      comments: commentsError ? undefined : (rows ?? []).map(buildComment).reverse(),
     };
   } catch (e) {
     // createSupabaseServerClient의 cookies()는 "이 라우트를 동적 렌더로 전환하라"는
