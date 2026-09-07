@@ -26,6 +26,10 @@ interface NoticeBannerProps {
  *   빈 띠가 먹는다 — 서버가 이미 판정해 내려주므로 나중에 튀어나오지도 않는다.
  * ⚠ 조회 실패도 조용히 넘긴다(`error`를 그리지 않는다). 이 배너는 화면의 본문이 아니라
  *   덧붙는 안내라, 실패를 알리면 정작 읽으러 온 글 목록 위에 에러 박스가 얹힌다.
+ * ⚠⚠ **이것이 공지로 가는 유일한 진입점이다** — 목록(`/notices`)으로는 상세 안의 "목록"
+ *   버튼이 그다음 홉이다. 그래서 필독이 없는 동안에는 `'공지'` 타입 글도 함께 도달
+ *   불가가 되는데, **수용한 결정이라 여기에 폴백(최신 공지로 떨어뜨리기)을 넣지 않는다.**
+ *   이 자리를 없애려면 대체 진입점을 먼저 만든다(`reuse.md`).
  */
 export function NoticeBanner({ initialNotice }: NoticeBannerProps) {
   const { data } = useBannerNoticeQuery(initialNotice);
