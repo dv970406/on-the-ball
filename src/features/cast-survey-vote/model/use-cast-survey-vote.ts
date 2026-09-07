@@ -192,7 +192,12 @@ export function useCastSurveyVote(surveyId: number) {
       //   빼면 참여하고 목록으로 돌아왔을 때 배지가 갱신되지 않는다.
       //   ⚠ `lists()`(prefix)로 지운다 — 유저별로 키가 갈려 있어 `list(userId)`만 지우면
       //     계정을 오가는 동안 다른 키의 낡은 배지가 남는다.
-      queryClient.invalidateQueries({ queryKey: surveyKeys.lists() });
+      //   ⚠ **stale 표시만 한다(`refetchType: "none"`).** `onMutate`가 이미 목록의 정답
+      //     (`myOptionId`)을 그려 놨고 목록은 참여자 수를 그리지 않으므로 리페치가 새로
+      //     알려줄 것이 없다. 기본값(`"active"`)이면 목록 화면에서 면을 탭할 때마다
+      //     상한(30행)만큼 조회가 한 번씩 더 나간다 — `toggle-post-like`·`predict-match`가
+      //     같은 이유로 이미 이렇게 한다(`data-and-state.md`).
+      queryClient.invalidateQueries({ queryKey: surveyKeys.lists(), refetchType: "none" });
     },
   });
 }
