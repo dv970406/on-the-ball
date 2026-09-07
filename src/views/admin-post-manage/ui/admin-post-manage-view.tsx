@@ -8,7 +8,7 @@ import { Button, Dialog, EmptyState, Markdown, Skeleton, StaleBanner, TextField 
 import { useSessionStore } from "@/entities/session";
 import { useAdminPostQuery } from "@/entities/post";
 import { usePollQuery } from "@/entities/poll";
-import { extractImageUrls } from "@/features/admin-post";
+import { extractImageUrls, MASK_REASON_LIMIT, validateMaskReason } from "@/features/admin-post";
 import { SubHeader } from "@/widgets/sub-header";
 import { usePostModeration } from "../model/use-post-moderation";
 import { PollLabelEditor } from "./poll-label-editor";
@@ -32,6 +32,8 @@ export function AdminPostManageView({ postId }: { postId: number }) {
 
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [reason, setReason] = useState("");
+  /** 사유 길이 오류 — 확인 대화상자를 열기 **전에** 잡아야 DB 23514가 나가지 않는다 */
+  const [reasonError, setReasonError] = useState<string | null>(null);
 
   const shell = (body: ReactNode) => (
     <>
@@ -157,13 +159,29 @@ export function AdminPostManageView({ postId }: { postId: number }) {
           <TextField
             label="가리는 사유 (선택)"
             value={reason}
-            hint="본문에 '사유: …'로 함께 표시돼요"
-            onChange={(e) => setReason(e.target.value)}
+            error={reasonError ?? undefined}
+            hint={`본문에 '사유: …'로 함께 표시돼요 · ${MASK_REASON_LIMIT.grapheme}자까지`}
+            onChange={(e) => {
+              setReason(e.target.value);
+              setReasonError(null);
+            }}
           />
         </div>
 
         <div className="flex flex-col gap-2">
-          <Button variant="secondary" block disabled={moderation.isPending} onClick={() => setConfirm("mask")}>
+          <Button
+            variant="secondary"
+            block
+            disabled={moderation.isPending}
+            onClick={() => {
+              // ⚠ 확인 대화상자를 열기 **전에** 잡는다 — 통과시키면 DB의 23514가
+              //   "입력값이 허용 범위를 벗어났어요."로 접혀 어느 칸인지 말하지 못한다.
+              const message = validateMaskReason(reason);
+              setReasonError(message);
+              if (message) return;
+              setConfirm("mask");
+            }}
+          >
             본문 가리기
           </Button>
           <Button

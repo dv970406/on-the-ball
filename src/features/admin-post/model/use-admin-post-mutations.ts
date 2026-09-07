@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Json } from "@/types/database.types";
 import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
 import { POST_IMAGE_BUCKET } from "@/shared/config";
-import { useToast } from "@/shared/lib";
+import { hasVisibleChar, useToast } from "@/shared/lib";
 import { commentKeys } from "@/entities/comment";
 import { pollKeys } from "@/entities/poll";
 import { postKeys } from "@/entities/post";
@@ -69,7 +69,9 @@ export function useMaskPost(postId: number) {
   return useMutation({
     mutationFn: async (reason: string) => {
       const supabase = requireBrowserSupabase();
-      const trimmed = reason.trim();
+      // ⚠ 빈 값 판정을 `.trim()`으로 하지 않는다 — 제로폭 문자만 담긴 사유는 trim을 통과해
+      //   본문에 `사유: ` 뒤가 비어 보이는 안내를 남긴다(DB의 `btrim`도 같은 함정이다).
+      const trimmed = hasVisibleChar(reason) ? reason.trim() : "";
       const { error } = await supabase.rpc("admin_mask_post", {
         p_post_id: postId,
         ...(trimmed === "" ? {} : { p_reason: trimmed }),

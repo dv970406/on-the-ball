@@ -464,6 +464,13 @@ end if;
 | 입축구 선택지·부제 | 40 | 400 | `SURVEY_LABEL_LIMIT`·`SURVEY_SUBTITLE_LIMIT` | `validateSurvey` |
 | 공지 제목 | 120 | 1,200 | `NOTICE_TITLE_LIMIT` | `validateNotice` |
 | 공지 본문 | — (도입 안 함) | 20,000 | `NOTICE_BODY_MAX` (단일) | `validateNotice` |
+| 가리는 사유 | 20 | 200 | `MASK_REASON_LIMIT` | `validateMaskReason` |
+
+⚠⚠ **길이는 저장하는 값으로 잰다.** 저장 직전에 값을 접는 자리(`normalizeNickname`)가 있으면
+**정규형을 재야** 화면 한도와 저장값이 갈리지 않는다. `normalizeNickname`이 ZWJ를 지우므로
+가족 이모지(👨‍👩‍👧‍👦)는 저장 시점에 4자로 분해된다 — 원본으로 재면 그래핌 20개가 한도 40을
+통과한 뒤 **80그래핌으로 부푼다**(실측). 정규형을 재는 것은 `validateNickname`·`validatePoll`·
+`validateSurvey`이고, 접지 않고 저장하는 값(공지 제목·본문)은 원본을 잰다.
 
 ⚠ **이 표는 "클라이언트가 쓰는 컬럼"만 담는다.** 쓰기 경로가 없는 컬럼은 DB CHECK만 둔다.
 ⚠ **클라이언트 쓰기 경로가 새로 열리면 그 순간 이 표의 대상이 된다** — 입축구가 실제로 그랬다.

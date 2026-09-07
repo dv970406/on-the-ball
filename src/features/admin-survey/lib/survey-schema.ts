@@ -71,12 +71,22 @@ export function validateSurvey(
 ): { ok: true; value: SurveyInput } | { ok: false; errors: SurveyFieldErrors } {
   const errors: SurveyFieldErrors = {};
 
+  /*
+   * ⚠⚠ **저장하는 값을 잰다 — 원본이 아니라 정규형이다.** 아래에서 `normalizeNickname`을
+   *   거쳐 저장하므로 원본으로 재면 화면 한도와 저장값이 갈린다. `normalizeNickname`이
+   *   ZWJ(`\u200D`)를 지우기 때문에 가족 이모지(👨‍👩‍👧‍👦)는 저장 시점에 4자로 분해된다 —
+   *   원본으로 세면 20개(=20그래핌)가 한도 40을 통과한 뒤 **80그래핌으로 부푼다**(실측).
+   *   `validateNickname`이 같은 이유로 정규형을 재고, 그 주석에 사유가 모여 있다.
+   */
+  const title = normalizeNickname(draft.title);
+  const subtitles = draft.options.map((option) => normalizeNickname(option.subtitle));
+
   // ⚠ 빈 값 판정은 `.trim()`이 아니라 `hasVisibleChar`다 — 제로폭·BOM만 담긴 제목이
   //   실제로 만들어졌던 사고 때문이고, DB의 has_visible_char와 문자 집합이 같다.
   if (!hasVisibleChar(draft.title)) {
     errors.title = "제목을 입력해 주세요.";
   } else {
-    const over = lengthOverflow(draft.title, SURVEY_TITLE_LIMIT);
+    const over = lengthOverflow(title, SURVEY_TITLE_LIMIT);
     if (over === "grapheme") errors.title = `제목은 ${SURVEY_TITLE_LIMIT.grapheme}자까지예요.`;
     else if (over === "codePoint") errors.title = "제목이 너무 길어요.";
   }
@@ -94,7 +104,7 @@ export function validateSurvey(
     if (!hasVisibleChar(option.label)) {
       optionErrors[index].label = "선택지를 입력해 주세요.";
     } else {
-      const over = lengthOverflow(option.label, SURVEY_LABEL_LIMIT);
+      const over = lengthOverflow(labels[index], SURVEY_LABEL_LIMIT);
       if (over === "grapheme") optionErrors[index].label = `${SURVEY_LABEL_LIMIT.grapheme}자까지예요.`;
       else if (over === "codePoint") optionErrors[index].label = "너무 길어요.";
       else if (labels.indexOf(labels[index]) !== index) {
@@ -102,8 +112,10 @@ export function validateSurvey(
       }
     }
 
-    if (option.subtitle !== "") {
-      const over = lengthOverflow(option.subtitle, SURVEY_SUBTITLE_LIMIT);
+    // ⚠ 비었는지도 **정규형으로** 판정한다 — 제로폭 문자만 담긴 부제가 `!== ""`를 통과해
+    //   "보이지 않는 부제"로 저장되던 자리다(제목·선택지가 `hasVisibleChar`로 막는 것과 같은 성질).
+    if (subtitles[index] !== "") {
+      const over = lengthOverflow(subtitles[index], SURVEY_SUBTITLE_LIMIT);
       if (over === "grapheme") optionErrors[index].subtitle = `${SURVEY_SUBTITLE_LIMIT.grapheme}자까지예요.`;
       else if (over === "codePoint") optionErrors[index].subtitle = "너무 길어요.";
     }
@@ -131,11 +143,11 @@ export function validateSurvey(
   return {
     ok: true,
     value: {
-      title: normalizeNickname(draft.title),
+      title,
       options: draft.options.map((option, index) => ({
         id: option.id,
         label: labels[index],
-        subtitle: option.subtitle === "" ? null : normalizeNickname(option.subtitle),
+        subtitle: subtitles[index] === "" ? null : subtitles[index],
         bgColor: option.bgColor === "" ? null : option.bgColor,
         textColor: option.textColor === "" ? null : option.textColor,
         imagePath: option.imagePath === "" ? null : option.imagePath,
