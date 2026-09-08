@@ -110,6 +110,7 @@ function cardClassName(peek: boolean) {
     | `views/match-detail/ui/match-detail-view.tsx` | 승부예측 상세의 "적중" 배지 — 한 화면에 1개 |
     | `entities/match/ui/prediction-block.tsx` | 승부예측 **결과 띠** — 채점이 끝난 뒤 **결과 칸에만 1개**. 같은 블록의 선택지 3개에는 쓰지 않는 것과 갈리는 지점이고, 체크 아이콘이 형태를 지어 "색이 정보를 혼자 지지 않는다"도 만족한다 |
     | `entities/match/ui/match-card.tsx` | 승부예측 "적중" 배지 — **예측했고 채점까지 끝난 카드에만 1개**. 선택지(카드당 3개)에 에메랄드를 쓰지 않는 것과 갈리는 지점이고, 글자를 담아 "색이 정보를 혼자 지지 않는다"도 만족한다 |
+    | `widgets/notice-banner/ui/notice-banner.tsx` · `views/notice-list` · `views/notice-detail` · `views/admin-notice-list` | `'필독'` 배지 — 공지가 닿는 네 자리에서 **같은 색이어야 한 종류로 읽힌다**. CTA가 아니라 상태 표시라 이 셈에 들어가지 않고(`match-card`의 적중 배지와 같은 자리), 글자를 담아 "색이 정보를 혼자 지지 않는다"도 만족한다. ⚠ 피드에서는 글쓰기 FAB과 한 뷰포트에 함께 뜨는데, **CTA는 여전히 FAB 하나**다 |
     | `views/post-detail/ui/comment-section.tsx` | 댓글 수 |
     | `widgets/bottom-tab-bar/ui/bottom-tab-bar.tsx` | 활성 탭 아이콘 |
 

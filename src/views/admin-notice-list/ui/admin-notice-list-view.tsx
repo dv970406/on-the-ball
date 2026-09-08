@@ -66,7 +66,7 @@ export function AdminNoticeListView({ deleted }: { deleted: boolean }) {
                   <p className="flex items-center gap-1.5 text-[11px] text-ink-mute-2">
                     {/* ⚠ variant는 리터럴이어야 한다 — 동적 값은 검사가 금지한다 */}
                     {notice.type === "필독" ? (
-                      <Pill variant="dark">필독</Pill>
+                      <Pill variant="green">필독</Pill>
                     ) : (
                       <Pill variant="soft">공지</Pill>
                     )}

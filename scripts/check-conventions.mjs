@@ -175,6 +175,13 @@ const STYLE_ALLOWED = {
     "src/shared/ui/live-status-pill.tsx", // v1 자산(미사용)
     "src/entities/match/ui/match-card.tsx", // 예측 적중 배지 — 예측했고 채점된 카드에만 1개
     "src/views/match-detail/ui/match-detail-view.tsx", // 상세의 적중 배지 — 한 화면에 1개
+    // '필독' 배지 — 공지가 닿는 네 자리에서 같은 색이어야 한 종류로 읽힌다.
+    // CTA가 아니라 상태 표시라 "눌러야 할 곳 하나" 셈에 들어가지 않고,
+    // 글자를 담고 있어 "색이 정보를 혼자 지지 않는다"도 만족한다.
+    "src/widgets/notice-banner/ui/notice-banner.tsx",
+    "src/views/notice-list/ui/notice-list-view.tsx",
+    "src/views/notice-detail/ui/notice-detail-view.tsx",
+    "src/views/admin-notice-list/ui/admin-notice-list-view.tsx",
   ],
   "text-primary": [
     "src/entities/post/ui/post-card.tsx", // 목록 카드의 좋아요 하트

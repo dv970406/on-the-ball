@@ -19,9 +19,10 @@ interface NoticeBannerProps {
 /**
  * 피드 최상단의 한 줄 공지 배너 — 가장 최신 **필독** 공지.
  *
- * ⚠ **에메랄드를 쓰지 않는다.** 이 화면의 "눌러야 할 곳"은 이미 글쓰기 FAB이고,
- *   목록 화면의 에메랄드 자리는 워드마크의 볼과 카드의 좋아요 하트뿐이다(`styling.md`).
- *   배지는 잉크(`Pill variant="dark"`)로 무게만 준다.
+ * ⚠ **배지가 에메랄드인 것은 CTA가 아니라 상태 표시라서다.** 이 화면의 "눌러야 할 곳"은
+ *   여전히 글쓰기 FAB 하나이고, 배지는 그 셈에 들어가지 않는다(`styling.md`의 에메랄드 표 —
+ *   판정은 원칙이 아니라 자리로 한다). "필독"이라는 글자가 함께 있어 **색이 정보를 혼자
+ *   지지 않는다**도 만족한다 — 글자를 빼고 색만 남기지 말 것.
  * ⚠ 없으면 **아무것도 그리지 않는다.** 자리를 비워 두면 첫 화면의 가장 값진 세로 공간을
  *   빈 띠가 먹는다 — 서버가 이미 판정해 내려주므로 나중에 튀어나오지도 않는다.
  * ⚠ 조회 실패도 조용히 넘긴다(`error`를 그리지 않는다). 이 배너는 화면의 본문이 아니라
@@ -41,7 +42,7 @@ export function NoticeBanner({ initialNotice }: NoticeBannerProps) {
       className="flex items-center gap-2 border-b border-hairline-cool px-5 py-2.5 transition-colors duration-150 ease-otb active:bg-canvas-soft"
     >
       {/* ⚠ variant는 리터럴이어야 한다 — 동적 값은 `check:conventions`가 금지한다 */}
-      <Pill variant="dark">필독</Pill>
+      <Pill variant="green">필독</Pill>
       <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{data.title}</span>
       <Icon as={ChevronRight} size={16} className="shrink-0 text-ink-mute-2" />
     </Link>
