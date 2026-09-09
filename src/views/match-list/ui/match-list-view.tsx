@@ -257,7 +257,7 @@ export function MatchListView({
               aria-labelledby={listTabId("upcoming")}
               hidden={activeTab !== "upcoming"}
             >
-              <h2 className="sr-only">다가오는 경기</h2>
+              <h2 className="sr-only">예정 경기</h2>
 
               {groupMatchesByDay(upcoming, nowMs).map((group) => (
                 <section key={group.key}>
@@ -284,7 +284,7 @@ export function MatchListView({
 
               {upcoming.length >= MATCH_UPCOMING_LIMIT && (
                 <p className="px-5 pb-1 pt-2 text-center text-[12px] text-ink-mute-2">
-                  다가오는 경기는 {formatCount(MATCH_UPCOMING_LIMIT)}경기까지만 표시하고 있어요.
+                  예정 경기는 {formatCount(MATCH_UPCOMING_LIMIT)}경기까지만 표시하고 있어요.
                 </p>
               )}
             </section>

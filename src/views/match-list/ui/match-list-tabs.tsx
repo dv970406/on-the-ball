@@ -24,7 +24,7 @@ export const listPanelId = (id: MatchListTabId) => `match-list-panel-${id}`;
  */
 const TABS: { id: MatchListTabId; label: string }[] = [
   { id: "past", label: "최근 경기" },
-  { id: "upcoming", label: "다가오는 경기" },
+  { id: "upcoming", label: "예정 경기" },
 ];
 
 interface MatchListTabsProps {
