@@ -136,6 +136,108 @@ pnpm dev
 
 ---
 
+## 🚀 배포 (Vercel)
+
+호스팅은 **Vercel**, 데이터는 **원격 Supabase 프로젝트**입니다. Auth 설정은 파일이 아니라
+**Supabase 대시보드**가 소유합니다 — `supabase config push`는 절대 쓰지 마세요(위 경고).
+
+### 1. 원격 Supabase 준비
+
+```bash
+supabase login                      # SUPABASE_ACCESS_TOKEN 발급
+supabase link --project-ref <ref>   # .env.local의 SUPABASE_PROJECT_REF
+
+supabase db reset                   # ① 로컬에서 먼저 마이그레이션 건전성 확인
+bash supabase/tests/run-rls.sh      #    (러너는 로컬 스택 전용입니다 — 127.0.0.1:64322 고정)
+
+supabase db push                    # ② 원격에 마이그레이션 적용 (Storage 버킷 3개도 여기서 생성)
+supabase migration list --linked    # ③ Local/Remote 열이 일치하는지 대조
+```
+
+> 🔴 **`supabase db reset --linked`를 쓰면 원격에서 `seed.sql`이 돕니다** — 비밀번호가
+> `test1234`인 테스트 계정이 생기고 그중 하나에 `is_admin = true`가 붙습니다.
+> 시드는 로컬 전용이고, `db push`는 시드를 실행하지 않습니다.
+
+### 2. Vercel 프로젝트
+
+| 항목 | 값 |
+|---|---|
+| Framework | Next.js (자동 감지) |
+| Build Command | **기본 `next build`** — ⚠ `build:prod`를 쓰면 안 됩니다(`.env.prod`는 저장소에 없습니다) |
+| Install Command | 자동 (`pnpm-lock.yaml`) |
+
+**환경변수는 아래 5개가 전부입니다.** `process.env`를 읽는 곳은
+`src/shared/config/env.ts` · `app/api/admin/sync-matches/route.ts` · `scripts/lib/sync-db.mjs` 셋뿐입니다.
+
+| 키 | 범위 | 없으면 |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Production + Preview | 모든 조회가 "서비스 설정이 완료되지 않았어요."(빌드는 성공합니다) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Production + Preview | 〃 |
+| `NEXT_PUBLIC_SITE_URL` | **Production만** | Preview는 비워 둬야 `VERCEL_URL` 폴백이 배포별 도메인을 잡습니다 |
+| `SUPABASE_SERVICE_ROLE_KEY` | Production (Sensitive) | 어드민 '경기 일정 가져오기'가 500 |
+| `API_FOOTBALL_KEY` | Production (Sensitive) | 〃 |
+
+> ⚠ **`NEXT_PUBLIC_*`는 빌드 시점에 인라인됩니다** — 값을 바꾸면 **반드시 재배포**해야 합니다.
+> `NEXT_PUBLIC_SITE_URL`이 도메인 확정 전에 정해져야 하므로, Import 화면에서 프로젝트 이름을
+> 먼저 정하고 그 자리에서 `https://<이름>.vercel.app`을 넣은 뒤 첫 배포를 돌립니다.
+
+> ⚠ **`NEXT_PUBLIC_SHOW_PLAYER_PHOTOS`는 넣지 않습니다.** 기본 꺼짐이 의도된 안전 기본값이고
+> (선수 초상·퍼블리시티권 미확인), 꺼지면 `PlayerPhoto`가 실루엣으로 떨어집니다.
+
+> ⚠ **`SUPABASE_AUTH_EXTERNAL_*` 4개와 `SUPABASE_PROJECT_REF`·`SUPABASE_DB_PASSWORD`·
+> `SUPABASE_ACCESS_TOKEN`은 Vercel에 넣지 않습니다** — 앞의 넷은 대시보드가, 뒤의 셋은
+> 로컬 CLI가 소유합니다.
+
+빌드 로그에서 확인할 것: `/posts`·`/posts/[id]`·`/surveys`·`/matches`가 **`ƒ`(동적)** 이어야
+합니다. `○`면 `unstable_rethrow` 가드가 `cookies()`의 내부 에러를 삼킨 것입니다
+([`docs/conventions/nextjs.md`](docs/conventions/nextjs.md)).
+**`/notices`만 `○` + `30s`가 정상**입니다 — 쿠키를 읽지 않아 통째로 프리렌더되고
+`ANON_REVALIDATE`가 ISR 주기가 됩니다.
+
+### 3. Supabase 대시보드 (배포 도메인이 정해진 뒤)
+
+| 위치 | 값 |
+|---|---|
+| Authentication → **URL Configuration** → Site URL | `https://<이름>.vercel.app` |
+| 〃 → Redirect URLs | `https://<이름>.vercel.app/**` (프리뷰도 쓰려면 `https://<이름>-*.vercel.app/**`) |
+| Authentication → **Providers** | Kakao · Google 활성화 + 키 4개 직접 입력 |
+| 〃 → Email | **비활성** (이 앱은 소셜 전용입니다) |
+| 〃 설정의 **Manual Linking** (`config.toml`의 `enable_manual_linking`에 대응) | 활성 — `/profile`의 "로그인 수단 연결"(`features/link-identity`)이 이 값에 의존합니다 |
+
+각 프로바이더 콘솔에는 **앱 주소가 아니라 Supabase 콜백**(`https://<ref>.supabase.co/auth/v1/callback`)을
+등록합니다 → [소셜 로그인 설정](docs/oauth-setup.md).
+
+> ⚠ 앱 복귀 주소가 Redirect URLs에 없으면 GoTrue가 **조용히 Site URL로 되돌려** 보냅니다 —
+> `?next=`가 통째로 사라져 "글쓰기를 누르고 로그인했는데 목록으로 떨어지는" 증상이 됩니다.
+
+### 4. 첫 관리자 지정
+
+앱에 자가 승격 경로가 없습니다(`profiles`의 UPDATE grant는 `(nickname, avatar_path)`뿐이고
+`is_admin`은 SELECT조차 막혀 있습니다). 배포 사이트에서 소셜 로그인을 한 번 한 뒤
+SQL Editor에서:
+
+```sql
+select id, nickname, created_at from public.profiles order by created_at desc limit 5;
+update public.profiles set is_admin = true where id = '<내 uuid>';
+```
+
+그다음 `/admin-you-can-not-access` → **경기 일정 가져오기**로 `team`·`match`를 채웁니다.
+비관리자에게 이 경로가 404인 것이 정상입니다.
+
+### 5. 배포 후 자동화되지 않는 것
+
+| 항목 | 상태 |
+|---|---|
+| **경기 상세 폴러**(`sync-match-detail.mjs`, 5분 주기 전제) | 실행 주체가 없습니다 — 라인업·기록 탭이 빕니다. `node scripts/sync-match-detail.mjs --remote`를 수동으로 돌립니다 |
+| **일정 동기화** | 어드민 화면 버튼으로만 돕니다. `/api/admin/sync-matches`는 쿠키 세션 + `is_admin` RPC로 인가해 크론이 부를 수 없습니다 |
+| **입축구 면 배경 이미지** | 마이그레이션이 파일을 옮기지 않습니다 → 어드민 화면에서 업로드합니다(`upload-survey-images.mjs`는 로컬 스택 전용입니다) |
+| **구단 엠블럼** | `public/crests/`에 커밋된 것만 뜹니다. 없는 팀은 약칭 모노그램으로 떨어지고, 채우려면 `node scripts/fetch-team-crests.mjs` 후 커밋·재배포입니다 |
+
+> ⚠ **무료 플랜의 Supabase 프로젝트는 무활동이 이어지면 정지됩니다** — 정지되면 사이트 전체가
+> 데이터를 잃은 것처럼 보입니다.
+
+---
+
 ## 📁 프로젝트 구조
 
 라우팅은 얇게(`app/`), 구현은 FSD 레이어(`src/`)로 분리합니다. 의존 방향은

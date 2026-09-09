@@ -2,6 +2,10 @@
   "name": "on-the-ball",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.25.0",
+  "engines": {
+    "node": ">=20.9"
+  },
   "sideEffects": [
     "*.css"
   ],
