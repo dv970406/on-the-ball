@@ -6,8 +6,16 @@ import { ADMIN_MATCH_SELECT, buildAdminMatch } from "./mappers";
 import { matchKeys } from "./keys";
 import type { AdminMatch } from "../model/types";
 
-/** 어드민 목록의 상한 — 운영 화면이라 일반 목록(지난 10·다가오는 20)보다 넓게 본다 */
-const ADMIN_MATCH_LIMIT = 200;
+/**
+ * 어드민 목록의 상한 — 운영 화면이라 일반 목록(지난 10·다가오는 20)보다 넓게 본다.
+ *
+ * ⚠⚠ **정렬이 오름차순이라 이 값이 한 시즌을 덮어야 한다.** 상한은 정렬한 뒤 앞에서 자르므로,
+ *   오름차순에서 잘려 나가는 것은 **가장 최근 경기**다(내림차순일 때와 반대다). EPL 한 시즌이
+ *   380경기라 그보다 작게 두면 시즌 후반 일정이 어드민 화면에서 통째로 사라진다.
+ * ⚠ **두 번째 시즌이 쌓이면 이 값으로는 못 버틴다.** 그때는 상한을 키우는 대신 시즌 필터를
+ *   붙인다 — `admin_match_list` RPC에 인자를 더하고 `AdminFilterRail`에 칸을 여는 일이다.
+ */
+const ADMIN_MATCH_LIMIT = 400;
 
 /**
  * 어드민 경기 목록.
@@ -25,7 +33,11 @@ export function useAdminMatchListQuery(deleted: boolean | null) {
       const { data, error } = await supabase
         .rpc("admin_match_list", deleted === null ? {} : { p_deleted: deleted })
         .select(ADMIN_MATCH_SELECT)
-        .order("kickoff_at", { ascending: false })
+        // ⚠ **킥오프 오름차순이다** — 일정을 라운드 순서대로 훑는 화면이라 시즌의 흐름과
+        //   목록의 순서가 같아야 한다. 서비스 목록의 "최근 경기"(내림차순)와 방향이 다른데,
+        //   그쪽은 방금 끝난 경기를 먼저 보는 자리이고 여기는 일정표다.
+        //   ⚠ 이 방향이 `ADMIN_MATCH_LIMIT`의 뜻을 바꾼다 — 그 상수 주석을 함께 읽을 것.
+        .order("kickoff_at", { ascending: true })
         .limit(ADMIN_MATCH_LIMIT);
 
       if (error) {

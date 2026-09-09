@@ -42,3 +42,4 @@ next-env.d.ts
 
 # .env.example은 커밋 허용
 !.env.example
+.env*.local
