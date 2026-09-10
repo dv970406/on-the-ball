@@ -211,7 +211,7 @@ export function ProfileView({
                 name="nickname"
                 value={nickname.value}
                 error={nickname.error}
-                hint={`${NICKNAME_LIMIT.grapheme}자까지 · 다른 사람과 같을 수 없어요`}
+                hint={`한글·영문·숫자 ${NICKNAME_LIMIT.grapheme}자까지 · 다른 사람과 같을 수 없어요`}
                 onChange={nickname.onChange}
               />
               <Button type="submit" block disabled={!nickname.canSave}>

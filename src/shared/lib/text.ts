@@ -158,13 +158,47 @@ const BLANK = new RegExp(
  *
  * ⚠ 위 두 문자 집합은 마이그레이션과 **한 쌍**이다. 한쪽만 고치면 다시 갈린다.
  *   합집합이 `hasVisibleChar`의 클래스와 같아야 한다는 제약도 그대로다.
+ *
+ * ⚠ **NFC로 접는 것이 마지막 단계다**(DB의 `normalize(…, NFC)`와 같은 자리). 없으면
+ *   `isPlainNickname`이 "한글인데 거부됨"을 만든다 — macOS에서 복사한 한글은 자모
+ *   분해형(U+1112 U+1161 U+11AB = '한')으로 오는 일이 있고, 그 형태는 `가-힣`
+ *   (U+AC00–U+D7A3) 범위에 걸리지 않는다(실측).
+ *
+ * ⚠ **NFKC가 아니다.** NFKC는 전각 'Ａ'를 'A'로 접는데, 그러면 `isPlainNickname`이
+ *   막으려는 동형이의 입력이 통과해 버린다. 순서도 규약이다 — 보이지 않는 문자를
+ *   먼저 지운 뒤에 NFC를 적용한다(반대로 두면 ZWJ가 결합 시퀀스의 일부로 남을 여지가 있다).
  */
 export function normalizeNickname(value: string): string {
   return value
     .replace(INVISIBLE, "")
     .replace(BLANK, " ")
     .replace(/ {2,}/g, " ")
-    .trim();
+    .trim()
+    .normalize("NFC");
+}
+
+/**
+ * 닉네임 허용 문자 — 한글 음절·한글 자모·영문·숫자. **공백도 허용하지 않는다.**
+ *
+ * ⚠ `supabase/migrations/20260910000001_nickname_charset.sql`의
+ *   `public.is_plain_nickname`과 **글자 하나까지 같아야 한다.** 한쪽만 고치면
+ *   클라이언트가 통과시킨 값이 DB의 23514가 되어, 사용자는 한국어 안내 대신
+ *   "입력값이 허용 범위를 벗어났어요."를 본다.
+ *
+ * ⚠ **정규형에 적용한다**(`normalizeNickname`의 결과). 원본으로 판정하면 NFD 한글이
+ *   거부되고, 꼬리 공백처럼 DB가 조용히 다듬는 입력까지 에러가 된다.
+ *
+ * ⚠ 상한 U+3163('ㅣ')은 실수가 아니다 — 다음 문자 U+3164는 HANGUL FILLER로 화면에
+ *   아무것도 그리지 않는다. 한 글자만 넓혀도 "보이지 않는 닉네임"이 되돌아온다.
+ *
+ * 부수 효과로 **동형이의 사칭이 막힌다.** 정규형 강제가 제로폭·NBSP 우회를 막았지만
+ * 키릴 'а'(U+0430)·전각 'Ａ'(U+FF21)는 통과해서 라틴 글자와 화면에서 구분되지 않는
+ * 닉네임을 만들 수 있었다 — 허용 집합을 열거하면 그 클래스 전체가 사라진다.
+ */
+const PLAIN_NICKNAME = /^[가-힣ㄱ-ㅣA-Za-z0-9]+$/u;
+
+export function isPlainNickname(value: string): boolean {
+  return PLAIN_NICKNAME.test(value);
 }
 
 /**

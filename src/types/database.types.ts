@@ -1052,6 +1052,7 @@ export type Database = {
       increment_post_view: { Args: { p_post_id: number }; Returns: undefined }
       is_admin: { Args: never; Returns: boolean }
       is_blocked: { Args: { p_user_id: string }; Returns: boolean }
+      is_plain_nickname: { Args: { p_text: string }; Returns: boolean }
       match_is_alive: { Args: { p_match_id: number }; Returns: boolean }
       match_is_open: { Args: { p_match_id: number }; Returns: boolean }
       match_prediction_results: {

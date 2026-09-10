@@ -27,6 +27,7 @@ export {
   graphemeLength,
   lengthOverflow,
   normalizeNickname,
+  isPlainNickname,
   clamp,
   type TextLimit,
 } from "./text";

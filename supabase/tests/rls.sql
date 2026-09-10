@@ -403,6 +403,10 @@ select p.id, p.like_count, coalesce(l.cnt,0) as actual_likes,
 \echo '   revoke를 한 번만 잊어도 즉시 구멍이 된다 — 손으로 반복하는 규칙은 언젠가 빠진다)'
 reset role;
 
+\echo '⚠ 이 섹션의 네 질의는 전부 **[0행 기대] 라벨을 달고 있어야 한다.** 라벨이 없으면'
+\echo '  run-rls.sh의 값 대조(③)가 이 질의를 보지 않아, 행이 나와도 "✅ 통과"로 넘어간다 —'
+\echo '  실제로 그랬다(is_plain_nickname을 anon에 열었는데 17d가 행을 뱉은 채 통과했다).'
+\echo '  전수 가드가 러너에 안 잡히면 가드가 아니다.'
 \echo '-- 17a. RLS가 꺼졌거나 anon에 쓰기 권한이 남은 테이블'
 \echo '   ⚠ **has_table_privilege만으로는 부족하다.** 컬럼 단위 grant는 그 함수가 false를'
 \echo '     돌려준다(실측: post에 grant insert (author_id, title, content, category)가 있는데도'
@@ -413,6 +417,7 @@ reset role;
 \echo '     (unrecognized privilege type) → 그쪽만 has_table_privilege로 본다.'
 \echo '   ⚠ authenticated의 INSERT/UPDATE는 여기서 세지 않는다 — 정상 기능이 그걸로 돈다.'
 \echo '     대신 **DELETE와 TRUNCATE**를 본다(comment·user_block만 정당한 DELETE 대상이다).'
+\echo '[0행 기대] RLS가 꺼졌거나 anon에 쓰기 권한이 남은 테이블'
 select c.relname,
        c.relrowsecurity                                          as rls_on,
        has_any_column_privilege('anon', c.oid, 'INSERT')         as anon_insert,
@@ -436,6 +441,7 @@ select c.relname,
             and c.relname not in ('comment', 'user_block')));
 
 \echo '-- 17b. RLS는 켜졌는데 정책이 하나도 없는 테이블 (전면 차단이 의도인지 확인 필요)'
+\echo '[0행 기대] 정책이 없는 RLS 테이블'
 select c.relname
   from pg_class c
   join pg_namespace n on n.oid = c.relnamespace
@@ -443,6 +449,7 @@ select c.relname
    and not exists (select 1 from pg_policy p where p.polrelid = c.oid);
 
 \echo '-- 17c. security definer인데 search_path가 고정되지 않은 함수'
+\echo '[0행 기대] search_path가 고정되지 않은 definer 함수'
 select p.proname
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
  where n.nspname = 'public' and p.prosecdef
@@ -464,8 +471,12 @@ select p.proname
 \echo '        정책에 `to` 절이 없어 비로그인 조회도 이 함수를 지난다. 닫으면 경기 상세와'
 \echo '        입축구가 통째로 42501로 죽는다. 입력한 id의 생존 여부만 돌려주는데 그건'
 \echo '        match·survey를 직접 조회해도 알 수 있는 사실이라 새는 정보가 없다)'
+\echo '        is_plain_nickname(닉네임 허용 문자 — has_visible_char·normalize_nickname과 같은'
+\echo '        사유다. profiles_nickname_plain CHECK 안에서 평가되므로 닫으면 가입과 닉네임'
+\echo '        변경이 전부 42501로 죽는다. 호출자가 넘긴 문자열의 형태만 돌려준다)'
 \echo '   ⚠ **is_admin은 여기 없다.** 어떤 RLS 정책도 그 함수를 부르지 않기 때문이다 —'
 \echo '     어드민 조회조차 definer RPC를 지나므로 anon에 열 이유가 없다.'
+\echo '[0행 기대] 화이트리스트 밖에서 anon에 열린 함수'
 select p.proname
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
  where n.nspname = 'public'
@@ -473,7 +484,8 @@ select p.proname
    and p.proname not in ('post_is_alive', 'has_visible_char', 'normalize_nickname',
                          'increment_post_view', 'is_blocked',
                          'match_prediction_results',
-                         'match_is_alive', 'survey_is_alive');
+                         'match_is_alive', 'survey_is_alive',
+                         'is_plain_nickname');
 
 -- ---------------------------------------------------------------------
 \echo ''
@@ -708,7 +720,36 @@ savepoint s;
 --   컬럼 상한을 따라 200으로 올리면 이 검사는 조용히 무의미해진다 — 올리지 말 것.
 select n from (select public.random_nickname() as n from generate_series(1, 2000)) t
  where n <> public.normalize_nickname(n)
-    or char_length(n) not between 1 and 20;
+    or char_length(n) not between 1 and 20
+    or not public.is_plain_nickname(n);   -- 20260910000001: 한글·영문·숫자만
+rollback to s;
+
+savepoint s;
+\echo '[0행 기대] **조합을 포화시켜 폴백 경로를 실제로 태운다** — 480조합을 다 쓰면'
+\echo '           handle_new_user가 md5 접미사로 탈출하는데, 그 값도 CHECK를 만족해야 한다'
+-- 🔴 이 검사가 지키는 것: 폴백은 한때 `left(닉,13) || '-' || md5…`였고, 하이픈은
+--    profiles_nickname_plain(20260910000001)이 거부한다. 그대로 뒀다면 조합이 포화되는
+--    순간부터 **그 사용자의 가입이 영구히 실패**했다 — 재시도 루프 안이라 무한 루프가 된다.
+--    실측: 500명 연속 가입에서 폴백이 25번 발동했다(즉 이 검사는 실제로 그 경로를 탄다).
+-- ⚠ 표현식을 복제해 검사하지 않는다. 폴백은 트리거 **내부** 로직이라 직접 부를 수 없고,
+--    복제하면 트리거를 고쳤을 때 검사만 옛 표현식을 통과시킨다 → 실제로 포화시킨다.
+-- ⚠ 500은 480(=24×20)을 넘겨야 한다는 뜻이다. 조합 목록을 늘리면 이 수도 함께 올린다.
+select nickname, char_length(nickname) as len from (
+  select pg_temp.mkuser(null, 'saturate' || g || '@example.com') as nickname
+    from generate_series(1, 500) as g
+) t
+ where not public.is_plain_nickname(nickname)
+    or char_length(nickname) not between 1 and 20;
+rollback to s;
+
+savepoint s;
+\echo '[t 기대] 그 포화 검사가 정말 폴백을 태웠는가 — md5 접미사가 붙은 닉네임이 나온다'
+\echo '         (이 검사가 0이 되면 위 검사는 폴백을 전혀 보지 못하고 통과하는 셈이다)'
+select count(*) > 0 as fallback_actually_fired from (
+  select pg_temp.mkuser(null, 'probe' || g || '@example.com') as nickname
+    from generate_series(1, 500) as g
+) t
+ where nickname ~ '[0-9a-f]{6}$';
 rollback to s;
 
 savepoint s;
@@ -743,6 +784,55 @@ savepoint s;
 select id, nickname from public.profiles where nickname <> public.normalize_nickname(nickname);
 rollback to s;
 
+savepoint s;
+\echo '[전부 t 기대] NFC로 접는다 — 자모 분해형과 완성형이 같은 값이 된다'
+\echo '              (macOS에서 복사한 한글이 이 형태로 오고, NFC 없이는 가-힣 범위를 벗어난다)'
+select public.normalize_nickname(U&'\1112\1161\11AB') = '한'  as nfd_folded,
+       public.is_plain_nickname(public.normalize_nickname(U&'\1112\1161\11AB'))
+                                                                as nfd_then_plain,
+       not public.is_plain_nickname(U&'\1112\1161\11AB')      as raw_nfd_rejected,
+       -- ⚠ NFKC가 아니다: 전각 A는 접히지 **않아야** 한다(접히면 동형이의가 통과한다)
+       public.normalize_nickname(U&'\FF21') = U&'\FF21'         as fullwidth_kept;
+rollback to s;
+
+\echo ''
+\echo '--- 23c. 닉네임 허용 문자 (is_plain_nickname · 20260910000001)'
+\echo '    한글 음절·한글 자모·영문·숫자만. 공백도 받지 않는다.'
+\echo '    ⚠ 문자 집합은 src/shared/lib/text.ts의 isPlainNickname과 한 쌍이다 — 한쪽만 고치지 말 것.'
+savepoint s;
+\echo '[전부 t 기대] 허용 문자는 통과한다'
+select public.is_plain_nickname('손흥민')           as hangul,
+       public.is_plain_nickname('ㅋㅋ부장')          as jamo_mixed,
+       public.is_plain_nickname(U&'\3160\3160')     as jamo_only,
+       public.is_plain_nickname('abc123')           as alnum,
+       public.is_plain_nickname('ABCdef')           as mixed_case,
+       public.is_plain_nickname('a')                as single_char;
+rollback to s;
+savepoint s;
+\echo '[전부 t 기대] 그 밖의 문자는 거부한다 — 공백·이모지·특수문자·타 문자체계'
+\echo '              키릴 a·전각 A는 **사칭 벡터**다(라틴 글자와 화면에서 구분되지 않는다)'
+select not public.is_plain_nickname('손 흥민')      as space,
+       not public.is_plain_nickname('손흥민⚽')      as emoji,
+       not public.is_plain_nickname('son_min')      as underscore,
+       not public.is_plain_nickname('son-min')      as hyphen,
+       not public.is_plain_nickname('nick.name')    as dot,
+       not public.is_plain_nickname('<script>')     as tag,
+       not public.is_plain_nickname('漢字')          as hanja,
+       not public.is_plain_nickname('カナ')          as kana,
+       not public.is_plain_nickname(U&'\0430' || 'lice') as cyrillic_a,
+       not public.is_plain_nickname(U&'\FF21' || 'BC')   as fullwidth_a,
+       not public.is_plain_nickname('')             as empty;
+rollback to s;
+savepoint s;
+\echo '[t 기대] 자모 범위의 상한이 ㅣ(U+3163)다 — 다음 문자 U+3164는 HANGUL FILLER로'
+\echo '         화면에 아무것도 그리지 않는다. 한 글자만 넓혀도 보이지 않는 닉네임이 돌아온다'
+select not public.is_plain_nickname(U&'\3164') as hangul_filler_rejected;
+rollback to s;
+savepoint s;
+\echo '[0행 기대] 기존 행이 전부 허용 문자다 (profiles_nickname_plain)'
+select id, nickname from public.profiles where not public.is_plain_nickname(nickname);
+rollback to s;
+
 \echo ''
 \echo '=== 24. 프로필 편집 (20260809000001) ==='
 \echo '    편집 UI가 생기면서 20260801000006이 회수했던 UPDATE 권한을 되살렸다 —'
@@ -758,6 +848,35 @@ savepoint s; :login_alice
 update public.profiles set nickname = '  손' || U&'\200B' || '흥민  ' where id = :'alice';
 reset role;
 select nickname from public.profiles where id = :'alice';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 이모지 닉네임 (profiles_nickname_plain — 20260910000001)'
+update public.profiles set nickname = '손흥민⚽' where id = :'alice';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 공백이 든 닉네임 — 트리거가 공백을 하나로 접지만 **없애지는 않는다**'
+\echo '         (정규화가 통과시킨 값을 CHECK가 받는다는 뜻 — 둘의 역할이 다르다)'
+update public.profiles set nickname = '손 흥민' where id = :'alice';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 키릴 a로 alice 사칭 — 정규형은 통과하지만 허용 문자가 아니다'
+\echo '         정규형 강제가 제로폭 우회를 막은 자리에 남아 있던 마지막 동형이의 구멍이다'
+update public.profiles set nickname = U&'\0430' || 'lice' where id = :'alice';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[한국 기대] NFD 한글(macOS 복붙)은 NFC로 접혀 통과한다 — 거부하면 "한글인데 왜 안 되지"가 된다'
+update public.profiles set nickname = U&'\1112\1161\11AB' || '국' where id = :'alice';
+reset role;
+select nickname from public.profiles where id = :'alice';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[성공] 자모 단독 닉네임 — ㅋㅋ·ㅠㅠ는 한국 커뮤니티의 관용 표기다'
+update public.profiles set nickname = 'ㅋㅋ부장' where id = :'alice';
 rollback to s;
 
 savepoint s; :login_alice
@@ -945,7 +1064,11 @@ values (:pid, :'alice', repeat('가', 10001));
 rollback to s;
 
 savepoint s; :login_alice
-\echo '[성공] 닉네임 200 코드포인트 (profiles_nickname_check 경계)'
+\echo '[성공] 닉네임 200 코드포인트 — CHECK와 btree 유니크 인덱스를 **둘 다** 통과한다'
+\echo '       ⚠ btree 인덱스 행은 8KB 페이지 기준 2704바이트가 상한이다. 코드포인트 한도를'
+\echo '         빼면 어긋남이 CHECK가 아니라 **인덱스**로 옮겨간다(영어 에러라 번역도 안 된다).'
+\echo '       ⚠ 여기 성공이 인덱스 통과의 증거다 — lower(nickname)이 유니크 인덱스라'
+\echo '         인덱스 행이 상한을 넘으면 이 UPDATE 자체가 실패한다.'
 update public.profiles set nickname = repeat('가', 200) where id = :'alice';
 rollback to s;
 
@@ -954,12 +1077,16 @@ savepoint s; :login_alice
 update public.profiles set nickname = repeat('가', 201) where id = :'alice';
 rollback to s;
 
-savepoint s; :login_alice
-\echo '[성공] 닉네임 200자가 btree 유니크 인덱스(lower(nickname))에도 들어간다'
-\echo '       ⚠ btree 인덱스 행은 8KB 페이지 기준 2704바이트가 상한이다. 코드포인트 한도를'
-\echo '         빼면 어긋남이 CHECK가 아니라 **인덱스**로 옮겨간다(영어 에러라 번역도 안 된다).'
-\echo '         200 × 최대 4바이트 = 800바이트 < 2704 — 이 한도가 인덱스도 함께 지킨다.'
-update public.profiles set nickname = repeat(U&'\+01F600', 200) where id = :'alice';
+savepoint s;
+\echo '[600 / t 기대] **허용 문자 집합이 바이트 상한을 보증한다** (20260910000001)'
+\echo '               한글 음절·자모는 UTF-8 3바이트, 영숫자는 1바이트 — 4바이트 문자(이모지 등)는'
+\echo '               is_plain_nickname이 애초에 거부하므로 최악이 200×3=600바이트다(< 2704).'
+-- ⚠ 한때 이 자리를 이모지 200개(4바이트)로 검사했다. 문자 집합이 좁아지면서 그 입력은
+--    CHECK에 먼저 걸려 "기대하지 않은 ERROR"가 됐다 — 최악 문자가 바뀌었으므로 검사도 바뀐다.
+-- ⚠ 문자 집합을 넓힐 때 이 곱셈을 다시 한다. 4바이트 문자를 허용하면 800바이트가 되고,
+--    그건 여전히 2704 아래지만 **한도를 올리면서 넓히면** 그 여유가 사라질 수 있다.
+select octet_length(repeat('가', 200)) as worst_bytes,
+       octet_length(repeat('가', 200)) < 2704 as fits_btree;
 rollback to s;
 
 savepoint s; :login_alice
