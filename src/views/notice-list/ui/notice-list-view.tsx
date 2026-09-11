@@ -75,13 +75,14 @@ export function NoticeListView({ initialNotices, serverNowMs }: NoticeListViewPr
                     ) : (
                       <Pill variant="soft">공지</Pill>
                     )}
-                    <span className="text-[12px] text-ink-mute-2">
+                    {/* 다른 목록 카드(PostCard·SurveyCard)와 같은 마크업 — 날짜는 <time>, 제목은 h1 아래 h2 */}
+                    <time dateTime={notice.opensAt} className="text-[12px] text-ink-mute-2">
                       {formatRelativeTime(notice.opensAt, nowMs)}
-                    </span>
+                    </time>
                   </span>
-                  <span className="line-clamp-2 text-[15px] font-medium leading-[1.45] text-ink">
+                  <h2 className="line-clamp-2 text-[15px] font-medium leading-[1.45] text-ink">
                     {notice.title}
-                  </span>
+                  </h2>
                 </Link>
               </li>
             ))}

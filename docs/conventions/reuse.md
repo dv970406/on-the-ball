@@ -97,6 +97,7 @@
 ## `@/entities/post` · `@/entities/comment`
 - `postKeys` / `commentKeys` — 쿼리 키. 낙관적 업데이트가 prefix 매칭에 의존하므로 계층을 지킨다.
 - `usePostListQuery` / `usePostQuery` / `useCommentListQuery`
+- `useAdminPostListQuery(deleted)` / `useAdminPostQuery(id)` — 어드민 조회. 테이블이 아니라 `admin_post_list` RPC를 부른다(정책이 감춘 삭제 행을 봐야 한다 — `entities/notice`의 어드민 훅과 같은 형태).
 - **`buildCommentListQuery(supabase, postId)`** — 댓글 목록 조립의 단일 소스(`entities/comment/api/list-query.ts` — 서버 안전). ⚠ 상수만 공유하고 `order`를 서버·훅이 각자 적으면 어긋날 자리가 남는다 — **정렬까지 이 함수가 소유한다.**
 - `POST_LIST_LIMIT` / `COMMENT_LIST_LIMIT` — 목록 상한. **화면이 잘림을 안내해야 한다** — 조용히 자르면 그 뒤 항목은 URL을 아는 사람 말고는 도달할 방법이 없다.
 - `POST_LIST_SELECT` / `POST_DETAIL_SELECT` / `COMMENT_SELECT` — PostgREST select 문자열의 단일 소스.
@@ -144,6 +145,7 @@
 > ⚠ 조사는 손으로 붙이지 않는다 — `StaleBanner`가 받침으로 판정한다("입축구**를**").
 
 - `useSurveyListQuery(userId, enabled, initialData)` / `useSurveyQuery(id, userId, enabled, initialData)` / `useSurveyResultsQuery(id, userId, enabled, initialData)` — 목록 · 단건 · 집계.
+  - `useAdminSurveyListQuery(deleted)` / `useAdminSurveyQuery(id)` — 어드민 조회(`admin_survey_list` RPC). 정책이 감춘 삭제 행을 봐야 해서 테이블을 직접 읽지 않는다.
   - ⚠ `initialData`는 **서버 프리페치의 결과**다. 넘길 때는 **키의 `userId`도 서버가 준 값**이어야 하고 `enabled`도 함께 열어야 한다 — 하나라도 어긋나면 서버가 그린 HTML을 첫 프레임에 스켈레톤이 덮는다(실측). 사유는 `nextjs.md`.
 - `surveyKeys` / `SURVEY_LIST_LIMIT` / `Survey` · `SurveyListItem` · `SurveyResult` / `SurveyCard` · `SurveyBlock`.
 - **`buildSurveyListQuery(supabase)`** — 목록 쿼리 조립의 단일 소스(`api/list-query.ts` — 서버 안전). 훅과 SSR 페이지가 **같은 함수**를 부른다(`buildPostListQuery`와 같은 규약·같은 이유).
@@ -175,6 +177,8 @@
 > ("경기 예측"·"매치 예측"과 섞지 않는다). 입축구(`survey`)와 같은 형태의 규약이다.
 
 - `useMatchListQuery(userId, enabled, initialData)` / `useMatchQuery(id, userId, enabled, initialData)` / `useMatchPredictionResultsQuery(id, userId, enabled, initialData)` — 목록 · 단건 · 예측 분포.
+- `useMatchLineupQuery(id, userId, enabled, initialData)` / `useMatchEventsQuery(…)` / `useMatchStatsQuery(…)` — 확정 라인업 · 사건 · 팀 스탯. ⚠ `initialData`의 `undefined`(프리페치 안 함)와 `[]`(받았는데 아직 발표 전)는 다른 뜻이다 — 하나로 접으면 라인업 없는 경기가 매번 재조회된다(`usePollQuery`가 `null`을 정상값으로 두는 것과 같은 이유).
+- `useAdminMatchListQuery(deleted)` / `useAdminMatchQuery(id)` / `useTeamListQuery()` — 어드민 조회(`admin_match_list` RPC · 팀 목록). 다른 슬라이스의 어드민 훅과 같은 형태다.
 - **`useMyAccuracyQuery(userId)`** — 내 적중률. ⚠ **`truncated`를 함께 돌려준다** — PostgREST의 `max_rows`(1,000)에 잘리면 비율이 거짓이 되므로 호출부가 그때는 숫자를 그리지 않고 사실을 알린다(실측: 행 1000 / `Content-Range` 총계 1108). 도달하면 세는 일을 DB로 내린다. ⚠ **컬럼이 아니라 그때그때 센다** — 카운터를 흔드는 경로가 다섯이라(예측 생성·변경·채점·**스코어 정정**·무효화, 그리고 탈퇴 cascade) `like_count`가 겪은 어긋남을 그대로 되풀이한다. ⚠ `match!inner`가 필수다(왼쪽 조인이면 경기 없는 행이 `result` null과 섞인다).
 - `matchKeys` / `Match` · `MatchListPage` · `MatchPick` · `MatchPredictionResult` · `MatchLineup` · `MatchEvent` · `MatchStat` / `MatchCard` · `TeamCrest` · `PredictionBlock` · `LineupPitch` · `LineupBench` · `StatComparison` / `buildPlayerMarks` · `buildStatRows`.
   ⚠ `MATCH_PICKS`·`MATCH_PICK_LABEL`·`Team`·`PredictionAccuracy`·`LineupPlayer`·`PlayerMarks`·`StatRow`·`playerPhotoUrl`은 **배럴에 없다** — 슬라이스 밖 소비자가 0이라 올리지 않았다(`entities/survey`가 `SurveyOption`·`SplitCount`를 뺀 것과 같은 이유). `check:conventions`는 상대 경로 소비를 현역으로 세어 **이 유형을 잡지 못하므로** 손으로 지킨다.
@@ -220,7 +224,8 @@
 
 ## 어드민 백오피스 (`@/features/admin-*`)
 - `admin-match` — `MatchForm` · `useUpdateMatch`/`useUnlockMatch`/`useDeleteMatch`/`useRestoreMatch`/`useSyncMatches`.
-- `admin-survey` — `SurveyForm` · `useCreateSurvey`/`useUpdateSurvey`/`useSetSurveyOptions`/`useEditSurveyOption`/`useDeleteSurvey`/`useRestoreSurvey` · `useSurveyImageUpload`/`useSurveyImageCleanup`.
+- `admin-survey` — `SurveyForm` · `useCreateSurvey`/`useUpdateSurvey`/`useSetSurveyOptions`/`useEditSurveyOption`/`useDeleteSurvey`/`useRestoreSurvey` · `useInvalidateSurveys` · `useSurveyImageUpload`/`useSurveyImageCleanup`.
+  - ⚠ `useInvalidateSurveys`가 따로 있는 이유: 입축구 폼은 문항 저장 → 선택지 저장이 **두 뮤테이션**인데, 각 훅이 `onSuccess`에서 무효화하면 첫 리페치가 `updatedAt`을 바꿔 그 값을 `key`로 쓰는 폼이 **선택지 저장 전에 리마운트**된다 — 관리자가 방금 친 입력이 서버의 옛 값으로 되돌아간다. 그래서 무효화를 **조립하는 쪽**(`views/admin-survey-form`의 `model/`)이 마지막에 한 번 부른다.
 - `admin-post` — `extractImageUrls` · `useStripPostImages`/`useMaskPost`/`useUnmaskPost`/`useAdminDeletePost`/`useAdminRestorePost`/`useEditPostPoll`.
 - `admin-notice` — `NoticeForm` · `useCreateNotice`/`useUpdateNotice`/`useDeleteNotice`/`useRestoreNotice`.
 - ⚠ **jsonb 인자를 만드는 직렬화 함수를 features가 단독으로 소유한다.** 생성 타입이 `Json`이라 키 오타(`bgColor` vs `bg_color`)를 컴파일러가 잡아주지 못한다 — `database.types.ts`의 보증이 여기서만 사라지는 자리다.
@@ -312,6 +317,8 @@
 - `SubHeader` — 상세·작성·수정 화면 상단(뒤로가기 + 공유).
 - `TabScrollArea` — 목록 스크롤 영역(`<main>` 제공 + 스크롤 복원).
 - `AuthShell` — 인증 화면의 공통 껍데기.
+- `AdminShell` — 어드민 화면의 공통 껍데기(상단 구역 레일). ⚠ **하단 탭바를 쓰지 않는다** — 탭바를 두면 `ToastViewport`가 `isTabBarRoute`로 위치를 정하는데 어드민 경로는 `null`이라 토스트가 바 아래에 깔린다. 상단 레일은 목록의 말머리 레일과 **같은 패턴**(`chipClassName` + `<Link aria-current="page">`)이라 새 스타일 예외가 필요 없다.
+- `AdminFilterRail` — 어드민 목록의 '사용 중 / 삭제됨' 필터. ⚠ **상태를 URL이 소유한다**(`?deleted=1`) — 로컬 state면 뒤로가기가 필터를 잃고, `useSearchParams`는 프리렌더를 CSR로 떨어뜨리므로 서버 page가 읽어 prop으로 내린다. 이동이라 `aria-current="page"`다(정렬 레일과 같은 형태).
 - **`NoticeBanner`** — 피드 최상단의 한 줄 공지 배너(최신 **필독** 하나). 없으면 **아무것도 그리지 않는다** — 빈 띠가 첫 화면의 가장 값진 세로 공간을 먹지 않게. ⚠ 조회 실패도 조용히 넘긴다(화면의 본문이 아니라 덧붙는 안내라, 에러 박스를 얹으면 정작 읽으러 온 목록 위에 뜬다). ⚠ 자리는 **말머리 레일 위**다 — 아래로 내리면 공지가 그 말머리에 속한 것으로 읽힌다.
   ⚠ **공지로 가는 진입점은 이 배너 하나다** — 앱바·탭바·프로필에 더하지 않는다. 대가는 **필독 공지가 없는 동안 `/notices`와 `'공지'` 타입 글의 도달 경로가 0이 되는 것**이고(사이트맵에는 남아 크롤러만 본다), 그것까지 포함해 수용한 상태다. 이 배너나 상세의 "목록" 버튼을 없애려면 **대체 진입점을 먼저 만든다.**
 - `AuthStatus` — **비로그인일 때의 로그인 링크**만 그린다(로그인 상태에서는 `null`). ⚠ 라벨이 "로그인"이라 `SignInDialog`를 거치지 않고 곧바로 이동한다 — 목적지가 라벨에 적혀 있어 한 단계 더 묻는 것이 방해다(`CommentBar`의 로그인 버튼도 같다).
