@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { Flame, Heart, MessageCircle } from "lucide-react";
+import Link from "next/link";
 import { ROUTES } from "@/shared/config";
 import { cn, formatCount, formatRelativeTime, useNowMs } from "@/shared/lib";
 import { Icon } from "@/shared/ui";
@@ -11,7 +11,12 @@ import type { PostListItem } from "../model/types";
 
 /** 메타 구분자 — 2px 점 (프로토타입 `.cm-post-meta .sep`) */
 function MetaDot() {
-  return <span aria-hidden className="size-[2px] shrink-0 rounded-full bg-hairline-strong" />;
+	return (
+		<span
+			aria-hidden
+			className="size-[2px] shrink-0 rounded-full bg-hairline-strong"
+		/>
+	);
 }
 
 /**
@@ -29,66 +34,61 @@ function MetaDot() {
  *   목록이 SSR되므로 서버 시각을 받아 **첫 프레임부터 최종 모습**을 그린다.
  */
 export function PostCard({
-  post,
-  serverNowMs,
+	post,
+	serverNowMs,
 }: {
-  post: PostListItem;
-  /** 서버가 렌더한 시점의 시각 — 마운트 전 판정의 기준(PostDetailView와 같은 형태) */
-  serverNowMs?: number;
+	post: PostListItem;
+	/** 서버가 렌더한 시점의 시각 — 마운트 전 판정의 기준(PostDetailView와 같은 형태) */
+	serverNowMs?: number;
 }) {
-  // ⚠ **서버 시각이 우선이다** — `useNowMs()`는 모듈 스코프에 세션당 한 번 고정되어 앱을
-  //   처음 연 순간에 굳는다(사유는 `use-now.ts`). 그 값을 앞에 두면 갓 받은 서버 시각을
-  //   낡은 클라 시계가 이긴다.
-  const clientNowMs = useNowMs();
-  const nowMs = serverNowMs ?? clientNowMs ?? null;
-  const hot = nowMs !== null && isHotPost(post, nowMs);
+	// ⚠ **서버 시각이 우선이다** — `useNowMs()`는 모듈 스코프에 세션당 한 번 고정되어 앱을
+	//   처음 연 순간에 굳는다(사유는 `use-now.ts`). 그 값을 앞에 두면 갓 받은 서버 시각을
+	//   낡은 클라 시계가 이긴다.
+	const clientNowMs = useNowMs();
+	const nowMs = serverNowMs ?? clientNowMs ?? null;
+	const hot = nowMs !== null && isHotPost(post, nowMs);
 
-  return (
-    <li>
-      <Link
-        href={ROUTES.post(post.id)}
-        className="flex gap-3 border-b border-hairline-cool px-5 py-4 transition-colors duration-150 ease-otb active:bg-canvas-soft"
-      >
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] uppercase tracking-[0.4px] text-ink-mute-2">
-              {post.category}
-            </span>
-            {hot && (
-              <span className="inline-flex items-center gap-[3px] text-[10px] font-medium text-crimson">
-                <Icon as={Flame} size={11} />
-                HOT
-              </span>
-            )}
-          </div>
+	return (
+		<li>
+			<Link
+				href={ROUTES.post(post.id)}
+				className="flex gap-3 border-b border-hairline-cool px-5 py-4 transition-colors duration-150 ease-otb active:bg-canvas-soft"
+			>
+				<div className="min-w-0 flex-1">
+					{hot && (
+						<span className="inline-flex items-center gap-[3px] text-[10px] font-medium text-crimson">
+							<Icon as={Flame} size={11} />
+							HOT
+						</span>
+					)}
 
-          {/* 제목도 2행에서 자른다 — 화면 한도는 클라이언트만 강제하므로
+					{/* 제목도 2행에서 자른다 — 화면 한도는 클라이언트만 강제하므로
               우회 삽입된 긴 제목이 카드를 세로로 늘이지 않게 여기서 막는다 */}
-          <h2 className="mt-[5px] line-clamp-2 text-pretty text-[15px] font-medium leading-[1.4] tracking-[-0.3px] text-ink">
-            {post.title}
-          </h2>
+					<h2 className="mt-[5px] line-clamp-2 text-pretty text-[15px] font-medium leading-[1.4] tracking-[-0.3px] text-ink">
+						{post.title}
+					</h2>
 
-          {/* 발췌는 2행에서 자른다 — 원문은 상세에서 본다 */}
-          {post.excerpt && (
-            <p className="mt-[5px] line-clamp-2 text-[13px] leading-[1.5] text-ink-mute">
-              {post.excerpt}
-            </p>
-          )}
+					{/* 발췌는 2행에서 자른다 — 원문은 상세에서 본다 */}
+					{post.excerpt && (
+						<p className="mt-[5px] line-clamp-2 text-[13px] leading-[1.5] text-ink-mute">
+							{post.excerpt}
+						</p>
+					)}
 
-          <div className="mt-[9px] flex items-center gap-2 text-[11px] text-ink-mute-2">
-            <span className="min-w-0 truncate">{post.authorNickname}</span>
-            <MetaDot />
-            <time dateTime={post.createdAt} className="shrink-0">
-              {formatRelativeTime(post.createdAt, nowMs)}
-            </time>
-            {isEdited(post) && (
-              <>
-                <MetaDot />
-                <span className="shrink-0">수정됨</span>
-              </>
-            )}
-            <MetaDot />
-            {/*
+					<div className="mt-[9px] flex items-center gap-2 text-[11px] text-ink-mute-2">
+						<span className="min-w-0 truncate">{post.authorNickname}</span>
+						<MetaDot />
+						<time dateTime={post.createdAt} className="shrink-0">
+							{formatRelativeTime(post.createdAt, nowMs)}
+						</time>
+						{isEdited(post) && (
+							<>
+								<MetaDot />
+								<span className="shrink-0">수정됨</span>
+							</>
+						)}
+						<MetaDot />
+						{/*
               내가 누른 좋아요는 **하트만** 에메랄드다(에메랄드 자리 표 — `styling.md`).
               윤곽선 없이 통짜로 칠한다 — 디자인 결정이다.
               ⚠ **숫자까지 물들이지 않는다.** 에메랄드(#3ecf8e)는 흰 배경 대비가 1.99:1이라
@@ -96,28 +96,30 @@ export function PostCard({
               ⚠ **상태를 색 혼자 지지 않게 `fill-current`를 함께 둔다.** 안 누른 하트는 속이 빈
                 윤곽이고 누른 하트는 꽉 찬 면이라, 색을 못 보아도 형태로 갈린다.
             */}
-            <span
-              className={cn(
-                "inline-flex shrink-0 items-center gap-[3px] font-mono text-[10px] tabular-nums",
-                post.isLiked && "text-ink",
-              )}
-            >
-              <Icon
-                as={Heart}
-                size={11}
-                className={post.isLiked ? "fill-current text-primary" : undefined}
-              />
-              {formatCount(post.likeCount)}
-              <span className="sr-only">좋아요</span>
-            </span>
-            <span className="inline-flex shrink-0 items-center gap-[3px] font-mono text-[10px] tabular-nums">
-              <Icon as={MessageCircle} size={11} />
-              {formatCount(post.commentCount)}
-              <span className="sr-only">댓글</span>
-            </span>
-          </div>
-        </div>
-      </Link>
-    </li>
-  );
+						<span
+							className={cn(
+								"inline-flex shrink-0 items-center gap-[3px] font-mono text-[10px] tabular-nums",
+								post.isLiked && "text-ink",
+							)}
+						>
+							<Icon
+								as={Heart}
+								size={11}
+								className={
+									post.isLiked ? "fill-current text-primary" : undefined
+								}
+							/>
+							{formatCount(post.likeCount)}
+							<span className="sr-only">좋아요</span>
+						</span>
+						<span className="inline-flex shrink-0 items-center gap-[3px] font-mono text-[10px] tabular-nums">
+							<Icon as={MessageCircle} size={11} />
+							{formatCount(post.commentCount)}
+							<span className="sr-only">댓글</span>
+						</span>
+					</div>
+				</div>
+			</Link>
+		</li>
+	);
 }
