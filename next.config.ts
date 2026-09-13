@@ -4,6 +4,21 @@ const nextConfig: NextConfig = {
   // 굳이 프레임워크와 버전대를 알려줄 이유가 없다 (X-Powered-By: Next.js)
   poweredByHeader: false,
 
+  experimental: {
+    /*
+     * React `<ViewTransition>`을 라우트 이동에서 발화시킨다 — 목록 카드의 엠블럼이 상세의
+     * 헤더로 이어지는 셰어드 엘리먼트(App Store 카드·Airbnb 사진 모핑).
+     *
+     * ⚠ **experimental이다.** 미지원 브라우저에서는 전환 없이 즉시 바뀌고(문서 명시), Safari는
+     *   일부 애니메이션이 다르게 동작한다. 이름을 준 요소(`match-{id}-{side}`)만 모핑한다 —
+     *   페이지 전체 크로스페이드는 `globals.css`가 `:root { view-transition-name: none }`으로
+     *   끈다(스크롤 복원·시트 상태가 라우트 언마운트 위에 서 있는 구조라 전환 범위를 좁게 둔다,
+     *   `nextjs.md`).
+     * ⚠ 타입은 `src/types/react-canary.d.ts`가 붙인다.
+     */
+    viewTransition: true,
+  },
+
   images: {
     /*
      * 선수·감독 사진(`entities/match`의 `PlayerPhoto`).

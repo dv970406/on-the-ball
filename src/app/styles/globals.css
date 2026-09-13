@@ -259,6 +259,20 @@ button:not(:disabled) {
   }
 }
 
+/* 라우트 전환의 셰어드 엘리먼트(엠블럼) — 이름을 준 요소만 움직인다(next.config 주석).
+   ⚠ UA 스타일시트가 `:root`에 `view-transition-name: root`를 줘서 그대로 두면 전환마다
+     페이지 전체가 크로스페이드한다(그라데이션·블러 금지와 같은 층위의 "덧씌우는 효과"이고,
+     스크롤 복원과 겹친다) — 루트 이름을 끄면 나머지 화면은 즉시 바뀌고 엠블럼만 날아간다.
+   브라우저 기본(0.25s ease)을 Tifo 이징·시간으로 맞춘다. */
+:root {
+  view-transition-name: none;
+}
+
+::view-transition-group(*) {
+  animation-duration: 300ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
 /* 모션 최소화 환경 존중 — 트랜지션/애니메이션 0ms */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -267,6 +281,12 @@ button:not(:disabled) {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0ms !important;
+  }
+  /* 뷰 트랜지션 의사 요소는 위 선택자에 걸리지 않는다 — 따로 끈다 */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
   }
 }
 

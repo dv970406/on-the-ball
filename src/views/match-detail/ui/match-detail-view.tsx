@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { ViewTransition, useRef, useState } from "react";
 import {
   LineupBench,
   LineupPitch,
@@ -316,7 +316,10 @@ export function MatchDetailView({
             */}
             <h1 className="mt-4 grid grid-cols-[1fr_auto_1fr] items-start gap-3">
               <span className="flex min-w-0 flex-col items-center gap-2.5">
+                {/* 목록 카드의 엠블럼과 같은 이름 — 셰어드 엘리먼트 모핑(next.config 주석) */}
+                <ViewTransition name={`match-${match.id}-home`}>
                   <TeamCrest team={match.homeTeam} size={44} />
+                </ViewTransition>
                 <span
                   className={cn(
                     "text-balance text-center text-[15px] leading-[1.35] tracking-[-0.3px]",
@@ -344,7 +347,9 @@ export function MatchDetailView({
               </span>
 
               <span className="flex min-w-0 flex-col items-center gap-2.5">
+                <ViewTransition name={`match-${match.id}-away`}>
                   <TeamCrest team={match.awayTeam} size={44} />
+                </ViewTransition>
                 <span
                   className={cn(
                     "text-balance text-center text-[15px] leading-[1.35] tracking-[-0.3px]",

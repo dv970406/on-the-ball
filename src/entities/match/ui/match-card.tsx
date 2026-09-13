@@ -2,6 +2,7 @@
 
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
+import { ViewTransition } from "react";
 import { ROUTES } from "@/shared/config";
 import { cn, formatKickoffTime, useEntranceMotion, useNowMs } from "@/shared/lib";
 import { Icon, LiveDot, Pill } from "@/shared/ui";
@@ -115,7 +116,10 @@ export function MatchCard({
             >
               {match.homeTeam.shortName}
             </span>
+            {/* 상세의 h1 엠블럼과 같은 이름 — 이동할 때 목록 자리에서 헤더로 날아간다(next.config 주석) */}
+            <ViewTransition name={`match-${match.id}-home`}>
               <TeamCrest team={match.homeTeam} size={24} />
+            </ViewTransition>
           </span>
 
           {score ? (
@@ -137,7 +141,9 @@ export function MatchCard({
           )}
 
           <span className="flex min-w-0 items-center gap-2">
+            <ViewTransition name={`match-${match.id}-away`}>
               <TeamCrest team={match.awayTeam} size={24} />
+            </ViewTransition>
             <span
               className={cn(
                 "truncate",
