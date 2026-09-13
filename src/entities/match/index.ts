@@ -48,6 +48,8 @@ export { groupMatchesByDay } from "./lib/day-group";
 export { MatchCard } from "./ui/match-card";
 // ⚠ 상세도 엠블럼을 그리므로 배럴에 올린다(카드는 같은 슬라이스라 상대 경로로 가져간다).
 export { TeamCrest } from "./ui/team-crest";
+// ⚠ 스코어도 같다 — 상세의 h1·고정 바가 카드와 같은 구르는 숫자를 쓴다(값이 바뀌면 굴러간다).
+export { Scoreline } from "./ui/scoreline";
 export { PredictionBlock } from "./ui/prediction-block";
 // ⚠ 라인업 UI에는 `"use client"`가 없지만 지금 소비자가 클라이언트 뷰라 클라이언트로 내려간다.
 //    피치 좌표의 좌우 판정은 `lib/pitch-layout`이 단독으로 갖고 배럴에 올리지 않는다

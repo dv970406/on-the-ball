@@ -11,6 +11,7 @@ import {
   type MatchLineup,
   type MatchStat,
   type MatchPredictionResult,
+  Scoreline,
   TeamCrest,
   isAwaitingResult,
   isMatchInProgress,
@@ -18,8 +19,8 @@ import {
 } from "@/entities/match";
 import { MatchPrediction } from "@/features/predict-match";
 import { ROUTES } from "@/shared/config";
-import { cn, formatKickoff, useNowMs } from "@/shared/lib";
-import { EmptyState, Pill, SignInDialog, Skeleton, StaleBanner } from "@/shared/ui";
+import { cn, formatKickoff, useEntranceMotion, useNowMs } from "@/shared/lib";
+import { EmptyState, LiveDot, Pill, SignInDialog, Skeleton, StaleBanner } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
 import { useMatchDetail } from "../model/use-match-detail";
 import {
@@ -115,6 +116,9 @@ export function MatchDetailView({
    * ⚠ 이미 그보다 위에 있으면 건드리지 않는다(대진을 보고 있는 사람을 밀어내지 않는다).
    */
   const handleSectionChange = (id: MatchSectionId) => {
+    // 이미 보고 있는 탭이면 아무것도 하지 않는다 — 안 그러면 첫 클릭에 `revealSections`가
+    // 켜지면서 보고 있던 패널이 그 자리에서 다시 등장한다
+    if (id === activeSection) return;
     setPickedSection(id);
     const main = mainRef.current;
     const heroEnd = heroEndNode.current;
@@ -129,6 +133,14 @@ export function MatchDetailView({
   //   ⚠ `??`는 단축평가라 훅을 뒤에 두면 조건부 호출이 된다 → 먼저 무조건 부른다.
   const clientNowMs = useNowMs();
   const nowMs = serverNowMs ?? clientNowMs ?? null;
+  // 클라이언트 이동으로 열린 상세에서만 적중 배지가 떠오르고 라인업·기록이 등장한다(훅 주석)
+  const play = useEntranceMotion();
+  /**
+   * 라인업·기록의 등장 모션 — 클라이언트 이동으로 열렸거나 **사용자가 탭을 고른 뒤**에만 건다.
+   * 하드 로드의 첫 패널은 SSR HTML 그대로다. 클래스가 붙은 뒤로는 패널이 `hidden`에서 벗어날
+   * 때마다 브라우저가 애니메이션을 새로 시작하므로 탭을 오갈 때마다 재생된다.
+   */
+  const revealSections = play || pickedSection !== null;
 
   /**
    * ⚠ **양 팀이 다 있을 때만 피치를 그린다.** 한쪽만 오는 경우가 실제로 있는데(제공자가
@@ -176,8 +188,11 @@ export function MatchDetailView({
   const title = match ? `${match.homeTeam.name} vs ${match.awayTeam.name}` : "경기";
   // ⚠ **두 컬럼을 함께 본다** — `MatchCard`와 같은 판정이어야 한다(DB CHECK가 쌍을 강제하지만
   //   판정이 갈리면 한쪽만 채워진 행에서 `2 - null`이 그려진다).
-  const scored =
-    match !== undefined && match !== null && match.homeScore !== null && match.awayScore !== null;
+  // ⚠ boolean이 아니라 좁혀진 값이다 — 두 스코어를 `number`로 받는 `Scoreline`에 그대로 넘긴다
+  const score =
+    match != null && match.homeScore !== null && match.awayScore !== null
+      ? { home: match.homeScore, away: match.awayScore }
+      : null;
   /** 판정은 `isMatchInProgress`가 단독으로 소유한다(상한이 필요한 이유는 그 함수 주석에) */
   const inProgress = match != null && nowMs !== null && isMatchInProgress(match, nowMs);
   /** ⚠ 목록 카드와 **같은 어휘**를 쓴다 — 침묵하면 과거 날짜 + `VS`가 "아직 시작 안 함"으로 읽힌다 */
@@ -265,7 +280,12 @@ export function MatchDetailView({
               */}
               {/* ⚠ 진행 중만 `dark`인 것은 위계다 — 취소·결과 대기는 "정보가 없다"이고
                     이것은 **지금 벌어지는 일**이다(`MatchCard`와 같은 판단). */}
-              {inProgress && <Pill variant="dark">진행 중</Pill>}
+              {inProgress && (
+                <Pill variant="dark">
+                  <LiveDot tone="current" pulse className="mr-0.5" />
+                  진행 중
+                </Pill>
+              )}
               {awaiting && <Pill variant="outline">결과 대기</Pill>}
               {/*
                 ⚠ **적중/실패를 상세에서도 글자로 말한다.** 목록 카드는 `적중`/`실패`라고
@@ -277,7 +297,11 @@ export function MatchDetailView({
                   `check:conventions`의 에메랄드 대조가 **리터럴을 훑기 때문에 보이지 않는다** —
                   화이트리스트를 우회하는 바로 그 형태다(실제로 이 자리에서 검사가 잡아냈다).
               */}
-              {hit === true && <Pill variant="green">적중</Pill>}
+              {hit === true && (
+                <Pill variant="green" className={play ? "animate-fade-up" : undefined}>
+                  적중
+                </Pill>
+              )}
               {hit === false && <Pill variant="crimson">실패</Pill>}
             </p>
 
@@ -292,7 +316,7 @@ export function MatchDetailView({
             */}
             <h1 className="mt-4 grid grid-cols-[1fr_auto_1fr] items-start gap-3">
               <span className="flex min-w-0 flex-col items-center gap-2.5">
-                <TeamCrest team={match.homeTeam} size={44} />
+                  <TeamCrest team={match.homeTeam} size={44} />
                 <span
                   className={cn(
                     "text-balance text-center text-[15px] leading-[1.35] tracking-[-0.3px]",
@@ -306,19 +330,21 @@ export function MatchDetailView({
 
               {/* ⚠ 높이를 엠블럼(44px)에 맞춰 스코어의 중심이 엠블럼 중심과 맞게 한다 */}
               <span className="flex h-11 shrink-0 items-center font-mono tabular-nums">
-                {scored ? (
-                  <span className="flex items-center gap-2 text-[28px] font-bold">
-                    <span className={awayWon ? "text-ink-mute" : "text-ink"}>{match.homeScore}</span>
-                    <span className="text-ink-faint">-</span>
-                    <span className={homeWon ? "text-ink-mute" : "text-ink"}>{match.awayScore}</span>
-                  </span>
+                {score ? (
+                  <Scoreline
+                    className="text-[28px] font-bold"
+                    home={score.home}
+                    away={score.away}
+                    homeClassName={awayWon ? "text-ink-mute" : "text-ink"}
+                    awayClassName={homeWon ? "text-ink-mute" : "text-ink"}
+                  />
                 ) : (
                   <span className="text-[15px] font-medium text-ink-mute-2">VS</span>
                 )}
               </span>
 
               <span className="flex min-w-0 flex-col items-center gap-2.5">
-                <TeamCrest team={match.awayTeam} size={44} />
+                  <TeamCrest team={match.awayTeam} size={44} />
                 <span
                   className={cn(
                     "text-balance text-center text-[15px] leading-[1.35] tracking-[-0.3px]",
@@ -401,7 +427,11 @@ export function MatchDetailView({
                     {match.homeTeam.shortName}
                   </span>
                   <span className="font-mono font-bold tabular-nums text-ink">
-                    {scored ? `${match.homeScore} - ${match.awayScore}` : "VS"}
+                    {score ? (
+                      <Scoreline className="gap-1" home={score.home} away={score.away} />
+                    ) : (
+                      "VS"
+                    )}
                   </span>
                   <span className={awayWon ? "font-semibold text-ink" : "text-ink-mute"}>
                     {match.awayTeam.shortName}
@@ -439,6 +469,7 @@ export function MatchDetailView({
                   homeTeam={match.homeTeam}
                   awayTeam={match.awayTeam}
                   marks={detail.playerMarks}
+                  animate={revealSections}
                 />
                 <LineupBench
                   home={home}
@@ -468,6 +499,7 @@ export function MatchDetailView({
                   rows={statRows}
                   homeTeam={match.homeTeam}
                   awayTeam={match.awayTeam}
+                  animate={revealSections}
                 />
               </div>
             ) : null}

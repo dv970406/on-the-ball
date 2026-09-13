@@ -55,8 +55,13 @@ export function MatchSectionTabs({ sections, active, onChange }: MatchSectionTab
     refs.current[next.id]?.focus();
   };
 
+  const activeIndex = Math.max(
+    0,
+    sections.findIndex((s) => s.id === active),
+  );
+
   return (
-    <div role="tablist" aria-label="경기 정보" className="flex">
+    <div role="tablist" aria-label="경기 정보" className="relative flex">
       {sections.map((section) => {
         const selected = section.id === active;
         return (
@@ -84,16 +89,29 @@ export function MatchSectionTabs({ sections, active, onChange }: MatchSectionTab
               }
             }}
             className={cn(
-              "flex-1 border-b-2 pb-2.5 pt-2 text-[14px] transition-colors duration-150 ease-otb",
-              selected
-                ? "border-ink font-semibold text-ink"
-                : "border-transparent text-ink-mute-2",
+              // 밑줄은 버튼이 아니라 아래 인디케이터 하나가 긋는다 — 투명 border는 자리만 잡는다
+              "flex-1 border-b-2 border-transparent pb-2.5 pt-2 text-[14px] transition-colors duration-150 ease-otb",
+              selected ? "font-semibold text-ink" : "text-ink-mute-2",
             )}
           >
             {section.label}
           </button>
         );
       })}
+      {/*
+       * 미끄러지는 밑줄(iOS Segmented Control · Material Tabs) — 탭이 "바뀐다"가 아니라
+       * "여기서 저기로 간다"로 읽힌다. 폭·위치가 탭 수와 선택에 따라 정해지는 런타임 값이라
+       * `style`이고, 이 요소에는 표준 translate 유틸이 없어 transform이 여기 하나뿐이다.
+       */}
+      {/*
+        ⚠ 폭은 `style`이 아니라 클래스다 — 구역은 `MatchSectionId` 둘뿐이고 이 컴포넌트는 둘 다
+          있을 때만 렌더되므로(`tabbed`) 항상 절반이다. 구역이 늘면 여기 폭도 함께 고친다.
+      */}
+      <span
+        aria-hidden
+        className="absolute bottom-0 left-0 h-0.5 w-1/2 bg-ink transition-transform duration-250 ease-otb"
+        style={{ transform: `translateX(${activeIndex * 100}%)` }}
+      />
     </div>
   );
 }

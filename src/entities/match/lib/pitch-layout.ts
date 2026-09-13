@@ -12,6 +12,8 @@ export interface PitchSpot {
   leftPct: number;
   /** 뷰어 기준 위에서(%) — 피치 전체 높이 기준이라 양 팀이 한 좌표계를 공유한다 */
   topPct: number;
+  /** 골키퍼가 0인 줄 번호 — 등장 모션이 이 순서로 줄을 세운다(GK → DF → MF → FW) */
+  rowIndex: number;
 }
 
 /**
@@ -67,6 +69,7 @@ export function buildPitchSpots(starters: LineupPlayer[], side: MatchSide): Pitc
 
     return {
       player,
+      rowIndex,
       // 위쪽 팀만 좌우를 뒤집는다(위 주석)
       leftPct: (isTop ? 1 - across : across) * 100,
       // 위쪽 팀은 위 절반, 아래쪽 팀은 아래 절반. 각자 자기 골라인에서 하프라인 쪽으로 자란다.

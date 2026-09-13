@@ -1,9 +1,10 @@
 "use client";
 
 import { Check } from "lucide-react";
+import { useState } from "react";
 import { COLOR } from "@/shared/config";
-import { cn, formatCount } from "@/shared/lib";
-import { Icon, RatioBar, Skeleton } from "@/shared/ui";
+import { cn, formatCount, useEntranceMotion } from "@/shared/lib";
+import { CountUp, DrawnCheck, Icon, RatioBar, Skeleton } from "@/shared/ui";
 import { isMatchSettled } from "../lib/open";
 import type { Match, MatchPick, MatchPredictionResult } from "../model/types";
 import { MATCH_PICKS, MATCH_PICK_LABEL } from "../model/types";
@@ -87,6 +88,17 @@ export function PredictionBlock({
    * ⚠ `result`가 무효 경기에서도 null이라는 규약은 `isMatchSettled`가 소유한다.
    */
   const settled = isMatchSettled(match);
+  /**
+   * 결과가 늦게 도착한 마운트(클라이언트 이동)에서만 띠가 내려오고 안내가 페이드된다 —
+   * 하드 로드의 SSR HTML은 그대로 둔다(사유는 `useEntranceMotion`). 막대와 숫자는 각자
+   * 안에서 같은 판정을 한다(`RatioBar`·`CountUp`).
+   */
+  const play = useEntranceMotion();
+  /**
+   * **방금 골랐는가** — 내 칸의 체크를 획으로 그릴지 판정한다. 마운트될 때 이미 고른 채였으면
+   * (SSR·이동해 온 화면) 그리지 않는다 — 그때 획이 그려지면 "지금 골랐다"는 거짓 신호다.
+   */
+  const [initialPick] = useState(match.myPick);
 
   return (
     <section
@@ -101,8 +113,9 @@ export function PredictionBlock({
        * ⚠ 칸 폭이 화면의 1/3이라 **라벨은 약칭이어야 한다**(위 `labelOf` 주석).
        */}
       <ul className="grid grid-cols-3 gap-2">
-        {MATCH_PICKS.map((pick) => {
+        {MATCH_PICKS.map((pick, i) => {
           const mine = match.myPick === pick;
+          const justPicked = mine && match.myPick !== initialPick;
           const correct = settled && match.result === pick;
           const count = countOf(pick);
           // 0으로 나누지 않는다 — 분포가 열렸는데 총 0건인 순간이 실제로 있다
@@ -117,7 +130,9 @@ export function PredictionBlock({
                 disabled={!onPick || locked}
                 onClick={onPick ? () => onPick(pick) : undefined}
                 className={cn(
-                  "w-full rounded-sm border px-2 py-2.5 text-center",
+                  // ⚠ `overflow-hidden`은 결과 띠가 위에서 내려올 때(`band-drop`) 칸 밖으로
+                  //   삐져나오지 않게 하는 장치다 — 띠가 `-mt-2.5`로 칸 위 모서리에 붙어 있다.
+                  "w-full overflow-hidden rounded-sm border px-2 py-2.5 text-center",
                   "transition-colors duration-150 ease-otb",
                   mine ? "border-ink" : "border-hairline-cool",
                   /*
@@ -175,6 +190,9 @@ export function PredictionBlock({
                         "-mx-2 -mt-2.5 flex items-center justify-center self-stretch",
                         "rounded-t-[5px] px-1 py-[3px]",
                         correct ? "bg-primary text-on-primary" : "invisible",
+                        // 채점 결과가 칸 위에서 내려온다(Duolingo의 정답 띠) — 이 요소에는 표준
+                        // translate 유틸이 없어 키프레임의 transform과 합성될 것이 없다
+                        correct && play && "animate-[band-drop_250ms_cubic-bezier(0.2,0,0,1)_both]",
                       )}
                     >
                       <Icon as={Check} size={12} />
@@ -183,11 +201,14 @@ export function PredictionBlock({
                   )}
                   <span
                     className={cn(
-                      "w-full truncate text-[14px] leading-[1.3]",
+                      "flex w-full items-center justify-center gap-1 text-[14px] leading-[1.3]",
                       mine ? "font-semibold text-ink" : "text-ink-secondary",
                     )}
                   >
-                    {labelOf(pick)}
+                    {/* 내 칸의 체크 — 방금 골랐을 때만 획이 그려진다(`DrawnCheck` 주석) */}
+                    {mine && <DrawnCheck size={14} animate={justPicked} />}
+                    {/* ⚠ flex 아이템은 `min-width:auto`라 `min-w-0`이 없으면 줄지 않고 넘친다 */}
+                    <span className="min-w-0 truncate">{labelOf(pick)}</span>
                   </span>
                   {/*
                     ⚠ **화면에서 뗀 "승"을 낭독에는 남긴다.** 눈으로는 세 칸이 나란히 놓여
@@ -201,7 +222,7 @@ export function PredictionBlock({
                   {signInRequired && <span className="sr-only"> (로그인 필요)</span>}
                   {results && (
                     <span className="font-mono text-[12px] tabular-nums text-ink-mute">
-                      {Math.round(ratio * 100)}%
+                      <CountUp value={Math.round(ratio * 100)} />%
                       <span className="sr-only"> ({formatCount(count)}명)</span>
                     </span>
                   )}
@@ -218,6 +239,8 @@ export function PredictionBlock({
                     //   진한 막대가 둘 뜬다 — 실제 결과는 위 `실제 결과` 띠가 지고, 막대는 내 예측만 진다.
                     { ratio, color: mine ? COLOR.ink : COLOR.hairlineStrong },
                   ]}
+                  // 분포가 열리면 홈·무·원정 순으로 60ms씩 늦게 자란다(X 투표의 결과 리빌)
+                  enterDelayMs={i * 60}
                 />
               )}
               {awaitingResults && <Skeleton className="mt-2 h-1 w-full" />}
@@ -227,7 +250,16 @@ export function PredictionBlock({
       </ul>
 
       {results ? (
-        <p className="mt-3 text-[12px] text-ink-mute-2">{formatCount(total)}명이 예측했어요</p>
+        <p
+          className={cn(
+            "mt-3 text-[12px] tabular-nums text-ink-mute-2",
+            // 막대 세 개가 다 자란 뒤(320ms)에 따라온다 — 순서가 "공개됐다"를 말한다
+            play && "animate-[cm-fade_200ms_cubic-bezier(0.2,0,0,1)_320ms_both]",
+          )}
+        >
+          <CountUp value={total} format={formatCount} />
+          명이 예측했어요
+        </p>
       ) : (
         /*
          * ⚠ **왜 안 보이는지를 말해 준다.** 게이팅 축이 투표·입축구와 반대라("참여"가 아니라

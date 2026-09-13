@@ -3,11 +3,12 @@
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { ROUTES } from "@/shared/config";
-import { cn, formatKickoffTime, useNowMs } from "@/shared/lib";
-import { Icon, Pill } from "@/shared/ui";
+import { cn, formatKickoffTime, useEntranceMotion, useNowMs } from "@/shared/lib";
+import { Icon, LiveDot, Pill } from "@/shared/ui";
 import { isAwaitingResult, isMatchInProgress, isMatchOpen, isMatchSettled } from "../lib/open";
 import type { Match, MatchPick } from "../model/types";
 import { MATCH_PICK_LABEL } from "../model/types";
+import { Scoreline } from "./scoreline";
 import { TeamCrest } from "./team-crest";
 
 /**
@@ -54,11 +55,17 @@ export function MatchCard({
   const nowMs = serverNowMs ?? clientNowMs ?? null;
 
   const settled = isMatchSettled(match);
-  const scored = match.homeScore !== null && match.awayScore !== null;
+  // ⚠ boolean이 아니라 좁혀진 값이다 — 두 스코어를 `number`로 받는 `Scoreline`에 그대로 넘긴다
+  const score =
+    match.homeScore !== null && match.awayScore !== null
+      ? { home: match.homeScore, away: match.awayScore }
+      : null;
   // 상태 판정은 전부 `lib/open`이 단독으로 소유한다 — 상세와 같은 어휘를 쓰기 위해서다
   const inProgress = nowMs !== null && isMatchInProgress(match, nowMs);
   const awaiting = nowMs !== null && isAwaitingResult(match, nowMs);
   const canPredict = nowMs !== null && isMatchOpen(match, nowMs);
+  // 클라이언트 이동으로 그려진 목록에서만 적중 배지가 떠오른다 — SSR 목록은 그대로다(훅 주석)
+  const play = useEntranceMotion();
 
   return (
     <li>
@@ -78,7 +85,13 @@ export function MatchCard({
               흔해서다 — 목록에 그 배지가 여러 개 깔리면 "한 뷰포트당 컬러 이벤트"가 무너진다.
           */}
           {match.isVoided && <Pill variant="outline">취소됨</Pill>}
-          {inProgress && <Pill variant="dark">진행 중</Pill>}
+          {/* 라이브 도트 — 배지 글자색을 따르는 `current` 톤이다(에메랄드가 카드 수만큼 늘지 않게) */}
+          {inProgress && (
+            <Pill variant="dark">
+              <LiveDot tone="current" pulse className="mr-0.5" />
+              진행 중
+            </Pill>
+          )}
           {/*
             ⚠ **침묵하면 거짓말이 된다.** 연기·스코어 미반영 경기는 과거 날짜에 스코어가
               비어 있어 "아직 시작 안 함"으로 읽혔다(사유는 `isAwaitingResult`).
@@ -102,15 +115,17 @@ export function MatchCard({
             >
               {match.homeTeam.shortName}
             </span>
-            <TeamCrest team={match.homeTeam} size={24} />
+              <TeamCrest team={match.homeTeam} size={24} />
           </span>
 
-          {scored ? (
-            <span className="flex shrink-0 items-center gap-1.5 font-mono text-[17px] font-semibold tabular-nums">
-              <span className={outcomeClassName("home", match.result)}>{match.homeScore}</span>
-              <span className="text-ink-faint">-</span>
-              <span className={outcomeClassName("away", match.result)}>{match.awayScore}</span>
-            </span>
+          {score ? (
+            <Scoreline
+              className="shrink-0 gap-1.5 font-mono text-[17px] font-semibold tabular-nums"
+              home={score.home}
+              away={score.away}
+              homeClassName={outcomeClassName("home", match.result)}
+              awayClassName={outcomeClassName("away", match.result)}
+            />
           ) : (
             // 아직 모르는 것이 스코어가 아니라 "언제 하는가"인 자리 — 날짜는 헤딩이 갖는다
             <time
@@ -122,7 +137,7 @@ export function MatchCard({
           )}
 
           <span className="flex min-w-0 items-center gap-2">
-            <TeamCrest team={match.awayTeam} size={24} />
+              <TeamCrest team={match.awayTeam} size={24} />
             <span
               className={cn(
                 "truncate",
@@ -156,9 +171,15 @@ export function MatchCard({
                   : `${(match.myPick === "home" ? match.homeTeam : match.awayTeam).shortName} 승`}
               </span>
             </span>
+            {/*
+              ⚠ 적중만 떠오른다(`fade-up`) — 실패에는 모션을 주지 않는다. 강조할 감정이 아니고,
+                Duolingo식 오답 흔들기는 바운스라 규약 밖이다.
+            */}
             {settled &&
               (match.result === match.myPick ? (
-                <Pill variant="green">적중</Pill>
+                <Pill variant="green" className={play ? "animate-fade-up" : undefined}>
+                  적중
+                </Pill>
               ) : (
                 <Pill variant="crimson">실패</Pill>
               ))}

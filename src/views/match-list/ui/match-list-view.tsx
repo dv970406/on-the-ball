@@ -10,7 +10,7 @@ import {
   groupMatchesByDay,
 } from "@/entities/match";
 import { cn, formatCount, useNowMs } from "@/shared/lib";
-import { EmptyState, StaleBanner } from "@/shared/ui";
+import { CountUp, EmptyState, StaleBanner } from "@/shared/ui";
 import { AppBar } from "@/widgets/app-bar";
 import { AuthStatus } from "@/widgets/auth-status";
 import { BottomTabBar } from "@/widgets/bottom-tab-bar";
@@ -141,7 +141,7 @@ export function MatchListView({
           <p className="border-b border-hairline-cool bg-canvas-soft px-5 py-3 text-[13px] text-ink-mute">
             내 적중률{" "}
             <span className="font-mono font-semibold tabular-nums text-ink">
-              {Math.round((accuracy.hits / accuracy.total) * 100)}%
+              <CountUp value={Math.round((accuracy.hits / accuracy.total) * 100)} />%
             </span>{" "}
             <span className="text-ink-mute-2">
               ({formatCount(accuracy.hits)}/{formatCount(accuracy.total)})

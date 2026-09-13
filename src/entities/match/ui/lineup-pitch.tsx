@@ -15,6 +15,13 @@ interface LineupPitchProps {
   awayTeam: Team;
   /** 선수별 득점·카드·교체 표시 — 판정은 `lib/player-marks`가 단독으로 갖는다 */
   marks: Map<number, PlayerMarks>;
+  /**
+   * 선수가 골키퍼부터 줄 단위로 나타난다(FotMob·Sofascore의 라인업 등장).
+   * ⚠ 판정은 호출부(뷰)가 한다 — 하드 로드의 SSR HTML에는 걸지 않고, 클라이언트 이동으로
+   *   열렸거나 **탭을 골라 패널이 드러날 때** 건다. 패널이 `hidden`에서 벗어나는 순간
+   *   애니메이션이 새로 시작되므로 탭을 오갈 때마다 자연스럽게 재생된다.
+   */
+  animate?: boolean;
 }
 
 /**
@@ -35,7 +42,14 @@ interface LineupPitchProps {
  *   주지 않는다) 초상권까지 겹치므로, 그 사실과 폴백은 `lib/player-photo`와 `PlayerPhoto`가
  *   진다 — 사진이 없는 선수는 등번호로 떨어진다.
  */
-export function LineupPitch({ home, away, homeTeam, awayTeam, marks }: LineupPitchProps) {
+export function LineupPitch({
+  home,
+  away,
+  homeTeam,
+  awayTeam,
+  marks,
+  animate = false,
+}: LineupPitchProps) {
   const homeSpots = buildPitchSpots(home.starters, "home");
   const awaySpots = buildPitchSpots(away.starters, "away");
   if (homeSpots.length === 0 && awaySpots.length === 0) return null;
@@ -93,13 +107,25 @@ export function LineupPitch({ home, away, homeTeam, awayTeam, marks }: LineupPit
           { spots: awaySpots, team: awayTeam },
         ].map(({ spots, team }) => (
           <div key={team.code} role="group" aria-label={`${team.shortName} 선발`}>
-            {spots.map(({ player, leftPct, topPct }) => (
+            {spots.map(({ player, leftPct, topPct, rowIndex }) => (
           <div
             key={player.playerId}
             // ⚠ 런타임에 계산된 비율이라 `style`이 허용되는 자리다(`styling.md`).
             //   클래스로는 확정할 수 없다 — 값이 포메이션마다 달라진다.
             style={{ left: `${leftPct}%`, top: `${topPct}%` }}
-            className="absolute flex w-[19%] -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1"
+            className="absolute w-[19%] -translate-x-1/2 -translate-y-1/2"
+          >
+          {/*
+           * ⚠ 등장 모션은 **안쪽 래퍼**에 건다. 바깥은 표준 `-translate-*` 유틸로 센터링하는데
+           *   `pop-in` 키프레임이 transform(scale)을 애니메이트하므로 같은 요소에 두면 합성되어
+           *   마커가 튄다(styling.md의 vs-pop 사례). 줄 지연은 런타임 값이라 `style`이다.
+           */}
+          <div
+            className={cn(
+              "flex w-full flex-col items-center gap-1",
+              animate && "animate-[pop-in_260ms_cubic-bezier(0.2,0,0,1)_both]",
+            )}
+            style={animate ? { animationDelay: `${rowIndex * 70}ms` } : undefined}
           >
             <PlayerMarker
               externalId={player.externalId}
@@ -124,6 +150,7 @@ export function LineupPitch({ home, away, homeTeam, awayTeam, marks }: LineupPit
               ) : null}
               {player.name}
             </span>
+          </div>
           </div>
             ))}
           </div>

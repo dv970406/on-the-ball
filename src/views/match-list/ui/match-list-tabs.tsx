@@ -64,12 +64,20 @@ export function MatchListTabs({ active, onChange }: MatchListTabsProps) {
     refs.current[next.id]?.focus();
   };
 
+  const activeIndex = Math.max(
+    0,
+    TABS.findIndex((t) => t.id === active),
+  );
+
   return (
     <div
       role="tablist"
       aria-label="경기 구역"
-      className="flex border-b border-hairline-cool px-5"
+      // ⚠ 인디케이터가 좌우 여백 안에서 움직여야 하므로 `relative`는 여백을 가진 이 요소가 아니라
+      //   안쪽 래퍼가 갖는다 — 아니면 밑줄이 여백까지 셈해 탭과 어긋난다
+      className="border-b border-hairline-cool px-5"
     >
+      <div className="relative flex">
       {TABS.map((tab) => {
         const selected = tab.id === active;
         return (
@@ -97,14 +105,23 @@ export function MatchListTabs({ active, onChange }: MatchListTabsProps) {
               }
             }}
             className={cn(
-              "flex-1 border-b-2 pb-2.5 pt-3 text-[14px] transition-colors duration-150 ease-otb",
-              selected ? "border-ink font-semibold text-ink" : "border-transparent text-ink-mute-2",
+              // 밑줄은 버튼이 아니라 아래 인디케이터 하나가 긋는다 — 투명 border는 자리만 잡는다
+              "flex-1 border-b-2 border-transparent pb-2.5 pt-3 text-[14px] transition-colors duration-150 ease-otb",
+              selected ? "font-semibold text-ink" : "text-ink-mute-2",
             )}
           >
             {tab.label}
           </button>
         );
       })}
+      {/* 미끄러지는 밑줄 — 사유는 경기 상세의 `MatchSectionTabs`와 같다(같은 이유로 합치지 않는다) */}
+      {/* ⚠ 폭은 클래스다 — 탭이 `TABS` 상수 둘로 고정이라 항상 절반이다(탭이 늘면 함께 고친다) */}
+      <span
+        aria-hidden
+        className="absolute bottom-0 left-0 h-0.5 w-1/2 bg-ink transition-transform duration-250 ease-otb"
+        style={{ transform: `translateX(${activeIndex * 100}%)` }}
+      />
+      </div>
     </div>
   );
 }

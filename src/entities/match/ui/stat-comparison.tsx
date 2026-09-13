@@ -1,3 +1,4 @@
+import { cn } from "@/shared/lib/cn";
 import { barPercent, type StatRow } from "../lib/stat-rows";
 import type { Team } from "../model/types";
 
@@ -9,6 +10,11 @@ interface StatComparisonProps {
   rows: StatRow[];
   homeTeam: Team;
   awayTeam: Team;
+  /**
+   * 막대가 가운데(항목)에서 바깥으로 자란다(Opta·WhoScored의 대칭 막대). 행마다 50ms씩 늦다.
+   * ⚠ 판정은 호출부(뷰)가 한다 — `LineupPitch`의 `animate`와 같은 규약·같은 이유.
+   */
+  animate?: boolean;
 }
 
 /**
@@ -30,7 +36,12 @@ interface StatComparisonProps {
  * ⚠ **`RatioBar`를 쓰지 않는다.** 그쪽은 한 줄을 비율로 나누는 컴포넌트인데 여기는 가운데를
  *   기준으로 좌우가 **각자 자라는** 형태라 모양이 다르다(중복이 아니라 다른 물건이다).
  */
-export function StatComparison({ rows, homeTeam, awayTeam }: StatComparisonProps) {
+export function StatComparison({
+  rows,
+  homeTeam,
+  awayTeam,
+  animate = false,
+}: StatComparisonProps) {
   if (rows.length === 0) return null;
 
   return (
@@ -56,8 +67,11 @@ export function StatComparison({ rows, homeTeam, awayTeam }: StatComparisonProps
           </tr>
         </thead>
         <tbody className="border-t border-hairline-cool">
-          {rows.map((row) => {
+          {rows.map((row, i) => {
             const format = (v: number) => `${v.toFixed(row.decimals)}${row.unit}`;
+            // 등장은 width가 아니라 scaleX(`ratio-grow`)라 리플로우가 없다 — 지연은 런타임 값이라 style
+            const grow = animate && "animate-[ratio-grow_320ms_cubic-bezier(0.2,0,0,1)_both]";
+            const delay = animate ? { animationDelay: `${i * 50}ms` } : undefined;
             return (
               <tr key={row.key}>
                 <td className="py-1 pr-2 align-middle">
@@ -68,8 +82,8 @@ export function StatComparison({ rows, homeTeam, awayTeam }: StatComparisonProps
                      *   두 막대가 마주 보아야 비교로 읽힌다.
                      */}
                     <span
-                      style={{ width: `${barPercent(row.home, row.away)}%` }}
-                      className="ml-auto block h-full rounded-[2px] bg-ink"
+                      style={{ width: `${barPercent(row.home, row.away)}%`, ...delay }}
+                      className={cn("ml-auto block h-full origin-right rounded-[2px] bg-ink", grow)}
                     />
                   </span>
                 </td>
@@ -86,8 +100,8 @@ export function StatComparison({ rows, homeTeam, awayTeam }: StatComparisonProps
                 <td className="py-1 pl-2 align-middle">
                   <span className="block h-1.5 overflow-hidden rounded-[2px] bg-canvas-soft">
                     <span
-                      style={{ width: `${barPercent(row.away, row.home)}%` }}
-                      className="block h-full rounded-[2px] bg-ink-mute"
+                      style={{ width: `${barPercent(row.away, row.home)}%`, ...delay }}
+                      className={cn("block h-full origin-left rounded-[2px] bg-ink-mute", grow)}
                     />
                   </span>
                 </td>
