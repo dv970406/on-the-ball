@@ -3,10 +3,13 @@
 import { useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/entities/session";
+import { useMarkHydrated } from "@/shared/lib";
 import { ToastViewport } from "@/shared/ui";
 
 /** 전역 프로바이더 — TanStack Query + supabase 세션 동기화 */
 export function AppProviders({ children }: { children: ReactNode }) {
+  // 등장 모션의 "하이드레이션 이후" 판정을 여기서 세운다 — 모든 페이지가 지나는 유일한 자리다(훅 주석)
+  useMarkHydrated();
   const [queryClient] = useState(
     () =>
       new QueryClient({

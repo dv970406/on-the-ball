@@ -33,6 +33,13 @@ export {
 } from "./text";
 export { useNextParam } from "./use-next-param";
 export { useDuplicateGuard } from "./use-duplicate-guard";
+// 결과·분포가 **늦게 도착할 때만** 등장 모션을 주는 판정과 카운트업 — 사유는 각 훅 주석에.
+//   ⚠ `useMarkHydrated`는 루트(`AppProviders`) 전용이다 — 다른 곳에서 부르지 않는다.
+//   ⚠ 렌더에 숫자를 그리는 쪽은 훅이 아니라 `@/shared/ui`의 `CountUp`을 쓴다(훅을 map 안에서
+//     부를 수 없어 컴포넌트가 필요하다). `useCountUp`의 소비자는 그 컴포넌트 하나다 — 숫자를
+//     그리는 새 자리가 생기면 훅이 아니라 `CountUp`을 쓴다.
+export { useEntranceMotion, useMarkHydrated } from "./use-entrance-motion";
+export { useCountUp } from "./use-count-up";
 // ⚠ 쿼리 키 조각이라 **서버 안전**하다 — 서버 프리페치가 키를 만들 일이 생기면
 //   배럴이 아니라 "@/shared/lib/query-scope" 직접 경로로.
 export { userScope } from "./query-scope";

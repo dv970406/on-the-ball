@@ -185,6 +185,80 @@ button:not(:disabled) {
   }
 }
 
+/* =========================================================
+   결과·데이터 도착 모션 (입축구 · 승부예측 · 경기 상세)
+
+   ⚠ 위 오버레이 블록과 같은 규약이다 — 일반 @keyframes + 소비처의 arbitrary 유틸.
+   ⚠ **"늦게 도착하는 것"에만 건다.** 집계·분포·라인업처럼 사용자 행동이나 탭 전환 뒤에
+     나타나는 내용이 대상이고, SSR로 이미 그려진 HTML에는 걸지 않는다(첫 페인트를 늦추고
+     뒤로가기마다 재생된다). 판정은 `useEntranceMotion`(shared/lib)이 단독으로 갖는다.
+   ⚠ **transform을 애니메이트하는 키프레임은 표준 translate/scale 유틸이 없는 요소에만**
+     얹는다 — Tailwind v4는 그 유틸을 개별 프로퍼티로 내보내 transform과 합성된다
+     (styling.md의 vs-pop 사례). 센터링이 필요한 요소는 안쪽 래퍼에 건다(lineup-pitch).
+   ========================================================= */
+/* 비율 막대가 왼쪽(또는 transform-origin)에서 자란다 — width가 아니라 scale이라 리플로우가 없다 */
+@keyframes ratio-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* 체크 아이콘의 획이 그려진다 — stroke-dasharray는 소비처가 path 길이에 맞춰 준다 */
+@keyframes check-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* 결과 띠가 칸 위에서 내려온다 — 소비하는 칸이 overflow-hidden이어야 위로 삐져나오지 않는다 */
+@keyframes band-drop {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* 피치의 선수 마커가 제자리에서 커지며 나타난다 */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 라이브 도트 — 끝이 없는 표시라 스피너와 같은 예외다(styling.md). 등속이 아니라
+   ease-in-out인 것은 숨 쉬는 리듬을 만들기 위해서이고, 오버슛(바운스)은 없다. */
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.4);
+  }
+}
+
+/* 스코어가 바뀐 순간 칸이 한 번 밝아졌다 가라앉는다 */
+@keyframes score-flash {
+  from {
+    background-color: var(--color-hairline-cool);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
 /* 모션 최소화 환경 존중 — 트랜지션/애니메이션 0ms */
 @media (prefers-reduced-motion: reduce) {
   *,

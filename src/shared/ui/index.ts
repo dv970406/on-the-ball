@@ -14,6 +14,9 @@ export { LiveDot } from "./live-dot";
 export { LiveStatusPill } from "./live-status-pill";
 export { Wordmark } from "./wordmark";
 export { RatioBar, type RatioSegment } from "./ratio-bar";
+// 결과 도착 모션 — 굴러가는 숫자 / 획이 그려지는 체크(사유는 각 파일과 globals.css의 결과 모션 절)
+export { CountUp } from "./count-up";
+export { DrawnCheck } from "./drawn-check";
 export { Skeleton } from "./skeleton";
 export { EmptyState } from "./empty-state";
 export { StaleBanner } from "./stale-banner";
