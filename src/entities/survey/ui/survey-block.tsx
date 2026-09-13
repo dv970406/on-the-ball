@@ -2,7 +2,7 @@
 
 import { COLOR } from "@/shared/config";
 import { cn, formatCount } from "@/shared/lib";
-import { RatioBar, Skeleton } from "@/shared/ui";
+import { CountUp, RatioBar, Skeleton } from "@/shared/ui";
 import type { Survey, SurveyResult } from "../model/types";
 
 interface SurveyBlockProps {
@@ -58,7 +58,7 @@ export function SurveyBlock({
   return (
     <div className="mt-5">
       <ul className="flex flex-col gap-2">
-        {survey.options.map((option) => {
+        {survey.options.map((option, i) => {
           const mine = survey.myOptionId === option.id;
           const count = countOf(option.id);
           // 0으로 나누지 않는다 — 결과가 열렸는데 총 0표인 순간이 실제로 있다(내 표가 롤백된 직후)
@@ -91,7 +91,7 @@ export function SurveyBlock({
                   {mine && <span className="sr-only">— 내가 고른 선택지</span>}
                   {results && (
                     <span className="shrink-0 font-mono text-[12px] tabular-nums text-ink-mute">
-                      {Math.round(ratio * 100)}%
+                      <CountUp value={Math.round(ratio * 100)} />%
                       <span className="sr-only"> ({formatCount(count)}표)</span>
                     </span>
                   )}
@@ -107,6 +107,8 @@ export function SurveyBlock({
                   className="mt-2"
                   height={4}
                   segments={[{ ratio, color: mine ? COLOR.ink : COLOR.hairlineStrong }]}
+                  // 결과가 도착하면 막대가 위에서부터 60ms 간격으로 자란다(X 투표의 결과 리빌)
+                  enterDelayMs={i * 60}
                 />
               )}
               {awaitingResults && <Skeleton className="mt-2 h-1 w-full" />}
@@ -117,7 +119,10 @@ export function SurveyBlock({
 
       {/* ⚠ 참여자 수도 결과의 일부다 — 미참여자에게는 숫자를 흘리지 않는다 */}
       {results && (
-        <p className="mt-3 text-[12px] text-ink-mute-2">{formatCount(total)}명이 참여했어요</p>
+        <p className="mt-3 text-[12px] tabular-nums text-ink-mute-2">
+          <CountUp value={total} format={formatCount} />
+          명이 참여했어요
+        </p>
       )}
     </div>
   );

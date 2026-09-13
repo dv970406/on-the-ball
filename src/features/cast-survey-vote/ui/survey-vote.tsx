@@ -1,6 +1,7 @@
 "use client";
 
-import { useNowMs } from "@/shared/lib";
+import { formatCount, useNowMs } from "@/shared/lib";
+import { CountUp, Skeleton } from "@/shared/ui";
 import { useSessionStore } from "@/entities/session";
 import {
   type Survey,
@@ -137,22 +138,56 @@ export function SurveyVote({
     </>
   );
 
+  const faces = splitCount(survey.options);
+
   /**
-   * 참여했으면 결과를 보여준다 — 분할 카드는 면적으로 고르는 UI라 비율을 읽을 수 없다.
+   * 참여했으면 결과를 보여준다.
+   *
+   * ⚠ **분할 카드는 갈아치우지 않는다.** 한때 투표 직후 카드를 버리고 목록(`SurveyBlock`)으로
+   *   바꿨는데, 이 기능의 시그니처가 **내 표가 반영되는 순간에** 사라졌다. 지금은 카드가 그대로
+   *   남아 시임이 득표비로 움직이고 면 위에 퍼센트가 얹힌다(Instagram 투표 스티커의 결과 화면 —
+   *   도형과 클램프는 `splitSeam`이 소유한다). 정확한 막대가 필요한 3·4분할도 도형은 두고
+   *   숫자만 얹는다 — 거짓 면적보다 낫다.
    * ⚠ **마감됐으면 `pick`이 `undefined`다.** 갈아타기도 정책이 막으므로 누를 수 있으면 거짓말이다.
    */
   if (answered) {
+    const total = results?.reduce((sum, r) => sum + r.voteCount, 0) ?? 0;
     return (
       <>
-        {/* 분할 카드를 통째로 갈아치우는 전환이라 fade를 준다 */}
-        <div className={splitCount(survey.options) ? "animate-fade-up" : undefined}>
+        {faces ? (
+          <div className="mt-5">
+            {/*
+              ⚠ `animateVs`를 미답변 분기와 똑같이 준다. 낙관값으로 이 분기에 왔다가 실패로 되돌아갈 때
+                클래스가 빠졌다 붙으면 VS 배지가 에러 토스트와 함께 다시 pop 한다.
+            */}
+            <SplitCard
+              options={survey.options}
+              count={faces}
+              myOptionId={survey.myOptionId}
+              onPick={pick}
+              results={results}
+              animateVs
+            />
+            {/* ⚠ 참여자 수도 결과의 일부다 — 집계가 오기 전에는 숫자를 흘리지 않는다 */}
+            {results && (
+              <p className="mt-3 text-center text-[12px] tabular-nums text-ink-mute-2">
+                <CountUp value={total} format={formatCount} />
+                명이 참여했어요
+              </p>
+            )}
+            {/* 집계를 기다리는 동안 — 실패는 아래 `errors`가 알리므로 이 자리는 "곧 온다"만 말한다 */}
+            {results === null && resultsPending && (
+              <Skeleton className="mx-auto mt-3 h-3 w-28" />
+            )}
+          </div>
+        ) : (
           <SurveyBlock
             survey={survey}
             results={results}
             resultsPending={resultsPending}
             onVote={pick}
           />
-        </div>
+        )}
         {open === false && (
           <p className="mt-2 text-[12px] text-ink-mute-2">마감된 입축구라 선택을 바꿀 수 없어요.</p>
         )}
@@ -170,8 +205,6 @@ export function SurveyVote({
       </>
     );
   }
-
-  const faces = splitCount(survey.options);
 
   if (!faces) {
     return (

@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { COLOR, surveyImageUrl } from "@/shared/config";
 import { cn } from "@/shared/lib";
-import type { SurveyOption } from "../model/types";
-import { type SplitCount, splitLayout } from "../lib/split-layout";
+import { CountUp, DrawnCheck } from "@/shared/ui";
+import type { SurveyOption, SurveyResult } from "../model/types";
+import { type SplitCount, splitLayout, splitSeam } from "../lib/split-layout";
 import { VsBadge } from "./vs-badge";
 
 interface SplitCardProps {
@@ -16,6 +18,12 @@ interface SplitCardProps {
   onPick?: (optionId: number) => void;
   /** VS 배지 등장 pop */
   animateVs?: boolean;
+  /**
+   * 선택지별 득표수. **`null`·`undefined`면 아직 볼 수 없다**(미참여·비로그인·집계 대기) —
+   * 열리면 면이 득표비로 갈리고(2분할) 각 면에 퍼센트가 얹힌다. 빈 배열은 "열렸는데
+   * 표가 없다"라 전부 0%다(`SurveyBlock`과 같은 계약).
+   */
+  results?: SurveyResult[] | null;
 }
 
 /**
@@ -48,7 +56,20 @@ export function SplitCard({
   myOptionId,
   onPick,
   animateVs = false,
+  results,
 }: SplitCardProps) {
+  const open = results != null;
+  const total = results?.reduce((sum, r) => sum + r.voteCount, 0) ?? 0;
+  const ratioOf = (optionId: number) =>
+    total > 0 ? (results?.find((r) => r.optionId === optionId)?.voteCount ?? 0) / total : 0;
+  /**
+   * 결과가 열리면 **면적이 득표비를 말한다**(Instagram 투표 스티커). 2분할만 시임이 움직이고
+   * 3·4분할은 도형을 두고 숫자만 얹는다 — 사유는 `splitSeam` 주석에.
+   * ⚠ 총 0표(내 표가 롤백된 직후)면 반반으로 둔다 — 0으로 나눈 NaN이 폴리곤에 들어가면
+   *   면이 통째로 사라진다.
+   */
+  const seam = open ? splitSeam(count, total > 0 ? ratioOf(options[0].id) : 0.5) : null;
+
   return (
     <div
       // ⚠ 목록과 상세가 같은 카드를 쓰므로 비율이 갈릴 이유가 없다 — 1:1 고정이다.
@@ -66,9 +87,11 @@ export function SplitCard({
           count={count}
           mine={myOptionId === option.id}
           onPick={onPick}
+          clipPathOverride={seam?.clipPaths[i]}
+          percent={open ? Math.round(ratioOf(option.id) * 100) : null}
         />
       ))}
-      <VsBadge animate={animateVs} />
+      <VsBadge animate={animateVs} topPct={seam?.junctionTopPct} />
     </div>
   );
 }
@@ -79,10 +102,22 @@ interface FaceProps {
   count: SplitCount;
   mine: boolean;
   onPick?: (optionId: number) => void;
+  /** 결과가 열린 뒤의 시임(2분할) — 런타임 값이라 `style`로 간다 */
+  clipPathOverride?: string;
+  /** 결과가 열렸을 때의 득표율. `null`이면 아직 닫혀 있다 */
+  percent: number | null;
 }
 
-function Face({ option, index, count, mine, onPick }: FaceProps) {
-  const { clipPath, anchor, nameSize } = splitLayout(count, index);
+function Face({ option, index, count, mine, onPick, clipPathOverride, percent }: FaceProps) {
+  const { clipPath, anchor, nameSize, percentBelow } = splitLayout(count, index);
+  const open = percent !== null;
+  /**
+   * **방금 골랐는가** — 체크의 획을 그릴지 판정한다. 마운트될 때 이미 내 면이었으면(SSR·이동해
+   * 온 화면) 그리지 않는다 — 그때 획이 그려지면 "지금 골랐다"는 거짓 신호다(`DrawnCheck` 주석).
+   * 값을 마운트 시점에 고정하므로 갈아탄 면은 언제나 "방금"이고, 되돌아온 면도 마찬가지다.
+   */
+  const [initiallyMine] = useState(mine);
+  const justPicked = mine && !initiallyMine;
   // 색은 splitCount()가 이미 걸렀다 — 여기 도달하면 둘 다 채워져 있다
   const color = option.textColor ?? undefined;
   // 밝은 글씨 = 어두운 면 → 스크림을 그 대비에 맞춘다.
@@ -107,39 +142,90 @@ function Face({ option, index, count, mine, onPick }: FaceProps) {
     ? `linear-gradient(${SCRIM[onDark ? "dark" : "light"]}), url("${image}") center/cover no-repeat, ${option.bgColor}`
     : (option.bgColor ?? undefined);
 
-  // ⚠ clipPath는 **완성된 클래스 문자열**이다(split-layout 주석 참고) — 여기서 조립하지 않는다
-  const faceClassName = cn("absolute inset-0 overflow-hidden", clipPath);
+  // ⚠ clipPath는 **완성된 클래스 문자열**이다(split-layout 주석 참고) — 여기서 조립하지 않는다.
+  //   결과가 열린 뒤의 시임만 `style`이 덮는다(런타임 값). 같은 프로퍼티라 트랜지션이 잇는다.
+  // ⚠ 내 면이 아닌 면은 결과가 열리면 채도를 낮춘다 — 체크가 이미 "내 것"을 말하므로 색은
+  //   거들 뿐이다(색이 정보를 혼자 지지 않는다, styling.md). 이미지 면도 함께 눌러 사진이
+  //   글자보다 튀지 않게 한다.
+  const faceClassName = cn(
+    "absolute inset-0 overflow-hidden transition-[clip-path,filter] duration-300 ease-otb",
+    clipPath,
+    open && !mine && "[filter:saturate(0.5)_brightness(0.85)]",
+  );
+  const faceStyle = {
+    background,
+    color,
+    clipPath: clipPathOverride,
+    WebkitClipPath: clipPathOverride,
+  };
+
+  /**
+   * 퍼센트 + 체크 — 결과가 열리면 이름 곁에 한 줄이 열린다(시임에 가까운 쪽, `percentBelow`).
+   * ⚠ 높이를 `grid-template-rows: 0fr → 1fr`로 트랜지션해 이름이 미끄러져 자리를 내준다.
+   * ⚠ `inline-flex`인 이유: 앵커의 `text-align`(left/right/center)을 그대로 따르기 위해서다.
+   * ⚠ 체크는 결과가 닫혀 있어도 내 면에 뜬다 — 집계를 기다리는 동안에도 "내 표가 들어갔다"는
+   *   응답이 있어야 탭이 먹었는지 알 수 있다.
+   */
+  const shown = open || mine;
+  const percentRow = (
+    <span
+      className={cn(
+        "grid transition-[grid-template-rows] duration-300 ease-otb",
+        shown ? "[grid-template-rows:1fr]" : "[grid-template-rows:0fr]",
+      )}
+    >
+      <span className="block overflow-hidden">
+        <span
+          className={cn(
+            "inline-flex items-center gap-1.5 font-mono text-[26px] font-semibold leading-none tabular-nums",
+            percentBelow ? "pt-2" : "pb-2",
+            "transition-opacity duration-300 ease-otb",
+            shown ? "opacity-100" : "opacity-0",
+          )}
+        >
+          {mine && <DrawnCheck size={22} animate={justPicked} />}
+          {open && (
+            <span>
+              <CountUp value={percent} />%
+            </span>
+          )}
+        </span>
+      </span>
+    </span>
+  );
 
   const content = (
     <span className={cn("absolute block", anchor)}>
+      {!percentBelow && percentRow}
       <span className={cn("block font-bold", nameSize)}>{option.label}</span>
 
       {option.subtitle && (
         <span className="mt-2 block text-[12px] opacity-70">{option.subtitle}</span>
       )}
+      {percentBelow && percentRow}
 
       {/* ⚠ 텍스트가 든 요소라 aria-label을 붙이지 않는다(콘텐츠를 덮어쓴다) */}
       {mine && <span className="sr-only">— 내가 고른 선택지</span>}
     </span>
   );
 
-  // 읽기 전용(히어로) — 카드 전체를 감싼 Link가 이동을 맡는다
-  if (!onPick) {
-    return (
-      <div className={faceClassName} style={{ background, color }}>
-        {content}
-      </div>
-    );
-  }
-
-  // 투표 모드 — 네이티브 button (Enter/Space·포커스 링·커서를 브라우저가 제공한다)
+  /**
+   * 네이티브 button — Enter/Space·포커스 링·커서를 브라우저가 제공한다.
+   *
+   * ⚠⚠ **읽기 전용이어도 요소 타입을 바꾸지 않는다(`disabled`로만 가른다).** 한때 `onPick`이 없으면
+   *   `div`를 그렸는데, 서버 렌더·하이드레이션은 세션 `loading`이라 `div`였다가 세션이 복원되는
+   *   순간 `button`으로 바뀌면서 **면의 서브트리가 통째로 재마운트**됐다 — 그 안의 `CountUp`이
+   *   하이드레이션 뒤에 새로 마운트된 것으로 판정돼 이미 참여한 카드가 하드 로드마다
+   *   100%→0%→100%로 튀었다(실측). 세션 상태로 갈리는 것은 속성까지다(`useEntranceMotion` 주석).
+   */
   return (
     <button
       type="button"
       aria-pressed={mine}
-      onClick={() => onPick(option.id)}
-      className={cn(faceClassName, "cursor-pointer text-left")}
-      style={{ background, color }}
+      disabled={!onPick}
+      onClick={onPick ? () => onPick(option.id) : undefined}
+      className={cn(faceClassName, "text-left", onPick && "cursor-pointer")}
+      style={faceStyle}
     >
       {content}
     </button>

@@ -5,6 +5,11 @@ interface VsBadgeProps {
   size?: number;
   /** 등장 pop 애니메이션 */
   animate?: boolean;
+  /**
+   * 세로 위치(%) — 결과가 열려 시임이 움직이면 접합점을 따라간다(`splitSeam`).
+   * 없으면 정중앙(정적 도형의 불변식). 런타임 값이라 `style`이다(styling.md).
+   */
+  topPct?: number;
 }
 
 /**
@@ -23,18 +28,22 @@ interface VsBadgeProps {
  *
  * ⚠ `"use client"` 없음 — 순수 렌더라 서버 렌더 여지를 남긴다(`cn`을 직접 경로로 가져오는 이유).
  */
-export function VsBadge({ size = 64, animate = false }: VsBadgeProps) {
+export function VsBadge({ size = 64, animate = false, topPct }: VsBadgeProps) {
   return (
     <span
       aria-hidden
       className={cn(
         // ⚠ **세 도형의 접합점이 전부 카드 정중앙이다**(split-layout 주석). 폴리곤을 고쳐
-        //   그 불변식을 깨면 배지가 시임에서 떨어진다.
+        //   그 불변식을 깨면 배지가 시임에서 떨어진다. 결과가 열린 뒤만 예외다 — 그때는
+        //   `splitSeam`이 계산한 접합점을 `topPct`로 받아 시임을 따라간다.
         "absolute left-1/2 top-1/2 z-[2] flex items-center justify-center rounded-full border-4 border-white bg-primary font-bold tracking-[-0.6px] text-on-primary",
         "[transform:translate(-50%,-50%)_rotate(-12deg)]",
+        // 시임을 따라 내려가는 이동 — `top`만 트랜지션한다(transform은 vs-pop 키프레임의 것이다)
+        "transition-[top] duration-300 ease-otb",
         animate && "animate-vs-pop",
       )}
       style={{
+        top: topPct !== undefined ? `${topPct}%` : undefined,
         width: size,
         height: size,
         // 기준 64px일 때 22px — 사이즈에 비례

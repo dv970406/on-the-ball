@@ -24,15 +24,18 @@ export type SplitCount = 2 | 3 | 4;
  *   접합점 y와 팔 높이는 **합이 4/3이면** 어떤 쌍이든 등분되는데(신발끈 공식으로 확인),
  *   (50%, 83.33%)가 하단을 얕은 띠로 만들면서 값도 깔끔한 쌍이다. 임의로 바꾸지 말 것.
  *
- * ⚠⚠ **세 도형의 접합점은 전부 카드 정중앙이다** — 2분할 시임(0,42%)-(100%,58%)의 중점도,
+ * ⚠⚠ **세 도형의 접합점은 전부 카드 정중앙이다** — 2분할 시임(0,58%)-(100%,42%)의 중점도,
  *   3분할의 Y 접합점도, 4분할 X의 교점도 (50%, 50%)다. `VsBadge`가 그 사실에 기대어
  *   위치를 고정하므로, 폴리곤을 고칠 때 이 불변식을 깨면 배지가 시임에서 떨어진다.
  */
 const CLIP: Record<SplitCount, readonly string[]> = {
-  // 비스듬한 대각선 — 42%/58% 좌표를 두 면이 공유해 지그재그 시임을 만든다
+  // 비스듬한 대각선 — 58%/42% 좌표를 두 면이 공유해 지그재그 시임을 만든다.
+  // ⚠ **왼쪽이 낮다(58%).** 위 면의 이름은 왼쪽 위, 아래 면의 이름은 오른쪽 아래에 붙는데
+  //   그 모서리가 각 면의 **두꺼운 쪽**이어야 결과가 열려 시임이 밀렸을 때도(`splitSeam`)
+  //   이름·퍼센트가 잘리지 않는다. 반대로 기울이면 진 면의 글자가 얇은 쐐기에 갇힌다.
   2: [
-    "[clip-path:polygon(0_0,100%_0,100%_58%,0_42%)] [-webkit-clip-path:polygon(0_0,100%_0,100%_58%,0_42%)]",
-    "[clip-path:polygon(0_42%,100%_58%,100%_100%,0_100%)] [-webkit-clip-path:polygon(0_42%,100%_58%,100%_100%,0_100%)]",
+    "[clip-path:polygon(0_0,100%_0,100%_42%,0_58%)] [-webkit-clip-path:polygon(0_0,100%_0,100%_42%,0_58%)]",
+    "[clip-path:polygon(0_58%,100%_42%,100%_100%,0_100%)] [-webkit-clip-path:polygon(0_58%,100%_42%,100%_100%,0_100%)]",
   ],
   // 삼각별(Y) — 중앙에서 위로 한 갈래, 아래 두 팔이 **좌우 변**(바닥 모서리가 아니다)에 닿는다
   3: [
@@ -75,6 +78,17 @@ const ANCHOR: Record<SplitCount, readonly string[]> = {
  * 면이 좁아질수록 이름을 줄인다.
  * ⚠ `style={{ fontSize }}`로 주지 않는다 — 값이 유한한 열거는 동적이 아니다(styling.md).
  */
+/**
+ * 결과가 열렸을 때 퍼센트 줄을 이름 **아래**에 둘지(위에 붙은 면) **위**에 둘지(아래에 붙은 면).
+ * 어느 쪽이든 퍼센트가 시임에 가깝다 — 면적과 숫자가 같은 사실을 말하므로 나란히 둔다.
+ * 4분할의 좌우 면은 세로 중앙이라 어느 쪽이든 되는데, 위 면과 같은 순서(이름 → 퍼센트)로 읽힌다.
+ */
+const PERCENT_BELOW: Record<SplitCount, readonly boolean[]> = {
+  2: [true, false],
+  3: [true, true, false],
+  4: [true, true, false, true],
+};
+
 const NAME_SIZE: Record<SplitCount, string> = {
   2: "text-[46px] leading-[0.95] tracking-[-2px]",
   3: "text-[30px] leading-[1] tracking-[-1.2px]",
@@ -86,6 +100,7 @@ export interface SplitLayout {
   clipPath: string;
   anchor: string;
   nameSize: string;
+  percentBelow: boolean;
 }
 
 /** 면 하나가 필요로 하는 값 묶음 — 호출부가 맵을 각각 뒤지지 않게 한다 */
@@ -94,6 +109,7 @@ export function splitLayout(count: SplitCount, index: number): SplitLayout {
     clipPath: CLIP[count][index],
     anchor: ANCHOR[count][index],
     nameSize: NAME_SIZE[count],
+    percentBelow: PERCENT_BELOW[count][index],
   };
 }
 
@@ -116,4 +132,48 @@ export function splitCount(options: SurveyOption[]): SplitCount | null {
   if (n !== 2 && n !== 3 && n !== 4) return null;
   if (!options.every((o) => o.bgColor !== null && o.textColor !== null)) return null;
   return n;
+}
+
+/**
+ * 결과가 열린 뒤의 시임 — **면적이 득표비를 말한다**(Instagram 투표 스티커의 결과 화면).
+ *
+ * 2분할만 움직인다. 시임은 (0, y왼)–(100%, y오) 대각선이고 위 면의 면적비가 (y왼+y오)/2 이므로,
+ * 기울기(16%p)를 그대로 둔 채 두 y를 평행이동하면 면적이 정확히 비율을 따라간다.
+ * 접합점은 (50%, (y왼+y오)/2) — `VsBadge`가 이 값을 받아 시임을 따라 내려간다.
+ *
+ * ⚠ **3·4분할은 `null`이다.** 접합점 하나를 옮기면 세 면·네 면의 면적이 비선형으로 갈려
+ *   "면적 = 비율"이 성립하지 않는다 — 거짓 면적을 그리느니 도형을 두고 숫자만 얹는다.
+ * ⚠ 비율을 **30~70%로 잠근다.** 100:0이면 진 면이 사라져 이름도 퍼센트도 그릴 자리가 없다.
+ *   하한은 글자 블록에서 나온다 — 이름(46px)·퍼센트 줄·부제·여백을 합친 ~130px가 320px 카드의
+ *   40%인데, 두꺼운 쪽 모서리 높이가 접합점 ± 8%p이므로 접합점이 30%면 38%가 남는다.
+ *   그래서 이 도형은 "정확한 비율"이 아니라 **"어느 쪽이 얼마나 우세한가"** 를 그리는 것이고,
+ *   정확한 숫자는 면 위의 퍼센트가 진다(`SurveyBlock`의 막대는 정확하다).
+ * ⚠ 값이 런타임(득표)이라 클래스가 아니라 `style`로 준다 — `CLIP`의 완성된 클래스 문자열
+ *   규약은 **정적** 도형의 것이고, 여기는 styling.md가 `style`을 허용하는 "런타임에 결정되는
+ *   동적 값" 그 자리다. `VsBadge`의 세로 위치도 같은 이유로 `style`이다.
+ */
+export interface SplitSeam {
+  /** 면 순서대로의 `clip-path` 값 */
+  clipPaths: [string, string];
+  /** 접합점의 세로 위치(%) — VS 배지 자리 */
+  junctionTopPct: number;
+}
+
+const SEAM_HALF_DROP = 8; // 시임 기울기 = 16%p (정적 도형의 58/42과 같다)
+const SEAM_MIN_PCT = 30;
+const SEAM_MAX_PCT = 70;
+
+export function splitSeam(count: SplitCount, topRatio: number): SplitSeam | null {
+  if (count !== 2) return null;
+  const junction = Math.min(SEAM_MAX_PCT, Math.max(SEAM_MIN_PCT, topRatio * 100));
+  // 정적 도형과 같은 방향 — 왼쪽이 낮다(위 면의 이름이 있는 왼쪽 위가 두껍다)
+  const yLeft = junction + SEAM_HALF_DROP;
+  const yRight = junction - SEAM_HALF_DROP;
+  return {
+    clipPaths: [
+      `polygon(0 0, 100% 0, 100% ${yRight}%, 0 ${yLeft}%)`,
+      `polygon(0 ${yLeft}%, 100% ${yRight}%, 100% 100%, 0 100%)`,
+    ],
+    junctionTopPct: junction,
+  };
 }
