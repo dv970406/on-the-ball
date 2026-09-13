@@ -57,6 +57,8 @@
 - **`useQueryNowMs(dataUpdatedAt)`** — **서버 프리페치가 없는 화면**의 기준 시각. 규약은 `serverNowMs ?? useNowMs()`인데 그 앞자리가 비는 화면(어드민 목록 전부)에서는 세션 고정 시계가 유일한 기준이 되어 **방금 만든 것이 과거 시계로 판정된다** — "지금부터" 노출되는 공지를 등록하고 목록으로 돌아오면 `예정`으로 그려졌다(실측). TanStack Query의 `dataUpdatedAt`(그 데이터를 받은 순간)을 쓰면 등록·수정 후의 무효화가 곧 리페치라 판정이 함께 따라온다. ⚠ 데이터가 없으면 `0`이라 그때만 `useNowMs()`로 떨어진다.
 - **`resizeToWebp(file)` / `IMAGE_TARGET_BYTES`** — 이미지를 **비율을 유지한 채** webp로 줄인다(결과는 항상 500KB 이하). ⚠ **승격된 함수다** — `features/write-post`에 있었고 그 주석이 "세 번째 이미지 기능이 생기면 올린다"고 예고했다(어드민 입축구 배경이 그 세 번째이고, features끼리는 import할 수 없어 승격 말고 길이 없다). ⚠ `resizeToAvatar`(정사각 crop)는 **함께 올리지 않았다** — 본문·배경 사진을 그렇게 자르면 내용이 날아가 형태가 같지 않다. ⚠ 받는 형식·원본 상한(`ACCEPTED_IMAGE_TYPES`·`MAX_SOURCE_BYTES`)은 **기능마다 다르므로** 각 feature가 갖는다(본문은 움직이는 GIF를 받고 입축구 배경은 안 받는다).
 - **`toKstInputValue(iso)` / `fromKstInputValue(value)`** — `<input type="datetime-local">` ↔ ISO. ⚠ **양방향을 KST로 못박는다** — `datetime-local`에는 타임존이 없어 `new Date(value)`로 파싱하면 **브라우저 로컬 시간대**로 해석되는데, 화면은 전부 KST로 그린다(`format.ts`의 `TIME_ZONE`). 해외에서 접속한 관리자가 킥오프를 넣으면 표기와 몇 시간씩 어긋난다. ⚠ 승부예측(킥오프)·입축구(마감)·공지(노출 기간) 셋이 쓰므로 `shared`에 있다.
+- **`useEntranceMotion()` / `useMarkHydrated()`** — 지금 마운트되는 요소에 **등장 모션을 줘도 되는가.** "하이드레이션 이후에 마운트됐는가"로 판정한다 — 하드 로드·크롤러는 `false`(SSR HTML 그대로), 클라이언트 이동·투표 뒤 결과 도착은 `true`. 값은 마운트 시점에 고정된다. ⚠ 플래그는 루트(`AppProviders`)의 `useMarkHydrated`가 세운다 — 소비자가 세우면 소비자 없는 화면에서 넘어온 첫 이동에 모션이 빠진다. ⚠ 세션 상태로 **요소 타입을 바꾸지 말 것** — 서브트리가 재마운트되면 `CountUp`이 0에서 다시 굴러 화면이 튄다(`disabled` 같은 속성으로만 가른다). ⚠ 등장 모션을 새로 붙일 때 이 판정을 직접 짜지 말 것 — 조건이 갈리면 어느 화면은 첫 페인트가 늦고 어느 화면은 모션이 없다. `CountUp`·`RatioBar`는 안에서 부르고, 탭 뒤에 숨는 라인업·기록은 뷰가 "탭을 골랐는가"와 OR로 묶는다(`views/match-detail`).
+- **`useCountUp(target, from?)`** — 숫자가 목표값으로 굴러간다(300ms · ease-otb 근사). `from`은 마운트 시 출발값(등장 모션일 때만 `0`), 이후 `target`이 바뀌면 **보이는 값**에서 이어서 굴러간다. ⚠ 렌더에 숫자를 그리는 자리는 훅이 아니라 `@/shared/ui`의 `CountUp`을 쓴다 — 선택지마다 하나씩이라 `map` 안에서 훅을 부를 수 없고, 반환값이 보간 중의 실수라 반올림을 그 컴포넌트가 맡는다. 소비자는 `CountUp` 하나다.
 - `useScrollRestore` / `clearScrollRestore` — 목록 스크롤 위치 저장/복원 (`clearScrollRestore`는 목록을 처음부터 보여야 할 때 저장분을 버린다)
 - `useFocusTrap` — 오버레이(`Dialog`·`Sheet`) 안에 포커스를 가둔다. ⚠ 초기 포커스는 **`preventScroll: true`** 로 준다 — 화면 밖에서 올라오는 시트에 그냥 `focus()`하면 브라우저가 `overflow-hidden`인 430px 프레임을 스크롤시켜 **되돌릴 수 없게** 화면이 밀린다(실측)
 - `useToast` / `useToastStore` — 토스트 발행. **표시 영역(`ToastViewport`)은 `@/shared/ui`에 있고 루트에 하나만 둔다** — 상태와 UI가 레이어를 달리한다
@@ -158,7 +160,8 @@
   - ⚠ **`splitCount`가 "분할 카드로 그릴 문항인가"를 단독으로 소유한다.** 목록과 상세가 같은 `SurveyVote`를 공유하므로 판정 지점이 하나뿐인데, 그 하나를 함수로 둬야 새 소비자가 생겨도 답이 갈리지 않는다. 판별자는 `bg_color`의 유무이고, layout enum을 두지 않은 이유는 `api-and-db.md`에.
   - ⚠ 도형(clip-path·텍스트 앵커·이름 크기)은 `lib/split-layout`이 **한 곳에서** 내려준다. 흩어지면 선택지 수를 늘렸을 때 조용히 어긋난다.
   - ⚠ **3분할은 아래 두 팔이 좌우 변(83.33%)에 닿는다.** 바닥 모서리로 보내면 하단이 큰 삼각형이 되어 면적은 1/3인데도 화면을 지배한다. 접합점 y와 팔 높이는 **합이 4/3이면** 등분되는데 (50%, 83.33%)가 하단을 얕은 띠로 만든다.
-  - ⚠ **세 도형의 접합점은 전부 카드 정중앙이다** — `VsBadge`가 그 불변식에 기대어 위치를 고정한다. 폴리곤을 고칠 때 깨면 배지가 시임에서 떨어진다.
+  - ⚠ **세 도형의 접합점은 전부 카드 정중앙이다** — `VsBadge`가 그 불변식에 기대어 위치를 고정한다. 폴리곤을 고칠 때 깨면 배지가 시임에서 떨어진다. **결과가 열린 뒤만 예외다** — `splitSeam(count, topRatio)`이 2분할의 시임을 득표비로 옮기고 접합점을 `VsBadge topPct`로 내린다(3·4분할은 `null` — 접합점 하나로는 면적이 비율을 따르지 않아 숫자만 얹는다). 클램프(30~70%)와 시임 방향의 근거는 그 함수 주석에.
+  - ⚠ `SplitCard`는 `results`를 받으면 **카드를 유지한 채** 결과를 얹는다 — 투표 직후 목록(`SurveyBlock`)으로 갈아치우지 않는다(`SurveyVote` 주석). 정확한 막대가 필요하면 그때도 `SurveyBlock`이 아니라 면 위 퍼센트가 정확한 숫자를 진다.
   - ⚠ clip-path는 **완성된 클래스 문자열**이라야 한다(Tailwind 스캐너). 사유는 `styling.md`.
   - ⚠ **면 배경은 `image_path` > `bg_color` 순이다.** 이미지가 있어도 색을 지우지 않고 아래에 깔아 둔다 — 이미지가 아직 안 왔거나 실패하면 면이 투명해져 카드가 깨진다. 사진 위에는 `text_color`에 맞춘 스크림을 덮어 최소 대비를 남긴다.
 - 서버에서는 배럴 대신 `model/types`·`api/keys`·`api/mappers`를 직접 import.
@@ -180,7 +183,9 @@
 - `useMatchLineupQuery(id, userId, enabled, initialData)` / `useMatchEventsQuery(…)` / `useMatchStatsQuery(…)` — 확정 라인업 · 사건 · 팀 스탯. ⚠ `initialData`의 `undefined`(프리페치 안 함)와 `[]`(받았는데 아직 발표 전)는 다른 뜻이다 — 하나로 접으면 라인업 없는 경기가 매번 재조회된다(`usePollQuery`가 `null`을 정상값으로 두는 것과 같은 이유).
 - `useAdminMatchListQuery(deleted)` / `useAdminMatchQuery(id)` / `useTeamListQuery()` — 어드민 조회(`admin_match_list` RPC · 팀 목록). 다른 슬라이스의 어드민 훅과 같은 형태다.
 - **`useMyAccuracyQuery(userId)`** — 내 적중률. ⚠ **`truncated`를 함께 돌려준다** — PostgREST의 `max_rows`(1,000)에 잘리면 비율이 거짓이 되므로 호출부가 그때는 숫자를 그리지 않고 사실을 알린다(실측: 행 1000 / `Content-Range` 총계 1108). 도달하면 세는 일을 DB로 내린다. ⚠ **컬럼이 아니라 그때그때 센다** — 카운터를 흔드는 경로가 다섯이라(예측 생성·변경·채점·**스코어 정정**·무효화, 그리고 탈퇴 cascade) `like_count`가 겪은 어긋남을 그대로 되풀이한다. ⚠ `match!inner`가 필수다(왼쪽 조인이면 경기 없는 행이 `result` null과 섞인다).
-- `matchKeys` / `Match` · `MatchListPage` · `MatchPick` · `MatchPredictionResult` · `MatchLineup` · `MatchEvent` · `MatchStat` / `MatchCard` · `TeamCrest` · `PredictionBlock` · `LineupPitch` · `LineupBench` · `StatComparison` / `buildPlayerMarks` · `buildStatRows`.
+- `matchKeys` / `Match` · `MatchListPage` · `MatchPick` · `MatchPredictionResult` · `MatchLineup` · `MatchEvent` · `MatchStat` / `MatchCard` · `TeamCrest` · `Scoreline` · `PredictionBlock` · `LineupPitch` · `LineupBench` · `StatComparison` / `buildPlayerMarks` · `buildStatRows`.
+- **`Scoreline`** — `H - A` 스코어. 숫자가 세로로 구르고 바뀐 순간 칸이 한 번 밝아진다(Apple Sports·BBC의 스코어 롤/플래시). **값이 바뀔 때만** 움직이므로 하이드레이션에는 최종 자리가 그대로 찍힌다. ⚠ 지금은 라이브 폴링이 꺼져 있어 화면에서 바뀌는 순간이 리페치뿐이다 — `--live` 폴러와 `refetchInterval`이 들어오는 커밋에서 화면 쪽은 손댈 것이 없다. ⚠ 구르는 열은 `aria-hidden`이고 값은 `sr-only`다 — 아니면 링크 이름이 `0123456789`가 된다(실측).
+- `LineupPitch`·`StatComparison`의 **`animate`** — 라인업이 GK→FW 줄 단위로, 스탯 막대가 가운데서 바깥으로 자란다. ⚠ 판정은 뷰가 한다(`useEntranceMotion() || 탭을 골랐는가`) — 패널이 `hidden`에서 벗어나는 순간 브라우저가 애니메이션을 새로 시작하므로 탭을 오갈 때마다 재생된다. ⚠ 마커는 표준 `-translate-*` 센터링이라 애니메이션을 **안쪽 래퍼**에 건다(styling.md).
   ⚠ `MATCH_PICKS`·`MATCH_PICK_LABEL`·`Team`·`PredictionAccuracy`·`LineupPlayer`·`PlayerMarks`·`StatRow`·`playerPhotoUrl`은 **배럴에 없다** — 슬라이스 밖 소비자가 0이라 올리지 않았다(`entities/survey`가 `SurveyOption`·`SplitCount`를 뺀 것과 같은 이유). `check:conventions`는 상대 경로 소비를 현역으로 세어 **이 유형을 잡지 못하므로** 손으로 지킨다.
 - ⚠ **`Team.name`은 한국어다**(DB에 그렇게 저장된다 — 사유는 `api-and-db.md`). 화면에서 옮기지 말 것. ⚠ `name`(정식)과 `shortName`(약칭)의 쓰임이 다르다 — **상세 제목만 정식명이고 목록 카드와 예측 버튼은 약칭**이다. 좁은 폭에 좌우로 두 팀을 놓는 자리에서 정식명은 잘리는데 **잘린 팀 이름은 고를 수가 없다.** 상세가 정식명을 감당하는 것은 엠블럼을 이름 **위**에 얹어 가로 폭을 이름에 전부 내주기 때문이다. 표기 추가는 `scripts/team-names-ko.json`.
 - **`TeamCrest`** — 구단 엠블럼 + 폴백. **엠블럼은 DB에 없다** — `public/crests/{team.code}.png`를 `team.code`에서 유도한다(사유는 `api-and-db.md`). ⚠ **직접 `<img>`로 그리지 말 것** — 폴백이 두 갈래인데 둘 다 필요하다: 팀 코드가 비었을 때와, **파일이 없어 404일 때**(승격팀이 생기면 반드시 겪는다). ⚠ `onError`만으로는 부족하다 — SSR HTML의 `<img>`는 **하이드레이션 전에** 실패할 수 있고 그러면 이벤트가 지나가 버린다(마운트 시 `complete && naturalWidth === 0`을 함께 확인하는 이유). ⚠ `Avatar`로 대신하지 말 것 — `rounded-full` + `object-cover`라 방패 모양 엠블럼의 모서리가 잘린다. ⚠ 자산을 새로 뽑을 때는 `scripts/fetch-team-crests.mjs`를 쓴다 — 크기·포맷·품질의 근거가 거기 있고, 손으로 만든 파일은 그 판단과 갈린다.
@@ -279,10 +284,10 @@
 ## `@/shared/ui`
 **현역(게시판 v2가 실제로 쓰는 것)** — 새로 만들기 전 여기부터 확인:
 `Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·`Markdown`·
-`Chip`·`chipClassName`·`ActionChip`·`actionChipClassName`·`Dialog`·`SignInDialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`·`RatioBar`·`StaleBanner`
+`Chip`·`chipClassName`·`ActionChip`·`actionChipClassName`·`Dialog`·`SignInDialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`·`RatioBar`·`StaleBanner`·`LiveDot`·`CountUp`·`DrawnCheck`
 
 **현재 미사용** — **"검증된 현역"으로 오인하지 말 것**:
-`TabHeader`·`Flag`·`Shirt`·`SectionHead`·`LiveDot`·`LiveStatusPill`·`NightCard`·`PlayerSilhouette`
+`TabHeader`·`Flag`·`Shirt`·`SectionHead`·`LiveStatusPill`·`NightCard`·`PlayerSilhouette`
 (전부 `docs/legacy/v1-inventory.md`가 보존 대상으로 명시한 v1 자산이다.)
 
 ⚠ 위 v1 자산은 **실측상 번들에 실리지 않는다**(위 미사용 목록 전량이 프로덕션 청크에서 0건). 다만 그건 각 모듈이 순수해서이지 "배럴이라 공짜"여서가 아니다 — 서드파티 의존을 끌고 오는 무거운 모듈은 `sideEffects` 선언이 없으면 그대로 실린다(`architecture.md`의 트리셰이킹 절).
@@ -291,6 +296,10 @@
 > **이 문서의 존재 이유가 "새로 만들기 전 확인"이라 목록이 틀리면 문서가 없느니만 못하다.** UI를 추가·제거하면 여기부터 고친다.
 
 - `Markdown` — 마크다운 렌더(GFM). `"use client"` **없음** — 서버 렌더 가능.
+- **`CountUp`** — 굴러가며 도착하는 숫자(퍼센트·참여자 수·적중률). 등장 모션 판정(`useEntranceMotion`)을 **안에서** 하므로 하이드레이션 값은 즉시 최종값이고 클라이언트에서 늦게 마운트된 값만 0에서 올라온다. `format`은 **정수**를 받는다(`formatCount` 등 — 보간 중의 실수는 안에서 반올림한다). ⚠ `tabular-nums`는 호출부가 준다.
+- **`DrawnCheck`** — 획이 그려지는 체크("내가 고른 것"). ⚠ `animate`의 판정은 **호출부**가 한다 — "방금 골랐다"는 `aria-pressed`를 바꾸는 쪽만 알고, 이미 고른 채로 이동해 온 화면에서 다시 그려지면 거짓 신호다(`useState(mine)`으로 마운트 시점 값을 고정해 비교하는 것이 선례 — `split-card`·`prediction-block`). `"use client"` 없음.
+- **`RatioBar`** — 비율 막대. `enterDelayMs`를 주면 마운트 순간 0에서 자란다(순차 리빌은 호출부가 `i * 60`으로). 등장 판정을 안에서 하는 `"use client"` 컴포넌트다 — 판정을 호출부에 맡기면 부모의 마운트 시점이 기준이 되어 첫 투표의 리빌이 빠진다.
+- **`LiveDot`** — 라이브 도트. `pulse`로 숨 쉬고, `dark` Pill 안에서는 **`current` 톤**이다(사유는 `styling.md`의 펄스 예외).
 - `Chip` — 말머리 칩. **`rounded-sm`(6px)** 이다 — 칩이라고 알약이 아니다(`styling.md` 예외 목록 참고).
 - `chipClassName(selected)` — 위 칩의 클래스만. 목록의 말머리 레일은 **이동**이라 `<Link>`에 이 클래스를 입히고(`Link` 안에 `button`을 넣지 않는다), 작성 폼은 **선택**이라 `Chip`(`button`)을 그대로 쓴다. 분리 사유는 `Button`↔`buttonClassName`과 같다.
 - `ActionChip` / `actionChipClassName` — 좋아요·댓글 카운터 칩. 클래스 함수가 분리된 이유는 `Button`↔`buttonClassName`과 같다 — **버튼이 아닌 요소로 같은 칩을 그려야 하는 자리**가 있어 클래스만 필요하다(세션 복원 중의 좋아요는 누를 수 없어 `span`이다).

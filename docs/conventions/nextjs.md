@@ -119,6 +119,24 @@ Router Cache는 **URL로만 키가 잡히고 세션은 키에 들어가지 않�
 → 조회 하나를 캐시하려고 켜지 않는다. `fetch`의 `next: { revalidate }`는 이 플래그 없이 동작하고
   영향 범위가 그 조회 하나다. 켜야 할 이유가 생기면 라우트 전수 마이그레이션으로 다룬다.
 
+### `experimental.viewTransition` — 켜 두되 **이름을 준 요소만** 움직인다
+
+React `<ViewTransition name>`으로 목록 카드의 엠블럼이 상세 `h1`의 엠블럼으로 이어진다
+(`MatchCard` ↔ `views/match-detail`, 이름은 `match-{id}-{home|away}`). 플래그가 켜져 있어야
+라우트 이동이 전환을 시작한다(`next.config.ts` 주석).
+
+- **루트를 감싸지 않고, `:root`의 `view-transition-name`도 끈다**(`globals.css`). UA 기본값을
+  두면 이름 없는 요소까지 페이지 전체가 크로스페이드하는데, 스크롤 복원·시트 상태가 라우트
+  언마운트 위에 서 있는 구조와 부딪힌다 — 범위를 셰어드 엘리먼트로 좁힌다. 타입은
+  `src/types/react-canary.d.ts`가 붙인다.
+- ⚠ 모핑을 기대할 수 있는 것은 **앞으로 가는 이동**이다 — popstate 복원은 React 전환이 아니다.
+  뒤로가기에서 모핑이 필요해지면 그때 따로 다룬다.
+- ⚠ **문서 가시성이 `hidden`이면** 브라우저가 `Transition was aborted because of invalid state`로
+  건너뛴다 — React가 그 메시지를 정상 건너뜀으로 취급하므로 **에러로 보지 말 것**. 백그라운드
+  탭에서는 모핑을 검증할 수 없다.
+- 시간·이징은 `globals.css`의 `::view-transition-group(*)`가 Tifo 값(300ms · ease-otb)으로 맞추고,
+  `prefers-reduced-motion`에서는 의사 요소의 애니메이션을 따로 끈다(전역 `*` 선택자에 안 걸린다).
+
 ### ⚠ 요청 API를 try/catch로 감쌀 땐 `unstable_rethrow`
 
 `cookies()`(= `createSupabaseServerClient`)는 "이 라우트를 동적 렌더로 전환하라"는 **Next 내부 에러를 throw**해서 동작한다. `try/catch`가 이걸 삼키면 **페이지가 스켈레톤 상태로 정적 프리렌더되어 버린다**(빌드는 성공하므로 조용히 망가진다).
