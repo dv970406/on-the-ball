@@ -582,14 +582,15 @@ end if;
 올리자, "생성 시 고정"과 "선택지 2~4개"를 **함수 하나가 단독으로 소유**하게 됐다 —
 정책으로 표현할 수 없는 규약은 유일 경로로 만들어야 지켜진다.
 
-⚠ **아래 셋은 definer로 오해하기 쉽지만 아니다.**
-권한 없이도 도는 함수를 "RLS를 우회하는 함수"로 세어두면 보안 검토가 헛돈다.
+⚠ **아래는 definer로 오해하기 쉽지만 아니다.**
+권한 없이도 도는 함수를 "RLS를 우회하는 함수"로 세어두면 보안 검토가 헛돈다. 위 검증 질의에서 `prosecdef = false`로 나오는 것이 전부이고, 아래 표는 그중 이유가 헷갈리는 것만 적는다.
 
 | 함수 | 왜 definer가 아닌가 |
 |---|---|
 | `touch_updated_at` | 트리거지만 자기 행의 `updated_at`만 채운다 → 권한 상승이 필요 없다 |
 | `normalize_profile_nickname` | 쓰기 직전 `new.nickname`을 다듬을 뿐이라 호출자 권한으로 충분하다 |
 | `random_nickname` | 인자도 테이블 접근도 없는 순수 조합 생성기 |
+| `admin_set_post_content` · `admin_validate_survey_options` | definer RPC **안에서만** 불리는 내부 헬퍼 — 호출자가 이미 definer 컨텍스트라 권한 상승이 필요 없고, 직접 부를 EXECUTE도 열려 있지 않다 |
 
 ⚠ **CHECK 제약 평가 함수(`has_visible_char`·`normalize_nickname`·`is_plain_nickname`)는 이 목록의 대상이 아니다.**
 성질이 반대다 — definer로 만들 게 아니라 오히려
