@@ -116,15 +116,15 @@ export function AdminMatchListView({ deleted }: { deleted: boolean }) {
                   {match.adminLockedAt !== null && <Pill variant="yellow">잠금</Pill>}
                   {match.deletedAt !== null && <Pill variant="outline">숨김</Pill>}
                 </p>
-                <p className="mt-1 truncate text-[14px] font-medium text-ink">
+                <h2 className="mt-1 truncate text-[14px] font-medium text-ink">
                   {match.homeTeam.name}
                   <span className="px-1.5 font-mono tabular-nums text-ink-mute">
                     {match.homeScore === null ? "vs" : `${match.homeScore}-${match.awayScore}`}
                   </span>
                   {match.awayTeam.name}
-                </p>
+                </h2>
                 <p className="mt-0.5 text-[12px] text-ink-mute">
-                  {formatKickoff(match.kickoffAt, nowMs)}
+                  <time dateTime={match.kickoffAt}>{formatKickoff(match.kickoffAt, nowMs)}</time>
                 </p>
               </div>
 

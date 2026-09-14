@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { ROUTES } from "@/shared/config";
-import { formatRelativeTime, useNowMs } from "@/shared/lib";
+import { formatRelativeTime, useQueryNowMs } from "@/shared/lib";
 import { Button, Dialog, EmptyState, Markdown, Skeleton, StaleBanner, TextField } from "@/shared/ui";
 import { useSessionStore } from "@/entities/session";
 import { useAdminPostQuery } from "@/entities/post";
@@ -23,9 +23,10 @@ type Confirm = "mask" | "remove" | "stripAll" | { url: string } | null;
  *   "수정됨" 표시가 함께 바뀐다.
  */
 export function AdminPostManageView({ postId }: { postId: number }) {
-  const nowMs = useNowMs();
   const userId = useSessionStore((s) => s.user?.id);
   const query = useAdminPostQuery(postId);
+  // ⚠ 세션 고정 시계가 아니라 **이 글을 받은 시각**이다 — 프리페치가 없는 어드민 화면의 규약
+  const nowMs = useQueryNowMs(query.dataUpdatedAt);
   const post = query.data;
   const poll = usePollQuery(postId, userId);
   const moderation = usePostModeration(postId);
@@ -73,7 +74,7 @@ export function AdminPostManageView({ postId }: { postId: number }) {
       <section className="border-b border-hairline-cool px-5 py-4">
         <p className="font-mono text-[11px] tabular-nums text-ink-mute-2">
           #{post.id} · {post.category} · {post.authorNickname} ·{" "}
-          {formatRelativeTime(post.createdAt, nowMs)}
+          <time dateTime={post.createdAt}>{formatRelativeTime(post.createdAt, nowMs)}</time>
         </p>
         <h2 className="mt-1.5 text-[17px] font-semibold leading-[1.4] tracking-[-0.3px] text-ink">
           {post.title}

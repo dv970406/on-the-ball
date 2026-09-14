@@ -71,9 +71,9 @@ export function AdminSurveyListView({ deleted }: { deleted: boolean }) {
                     {open === false && <Pill variant="outline">마감</Pill>}
                     {survey.deletedAt !== null && <Pill variant="outline">숨김</Pill>}
                   </p>
-                  <p className="mt-1 truncate text-[14px] font-medium text-ink">{survey.title}</p>
+                  <h2 className="mt-1 truncate text-[14px] font-medium text-ink">{survey.title}</h2>
                   <p className="mt-0.5 text-[12px] text-ink-mute">
-                    마감 {formatKickoff(survey.closesAt, nowMs)}
+                    마감 <time dateTime={survey.closesAt}>{formatKickoff(survey.closesAt, nowMs)}</time>
                   </p>
                 </div>
 

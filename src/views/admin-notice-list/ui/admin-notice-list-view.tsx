@@ -75,10 +75,14 @@ export function AdminNoticeListView({ deleted }: { deleted: boolean }) {
                     {visibility === "closed" && <Pill variant="outline">종료</Pill>}
                     {notice.deletedAt !== null && <Pill variant="crimson">삭제됨</Pill>}
                   </p>
-                  <p className="mt-1 truncate text-[14px] font-medium text-ink">{notice.title}</p>
+                  <h2 className="mt-1 truncate text-[14px] font-medium text-ink">{notice.title}</h2>
                   <p className="mt-0.5 text-[12px] text-ink-mute">
-                    {formatKickoff(notice.opensAt, nowMs)} ~{" "}
-                    {notice.closesAt === null ? "무기한" : formatKickoff(notice.closesAt, nowMs)}
+                    <time dateTime={notice.opensAt}>{formatKickoff(notice.opensAt, nowMs)}</time> ~{" "}
+                    {notice.closesAt === null ? (
+                      "무기한"
+                    ) : (
+                      <time dateTime={notice.closesAt}>{formatKickoff(notice.closesAt, nowMs)}</time>
+                    )}
                   </p>
                 </div>
 

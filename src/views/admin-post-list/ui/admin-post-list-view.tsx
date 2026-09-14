@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { MessagesSquare } from "lucide-react";
 import { ROUTES } from "@/shared/config";
-import { formatCount, formatRelativeTime, useNowMs } from "@/shared/lib";
+import { formatCount, formatRelativeTime, useQueryNowMs } from "@/shared/lib";
 import { EmptyState, Pill, Skeleton, StaleBanner, buttonClassName } from "@/shared/ui";
 import { useAdminPostListQuery } from "@/entities/post";
 import { AdminFilterRail, AdminShell } from "@/widgets/admin-shell";
@@ -16,8 +16,9 @@ import { AdminFilterRail, AdminShell } from "@/widgets/admin-shell";
  *   목록에서 바로 지우면 무엇을 지우는지 못 보고 누르게 된다.
  */
 export function AdminPostListView({ deleted }: { deleted: boolean }) {
-  const nowMs = useNowMs();
-  const { data, isPending, error, refetch } = useAdminPostListQuery(deleted);
+  const { data, dataUpdatedAt, isPending, error, refetch } = useAdminPostListQuery(deleted);
+  // ⚠ 세션 고정 시계가 아니라 **이 목록을 받은 시각**이다 — 프리페치가 없는 어드민 화면의 규약
+  const nowMs = useQueryNowMs(dataUpdatedAt);
 
   return (
     <AdminShell>
@@ -57,13 +58,15 @@ export function AdminPostListView({ deleted }: { deleted: boolean }) {
                 {post.deletedAt !== null && <Pill variant="outline">삭제됨</Pill>}
               </p>
               {/* ⚠ 우회 삽입된 긴 제목이 행을 늘리지 않게 자른다(PostCard와 같은 이유) */}
-              <p className="mt-1 line-clamp-2 text-[14px] font-medium leading-[1.45] text-ink">
+              <h2 className="mt-1 line-clamp-2 text-[14px] font-medium leading-[1.45] text-ink">
                 {post.title}
-              </p>
+              </h2>
               <p className="mt-1 line-clamp-1 text-[12px] text-ink-mute">{post.excerpt}</p>
               <div className="mt-2 flex items-center gap-2">
                 <p className="min-w-0 flex-1 truncate font-mono text-[11px] tabular-nums text-ink-mute-2">
-                  {post.authorNickname} · {formatRelativeTime(post.createdAt, nowMs)} · ♥
+                  {post.authorNickname} ·{" "}
+                  <time dateTime={post.createdAt}>{formatRelativeTime(post.createdAt, nowMs)}</time>{" "}
+                  · ♥
                   {formatCount(post.likeCount)} · 💬{formatCount(post.commentCount)}
                 </p>
                 <Link
