@@ -49,7 +49,10 @@
   - ⚠ **`isPending`(boolean)이 아니라 뮤테이션을 통째로 넘긴다.** 해제가 `status`+`submittedAt`에 걸려 있어서다 — boolean은 "아직 시작 전"과 "이미 끝남"을 구분하지 못해, 마이크로태스크만으로 끝나는 실패(동기 `throw`)에서 deps가 `false → false`가 되어 **자물쇠가 영영 풀리지 않았다.**
   - ⚠ **`isPending`을 prop으로 받는 컴포넌트에 두지 말 것.** 부모가 리렌더될 때까지 낡은 값을 읽으므로 같은 무증상 잠금이 된다 → 뮤테이션을 조립하는 쪽에 둔다.
   - ⚠ 확인과 잠금이 **나뉜 이유가 규약이다** — 사이에 끼는 검증이 실패하면 잠그지 않고 빠져나가야 한다. 잠그면 뮤테이션이 시작되지 않아 `isPending`이 돌지 않고, 그 자물쇠는 영영 풀리지 않는다.
-  - ⚠ 목록의 **항목별** 가드는 이 훅이 아니다 — 렌더 표시용 상태를 함께 가져야 해서 형태가 다르다. 그리고 해제를 `mutate`의 per-call 콜백에 걸면 **다음 항목을 누르는 순간 앞 항목의 콜백이 유실되어** 무증상 잠금이 된다 → `mutateAsync().finally()`로 건다(사유는 `data-and-state.md`).
+  - ⚠ 목록의 **항목별** 가드는 이 훅이 아니라 아래 `useItemGuard`다 — 렌더 표시용 상태를 함께 가져야 해서 형태가 다르다.
+- **`useItemGuard<K>()`** — 목록의 **항목별** 중복 실행 가드. `{ run(id, task), isBusy(id) }`를 돌려준다. 뮤테이션 훅이 하나뿐인 목록에서 다른 항목을 누르면 `variables`가 갈아타 처리 중이던 행의 버튼이 되살아나므로 보낸 id의 **집합**이 필요한데, 그 집합의 동기 판정(ref)·렌더 표시(state)·둘을 함께 지우는 해제·`mutateAsync().finally()`에 거는 규약을 **이 훅이 단독으로 소유한다**. 소비자는 `useCommentDeletion`·`useBlockRemoval`·어드민 목록의 `use-*-row-actions` 셋이다.
+  - ⚠ **`ref` + `state`를 호출부에서 다시 짜지 말 것** — 해제를 per-call 콜백에 걸거나 한쪽 값만 지우는 두 함정이 실제로 났다(사유는 `data-and-state.md`와 훅 주석).
+  - ⚠ "항목 수 자체가 불변조건인 목록"(`useUnlinkIdentity`)에는 쓰지 않는다 — 그쪽은 boolean 전역 잠금이 맞다.
 - **`useNowMs`** — 클라이언트 시계. 마운트 전에는 `null`.
   - ⚠ **"현재 시각"이 아니다.** 값이 **모듈 스코프에 세션당 한 번** 고정되어(앱을 처음 연 화면에서 굳는다) SPA 세션 내내 그대로다 — `useSyncExternalStore` 계약상 스냅샷이 매번 달라지면 무한 렌더가 되기 때문이다(그 훅 주석).
   - ⚠ **그래서 서버 시각이 있으면 그쪽이 우선이다** — `serverNowMs ?? useNowMs()`. 순서를 뒤집으면 낡은 클라 시계가 갓 받은 서버 시각을 이겨 **마감된 것이 진행 중으로 보인다**(`data-and-state.md`에 실측).
@@ -235,7 +238,7 @@
 - `admin-notice` — `NoticeForm` · `useCreateNotice`/`useUpdateNotice`/`useDeleteNotice`/`useRestoreNotice`.
 - ⚠ **jsonb 인자를 만드는 직렬화 함수를 features가 단독으로 소유한다.** 생성 타입이 `Json`이라 키 오타(`bgColor` vs `bg_color`)를 컴파일러가 잡아주지 못한다 — `database.types.ts`의 보증이 여기서만 사라지는 자리다.
 - ⚠ **버려진 배경 파일은 "빼기"가 아니라 저장이 지운다**(`useSurveyImageCleanup`). 버튼을 누른 순간 지우면 저장하지 않고 떠났을 때 **경로는 남고 파일이 없는** 면이 되어 카드가 통째로 투명해진다 → DB가 그 경로를 실제로 버린 뒤에 정리한다.
-- ⚠ **중복 실행 가드가 features에 없다.** 성공의 부수효과(이동 목적지·문구)가 화면의 결정이라 뮤테이션을 조립하는 뷰의 `model/`이 갖는다. 목록의 항목별 삭제·복구는 `useDuplicateGuard`가 아니라 **Set + `mutateAsync().finally()`** 형태다(`useBlockRemoval` 선례).
+- ⚠ **중복 실행 가드가 features에 없다.** 성공의 부수효과(이동 목적지·문구)가 화면의 결정이라 뮤테이션을 조립하는 뷰의 `model/`이 갖는다. 목록의 항목별 삭제·복구는 `useDuplicateGuard`가 아니라 **`useItemGuard`** 다(`useBlockRemoval` 선례).
 
 ## `@/entities/block`
 - `useBlockedUsersQuery(userId)` / `blockKeys` / `BlockedUser` — 내가 차단한 사람 목록. (select 문자열과 매퍼는 슬라이스 내부다 — 배럴에 올리면 호출부가 0인 export가 되어 `check:conventions`가 막는다.)
@@ -246,7 +249,7 @@
 ## `@/features/block-user`
 - `useBlockUser()` / `useUnblockUser()` — 차단·해제. 조회는 `@/entities/block`이다(`entities/post` ↔ `features/toggle-post-like`와 같은 분업).
 - ⚠ **숨김은 이 훅들이 하지 않는다.** `post_select_visible`·`comment_select_visible` 정책이 한다 — 여기가 하는 일은 행 하나를 만들거나 지우고 **가시성이 달라진 캐시를 되돌리는 것**뿐이다.
-- ⚠ **중복 실행 가드가 여기 없다.** 성공의 부수효과(이동 목적지·스크롤 저장분 폐기·문구)가 화면의 결정이라 뮤테이션을 조립하는 쪽이 갖는다 — 차단은 `views/post-detail`의 `use-post-block`, 해제는 `views/profile`의 `use-block-removal`(항목별 Set 가드).
+- ⚠ **중복 실행 가드가 여기 없다.** 성공의 부수효과(이동 목적지·스크롤 저장분 폐기·문구)가 화면의 결정이라 뮤테이션을 조립하는 쪽이 갖는다 — 차단은 `views/post-detail`의 `use-post-block`, 해제는 `views/profile`의 `use-block-removal`(`useItemGuard`).
 - ⚠ 무효화 Promise를 **차단은 반환하지 않고 해제는 반환한다.** 차단은 성공 직후 목록으로 떠나므로(리페치를 기다리면 "글을 찾을 수 없어요"가 깜빡인다), 해제는 화면에 머무르므로. 표는 `data-and-state.md`.
 - ⚠ 이미 차단한 사람을 다시 차단하면 **23505를 성공으로 흡수한다**(멱등). 신고는 반대다 — 사유를 설명해야 한다(`api-and-db.md`의 "설명과 흡수" 표).
 

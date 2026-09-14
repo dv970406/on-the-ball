@@ -33,6 +33,8 @@ export {
 } from "./text";
 export { useNextParam } from "./use-next-param";
 export { useDuplicateGuard } from "./use-duplicate-guard";
+// 목록의 **항목별** 가드 — boolean 전역 잠금과 형태가 달라(렌더 표시용 상태를 갖는다) 합치지 않는다.
+export { useItemGuard } from "./use-item-guard";
 // 결과·분포가 **늦게 도착할 때만** 등장 모션을 주는 판정과 카운트업 — 사유는 각 훅 주석에.
 //   ⚠ `useMarkHydrated`는 루트(`AppProviders`) 전용이다 — 다른 곳에서 부르지 않는다.
 //   ⚠ 렌더에 숫자를 그리는 쪽은 훅이 아니라 `@/shared/ui`의 `CountUp`을 쓴다(훅을 map 안에서

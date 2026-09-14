@@ -70,7 +70,7 @@ export interface DuplicateGuard {
  *
  * ⚠ 여러 행을 동시에 다루는 화면(목록의 항목별 삭제)은 boolean 하나로 부족하다 —
  *   가드가 키를 받아야 한다. 그 변형은 렌더 표시용 상태를 함께 갖기 때문에 **형태가 달라**
- *   이 훅에 합치지 않는다(선례 `useCommentDeletion`).
+ *   이 훅에 합치지 않고 `useItemGuard`가 따로 갖는다.
  */
 export function useDuplicateGuard({ status, submittedAt }: GuardedMutation): DuplicateGuard {
   const lockedRef = useRef(false);
