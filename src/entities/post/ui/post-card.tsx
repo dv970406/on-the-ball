@@ -64,7 +64,13 @@ export function PostCard({
 
           {/* 제목도 2행에서 자른다 — 화면 한도는 클라이언트만 강제하므로
               우회 삽입된 긴 제목이 카드를 세로로 늘이지 않게 여기서 막는다 */}
-          <h2 className="mt-[5px] line-clamp-2 text-pretty text-[15px] font-medium leading-[1.4] tracking-[-0.3px] text-ink">
+          <h2
+            className={cn(
+              "line-clamp-2 text-pretty text-[15px] font-medium leading-[1.4] tracking-[-0.3px] text-ink",
+              // 위 HOT 배지가 조건부라 간격도 조건부다 — 배지가 없으면 빈 여백이 남는다
+              hot && "mt-[5px]",
+            )}
+          >
             {post.title}
           </h2>
 
