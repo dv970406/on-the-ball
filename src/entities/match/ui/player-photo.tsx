@@ -14,7 +14,7 @@ interface PlayerPhotoProps {
 }
 
 /**
- * 선수 얼굴 — 없으면 **등번호**로 떨어진다.
+ * 선수 얼굴 — 없으면 **실루엣**으로 떨어진다.
  *
  * ⚠ **`"use client"`가 필요하다.** 실패 판정에 `useState`·`useEffect`가 있어서다.
  *   형제 컴포넌트들은 디렉티브가 없지만 지금은 다 같이 클라이언트로 내려간다 —
@@ -44,7 +44,7 @@ export function PlayerPhoto({ externalId, size, className }: PlayerPhotoProps) {
   /**
    * ⚠ **boolean이 아니라 "실패한 경로"를 기억한다**(`TeamCrest`와 같은 이유). 목록이
    *   리페치로 재배열되면 같은 인스턴스에 다른 선수가 들어오는데, boolean이면 그 선수까지
-   *   등번호로 남는다.
+   *   실루엣으로 남는다.
    */
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const src = playerPhotoUrl(externalId);
