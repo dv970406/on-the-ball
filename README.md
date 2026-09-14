@@ -18,15 +18,20 @@
 | 게시글 | 목록 · 상세 · 작성 · 수정 · 삭제(소프트). 본문은 **마크다운**(GFM) |
 | 댓글 | 작성 · 삭제. 글의 `comment_count`는 DB 트리거가 관리 |
 | 좋아요 | 토글(낙관적 업데이트). 동시성은 `SECURITY DEFINER` RPC의 행 잠금으로 직렬화 |
-| 입축구 | 운영진이 등록하는 전 유저 대상 단일 선택 문항. 코드·DB·URL에서는 `survey`다(화면 라벨만 "입축구"). **참여한 사람에게만** 결과 공개(DB 함수가 게이팅). 색을 지정한 문항은 선택지 수(2·3·4)에 따라 면적을 등분하는 **분할 카드**로 그리고 목록에서 바로 투표한다. 면 배경은 **이미지 > 색** 순으로 폴백한다. 기간은 생성 후 7일(`closes_at`)이고 마감 뒤 차단은 RLS가 한다 |
+| 투표 | 글에 딸린 2~4지선다(`post_poll`). 글과 **한 트랜잭션**으로 만들어지고 선택지는 생성 뒤 고정. 결과는 **투표한 사람에게만** 공개(DB 함수가 게이팅) |
+| 입축구 | 운영진이 등록하는 전 유저 대상 단일 선택 문항. 코드·DB·URL에서는 `survey`다(화면 라벨만 "입축구"). **참여한 사람에게만** 결과 공개(DB 함수가 게이팅). 색을 지정한 문항은 선택지 수(2·3·4)에 따라 면적을 등분하는 **분할 카드**로 그리고 목록에서 바로 투표한다. 면 배경은 **이미지 > 색** 순으로 폴백한다. 기간은 어드민이 정하고(`closes_at`) 마감 뒤 차단은 RLS가 한다 |
+| 승부예측 | EPL 경기의 승·무·패 예측(`/matches`). 마감·공개 시점이 둘 다 **킥오프**라 예측 중에는 분포가 닫히고 킥오프 뒤에는 비로그인에게도 열린다. 확정 라인업·사건·팀 스탯을 함께 보여주고, 일정·결과는 API-Football에서 동기화한다(`scripts/sync-*.mjs`) |
+| 공지 | 운영진 공지(`/notices`). 피드 최상단 배너에는 최신 **필독** 하나만 뜨고, 노출 기간은 RLS가 가른다 |
 | 인증 | **카카오 · 구글 소셜 로그인**(로그인 = 가입) · 로그아웃. 에러는 한국어로 매핑 |
-| 프로필 | 닉네임(가입 시 랜덤 배정 → 본인이 변경) · 프로필 사진 업로드 · **로그인 수단 연결** |
-| 권한 | **3중 방어** — `proxy.ts` 서버 가드 → 클라이언트 가드 → **RLS + 컬럼 권한(최종)** |
+| 프로필 | 닉네임(가입 시 랜덤 배정 → 본인이 변경) · 프로필 사진 업로드 · **로그인 수단 연결** · 차단 목록 |
+| 차단 · 신고 | 사용자 차단(그 사람의 글·댓글이 **RLS 정책에서** 걸러진다 — 조회 훅이 아니다) · 글 신고(사유는 enum) |
+| 어드민 | `/admin-you-can-not-access` — 경기·입축구·공지·피드 관리. 서버 가드는 `notFound()`이고 실제 방어는 definer RPC 안의 `is_admin()` |
+| 권한 | **2중 방어** — 클라이언트 가드(`AuthRequired`·`GuestOnly`, 안내) → **RLS + 컬럼 권한(실제 차단)**. `proxy.ts`는 세션 쿠키 갱신만 하고 라우트 가드를 두지 않는다(판정자가 둘이면 무한 리다이렉트가 된다 — `docs/conventions/nextjs.md`) |
 | 검색 유입 | 목록·상세 **SSR** · 말머리별 랜딩(`/posts/category/[slug]`) · 정렬은 쿼리 + canonical · `sitemap.xml` · `robots.txt` |
 
-> **색인 대상 화면은 전부 SSR**입니다 — 목록(글·말머리·입축구)과 상세(글·입축구) 모두
-> 서버가 본문·댓글·선택지·집계를 조립해 초기 HTML에 담습니다(작성·수정·프로필처럼 색인하지
-> 않는 화면만 클라이언트 쿼리). 프리페치는 최적화라 실패하면 클라이언트 조회로 폴백합니다 —
+> **색인 대상 화면은 전부 SSR**입니다 — 목록(글·말머리·입축구·경기·공지)과 상세(글·입축구·경기·공지)
+> 모두 서버가 본문·댓글·선택지·집계를 조립해 초기 HTML에 담습니다(작성·수정·프로필·어드민처럼
+> 색인하지 않는 화면만 클라이언트 쿼리). 프리페치는 최적화라 실패하면 클라이언트 조회로 폴백합니다 —
 > 자세한 규약은 [`docs/conventions/nextjs.md`](docs/conventions/nextjs.md).
 
 > 데이터 접근에 Route Handler를 두지 않고 **브라우저가 Supabase를 직접 호출**합니다.
@@ -44,7 +49,7 @@
 
 그중 **단일 선택 문항(입축구) 1종만** 2026-08-23에 되살렸습니다 — 데이터 레이어는 물려받지 않고 v2 규약으로 다시 설계했습니다(결과 게이팅을 DB에, 집계 컬럼 없이, jsonb 없이).
 
-`src/shared/ui`의 일부 컴포넌트와 `shared/lib`의 포맷터 몇 개는 그때의 자산으로 **의도적으로 보존**돼 있습니다
+`src/shared/ui`의 일부 컴포넌트는 그때의 자산으로 **의도적으로 보존**돼 있습니다
 (현재 미사용, 트리셰이킹되어 번들 비용 0). 현역/보존 구분은 [`docs/conventions/reuse.md`](docs/conventions/reuse.md).
 </details>
 
@@ -62,7 +67,7 @@
 | Global State | zustand (세션) |
 | Backend / DB | Supabase (PostgreSQL, RLS, 카카오·구글 OAuth) |
 | Markdown | react-markdown + remark-gfm |
-| Validation | Zod 4 |
+| Validation | 손으로 쓴 순수 함수(`validatePost` 등) — 스키마 라이브러리 없음. DB CHECK가 실제 방어선 |
 | Icons | lucide-react |
 | Architecture | FSD (Feature-Sliced Design) |
 
@@ -115,14 +120,17 @@ pnpm dev
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 URL | 둘 다 | ✅ |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon(publishable) 키 | 둘 다 | ✅ |
 | `NEXT_PUBLIC_SITE_URL` | `og:image` 절대 URL 기준(빌드 시점에 인라인) | 둘 다 | 배포 시 |
-| `SUPABASE_SERVICE_ROLE_KEY` | 관리 작업용 (런타임 불필요) | `.env.local` | — |
+| `NEXT_PUBLIC_SHOW_PLAYER_PHOTOS` | 선수 사진 표시. **기본 꺼짐** — `"true"`일 때만 켜진다(권리 미확인) | 둘 다 | — |
+| `SUPABASE_SERVICE_ROLE_KEY` | 어드민 경기 동기화(`/api/admin/sync-matches`)와 관리 스크립트 | 둘 다 | 어드민 동기화 시 |
+| `API_FOOTBALL_KEY` | 경기 일정·라인업·스탯 제공자 키 — 위 Route Handler와 `scripts/sync-*.mjs` | 둘 다 | 어드민 동기화 시 |
 | `SUPABASE_PROJECT_REF` | `supabase link`용 프로젝트 ref | `.env.local` | 배포 시 |
 | `SUPABASE_DB_PASSWORD` | `supabase db push`용 DB 비밀번호 | `.env.local` | 배포 시 |
 | `SUPABASE_ACCESS_TOKEN` | CLI/MCP 인증 토큰 | `.env.local` | 배포 시 |
 | `SUPABASE_AUTH_EXTERNAL_KAKAO_CLIENT_ID` / `_SECRET` | 카카오 로그인 | `.env.local` | ✅ |
 | `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` / `_SECRET` | 구글 로그인 | `.env.local` | ✅ |
 
-> `SUPABASE_*`는 전부 **`.env.local` 전용**입니다 — supabase CLI가 이 이름만 읽습니다.
+> `SUPABASE_AUTH_EXTERNAL_*`·`SUPABASE_PROJECT_REF`·`SUPABASE_DB_PASSWORD`·`SUPABASE_ACCESS_TOKEN`은
+> **`.env.local` 전용**입니다 — supabase CLI가 읽는 값이라 `.env.prod`에 적어도 아무 데도 가지 않습니다.
 > 원격의 소셜 로그인 키는 파일이 아니라 **대시보드 Authentication → Providers**가 소유합니다.
 
 > env가 비어 있어도 빌드는 성공합니다. 런타임에 쿼리 훅이 한국어 안내 에러를 던집니다.
@@ -248,8 +256,10 @@ update public.profiles set is_admin = true where id = '<내 uuid>';
 app/                     # Next.js 라우팅 전용 (view만 마운트)
 ├── (auth)/              #   sign-in (GuestOnly 셸). 소셜 로그인 복귀 지점이기도 하다
 ├── posts/               #   목록(list-page.tsx 공유) · category/[slug] · new · [id] · [id]/edit
-├── surveys/             #   목록 · [id] (운영진 문항 — 사용자가 만드는 화면이 없다)
-├── profile/             #   닉네임·사진 수정 + 계정 연결. 계정 연결의 복귀 지점
+├── surveys/             #   목록 · [id] (운영진 문항 — 어드민이 등록한다)
+├── matches/             #   승부예측 목록 · [id] (대진·예측 분포·라인업·기록)
+├── notices/             #   공지 목록 · [id] (익명 클라이언트 — /notices만 ○ + 30s로 프리렌더된다)
+├── profile/             #   닉네임·사진 수정 + 계정 연결 + 차단 목록. 계정 연결의 복귀 지점
 ├── admin-you-can-not-access/  # 어드민 백오피스 (layout이 is_admin()으로 판정 → 아니면 404)
 ├── api/admin/sync-matches/    # ⚠ 유일한 Route Handler — 외부 API를 서버 비밀로 부르는 자리
 └── sitemap.ts / robots.ts  #   색인 신호 (Next 특수 파일이라 "route.ts 금지"에 걸리지 않는다)
@@ -257,7 +267,7 @@ proxy.ts                 # 세션 쿠키 리프레시 (Next 16의 middleware). �
 src/
 ├── app/                 # providers(QueryClient + AuthProvider), fonts, globals.css
 ├── views/               # 화면 조립 (⚠ pages 금지)
-├── widgets/             # app-bar · bottom-tab-bar · sub-header · tab-scroll-area · auth-shell · auth-status · admin-shell
+├── widgets/             # app-bar · bottom-tab-bar · sub-header · tab-scroll-area · auth-shell · auth-status · notice-banner · admin-shell
 ├── features/            # 사용자 액션 1개 = 슬라이스 1개
 ├── entities/            # session · post · comment · profile · poll · survey · match · block · notice
 ├── shared/              # ui / api / lib / config
@@ -269,7 +279,7 @@ supabase/
 └── tests/               # run-rls.sh · rls.sql · concurrency.sh
 handoff_community/       # 디자인 핸드오프 레퍼런스 (구현 대상 아님 — 린트 제외)
 docs/
-├── conventions/         # 코딩 컨벤션 7종
+├── conventions/         # 코딩 컨벤션
 ├── oauth-setup.md       # 카카오·구글 앱 등록 → 키 → 검증 절차
 └── legacy/              # v1 인벤토리 (청산 전 스냅샷)
 ```
