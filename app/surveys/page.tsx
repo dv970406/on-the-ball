@@ -75,14 +75,16 @@ const fetchSurveyList = cache(async (): Promise<SurveyList> => {
       const rows = await Promise.all(
         answered.map((survey) => supabase.rpc("survey_results", { p_survey_id: survey.id })),
       );
-      results = {};
+      // 채운 뒤 대입한다 — 콜백 안에서는 TS가 `results`의 좁힘을 잃어 non-null 단언이 필요해진다
+      const resultsBySurvey: Record<number, SurveyResult[]> = {};
       answered.forEach((survey, index) => {
         // ⚠ 실패한 문항은 **담지 않는다** — `[]`로 접으면 "열렸는데 0표"라는 거짓이 되고,
         //   담지 않으면 그 카드만 클라이언트 조회로 폴백한다(상세와 같은 판단).
         const { data: rowsForSurvey, error: resultsError } = rows[index];
         if (resultsError) return;
-        results![survey.id] = (rowsForSurvey ?? []).map(buildSurveyResult);
+        resultsBySurvey[survey.id] = (rowsForSurvey ?? []).map(buildSurveyResult);
       });
+      results = resultsBySurvey;
     }
 
     return { items, results, userId: auth.user?.id, nowMs };
