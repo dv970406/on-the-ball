@@ -17,7 +17,7 @@ const NOT_FOUND_METADATA: Metadata = { title: NOT_FOUND_TITLE };
 const META_TITLE_MAX = 60;
 
 type NoticeHead =
-  | { state: "found"; notice: Notice; nowMs: number }
+  | { state: "found"; notice: Notice }
   | { state: "missing" }
   /** 조회 자체가 실패 — 일시 장애로 멀쩡한 공지를 없다고 단정하면 안 되므로 구분한다 */
   | { state: "unknown" };
@@ -42,7 +42,7 @@ const fetchNoticeHead = cache(async (noticeId: number): Promise<NoticeHead> => {
 
     if (error) return { state: "unknown" };
     if (!data) return { state: "missing" };
-    return { state: "found", notice: buildNotice(data), nowMs: Date.now() };
+    return { state: "found", notice: buildNotice(data) };
   } catch (e) {
     unstable_rethrow(e);
     console.error("[notices/[id]] 공지 조회 실패:", e);
@@ -85,7 +85,6 @@ export default async function Page(props: PageProps<"/notices/[id]">) {
     <NoticeDetailView
       noticeId={noticeId}
       initialNotice={head.state === "found" ? head.notice : undefined}
-      serverNowMs={head.state === "found" ? head.nowMs : undefined}
     />
   );
 }

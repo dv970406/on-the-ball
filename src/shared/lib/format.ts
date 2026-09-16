@@ -106,6 +106,22 @@ export function formatRelativeTime(iso: string, nowMs: number | null): string {
 }
 
 /**
+ * 날짜를 **연도까지 항상** 붙여 "2026년 8월 30일"로 표기. 공지 목록·상세가 쓴다.
+ *
+ * ⚠ **`formatRelativeTime`을 공지에 쓰지 않는다.** 그 함수는 올해 글의 연도를 생략하는데
+ *   ("8월 30일"), 공지는 글과 달리 **문서로서 읽히는 자리**라 그 날짜만으로는 언제 것인지
+ *   알 수 없다(실제로 "8월 30일"만 떠서 연도가 없다는 지적이 들어왔다). "3일 전" 같은
+ *   상대시각도 같은 이유로 쓰지 않는다 — 공지에서 사용자가 기억하는 것은 날짜다.
+ * ⚠ 그래서 `nowMs`를 받지 않는다 — 연도를 붙일지 정할 일이 없어 기준 시각이 필요 없다
+ *   (`formatKickoffTime`과 같은 계약). 호출부에 `serverNowMs`를 흘려보낼 이유도 함께 사라진다.
+ * ⚠ 달력 조각은 **KST 기준**이다(위 TIME_ZONE 주석).
+ */
+export function formatDate(iso: string): string {
+  const p = seoulParts(new Date(iso));
+  return `${p.year}년 ${p.month}월 ${p.day}일`;
+}
+
+/**
  * 킥오프 시각을 "11월 3일 (일) 04:30"으로 표기. 해가 다르면 앞에 연도를 붙인다.
  *
  * ⚠ **`formatRelativeTime`을 쓸 수 없다.** 그 함수는 `nowMs - date`로 과거를 전제하는데

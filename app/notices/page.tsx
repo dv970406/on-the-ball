@@ -30,11 +30,6 @@ export const metadata: Metadata = {
 interface NoticeList {
   /** 프리페치 결과 — 실패하면 undefined를 넘겨 클라이언트 조회로 폴백한다 */
   items?: NoticeListItem[];
-  /**
-   * 이 목록을 읽은 시각.
-   * ⚠ 렌더 본문이 아니라 여기서 찍는다(`react-hooks/purity`가 서버 컴포넌트도 막는다).
-   */
-  nowMs: number;
 }
 
 /**
@@ -42,28 +37,29 @@ interface NoticeList {
  *   (`notice_select_live` 정책이 `auth.uid()`를 아예 보지 않는다) 응답이 모든 요청에
  *   동일하다 → Data Cache를 태워도 사용자별로 갈릴 값이 없다. 경기 상세의 라인업·스탯이
  *   같은 이유로 `hasSessionCookie()` 갈림 없이 익명으로 가는 것과 같은 자리다.
- * ⚠ `nowMs`는 캐시 **밖**에서 찍는다 — 안에서 찍으면 상대시각이 캐시 나이만큼 뒤처진다.
+ * ⚠ 서버 시각을 내리지 않는다 — 공지 날짜는 연도까지 붙인 절대 표기라(`formatDate`) 기준
+ *   시각이 필요 없다. 상대시각을 되살리면 그때 `nowMs`를 캐시 **밖**에서 찍어 함께 내린다.
  * ⚠ `cache()`로 감싼다 — 지금은 소비자가 `Page` 하나지만 `generateMetadata`를 동적으로
  *   바꾸는 순간 요청당 2회가 된다.
  */
 const fetchNoticeList = cache(async (): Promise<NoticeList> => {
   try {
     const supabase = createSupabaseAnonClient();
-    if (!supabase) return { nowMs: Date.now() };
+    if (!supabase) return {};
 
     const { data, error } = await buildNoticeListQuery(supabase);
-    if (error) return { nowMs: Date.now() };
+    if (error) return {};
 
-    return { items: (data ?? []).map(buildNoticeListItem), nowMs: Date.now() };
+    return { items: (data ?? []).map(buildNoticeListItem) };
   } catch (e) {
     // 프레임워크 내부 에러를 삼키면 라우트가 조용히 정적 프리렌더된다
     unstable_rethrow(e);
     console.error("[notices] 목록 조회 실패:", e);
-    return { nowMs: Date.now() };
+    return {};
   }
 });
 
 export default async function Page() {
-  const { items, nowMs } = await fetchNoticeList();
-  return <NoticeListView initialNotices={items} serverNowMs={nowMs} />;
+  const { items } = await fetchNoticeList();
+  return <NoticeListView initialNotices={items} />;
 }

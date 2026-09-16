@@ -13,6 +13,7 @@ export { useScrollRestore, clearScrollRestore } from "./use-scroll-restore";
 //    ⚠ `check:conventions`는 이 유형을 잡지 못한다(상대·직접 경로 소비도 "현역"으로 센다).
 export {
   formatCount,
+  formatDate,
   formatKickoff,
   formatKickoffTime,
   formatRelativeTime,

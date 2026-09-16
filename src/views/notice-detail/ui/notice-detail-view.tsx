@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { type Notice, useNoticeQuery } from "@/entities/notice";
 import { ROUTES } from "@/shared/config";
-import { formatRelativeTime, useNowMs } from "@/shared/lib";
+import { formatDate } from "@/shared/lib";
 import { EmptyState, Markdown, Pill, Skeleton, StaleBanner } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
 
@@ -14,15 +14,10 @@ interface NoticeDetailViewProps {
    * ⚠ 서버 조회가 실패하면 `undefined`가 오고 화면은 클라이언트 쿼리로 폴백한다.
    */
   initialNotice?: Notice;
-  /** 서버가 렌더한 시점의 시각 — 상대시각이 첫 프레임부터 그려지게 한다 */
-  serverNowMs?: number;
 }
 
-export function NoticeDetailView({ noticeId, initialNotice, serverNowMs }: NoticeDetailViewProps) {
+export function NoticeDetailView({ noticeId, initialNotice }: NoticeDetailViewProps) {
   const { data, isPending, error, refetch } = useNoticeQuery(noticeId, initialNotice);
-  // ⚠ 순서를 뒤집지 말 것 — 세션당 한 번 고정되는 클라 시계가 서버 시각을 이기면 안 된다
-  const clientNowMs = useNowMs();
-  const nowMs = serverNowMs ?? clientNowMs;
 
   /**
    * ⚠ **네 분기가 같은 값을 쓴다.** 루트 프레임이 `h-dvh … overflow-hidden`이라 `<main>`이
@@ -102,8 +97,9 @@ export function NoticeDetailView({ noticeId, initialNotice, serverNowMs }: Notic
         <div className="flex items-center gap-1.5 pt-5">
           {/* ⚠ variant는 리터럴이어야 한다 — 동적 값은 검사가 금지한다 */}
           {data.type === "필독" ? <Pill variant="green">필독</Pill> : <Pill variant="soft">공지</Pill>}
+          {/* 연도까지 항상 붙인다 — 공지는 날짜가 곧 정보라 상대시각·연도 생략을 쓰지 않는다 */}
           <time dateTime={data.opensAt} className="text-[12px] text-ink-mute-2">
-            {formatRelativeTime(data.opensAt, nowMs)}
+            {formatDate(data.opensAt)}
           </time>
         </div>
 

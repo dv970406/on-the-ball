@@ -4,15 +4,13 @@ import Link from "next/link";
 import { ClipboardList } from "lucide-react";
 import { type NoticeListItem, useNoticeListQuery } from "@/entities/notice";
 import { ROUTES } from "@/shared/config";
-import { formatRelativeTime, useNowMs } from "@/shared/lib";
+import { formatDate } from "@/shared/lib";
 import { EmptyState, Pill, Skeleton, StaleBanner } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
 
 interface NoticeListViewProps {
   /** 서버 프리페치 결과. 실패하면 undefined가 오고 클라이언트가 조회한다 */
   initialNotices?: NoticeListItem[];
-  /** 서버가 렌더한 시점의 시각 — 상대시각이 첫 프레임부터 그려지게 한다 */
-  serverNowMs?: number;
 }
 
 /**
@@ -21,11 +19,8 @@ interface NoticeListViewProps {
  * 하단 탭바를 그리지 않는다(탭에 공지가 없는 서브헤더 화면이다 — 상세들과 같다).
  * ⚠ 노출 기간 밖·삭제된 공지는 `notice_select_live` 정책이 거른다 — 화면이 다시 거르지 않는다.
  */
-export function NoticeListView({ initialNotices, serverNowMs }: NoticeListViewProps) {
+export function NoticeListView({ initialNotices }: NoticeListViewProps) {
   const { data, isPending, error, refetch } = useNoticeListQuery(initialNotices);
-  // ⚠ 순서를 뒤집지 말 것 — `useNowMs()`는 세션당 한 번 고정되어 갓 받은 서버 시각보다 낡았다
-  const clientNowMs = useNowMs();
-  const nowMs = serverNowMs ?? clientNowMs;
 
   return (
     <>
@@ -76,8 +71,9 @@ export function NoticeListView({ initialNotices, serverNowMs }: NoticeListViewPr
                       <Pill variant="soft">공지</Pill>
                     )}
                     {/* 다른 목록 카드(PostCard·SurveyCard)와 같은 마크업 — 날짜는 <time>, 제목은 h1 아래 h2 */}
+                    {/* 연도까지 항상 붙인다 — 상세와 같은 표기라야 한 종류로 읽힌다 */}
                     <time dateTime={notice.opensAt} className="text-[12px] text-ink-mute-2">
-                      {formatRelativeTime(notice.opensAt, nowMs)}
+                      {formatDate(notice.opensAt)}
                     </time>
                   </span>
                   <h2 className="line-clamp-2 text-[15px] font-medium leading-[1.45] text-ink">
