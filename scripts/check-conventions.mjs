@@ -35,6 +35,8 @@ const DEEP_IMPORT_ALLOWED = new Set([
   "@/shared/lib/format",
   "@/shared/lib/post-id",
   "@/shared/lib/text",
+  // 구조화 데이터 렌더 — "use client"가 없어 서버 page가 직접 경로로 렌더한다(배럴은 클라이언트 UI를 담는다)
+  "@/shared/ui/json-ld",
   // 쿼리 키 조각 — `api/keys.ts`는 서버 소비자라 "use client"를 담은 배럴을 거칠 수 없다
   "@/shared/lib/query-scope",
   "@/entities/post/api/list-query",
@@ -49,8 +51,15 @@ const DEEP_IMPORT_ALLOWED = new Set([
   "@/entities/match/lib/open",
   "@/entities/post/lib/plain-summary",
   "@/entities/post/lib/hot",
+  // 본문의 이미지 URL — `og:image`·구조화 데이터가 화면(어드민)과 같은 추출을 써야 한다
+  "@/entities/post/lib/post-images",
+  // 댓글 스레드 조립 — 구조화 데이터의 `comment` 중첩이 화면과 같은 판정(고아 승격)을 써야 한다
+  "@/entities/comment/lib/build-comment-threads",
   "@/entities/session/lib/auth-error-message",
   "@/features/sign-in/lib/pkce-verifier",
+  // 구조화 데이터(JSON-LD) 조립 — views 배럴은 "use client" 뷰를 담아 서버 page가 거칠 수 없다.
+  // 뷰 슬라이스에 두는 이유: "화면에 보이는 것만 적는다"가 규칙이라 그 화면을 소유한 슬라이스가 갖는다
+  "@/views/post-detail/lib/json-ld",
 ]);
 /** `@/entities/<slice>/...` 형태로 모든 엔티티에 공통 허용되는 서버 안전 경로 */
 const DEEP_IMPORT_ALLOWED_ENTITY_SUFFIX = ["model/types", "api/mappers", "api/keys"];

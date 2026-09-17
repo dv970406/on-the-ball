@@ -37,3 +37,5 @@ export { SignInDialog } from "./sign-in-dialog";
 // 토스트의 상태(useToast·useToastStore)는 @/shared/lib에 있다 — ui는 뷰포트만 노출한다
 export { ToastViewport } from "./toast";
 export { Markdown } from "./markdown";
+// 구조화 데이터 — 서버 page가 렌더한다("use client" 없음, Markdown과 같은 성질)
+export { JsonLd, type JsonLdObject } from "./json-ld";

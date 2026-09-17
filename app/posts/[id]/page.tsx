@@ -5,14 +5,17 @@ import { notFound, unstable_rethrow } from "next/navigation";
 import { parsePostId } from "@/shared/lib/post-id";
 // ⚠ 배럴(@/shared/lib)이 아니라 직접 경로 — 배럴은 "use client" 훅을 포함한다.
 import { clamp } from "@/shared/lib/text";
-import { NOT_FOUND_TITLE, OG_IMAGE, ROUTES } from "@/shared/config";
+import { NOT_FOUND_TITLE, OG_IMAGE, OG_SITE, ROUTES, absoluteUrl } from "@/shared/config";
+// ⚠ 배럴(@/shared/ui)이 아니라 직접 경로 — 이 page는 "use client"를 담은 배럴을 하나도 거치지 않는다(architecture.md)
+import { JsonLd } from "@/shared/ui/json-ld";
 import { createSupabaseServerClient } from "@/shared/api/supabase-server";
 // ⚠ 배럴(@/entities/post)이 아니라 직접 경로 — 배럴은 "use client" 모듈을 포함한다.
 //   목록 카드의 발췌와 **같은 변환기**를 쓴다(둘이 갈리면 화면과 공유 프리뷰의 요약이 달라진다).
 import { toPlainSummary } from "@/entities/post/lib/plain-summary";
+import { extractImageUrls } from "@/entities/post/lib/post-images";
 // ⚠ 배럴이 아니라 직접 경로 — 매퍼는 "use client"가 없어 서버에서 쓸 수 있다.
 //   select 문자열·빌더를 클라이언트 훅과 **공유해야** 프리페치가 같은 모양을 만든다.
-import { POST_DETAIL_SELECT, buildPostDetail } from "@/entities/post/api/mappers";
+import { POST_DETAIL_SELECT, buildPostDetail, isEdited } from "@/entities/post/api/mappers";
 import { buildComment } from "@/entities/comment/api/mappers";
 import { buildCommentListQuery } from "@/entities/comment/api/list-query";
 import { POLL_SELECT, buildPoll, buildPollResult } from "@/entities/poll/api/mappers";
@@ -20,6 +23,8 @@ import type { PostDetail } from "@/entities/post/model/types";
 import type { Comment } from "@/entities/comment/model/types";
 import type { Poll, PollResult } from "@/entities/poll/model/types";
 import { PostDetailView } from "@/views/post-detail";
+// ⚠ 배럴이 아니라 직접 경로 — 배럴은 "use client" 뷰를 담는다. 순수 함수라 서버에서 호출한다.
+import { buildPostJsonLd } from "@/views/post-detail/lib/json-ld";
 
 /** 조회 실패("unknown")로 화면은 띄우되 제목을 알 수 없을 때 */
 const FALLBACK_METADATA: Metadata = { title: "게시글" };
@@ -34,6 +39,17 @@ const NOT_FOUND_METADATA: Metadata = { title: NOT_FOUND_TITLE };
 const META_TITLE_MAX = 60;
 /** 공유 프리뷰 설명 길이 — 대부분의 플랫폼이 이 언저리에서 자른다 */
 const META_DESCRIPTION_MAX = 120;
+
+/**
+ * 본문의 이미지 중 **공유 카드·구조화 데이터에 실을 수 있는 것**만 고른다.
+ *
+ * 본문은 자유 텍스트라 상대 경로·`data:` 등 무엇이든 들어올 수 있는데, `og:image`는 크롤러가
+ * 직접 받아 가는 절대 URL이어야 한다. 렌더러(`Markdown`)가 그리지 않는 스킴을 우리만 세면
+ * 화면에 없는 이미지가 카드에 실린다.
+ */
+function shareableImages(content: string): string[] {
+  return extractImageUrls(content).filter((url) => /^https?:\/\//i.test(url));
+}
 
 /** 글이 존재하는지 + 화면을 그릴 데이터까지 확인한 결과 */
 type PostHead =
@@ -183,6 +199,10 @@ export async function generateMetadata(props: PageProps<"/posts/[id]">): Promise
 
   const title = clamp(head.post.title, META_TITLE_MAX);
   const description = toPlainSummary(head.post.content, META_DESCRIPTION_MAX);
+  // 본문 첫 사진이 공유 카드가 된다 — 없을 때만 브랜드 이미지로 폴백한다.
+  // ⚠ 본문 사진은 치수·타입을 모르므로 URL만 싣는다(`OG_IMAGE`처럼 width·height를 적지 않는다).
+  const [firstImage] = shareableImages(head.post.content);
+  const images = firstImage ?? OG_IMAGE;
 
   return {
     title,
@@ -191,17 +211,24 @@ export async function generateMetadata(props: PageProps<"/posts/[id]">): Promise
     alternates: { canonical: ROUTES.post(postId) },
     description,
     openGraph: {
+      ...OG_SITE,
       type: "article",
       title,
       description,
-      siteName: "온더볼",
+      // ⚠ Next는 `og:url`을 canonical에서 만들어 주지 않는다(실측 — 없었다). 네이버가 읽는 값이라 명시한다.
+      url: absoluteUrl(ROUTES.post(postId)),
       // ⚠ images를 여기서 **명시해야 한다.** 세그먼트가 openGraph를 직접 채우면
       //   루트 opengraph-image.png의 자동 주입이 통째로 대체되어 사라진다(실측 확인) —
       //   생략했더니 글 상세만 이미지 없는 카드로 나갔다.
       //   metadataBase가 절대 URL로 만들어 준다.
-      images: OG_IMAGE,
+      images,
+      // article:* — 발행·수정 시각과 말머리. `updated_at`은 제목·본문이 바뀔 때만 움직이므로
+      // 화면의 "수정됨"과 같은 판정(`isEdited`)으로 싣는다.
+      publishedTime: head.post.createdAt,
+      ...(isEdited(head.post) ? { modifiedTime: head.post.updatedAt } : {}),
+      section: head.post.category,
     },
-    twitter: { card: "summary_large_image", title, description, images: OG_IMAGE },
+    twitter: { card: "summary_large_image", title, description, images },
   };
 }
 
@@ -217,15 +244,28 @@ export default async function Page(props: PageProps<"/posts/[id]">) {
 
   // state가 "unknown"이면 404로 단정하지 않고 화면을 띄운다 —
   // 클라이언트 쿼리가 다시 시도해 성공하거나 에러 상태를 보여준다.
+  // ⚠ 구조화 데이터는 **서버가 본문을 손에 쥔 경우에만** 싣는다 — 폴백 경로에서는 화면이
+  //   클라이언트 조회로 채워지는데, 그 값으로 JSON-LD를 만들면 크롤러가 받는 HTML과 어긋난다.
   return (
-    <PostDetailView
-      postId={postId}
-      initialPost={head.state === "found" ? head.post : undefined}
-      initialComments={head.state === "found" ? head.comments : undefined}
-      initialPoll={head.state === "found" ? head.poll : undefined}
-      initialPollResults={head.state === "found" ? head.pollResults : undefined}
-      initialUserId={head.state === "found" ? head.userId : undefined}
-      serverNowMs={head.state === "found" ? head.nowMs : undefined}
-    />
+    <>
+      {head.state === "found" && (
+        <JsonLd
+          data={buildPostJsonLd({
+            post: head.post,
+            comments: head.comments,
+            images: shareableImages(head.post.content),
+          })}
+        />
+      )}
+      <PostDetailView
+        postId={postId}
+        initialPost={head.state === "found" ? head.post : undefined}
+        initialComments={head.state === "found" ? head.comments : undefined}
+        initialPoll={head.state === "found" ? head.poll : undefined}
+        initialPollResults={head.state === "found" ? head.pollResults : undefined}
+        initialUserId={head.state === "found" ? head.userId : undefined}
+        serverNowMs={head.state === "found" ? head.nowMs : undefined}
+      />
+    </>
   );
 }

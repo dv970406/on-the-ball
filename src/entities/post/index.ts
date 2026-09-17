@@ -1,7 +1,7 @@
 // ⚠ 이 배럴은 "use client" 모듈(쿼리 훅·UI)을 포함한다 — 서버에서 import 금지.
 //    서버(generateMetadata 등)에서는 서버 안전 경로를 직접 쓴다:
 //      "@/entities/post/model/types", "@/entities/post/api/mappers", "@/entities/post/api/keys",
-//      "@/entities/post/lib/plain-summary", "@/entities/post/lib/hot"
+//      "@/entities/post/lib/plain-summary", "@/entities/post/lib/hot", "@/entities/post/lib/post-images"
 export type {
   PostListItem,
   PostListPage,
@@ -33,6 +33,8 @@ export {
   isEdited,
 } from "./api/mappers";
 export { toPlainSummary } from "./lib/plain-summary";
+// 본문의 이미지 URL — 어드민 화면(배럴)과 글 상세 page(직접 경로)가 함께 쓴다
+export { extractImageUrls } from "./lib/post-images";
 export { isHotPost, HOT_LIKE_THRESHOLD, HOT_WINDOW_MS } from "./lib/hot";
 export { usePostListQuery, usePostQuery } from "./api/queries";
 export { PostCard } from "./ui/post-card";
