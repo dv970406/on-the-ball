@@ -5,7 +5,7 @@ import { notFound, unstable_rethrow } from "next/navigation";
 //   아니고, 이름은 첫 호출자를 기록할 뿐이다. 판정이 갈리면 `/matches/2`·`/matches/002`가
 //   같은 경기의 별칭 URL이 된다.
 import { parsePostId } from "@/shared/lib/post-id";
-import { NOT_FOUND_TITLE, OG_IMAGE, ROUTES } from "@/shared/config";
+import { NOT_FOUND_TITLE, OG_IMAGE, ROUTES, OG_SITE, absoluteUrl } from "@/shared/config";
 // ⚠ 배럴(@/shared/lib)이 아니라 직접 경로 — 배럴은 "use client" 훅을 포함한다.
 import { clamp } from "@/shared/lib/text";
 import { createSupabaseServerClient } from "@/shared/api/supabase-server";
@@ -223,7 +223,15 @@ export async function generateMetadata(props: PageProps<"/matches/[id]">): Promi
     alternates: { canonical: ROUTES.match(matchId) },
     // ⚠ **`images`를 명시한다.** 세그먼트가 `openGraph`를 채우면 루트의
     //   `app/opengraph-image.png` 상속이 통째로 대체되어 이미지가 빠진다(실측).
-    openGraph: { type: "article", title, description, siteName: "온더볼", images: OG_IMAGE },
+    // Next는 `og:url`을 canonical에서 만들어 주지 않는다 — 네이버가 읽는 값이라 명시한다
+    openGraph: {
+      ...OG_SITE,
+      type: "article",
+      title,
+      description,
+      url: absoluteUrl(ROUTES.match(matchId)),
+      images: OG_IMAGE,
+    },
     twitter: { card: "summary_large_image", title, description, images: OG_IMAGE },
   };
 }

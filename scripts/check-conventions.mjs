@@ -60,6 +60,7 @@ const DEEP_IMPORT_ALLOWED = new Set([
   // 구조화 데이터(JSON-LD) 조립 — views 배럴은 "use client" 뷰를 담아 서버 page가 거칠 수 없다.
   // 뷰 슬라이스에 두는 이유: "화면에 보이는 것만 적는다"가 규칙이라 그 화면을 소유한 슬라이스가 갖는다
   "@/views/post-detail/lib/json-ld",
+  "@/views/notice-detail/lib/json-ld",
 ]);
 /** `@/entities/<slice>/...` 형태로 모든 엔티티에 공통 허용되는 서버 안전 경로 */
 const DEEP_IMPORT_ALLOWED_ENTITY_SUFFIX = ["model/types", "api/mappers", "api/keys"];

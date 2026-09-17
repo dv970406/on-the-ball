@@ -5,16 +5,24 @@ import { notFound, unstable_rethrow } from "next/navigation";
 //   아니고, 판정이 갈리면 `/notices/2`·`/notices/002`가 같은 공지의 별칭 URL이 된다.
 import { parsePostId } from "@/shared/lib/post-id";
 import { clamp } from "@/shared/lib/text";
-import { NOT_FOUND_TITLE, OG_IMAGE, ROUTES } from "@/shared/config";
+import { NOT_FOUND_TITLE, OG_IMAGE, OG_SITE, ROUTES, absoluteUrl } from "@/shared/config";
+// ⚠ 배럴(@/shared/ui)이 아니라 직접 경로 — 이 page는 "use client"를 담은 배럴을 하나도 거치지 않는다(architecture.md)
+import { JsonLd } from "@/shared/ui/json-ld";
 import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
+// 마크다운 → 평문의 단일 소스(`views/notice-detail/lib/json-ld`가 같은 변환기를 쓴다)
+import { toPlainSummary } from "@/entities/post/lib/plain-summary";
 import { NOTICE_SELECT, buildNotice } from "@/entities/notice/api/mappers";
 import type { Notice } from "@/entities/notice/model/types";
 import { NoticeDetailView } from "@/views/notice-detail";
+// ⚠ 배럴이 아니라 직접 경로 — 배럴은 "use client" 뷰를 담는다. 순수 함수라 서버에서 호출한다.
+import { buildNoticeJsonLd } from "@/views/notice-detail/lib/json-ld";
 
 const FALLBACK_METADATA: Metadata = { title: "공지사항" };
 /** 없는 공지 — `Page`가 `notFound()`를 부르므로 **404 화면과 같은 제목**이어야 한다. */
 const NOT_FOUND_METADATA: Metadata = { title: NOT_FOUND_TITLE };
 const META_TITLE_MAX = 60;
+/** 공유 프리뷰·검색 결과 설명 길이 — 글 상세와 같은 값 */
+const META_DESCRIPTION_MAX = 120;
 
 type NoticeHead =
   | { state: "found"; notice: Notice }
@@ -61,12 +69,27 @@ export async function generateMetadata(props: PageProps<"/notices/[id]">): Promi
 
   // DB 한도(1,200 코드포인트)가 <title>보다 훨씬 넓어 클램프가 필요하다
   const title = clamp(head.notice.title, META_TITLE_MAX);
+  // ⚠ 본문 요약을 `description`으로 싣는다 — 없으면 모든 공지가 루트의 사이트 소개 한 줄로
+  //   똑같이 검색 결과·공유 카드에 나간다(글 상세에서 실측했던 것과 같은 결함).
+  const description = toPlainSummary(head.notice.body, META_DESCRIPTION_MAX);
 
   return {
     title,
+    description,
     alternates: { canonical: ROUTES.notice(noticeId) },
-    openGraph: { type: "article", title, siteName: "온더볼", images: OG_IMAGE },
-    twitter: { card: "summary_large_image", title, images: OG_IMAGE },
+    openGraph: {
+      ...OG_SITE,
+      type: "article",
+      title,
+      description,
+      // Next는 `og:url`을 canonical에서 만들어 주지 않는다 — 네이버가 읽는 값이라 명시한다
+      url: absoluteUrl(ROUTES.notice(noticeId)),
+      images: OG_IMAGE,
+      // 화면의 `<time>`이 그리는 시각과 같은 값(`opensAt`) — JSON-LD의 `datePublished`와 한 쌍
+      publishedTime: head.notice.opensAt,
+      section: head.notice.type,
+    },
+    twitter: { card: "summary_large_image", title, description, images: OG_IMAGE },
   };
 }
 
@@ -81,10 +104,14 @@ export default async function Page(props: PageProps<"/notices/[id]">) {
   if (head.state === "missing") notFound();
 
   // "unknown"이면 404로 단정하지 않고 화면을 띄운다(클라이언트가 다시 조회한다)
+  // ⚠ 구조화 데이터는 서버가 본문을 손에 쥔 경우에만 싣는다(글 상세와 같은 이유)
   return (
-    <NoticeDetailView
-      noticeId={noticeId}
-      initialNotice={head.state === "found" ? head.notice : undefined}
-    />
+    <>
+      {head.state === "found" && <JsonLd data={buildNoticeJsonLd(head.notice)} />}
+      <NoticeDetailView
+        noticeId={noticeId}
+        initialNotice={head.state === "found" ? head.notice : undefined}
+      />
+    </>
   );
 }
