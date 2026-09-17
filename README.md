@@ -120,6 +120,7 @@ pnpm dev
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase 프로젝트 URL | 둘 다 | ✅ |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon(publishable) 키 | 둘 다 | ✅ |
 | `NEXT_PUBLIC_SITE_URL` | `og:image` 절대 URL 기준(빌드 시점에 인라인) | 둘 다 | 배포 시 |
+| `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` / `NEXT_PUBLIC_NAVER_SITE_VERIFICATION` | Search Console·네이버 서치어드바이저 소유권 확인 메타(비우면 태그를 내보내지 않음). 등록 뒤 `/sitemap.xml` 제출 | `.env.prod` | 검색 등록 시 |
 | `NEXT_PUBLIC_SHOW_PLAYER_PHOTOS` | 선수 사진 표시. **기본 꺼짐** — `"true"`일 때만 켜진다(권리 미확인) | 둘 다 | — |
 | `SUPABASE_SERVICE_ROLE_KEY` | 어드민 경기 동기화(`/api/admin/sync-matches`)와 관리 스크립트 | 둘 다 | 어드민 동기화 시 |
 | `API_FOOTBALL_KEY` | 경기 일정·라인업·스탯 제공자 키 — 위 Route Handler와 `scripts/sync-*.mjs` | 둘 다 | 어드민 동기화 시 |

@@ -30,6 +30,16 @@ export const env = {
    *   보고 `null`을 돌려준다(호출부가 기억해야 하는 방어는 방어가 아니다).
    */
   showPlayerPhotos: process.env.NEXT_PUBLIC_SHOW_PLAYER_PHOTOS === "true",
+  /**
+   * 검색엔진 소유권 확인 토큰 — 루트 layout이 `<meta name="…-site-verification">`으로 내보낸다.
+   *
+   * Search Console·네이버 서치어드바이저에 사이트를 등록해야 사이트맵 제출·색인 요청·검색
+   * 유입 리포트가 열린다. 비어 있으면 태그를 아예 내보내지 않는다(빈 content는 확인에 실패한다).
+   * ⚠ 값은 HTML에 그대로 실리는 공개 토큰이라 `NEXT_PUBLIC_*`이어도 무해하다 — 비밀이 아니라
+   *   "이 도메인의 HTML을 내가 고칠 수 있다"는 증명이다.
+   */
+  googleSiteVerification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ?? "",
+  naverSiteVerification: process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION ?? "",
 };
 
 /** 스킴이 빠진 값이 흔해서 붙여준다 — `new URL("example.com")`은 그대로 두면 throw한다 */
