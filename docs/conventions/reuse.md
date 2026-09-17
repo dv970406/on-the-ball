@@ -118,10 +118,11 @@
 - **`POST_LIST_LIMIT`은 `api/mappers.ts`에 있다**(`api/queries.ts`는 `"use client"`라 서버가 못 읽는다). `COMMENT_LIST_LIMIT`·`SURVEY_LIST_LIMIT`도 같은 이유로 같은 자리다.
 - **`POST_CATEGORIES` / `POST_SORTS` / `POST_SORT_LABEL`** — 말머리·정렬의 단일 소스. 말머리는 **DB의 `post_category` enum에서 생성된 타입**이라 목록을 손으로 다시 적지 않는다(`Record<PostCategory, ...>` 맵이 값 추가 시 누락을 컴파일 에러로 잡아준다).
 - **`isHotPost(post, nowMs)` / `HOT_LIKE_THRESHOLD` / `HOT_WINDOW_MS`** — HOT 배지 판정. **`nowMs`를 인자로 받는 이유**가 규약이다 — 매퍼에 넣으면 순수·서버 안전이 깨지고 같은 행이 호출 시점마다 달라진다. 호출부는 `useNowMs`를 넘긴다.
+- **`extractImageUrls(content)`** — 본문 마크다운의 이미지 URL(중복 제거). 어드민의 "이미지 제거" 목록과 글 상세의 `og:image`·JSON-LD `image`가 **같은 추출**을 쓴다 — 갈리면 카드에 실린 사진과 어드민이 지우는 대상이 다르다. 패턴의 단일 소스는 `IMAGE_MARKDOWN_SOURCE`(`lib/plain-summary`)다. 우리 버킷 판정(`toStoragePath`)은 지우는 쪽(`features/admin-post`)에 남아 있다. 서버에서는 `@/entities/post/lib/post-images` 직접 경로.
 - **`toPlainSummary`** — 마크다운 원문 → 기호를 걷어낸 요약. 목록 카드의 `excerpt`와 `og:description`이 **같은 변환기**를 쓴다. ⚠ 말줄임은 여기 없다 → `@/shared/lib`의 `clamp`(도메인을 모르는 순수 함수라 소비처가 셋이 되면서 승격했다).
-- **`buildCommentThreads`** — 평면 댓글 배열 → 깊이 1 스레드(`CommentThread`). 답글 정렬·부모 매칭을 화면에서 다시 짜지 않는다.
+- **`buildCommentThreads`** — 평면 댓글 배열 → 깊이 1 스레드(`CommentThread`). 답글 정렬·부모 매칭을 화면에서 다시 짜지 않는다. 구조화 데이터의 댓글 중첩도 이 함수다(화면과 같은 고아 승격) — 서버에서는 `@/entities/comment/lib/build-comment-threads` 직접 경로.
 - `PostCard` / `CommentItem` — 목록 아이템 UI.
-- 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/keys`·`api/list-query`·`lib/plain-summary`·`lib/hot`을 직접 import.
+- 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/keys`·`api/list-query`·`lib/plain-summary`·`lib/hot`·`lib/post-images`를 직접 import.
 
 ## `@/entities/poll`
 - `usePollQuery(postId, userId)` — 글에 딸린 투표. 없으면 `null`(투표 없는 글이 대부분이라 정상값이다).
@@ -237,7 +238,7 @@
 - `admin-match` — `MatchForm` · `useUpdateMatch`/`useUnlockMatch`/`useDeleteMatch`/`useRestoreMatch`/`useSyncMatches`.
 - `admin-survey` — `SurveyForm` · `useCreateSurvey`/`useUpdateSurvey`/`useSetSurveyOptions`/`useEditSurveyOption`/`useDeleteSurvey`/`useRestoreSurvey` · `useInvalidateSurveys` · `useSurveyImageUpload`/`useSurveyImageCleanup`.
   - ⚠ `useInvalidateSurveys`가 따로 있는 이유: 입축구 폼은 문항 저장 → 선택지 저장이 **두 뮤테이션**인데, 각 훅이 `onSuccess`에서 무효화하면 첫 리페치가 `updatedAt`을 바꿔 그 값을 `key`로 쓰는 폼이 **선택지 저장 전에 리마운트**된다 — 관리자가 방금 친 입력이 서버의 옛 값으로 되돌아간다. 그래서 무효화를 **조립하는 쪽**(`views/admin-survey-form`의 `model/`)이 마지막에 한 번 부른다.
-- `admin-post` — `extractImageUrls` · `useStripPostImages`/`useMaskPost`/`useUnmaskPost`/`useAdminDeletePost`/`useAdminRestorePost`/`useEditPostPoll`.
+- `admin-post` — `useStripPostImages`/`useMaskPost`/`useUnmaskPost`/`useAdminDeletePost`/`useAdminRestorePost`/`useEditPostPoll`.
 - `admin-notice` — `NoticeForm` · `useCreateNotice`/`useUpdateNotice`/`useDeleteNotice`/`useRestoreNotice`.
 - ⚠ **jsonb 인자를 만드는 직렬화 함수를 features가 단독으로 소유한다.** 생성 타입이 `Json`이라 키 오타(`bgColor` vs `bg_color`)를 컴파일러가 잡아주지 못한다 — `database.types.ts`의 보증이 여기서만 사라지는 자리다.
 - ⚠ **버려진 배경 파일은 "빼기"가 아니라 저장이 지운다**(`useSurveyImageCleanup`). 버튼을 누른 순간 지우면 저장하지 않고 떠났을 때 **경로는 남고 파일이 없는** 면이 되어 카드가 통째로 투명해진다 → DB가 그 경로를 실제로 버린 뒤에 정리한다.
@@ -283,14 +284,15 @@
 - **`postImageUrl(path)` / `POST_IMAGE_BUCKET`** — 본문 이미지 경로 → 공개 URL.
   ⚠ **아바타와 달리 결과(전체 URL)가 그대로 `post.content`에 들어간다.** 본문은 사용자가 외부 주소도 적을 수 있는 자유 텍스트라 경로 규약을 강제할 자리가 없다 — 사유는 `api-and-db.md`의 "본문 이미지는 URL을 본문에 담는다" 절에 있다.
   ⚠ 조립 자체는 `publicStorageUrl`이 한다. **이 함수만 결과(전체 URL)가 DB에 들어간다** — 본문은 자유 텍스트라 경로 규약을 강제할 자리가 없다.
-- **`env`** — `NEXT_PUBLIC_*` 환경변수의 단일 소스(`supabaseUrl`·`supabaseAnonKey`·`siteUrl`·`showPlayerPhotos`). **`process.env`를 호출부에서 다시 읽지 말 것** — `proxy.ts`가 화면·훅과 같은 supabase 인스턴스를 봐야 세션 쿠키가 어긋나지 않는다.
+- **`OG_IMAGE` / `OG_SITE` / `absoluteUrl(path)`** — 세그먼트가 `openGraph`를 채울 때 함께 싣는 이미지·사이트 공통 값(`siteName`·`locale`), 그리고 앱 경로 → 절대 URL. ⚠ `new URL(path, env.siteUrl)`을 호출부가 각자 짜지 말 것 — 사이트맵·`robots.txt`·`og:url`·JSON-LD 넷이 **같은 URL**을 가리켜야 검색엔진·공유 플랫폼이 한 주소를 대표로 본다(canonical과도 같은 경로여야 한다).
+- **`env`** — `NEXT_PUBLIC_*` 환경변수의 단일 소스(`supabaseUrl`·`supabaseAnonKey`·`siteUrl`·`showPlayerPhotos`·`googleSiteVerification`·`naverSiteVerification`). **`process.env`를 호출부에서 다시 읽지 말 것** — `proxy.ts`가 화면·훅과 같은 supabase 인스턴스를 봐야 세션 쿠키가 어긋나지 않는다.
   - `siteUrl`은 `og:image`를 절대 URL로 만드는 `metadataBase`(루트 layout)용이다. `NEXT_PUBLIC_SITE_URL` → `VERCEL_URL` → `localhost:3000` 순으로 폴백한다.
 - **`isSupabaseConfigured()`** — env가 채워졌는지. 값이 비어도 빌드는 성공해야 하므로 `env`는 throw하지 않는다 → **가드는 호출부의 책임**이고, 그 가드를 각자 짜지 말고 이걸 쓴다(`proxy.ts`가 선례).
 
 ## `@/shared/ui`
 **현역(게시판 v2가 실제로 쓰는 것)** — 새로 만들기 전 여기부터 확인:
 `Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·`Markdown`·
-`Chip`·`chipClassName`·`ActionChip`·`actionChipClassName`·`Dialog`·`SignInDialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`·`RatioBar`·`StaleBanner`·`LiveDot`·`CountUp`·`DrawnCheck`
+`Chip`·`chipClassName`·`ActionChip`·`actionChipClassName`·`Dialog`·`SignInDialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`·`RatioBar`·`StaleBanner`·`LiveDot`·`CountUp`·`DrawnCheck`·`JsonLd`
 
 **현재 미사용** — **"검증된 현역"으로 오인하지 말 것**:
 `TabHeader`·`Flag`·`Shirt`·`SectionHead`·`LiveStatusPill`·`NightCard`·`PlayerSilhouette`
@@ -302,6 +304,7 @@
 > **이 문서의 존재 이유가 "새로 만들기 전 확인"이라 목록이 틀리면 문서가 없느니만 못하다.** UI를 추가·제거하면 여기부터 고친다.
 
 - `Markdown` — 마크다운 렌더(GFM). `"use client"` **없음** — 서버 렌더 가능.
+- **`JsonLd`** — 구조화 데이터 `<script type="application/ld+json">`. `"use client"` **없음** — 서버 page가 렌더한다. 직렬화만 하고(`<` 이스케이프 포함) 모양은 뷰 슬라이스의 `lib/json-ld.ts`가 조립한다(`nextjs.md`의 구조화 데이터 절). 서버에서는 `@/shared/ui/json-ld` 직접 경로. ⚠ `next/script`로 바꾸지 말 것 — 데이터지 코드가 아니다.
 - **`CountUp`** — 굴러가며 도착하는 숫자(퍼센트·참여자 수·적중률). 등장 모션 판정(`useEntranceMotion`)을 **안에서** 하므로 하이드레이션 값은 즉시 최종값이고 클라이언트에서 늦게 마운트된 값만 0에서 올라온다. `format`은 **정수**를 받는다(`formatCount` 등 — 보간 중의 실수는 안에서 반올림한다). ⚠ `tabular-nums`는 호출부가 준다.
 - **`DrawnCheck`** — 획이 그려지는 체크("내가 고른 것"). ⚠ `animate`의 판정은 **호출부**가 한다 — "방금 골랐다"는 `aria-pressed`를 바꾸는 쪽만 알고, 이미 고른 채로 이동해 온 화면에서 다시 그려지면 거짓 신호다(`useState(mine)`으로 마운트 시점 값을 고정해 비교하는 것이 선례 — `split-card`·`prediction-block`). `"use client"` 없음.
 - **`RatioBar`** — 비율 막대. `enterDelayMs`를 주면 마운트 순간 0에서 자란다(순차 리빌은 호출부가 `i * 60`으로). 등장 판정을 안에서 하는 `"use client"` 컴포넌트다 — 판정을 호출부에 맡기면 부모의 마운트 시점이 기준이 되어 첫 투표의 리빌이 빠진다.

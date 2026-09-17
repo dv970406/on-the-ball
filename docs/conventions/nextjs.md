@@ -411,6 +411,65 @@ React `<ViewTransition name>`으로 목록 카드의 엠블럼이 상세 `h1`의
 - 제목·본문 요약은 **길이를 클램프**해서 넣는다(120자 제목이 `<title>`에 그대로 들어갔다).
 - 로그인 필수 화면(`/posts/new`·`/posts/[id]/edit`·`/profile`)은 `robots: { index: false }`. 본문이 스켈레톤뿐인 페이지가 정적 프리렌더되어 색인될 수 있다.
 - `global-error.tsx`에서는 `metadata`가 동작하지 않는다 — React `<title>`을 직접 쓴다(Next 16 문서 명시).
+- ⚠ **`og:url`은 Next가 만들어 주지 않는다.** canonical을 적어도 `og:url`은 비어 있다(실측). 네이버가
+  읽는 값이라 `openGraph.url`을 **명시**한다 — 조립은 `absoluteUrl(ROUTES.…)`(`@/shared/config`)이고,
+  canonical과 같은 경로여야 한다(둘이 갈리면 검색엔진과 공유 플랫폼이 다른 URL을 대표로 본다).
+- ⚠ **`openGraph`를 채우는 세그먼트는 `OG_SITE`를 스프레드한다**(`siteName`·`locale`). 루트의
+  `openGraph`는 세그먼트 값과 병합되지 않고 통째로 대체되어 루트에 한 번 적어 두는 방법이 없다
+  (`OG_IMAGE`와 같은 함정). `og:locale`은 `ko_KR`(OGP의 `언어_지역`)이다.
+- **색인 대상 상세는 `description`을 채운다.** 비우면 루트의 사이트 소개 한 줄이 그 리소스의 검색
+  결과 설명·공유 카드가 된다 — 글 상세에서 실측했던 것이고 공지·입축구도 같았다. 본문이 있으면
+  `toPlainSummary`(마크다운 → 평문), 없으면 화면이 그리는 값으로 만든다(입축구는 선택지 라벨,
+  승부예측은 라운드·상태) — 어느 쪽이든 120자에서 클램프한다.
+- 글 상세의 `og:image`는 **본문 첫 사진**이고 없을 때만 브랜드 이미지(`OG_IMAGE`)다. 본문 사진은
+  치수를 모르므로 URL만 싣는다. 절대 URL(`http(s)://`)만 고른다 — 렌더러가 그리지 않는 스킴을
+  우리만 세면 화면에 없는 이미지가 카드에 실린다(`shareableImages`).
+- `article:published_time`·`article:modified_time`·`article:section`(`openGraph.publishedTime` 등)은
+  화면이 그리는 값과 같은 판정으로 싣는다 — 글의 수정 시각은 `isEdited`가 참일 때만("수정됨" 표시와
+  한 쌍), 공지의 발행 시각은 `<time>`이 그리는 `opensAt`이다.
+- 루트 layout의 `robots`는 `max-image-preview:large`·`max-snippet:-1`·`max-video-preview:-1`이다.
+  기본 색인 동작은 그대로이고 **미리보기 상한만 연다** — 큰 이미지가 없으면 구글이 검색 결과·Discover에
+  작은 썸네일만 쓴다. 로그인 필수 화면의 `robots: { index: false }`는 이 객체를 통째로 대체하는데,
+  색인되지 않는 화면이라 무관하다.
+- 검색엔진 **소유권 확인 메타**(`google-site-verification`·`naver-site-verification`)는 루트 layout의
+  `verification`이 내보내고 값은 `env`(`NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION`·
+  `NEXT_PUBLIC_NAVER_SITE_VERIFICATION`)에서 온다. 비어 있으면 태그를 내보내지 않는다(빈 content는
+  확인에 실패한다). 등록 뒤에는 각 콘솔에 `/sitemap.xml`을 제출한다 — 파일이 있다고 크롤러가 알아서
+  찾지 않는다(`robots.txt`의 `Sitemap:`은 발견 경로일 뿐 등록이 아니다).
+
+### 구조화 데이터 (JSON-LD)
+
+색인 대상 상세는 `<script type="application/ld+json">`로 schema.org 데이터를 함께 내보낸다.
+렌더는 `@/shared/ui`의 `JsonLd`(서버 안전 — `"use client"` 없음)가 하고, **조립은 그 화면을 소유한
+뷰 슬라이스의 `lib/json-ld.ts`** 가 한다(`views/post-detail`·`views/notice-detail`). 서버 page는
+직접 경로로 가져간다(views 배럴은 클라이언트 뷰를 담는다 — `architecture.md`의 직접 경로 규약).
+
+| 화면 | `@type` | 왜 그 유형인가 |
+|---|---|---|
+| `app/posts/[id]` | `DiscussionForumPosting` + 중첩 `Comment` | 구글이 유형을 **콘텐츠의 성격**으로 가른다 — 사용자가 올리고 다른 사용자가 답하는 글은 `Article`이 아니라 이것이다(Q&A 구조면 `QAPage`). 댓글 스레드를 `comment`로 중첩한다 |
+| `app/notices/[id]` | `Article` | 운영진(발행인)이 쓰고 댓글이 없다 — 작성자·발행인은 `Organization`(사이트 자체) |
+
+입축구·승부예측은 싣지 않는다 — 맞는 유형이 없다(`SportsEvent`는 경기장 `location`을 요구하는데
+DB에 없고, 투표 문항에 해당하는 리치 결과 유형이 없다). 억지로 넣은 마크업은 없느니만 못하다.
+
+- **화면에 보이는 것만 적는다**(구글 구조화 데이터 일반 정책). 본문·댓글·좋아요·조회수·댓글 수는
+  전부 이 화면이 그리는 값이다. 그래서 **서버가 본문을 손에 쥔 경우(`state === "found"`)에만** 싣는다 —
+  폴백 경로의 화면은 클라이언트가 채우므로 그 값으로 만들면 크롤러가 받는 HTML과 어긋난다.
+- 댓글은 **SSR한 목록**(최신 `COMMENT_LIST_LIMIT`건)만 싣고 전체 수는 `commentCount`가 말한다 —
+  구글 문서가 정확히 그 용도로 두 값을 가른다. 중첩은 화면과 같은 `buildCommentThreads`로 만든다
+  (고아 승격 판정이 갈리면 화면에 있는 댓글이 마크업에서 빠진다).
+- `image`는 **본문에 있을 때만**. 기본·아이콘·플레이스홀더·작성자 이미지를 넣지 말라는 것이 문서다 —
+  `og:image`가 브랜드 이미지로 폴백하는 것과 갈리는 지점이다.
+- `text`는 마크다운 기호를 걷어낸 **평문 전체**다(요약이 아니다). 발췌·`og:description`과 같은
+  변환기(`toPlainSummary`)라 세 곳의 문장이 갈리지 않는다. 대가로 HTML이 본문만큼 한 번 더
+  무거워지는데, 문서가 그 이유로 권하는 Microdata는 마크업이 본문·댓글·액션 바 세 컴포넌트에 흩어져
+  한 곳에서 검증할 수 없다 → JSON-LD를 택한다.
+- ⚠ **`<`를 이스케이프한다**(`JsonLd`가 한다). `JSON.stringify`는 HTML을 모른다 — 본문에 `</script>`가
+  들어오면(사용자 입력이다) 그 자리에서 블록이 닫혀 뒤가 마크업으로 풀린다.
+- ⚠ **`next/script`가 아니라 생 `<script>`다.** 실행할 코드가 아니라 데이터다(Next 문서 `node_modules/next/dist/docs/01-app/02-guides/json-ld.md`).
+- 검증은 [Rich Results Test](https://search.google.com/test/rich-results)와
+  [Schema Markup Validator](https://validator.schema.org/)로 한다 — 빌드는 아무것도 보지 않는다.
+  로컬에서는 `curl`로 `application/ld+json` 블록을 뽑아 `JSON.parse`가 되는지부터 본다.
 
 ### 아이콘·OG 이미지 (파일 컨벤션)
 

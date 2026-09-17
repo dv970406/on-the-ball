@@ -66,9 +66,11 @@ shared ← entities ← features ← widgets ← views
 
 - `@/shared/api` — 클라이언트 안전 모듈만 노출. 서버 전용은 **직접 경로**로 import: `@/shared/api/supabase-server`(`next/headers` 의존) · `@/shared/api/supabase-anon`(Next Data Cache 의존).
 - `@/shared/lib` — `"use client"` 훅을 포함한다(목록은 `reuse.md`). **서버에서는 순수 함수를 직접 경로로 import**: `@/shared/lib/cn`·`format`·`post-id`·`text`·`query-scope`. 이 직접 경로 나열이 곧 `shared/lib`의 화이트리스트이고 **단일 소스는 `src/shared/lib/index.ts` 말미의 주석**이다.
+  - `@/shared/ui`도 같다 — 배럴이 클라이언트 컴포넌트를 담으므로 서버 page가 **렌더가 아니라 값으로** 쓰는 서버 안전 컴포넌트(`json-ld`)는 `@/shared/ui/json-ld` 직접 경로로 가져간다.
   - ⚠ **`"use client"`를 붙이지 않은 `shared/ui` 컴포넌트도 서버 소비자다.** 배럴을 거치면 서버 렌더 여지를 잃는다 — `markdown`·`empty-state`·`avatar`·`pill`·`skeleton`·`drawn-check`와 클래스 함수들(`button-class`·`action-chip-class`·`chip-class`)이 `@/shared/lib/cn` 직접 경로를 쓰는 이유다(사유는 `empty-state.tsx` 주석에).
 - `@/entities/post`·`@/entities/comment`·`@/entities/profile`·`@/entities/survey`·`@/entities/notice` — `"use client"` 쿼리 훅·UI 포함. **서버는 `model/types`·`api/mappers`·`api/keys`·`api/list-query`를 직접 import**. post의 순수 헬퍼도 마찬가지다 — `app/posts/[id]/page.tsx`가 `@/entities/post/lib/plain-summary`를 직접 경로로 가져와 `og:description`을 만든다.
 - `@/entities/session` — 배럴이 zustand 스토어·Provider·가드를 재export(전부 클라이언트). 순수 함수 `toAuthErrorMessage`는 `lib/auth-error-message`에, 쿼리 키는 `api/keys`에 따로 있다.
+- `@/views/post-detail`·`@/views/notice-detail` — 배럴은 클라이언트 뷰다. **구조화 데이터 조립(`lib/json-ld`)은 순수 함수라 서버 page가 직접 경로로 가져간다** — 조립이 뷰 슬라이스에 있는 이유는 "화면에 보이는 것만 적는다"가 규칙이라 그 화면을 소유한 슬라이스가 갖기 때문이다(`nextjs.md`).
 - `@/features/sign-in` — 배럴이 `"use client"` 훅(`useOAuthSignIn`)을 포함한다. **서버가 쓰는 순수 함수 `hasPkceVerifier`는 `@/features/sign-in/lib/pkce-verifier` 직접 경로**로 가져간다(`app/(auth)/sign-in/page.tsx`가 선례). features 레이어에도 같은 예외가 성립한다는 뜻이다 — 배럴이 클라이언트 훅을 담고 있으면 서버 소비자는 직접 경로를 쓴다.
 - 선례: `app/posts/[id]/page.tsx`는 **`"use client"`를 담은 배럴을 하나도 거치지 않는다.** 서버 안전 모듈은 전부 직접 경로로 가져오고, 배럴을 쓰는 곳은 순수 상수만 담은 `@/shared/config`와 서버가 **렌더**하는 뷰(`@/views/post-detail`)뿐이다(렌더는 합법 — 아래 절 참고).
 
