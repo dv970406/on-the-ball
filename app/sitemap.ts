@@ -1,7 +1,7 @@
 import { cache } from "react";
 import type { MetadataRoute } from "next";
 import { unstable_rethrow } from "next/navigation";
-import { ROUTES, env } from "@/shared/config";
+import { ROUTES, absoluteUrl } from "@/shared/config";
 import { POST_CATEGORIES, POST_CATEGORY_SLUG } from "@/entities/post/model/types";
 import { createSupabaseServerClient } from "@/shared/api/supabase-server";
 
@@ -29,12 +29,12 @@ const URL_LIMIT = 10_000;
 /** 목록·말머리처럼 DB를 타지 않는 고정 URL */
 function staticEntries(now: Date): MetadataRoute.Sitemap {
   return [
-    { url: url(ROUTES.postList), lastModified: now },
-    { url: url(ROUTES.surveyList), lastModified: now },
-    { url: url(ROUTES.matchList), lastModified: now },
-    { url: url(ROUTES.noticeList), lastModified: now },
+    { url: absoluteUrl(ROUTES.postList), lastModified: now },
+    { url: absoluteUrl(ROUTES.surveyList), lastModified: now },
+    { url: absoluteUrl(ROUTES.matchList), lastModified: now },
+    { url: absoluteUrl(ROUTES.noticeList), lastModified: now },
     ...POST_CATEGORIES.map((category) => ({
-      url: url(ROUTES.postCategory(POST_CATEGORY_SLUG[category])),
+      url: absoluteUrl(ROUTES.postCategory(POST_CATEGORY_SLUG[category])),
       lastModified: now,
     })),
   ];
@@ -84,21 +84,21 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
     return [
       ...statics,
       ...(posts.data ?? []).map((post) => ({
-        url: url(ROUTES.post(post.id)),
+        url: absoluteUrl(ROUTES.post(post.id)),
         lastModified: new Date(post.updated_at),
       })),
       ...(surveys.data ?? []).map((survey) => ({
-        url: url(ROUTES.survey(survey.id)),
+        url: absoluteUrl(ROUTES.survey(survey.id)),
         lastModified: new Date(survey.created_at),
       })),
       ...(matches.data ?? []).map((match) => ({
-        url: url(ROUTES.match(match.id)),
+        url: absoluteUrl(ROUTES.match(match.id)),
         // 결과가 없으면 lastModified를 생략한다 — 없는 값을 now()로 채우면 사이트맵을 부를
         // 때마다 "방금 바뀌었다"는 거짓 신호가 나간다
         ...(match.finished_at ? { lastModified: new Date(match.finished_at) } : {}),
       })),
       ...(notices.data ?? []).map((notice) => ({
-        url: url(ROUTES.notice(notice.id)),
+        url: absoluteUrl(ROUTES.notice(notice.id)),
         // ⚠ `opens_at`이 아니라 `updated_at`이다 — 예약 공지의 `opens_at`은 **미래 시각**이라
         //   입축구의 `closes_at`과 같은 함정이다(정책이 감춰 여기 오지 않더라도 규약은 같다).
         lastModified: new Date(notice.updated_at),
@@ -113,11 +113,6 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
     return statics;
   }
 });
-
-/** 상대 경로 → 절대 URL. 사이트맵은 절대 URL만 허용한다(sitemaps.org) */
-function url(path: string): string {
-  return new URL(path, env.siteUrl).href;
-}
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return fetchEntries();

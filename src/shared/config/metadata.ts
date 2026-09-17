@@ -1,3 +1,5 @@
+import { env } from "./env";
+
 /**
  * 라우트가 공유하는 메타데이터 상수.
  *
@@ -34,3 +36,16 @@ export const OG_IMAGE = {
  *   하이드레이션 후 탭 제목만 세그먼트 값으로 바뀐다(실측). 그래서 404 화면도 이 상수를 쓴다.
  */
 export const NOT_FOUND_TITLE = "페이지를 찾을 수 없어요";
+
+/**
+ * 앱 경로 → 절대 URL.
+ *
+ * 절대 URL을 요구하는 자리가 넷이다 — 사이트맵(sitemaps.org 규격), `robots.txt`의 `Sitemap:`,
+ * `og:url`(네이버가 읽는다), 구조화 데이터의 `url`(JSON-LD는 `metadataBase`를 모른다).
+ * 넷이 **같은 URL을 가리켜야** 검색엔진·공유 플랫폼이 한 주소를 대표로 본다 — 조립을 한 곳에 둔다.
+ * ⚠ `ROUTES`가 주는 절대 경로(`/posts/1`)를 받으므로 `env.siteUrl`의 경로 부분은 버려진다 —
+ *   basePath 배포는 이 앱의 전제가 아니다(`metadataBase`도 같은 방식으로 해석한다).
+ */
+export function absoluteUrl(path: string): string {
+  return new URL(path, env.siteUrl).href;
+}

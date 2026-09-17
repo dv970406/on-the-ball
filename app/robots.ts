@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { env } from "@/shared/config";
+import { absoluteUrl } from "@/shared/config";
 
 /**
  * robots.txt.
@@ -26,6 +26,6 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: { userAgent: "*", allow: "/" },
     // ⚠ 사이트맵 위치는 **절대 URL이어야 한다**(robots.txt 규격). 상대 경로는 무시된다.
-    sitemap: new URL("/sitemap.xml", env.siteUrl).href,
+    sitemap: absoluteUrl("/sitemap.xml"),
   };
 }
