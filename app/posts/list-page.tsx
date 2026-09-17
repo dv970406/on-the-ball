@@ -12,7 +12,7 @@ import { buildNoticeListItem } from "@/entities/notice/api/mappers";
 import type { NoticeListItem } from "@/entities/notice/model/types";
 import type { PostCategory, PostListFilters, PostListPage, PostSort } from "@/entities/post/model/types";
 import { POST_CATEGORY_SLUG, parsePostSort } from "@/entities/post/model/types";
-import { OG_IMAGE, ROUTES, env } from "@/shared/config";
+import { OG_IMAGE, OG_SITE, ROUTES, absoluteUrl } from "@/shared/config";
 import { PostListView } from "@/views/post-list";
 
 /**
@@ -129,11 +129,11 @@ export function listMetadata(category: PostCategory | null): Metadata {
     description,
     alternates: { canonical: listPath(category) },
     openGraph: {
+      ...OG_SITE,
       type: "website",
       title,
       description,
-      siteName: "온더볼",
-      url: new URL(listPath(category), env.siteUrl).toString(),
+      url: absoluteUrl(listPath(category)),
       images: OG_IMAGE,
     },
     twitter: { card: "summary_large_image", title, description, images: OG_IMAGE },

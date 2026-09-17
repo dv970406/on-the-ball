@@ -1,7 +1,7 @@
 import { cache } from "react";
 import type { Metadata } from "next";
 import { unstable_rethrow } from "next/navigation";
-import { OG_IMAGE, ROUTES, env } from "@/shared/config";
+import { OG_IMAGE, OG_SITE, ROUTES, absoluteUrl } from "@/shared/config";
 import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
 // ⚠ 배럴이 아니라 직접 경로 — 매퍼·빌더는 "use client"가 없어 서버에서 쓸 수 있다.
 //   select 문자열·정렬·상한을 클라이언트 훅과 **공유해야** 하이드레이션 직후 목록이 안 흔들린다.
@@ -17,10 +17,10 @@ export const metadata: Metadata = {
   // 색인되는 것을 막는다(목록 화면들과 같은 처리).
   alternates: { canonical: ROUTES.noticeList },
   openGraph: {
+    ...OG_SITE,
     type: "website",
     title: "공지사항",
-    siteName: "온더볼",
-    url: new URL(ROUTES.noticeList, env.siteUrl).toString(),
+    url: absoluteUrl(ROUTES.noticeList),
     // ⚠ 세그먼트가 openGraph를 채우면 루트 이미지 상속이 통째로 사라진다 → 명시한다
     images: OG_IMAGE,
   },

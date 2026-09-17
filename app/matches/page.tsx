@@ -1,7 +1,7 @@
 import { cache } from "react";
 import type { Metadata } from "next";
 import { unstable_rethrow } from "next/navigation";
-import { ROUTES } from "@/shared/config";
+import { OG_IMAGE, OG_SITE, ROUTES, absoluteUrl } from "@/shared/config";
 import { createSupabaseServerClient } from "@/shared/api/supabase-server";
 // ⚠ 배럴이 아니라 직접 경로 — 매퍼·빌더는 "use client"가 없어 서버에서 쓸 수 있다.
 //   select 문자열·정렬·상한을 클라이언트 훅과 **공유해야** 같은 목록이 나온다.
@@ -16,6 +16,15 @@ export const metadata: Metadata = {
   //   별개 페이지로 색인되는 것을 막는다(다른 목록과 같은 처리).
   alternates: { canonical: ROUTES.matchList },
   // description을 적지 않는다 — 루트 layout의 값을 상속한다.
+  // ⚠ openGraph를 채우는 이유는 `og:url` 하나다(입축구 목록과 같은 처리) — `images`를 함께 명시한다.
+  openGraph: {
+    ...OG_SITE,
+    type: "website",
+    title: "승부예측",
+    url: absoluteUrl(ROUTES.matchList),
+    images: OG_IMAGE,
+  },
+  twitter: { card: "summary_large_image", title: "승부예측", images: OG_IMAGE },
 };
 
 interface MatchList {

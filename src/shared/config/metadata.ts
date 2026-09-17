@@ -38,6 +38,18 @@ export const OG_IMAGE = {
 export const NOT_FOUND_TITLE = "페이지를 찾을 수 없어요";
 
 /**
+ * 세그먼트가 `openGraph`를 채울 때 **함께 실어야 하는** 사이트 공통 값.
+ *
+ * ⚠ `openGraph`는 루트 layout의 값과 **병합되지 않고 통째로 대체된다**(`OG_IMAGE`와 같은 함정).
+ *   그래서 루트에 `siteName`·`locale`을 한 번 적어 두는 방법이 없고, 세그먼트마다 스프레드한다.
+ * ⚠ `locale`은 OGP 규격의 `언어_지역` 형식이다(`ko-KR`이 아니다).
+ */
+export const OG_SITE = {
+  siteName: "온더볼",
+  locale: "ko_KR",
+} as const;
+
+/**
  * 앱 경로 → 절대 URL.
  *
  * 절대 URL을 요구하는 자리가 넷이다 — 사이트맵(sitemaps.org 규격), `robots.txt`의 `Sitemap:`,
