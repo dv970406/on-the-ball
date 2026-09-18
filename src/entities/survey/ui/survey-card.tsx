@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Check } from "lucide-react";
+import { Check, ChevronRight } from "lucide-react";
 import { ROUTES } from "@/shared/config";
-import { formatRelativeTime, useNowMs } from "@/shared/lib";
-import { Icon } from "@/shared/ui";
+import { cn, formatRelativeTime, useNowMs } from "@/shared/lib";
+import { Icon, Pill } from "@/shared/ui";
+import { isSurveyOpen } from "../lib/open";
 import type { SurveyListItem } from "../model/types";
 
 /**
@@ -18,6 +19,13 @@ import type { SurveyListItem } from "../model/types";
  * ⚠ 참여 표시를 에메랄드로 칠하지 않는다 — `styling.md`의 **에메랄드 자리 표에 이 파일이
  *   없다.** 칠하려면 표와 `check:conventions`에 함께 올려야 하고, 그때는 대비도 함께 본다
  *   (에메랄드는 흰 배경 1.99:1이라 형태 없는 표시를 실을 수 없다). 잉크 래더로만 구분한다.
+ *
+ * ⚠ **마감된 행은 흐리게 그리되 링크는 살린다.** 상세에서 결과를 볼 수 있으므로 `disabled`
+ *   (포인터 차단·`aria-disabled`)가 아니라 **톤**으로만 가른다 — 배지 `마감` + 제목 `ink-mute` +
+ *   날짜가 마감 시각을 말한다. 오른쪽 화살표가 "그래도 들어갈 수 있다"를 지킨다.
+ *   ⚠ 제목을 `ink-mute-2`까지 내리지 않는다 — 흰 배경 2.85:1이라 본문 대비에 못 미친다
+ *   (`match-card`의 진 쪽 팀과 같은 판단). `ink-mute`가 그 선을 넘는 가장 옅은 단계다.
+ *   ⚠ `opacity`로 통째로 흐리지 않는다 — 배지·체크까지 대비가 함께 떨어진다.
  *
  * ⚠ `formatRelativeTime`은 **`nowMs`를 인자로 받는다**(`PostCard`와 같은 형태). 목록이
  *   SSR이라 렌더 중에 시계를 읽으면 서버와 하이드레이션이 다른 값을 만든다.
@@ -37,33 +45,60 @@ export function SurveyCard({
   //   낡은 클라 시계가 이긴다.
   const clientNowMs = useNowMs();
   const nowMs = serverNowMs ?? clientNowMs ?? null;
+  // ⚠ `null`(판정 전)은 마감으로 접지 않는다 — `isSurveyOpen` 주석과 같은 이유
+  const closed = nowMs !== null && !isSurveyOpen(survey, nowMs);
 
   return (
     <li>
       <Link
         href={ROUTES.survey(survey.id)}
-        className="block border-b border-hairline-cool px-5 py-4 transition-colors duration-150 ease-otb active:bg-canvas-soft"
+        className="flex items-center gap-3 border-b border-hairline-cool px-5 py-4 transition-colors duration-150 ease-otb active:bg-canvas-soft"
       >
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-[10px] uppercase tracking-[0.4px] text-ink-mute-2">
-            입축구
-          </span>
-          {survey.myOptionId !== null && (
-            <span className="inline-flex items-center gap-[3px] text-[10px] font-medium text-ink">
-              <Icon as={Check} size={11} />
-              참여 완료
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-[10px] uppercase tracking-[0.4px] text-ink-mute-2">
+              입축구
             </span>
-          )}
+            {/* 결과 대기·취소됨과 같은 `outline` — "지금 할 수 있는 일이 없다"의 위계다(`match-card`) */}
+            {closed && <Pill variant="outline">마감</Pill>}
+            {survey.myOptionId !== null && (
+              <span
+                className={cn(
+                  "inline-flex items-center gap-[3px] text-[10px] font-medium",
+                  closed ? "text-ink-mute" : "text-ink",
+                )}
+              >
+                <Icon as={Check} size={11} />
+                참여 완료
+              </span>
+            )}
+          </div>
+
+          {/* 제목도 2행에서 자른다 — DB 한도(1,000 코드포인트)가 화면 한도보다 넓다 */}
+          <h3
+            className={cn(
+              "mt-[5px] line-clamp-2 text-pretty text-[15px] font-medium leading-[1.4] tracking-[-0.3px]",
+              closed ? "text-ink-mute" : "text-ink",
+            )}
+          >
+            {survey.title}
+          </h3>
+
+          {/* 마감된 행은 **언제 끝났는가**가 정보다 — 만든 날보다 그쪽을 그린다 */}
+          <div className="mt-[9px] text-[11px] text-ink-mute-2">
+            {closed ? (
+              <>
+                <time dateTime={survey.closesAt}>{formatRelativeTime(survey.closesAt, nowMs)}</time>{" "}
+                마감
+              </>
+            ) : (
+              <time dateTime={survey.createdAt}>{formatRelativeTime(survey.createdAt, nowMs)}</time>
+            )}
+          </div>
         </div>
 
-        {/* 제목도 2행에서 자른다 — DB 한도(1,000 코드포인트)가 화면 한도보다 넓다 */}
-        <h3 className="mt-[5px] line-clamp-2 text-pretty text-[15px] font-medium leading-[1.4] tracking-[-0.3px] text-ink">
-          {survey.title}
-        </h3>
-
-        <div className="mt-[9px] text-[11px] text-ink-mute-2">
-          <time dateTime={survey.createdAt}>{formatRelativeTime(survey.createdAt, nowMs)}</time>
-        </div>
+        {/* 흐려도 상세로 들어갈 수 있다는 어포던스 — 결과는 상세가 보여준다 */}
+        <Icon as={ChevronRight} size={16} className="shrink-0 text-ink-faint" />
       </Link>
     </li>
   );
