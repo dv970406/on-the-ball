@@ -132,7 +132,7 @@ export function MatchDetailView({
   //   (사유는 `use-now.ts`·`data-and-state.md`). 클라 값을 앞에 두면 낡은 시계가 이긴다.
   //   ⚠ `??`는 단축평가라 훅을 뒤에 두면 조건부 호출이 된다 → 먼저 무조건 부른다.
   const clientNowMs = useNowMs();
-  const nowMs = serverNowMs ?? clientNowMs ?? null;
+  const nowMs = serverNowMs ?? clientNowMs;
   // 클라이언트 이동으로 열린 상세에서만 적중 배지가 떠오르고 라인업·기록이 등장한다(훅 주석)
   const play = useEntranceMotion();
   /**

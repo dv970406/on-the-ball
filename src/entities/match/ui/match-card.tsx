@@ -53,7 +53,7 @@ export function MatchCard({
   //   (사유는 `use-now.ts`·`data-and-state.md`). 클라 값을 앞에 두면 낡은 시계가 이긴다.
   //   ⚠ `??`는 단축평가라 훅을 뒤에 두면 조건부 호출이 된다 → 먼저 무조건 부른다.
   const clientNowMs = useNowMs();
-  const nowMs = serverNowMs ?? clientNowMs ?? null;
+  const nowMs = serverNowMs ?? clientNowMs;
 
   const settled = isMatchSettled(match);
   // ⚠ boolean이 아니라 좁혀진 값이다 — 두 스코어를 `number`로 받는 `Scoreline`에 그대로 넘긴다

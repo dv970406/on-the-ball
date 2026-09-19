@@ -44,7 +44,7 @@ export function SurveyCard({
   //   처음 연 순간에 굳는다(사유는 `use-now.ts`). 그 값을 앞에 두면 갓 받은 서버 시각을
   //   낡은 클라 시계가 이긴다.
   const clientNowMs = useNowMs();
-  const nowMs = serverNowMs ?? clientNowMs ?? null;
+  const nowMs = serverNowMs ?? clientNowMs;
   // ⚠ `null`(판정 전)은 마감으로 접지 않는다 — `isSurveyOpen` 주석과 같은 이유
   const closed = nowMs !== null && !isSurveyOpen(survey, nowMs);
 

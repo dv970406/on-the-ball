@@ -125,10 +125,10 @@ const MARKDOWN_COMPONENTS: Components = {
 
     return (
       // loading="lazy"는 **뷰포트 밖 이미지를 미리 받지 않게** 한다.
-      //   서버 렌더에서는 이게 없으면 React 19가 <link rel="preload" as="image">를 head로
-      //   끌어올려, 글쓴이가 지정한 임의의 서드파티 호스트로 독자의 브라우저가 즉시 요청을
-      //   보낸다(react-dom-server의 lazy 분기로 확인). 지금은 본문이 전부 클라이언트 렌더라
-      //   그 호이스팅 경로 자체가 없지만, 서버 프리페치를 붙이면 바로 되살아난다.
+      //   ⚠ 지우지 않는다 — 없으면 React 19가 서버 렌더에서 <link rel="preload" as="image">를
+      //   head로 끌어올려, 글쓴이가 지정한 임의의 서드파티 호스트로 독자의 브라우저가 즉시
+      //   요청을 보낸다(react-dom-server의 lazy 분기로 확인). 글·공지 상세는 본문을 SSR하므로
+      //   (`"use client"` 뷰도 서버에서 렌더된다) 이 속성이 그 경로를 막는 유일한 장치다.
       //   decoding="async"와 함께 두면 렌더 블로킹도 피한다.
       // eslint-disable-next-line @next/next/no-img-element -- 외부 임의 호스트라 next/image 최적화 대상이 아니다
       <img

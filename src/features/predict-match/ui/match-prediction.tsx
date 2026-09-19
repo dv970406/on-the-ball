@@ -66,7 +66,7 @@ export function MatchPrediction({
   //   ⚠ `??`는 단축평가라 훅을 뒤에 두면 조건부 호출이 된다 → 먼저 무조건 부른다.
   const predict = usePredictMatch(match.id);
   const clientNowMs = useNowMs();
-  const nowMs = serverNowMs ?? clientNowMs ?? null;
+  const nowMs = serverNowMs ?? clientNowMs;
 
   /**
    * **`null`은 "아직 판정 전"** 이다 — `false`로 접으면 첫 프레임에 멀쩡한 경기가 잠긴다.

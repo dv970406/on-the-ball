@@ -46,7 +46,7 @@ export function useSurveyList({ initialSurveys, initialUserId, serverNowMs }: Us
   //   처음 연 순간에 굳는다(사유는 `use-now.ts`). 그 값을 앞에 두면 갓 받은 서버 시각을
   //   낡은 클라 시계가 이긴다.
   const clientNowMs = useNowMs();
-  const nowMs = serverNowMs ?? clientNowMs ?? null;
+  const nowMs = serverNowMs ?? clientNowMs;
   const surveys = data?.items;
 
   // 목록을 **기간으로** 가른다 — 진행 중은 분할 카드로 그 자리에서 투표하고,

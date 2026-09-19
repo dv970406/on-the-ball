@@ -82,7 +82,7 @@ export function MatchListView({
   //   낡은 시계가 갓 받은 서버 시각을 이겨 **어제 경기가 "오늘"로 그려진다**
   //   (`data-and-state.md`에 실측). `??`가 단축평가라 훅은 먼저 무조건 부른다.
   const clientNowMs = useNowMs();
-  const nowMs = serverNowMs ?? clientNowMs ?? null;
+  const nowMs = serverNowMs ?? clientNowMs;
 
   const past = page?.past ?? [];
   const upcoming = page?.upcoming ?? [];
