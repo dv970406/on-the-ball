@@ -2,7 +2,8 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { unstable_rethrow } from "next/navigation";
 import { OG_IMAGE, OG_SITE, ROUTES, absoluteUrl } from "@/shared/config";
-import { createSupabaseServerClient } from "@/shared/api/supabase-server";
+import { createSupabaseServerClient, hasSessionCookie } from "@/shared/api/supabase-server";
+import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
 // ⚠ 배럴이 아니라 직접 경로 — 매퍼는 "use client"가 없어 서버에서 쓸 수 있다.
 //   select 문자열·빌더·상한을 클라이언트 훅과 **공유해야** 같은 목록이 나온다.
 import { buildSurveyListItem, buildSurveyResult } from "@/entities/survey/api/mappers";
@@ -51,6 +52,23 @@ interface SurveyList {
 
 const fetchSurveyList = cache(async (): Promise<SurveyList> => {
   try {
+    /*
+     * ⚠ **세션이 없으면 익명 클라이언트로 갈아탄다**(`app/posts/list-page.tsx`와 같은 갈림).
+     *   비로그인에게 이 목록은 모든 요청에 동일하다 — `survey_vote` 임베딩("내 행만")이 빈
+     *   배열이고, 집계는 참여자에게만 나가므로 아래 `answered`가 비어 조회 자체가 없다.
+     *   그래서 Data Cache를 태워 크롤러·비로그인의 조회가 캐시 히트에서 DB를 타지 않게 한다.
+     * ⚠ 판정은 쿠키만 본다 — 헛짚어도 평소 경로로 갈 뿐이다(사유는 `hasSessionCookie` 주석).
+     * ⚠ `nowMs`는 캐시 밖에서 찍힌다 — 진행/마감 판정이 캐시 나이만큼 뒤처지지 않는다.
+     */
+    if (!(await hasSessionCookie())) {
+      const anon = createSupabaseAnonClient();
+      if (!anon) return { userId: undefined, nowMs: Date.now() };
+      const { data, error } = await buildSurveyListQuery(anon);
+      const nowMs = Date.now();
+      if (error) return { userId: undefined, nowMs };
+      return { items: (data ?? []).map(buildSurveyListItem), userId: undefined, nowMs };
+    }
+
     const supabase = await createSupabaseServerClient();
     if (!supabase) return { userId: undefined, nowMs: Date.now() };
 

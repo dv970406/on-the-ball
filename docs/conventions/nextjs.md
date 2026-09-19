@@ -40,13 +40,13 @@
 | `app/posts/[id]/edit/page.tsx` | 404 판정만 (`metadata`는 정적) | 불필요 — 소비자가 `Page` 하나라 요청당 1회다 |
 | `app/surveys/[id]/page.tsx` | `<title>`·`og:*` + 404 판정 + **제목·선택지 SSR** | **필수** — 위와 같은 이유다 |
 | `app/posts/list-page.tsx`(`/posts`·`/posts/category/[slug]`가 공유) | 목록 SSR + 말머리별 고유 메타데이터 | 지금은 불필요(메타데이터가 조회를 타지 않는다). **감싸 둔 이유는 `generateMetadata`를 동적으로 바꾸는 순간 2회가 되기 때문**이다. ⚠ 인자를 **원시값**으로 받아야 중복이 없어진다(객체는 매 호출 새 참조다) |
-| `app/surveys/page.tsx` | 목록 SSR | 〃 |
+| `app/surveys/page.tsx` | 목록 SSR | 〃 — ⚠ 세션이 없으면 **익명 클라이언트**다(글 목록과 같은 `hasSessionCookie()` 갈림). 집계는 참여자에게만 나가 익명 경로에는 애초에 없다 |
 | `app/matches/[id]/page.tsx` | `<title>`·`og:*` + 404 판정 + **대진·스코어·예측 분포 SSR** | **필수** — `generateMetadata`와 `Page`가 같은 데이터를 쓴다 |
 | `app/matches/page.tsx` | 목록 SSR | 지금은 불필요(메타데이터가 정적). ⚠ **조회 창(`gte kickoff_at`)과 화면 구역 판정이 같은 `nowMs`를 봐야** 경계에 걸친 경기가 실렸는데 어느 구역에도 없는 일이 안 생긴다 |
-| `app/notices/page.tsx` | 공지 목록 SSR | 지금은 불필요(메타데이터가 정적). ⚠ **쿠키를 보지 않고 항상 익명 클라이언트다** — 공지에는 개인화가 한 조각도 없어(`notice_select_live`가 `auth.uid()`를 아예 보지 않는다) `hasSessionCookie()` 갈림 자체가 필요 없다. ⚠ 그래서 이 라우트만 빌드 로그에 **`○`(정적) + `30s`** 로 찍힌다 — 쿠키를 읽지 않아 라우트가 통째로 프리렌더되고 `ANON_REVALIDATE`가 ISR 주기가 된다. **아래 "동적이어야 할 라우트가 `○`면 가드가 삼킨 것"의 예외가 여기 하나다** |
+| `app/notices/page.tsx` | 공지 목록 SSR | 지금은 불필요(메타데이터가 정적). ⚠ **쿠키를 보지 않고 항상 익명 클라이언트다** — 공지에는 개인화가 한 조각도 없어(`notice_select_live`가 `auth.uid()`를 아예 보지 않는다) `hasSessionCookie()` 갈림 자체가 필요 없다. ⚠ 그래서 이 라우트는 빌드 로그에 **`○`(정적) + `30s`** 로 찍힌다 — 쿠키를 읽지 않아 라우트가 통째로 프리렌더되고 `ANON_REVALIDATE`가 ISR 주기가 된다. **아래 "동적이어야 할 라우트가 `○`면 가드가 삼킨 것"의 예외가 이 행과 `app/sitemap.ts`다** — 쿠키를 읽지 않는 라우트만 `○`가 정상이다 |
 | `app/notices/[id]/page.tsx` | `<title>`·`og:*` + 404 판정 + **본문 SSR** | **필수** — `generateMetadata`와 `Page`가 같은 데이터를 쓴다 |
 | `app/posts/list-page.tsx`(배너) | 피드 최상단의 최신 **필독** 공지 한 줄 | 목록 조회와 **같은 `cache()` 안에서 병렬로** 나간다 |
-| `app/sitemap.ts` | 글·입축구·경기·**공지** URL 열거 | 불필요 — 소비자가 하나이고 `generateMetadata`가 없다 |
+| `app/sitemap.ts` | 글·입축구·경기·**공지** URL 열거 | 불필요 — 소비자가 하나이고 `generateMetadata`가 없다. ⚠ **쿠키를 보지 않고 항상 익명 클라이언트다** — 크롤러가 읽는 문서라 누가 열든 공개분만 담아야 하고, 그래서 `/notices`처럼 `○` + `30s`로 찍힌다 |
 
 **표의 모든 행이 아래 규약을 똑같이 지킨다.** 서버 조회를 새로 붙일 때도 마찬가지다.
 
@@ -294,6 +294,10 @@ React `<ViewTransition name>`으로 목록 카드의 엠블럼이 상세 `h1`의
 - 조회가 실패해도 **고정 URL은 남긴다.** 빈 사이트맵은 "이 사이트에 페이지가 없다"는 뜻이다.
 - `changeFrequency`·`priority`는 구글이 무시한다 → 적지 않는다. `lastModified`는 읽는다.
   ⚠ 미래 시각을 넣지 않는다(입축구의 `closes_at`이 그 함정이라 `created_at`을 쓴다).
+  ⚠ **요청 시각(`new Date()`)도 넣지 않는다.** 부를 때마다 "방금 바뀌었다"가 되고, 구글은
+  실제 변경과 맞지 않는 lastmod를 사이트 단위로 무시한다 — 상세 URL의 정확한 값까지 함께
+  신호를 잃는다. 고정 URL(목록·말머리)은 **그 목록에 실리는 항목의 최신 시각**을 쓰고,
+  행 시각으로 말할 수 없는 목록(창이 시간에 따라 움직이는 경기 목록)은 생략한다.
 - **robots.txt는 아무것도 막지 않는다.** 크롤을 막는 것과 색인을 막는 것은 다른 일이고,
   이 앱에서 색인을 원치 않는 화면은 전부 막지 않는 편이 낫다.
   - 로그인 필수 화면은 크롤러에게 `robots: { index: false }`를 내보인다 → **크롤을 허용해야
@@ -337,12 +341,12 @@ React `<ViewTransition name>`으로 목록 카드의 엠블럼이 상세 `h1`의
   수용한다 — 실제 방어는 언제나 RPC 안의 `is_admin()`이다.
 - 화면 차단은 **안내**이고 실제 방어는 어드민 definer RPC 안의 `is_admin()`이다.
 
-⚠ **어드민 조치가 `/posts` 목록에는 최대 30초 늦게 반영된다.** 그 화면만 익명 요청에
+⚠ **어드민 조치가 `/posts`·`/surveys` 목록과 `/sitemap.xml`에는 최대 30초 늦게 반영된다.** 그 화면들이 익명 요청에
 `createSupabaseAnonClient()`(Next Data Cache, `ANON_REVALIDATE`)를 타기 때문이다 —
 실측으로 글을 지운 뒤 **+31초까지 목록에 카드가 남았고 눌러도 404**였다. 본문 가리기도 같은
 창에 걸린다(목록 카드의 `excerpt`가 그동안 원문이다). 나머지 화면은 지연이 없다
-(`/posts/[id]`·`/surveys`·`/matches`·`/sitemap.xml`은 전부 쿠키 클라이언트이고,
-로그인 사용자는 `/posts`도 즉시 반영된다).
+(`/posts/[id]`·`/surveys/[id]`·`/matches`는 쿠키 클라이언트이고,
+로그인 사용자는 `/posts`·`/surveys`도 즉시 반영된다).
 → 긴급 조치라면 **삭제**가 즉시 듣는다(상세가 곧바로 404다). 목록 카드가 잠깐 남는 것은
   수용하되, "가렸는데 목록에 그대로 있다"를 버그로 착각하지 않도록 여기 적어 둔다.
 

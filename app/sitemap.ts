@@ -2,8 +2,12 @@ import { cache } from "react";
 import type { MetadataRoute } from "next";
 import { unstable_rethrow } from "next/navigation";
 import { ROUTES, absoluteUrl } from "@/shared/config";
-import { POST_CATEGORIES, POST_CATEGORY_SLUG } from "@/entities/post/model/types";
-import { createSupabaseServerClient } from "@/shared/api/supabase-server";
+import {
+  POST_CATEGORIES,
+  POST_CATEGORY_SLUG,
+  type PostCategory,
+} from "@/entities/post/model/types";
+import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
 
 /**
  * 사이트맵.
@@ -15,8 +19,13 @@ import { createSupabaseServerClient } from "@/shared/api/supabase-server";
  * ⚠ **정렬 쿼리(`?sort=`)를 넣지 않는다.** 같은 집합의 순서만 다른 중복이고, canonical이
  *   이미 정렬 없는 URL을 가리킨다 — 사이트맵은 **canonical만** 담는다.
  *
- * ⚠ 소프트 삭제·차단은 RLS가 거른다. 크롤러는 쿠키가 없어 `auth.uid()`가 null이므로
- *   공개분만 나온다(차단 필터는 아무것도 감추지 않는다).
+ * ⚠ 소프트 삭제·차단은 RLS가 거른다.
+ *
+ * ⚠ **쿠키를 보지 않고 항상 익명 클라이언트다.** 사이트맵은 크롤러가 읽는 문서라 누가 부르든
+ *   공개분만 담아야 한다 — 쿠키 클라이언트면 로그인 사용자가 열었을 때 그 사람의 차단 숨김이
+ *   섞이고, `cookies()` 때문에 라우트가 동적이 되어 **크롤마다 DB 조회 4건**이 나간다.
+ *   익명이면 fetch가 Data Cache를 타 라우트가 `ANON_REVALIDATE` 주기의 ISR이 된다(`/notices`와
+ *   같은 자리). 대가로 새 글·삭제가 최대 그 주기만큼 늦게 반영된다.
  */
 
 /**
@@ -26,18 +35,47 @@ import { createSupabaseServerClient } from "@/shared/api/supabase-server";
  */
 const URL_LIMIT = 10_000;
 
-/** 목록·말머리처럼 DB를 타지 않는 고정 URL */
-function staticEntries(now: Date): MetadataRoute.Sitemap {
+/** 목록 화면의 마지막 변경 시각 — 각 목록에 실리는 항목들의 최신 시각이다 */
+interface ListLastModified {
+  posts?: Date;
+  byCategory: Partial<Record<PostCategory, Date>>;
+  surveys?: Date;
+  notices?: Date;
+}
+
+/** 값이 있을 때만 `lastModified`를 싣는다 */
+function withLastModified(url: string, lastModified: Date | undefined) {
+  return lastModified ? { url, lastModified } : { url };
+}
+
+/**
+ * 목록·말머리처럼 경로가 고정된 URL.
+ *
+ * ⚠ **`lastModified`를 요청 시각(`new Date()`)으로 채우지 않는다.** 사이트맵을 부를 때마다
+ *   "방금 바뀌었다"가 되는데, 구글은 이 값이 실제 변경과 맞지 않으면 사이트 전체의
+ *   lastmod를 무시한다 — 상세 URL들의 정확한 값까지 함께 신호를 잃는다.
+ *   그래서 그 목록에 실리는 항목의 최신 시각을 쓰고, 알 수 없으면 **생략한다.**
+ * ⚠ 경기 목록은 생략한다 — 창(`MATCH_LIST_LOOKBACK_MS`)이 시간에 따라 움직여 내용이
+ *   행의 변경 없이도 바뀌므로 행 시각으로는 그 목록의 변경을 말할 수 없다.
+ */
+function staticEntries(last: ListLastModified): MetadataRoute.Sitemap {
   return [
-    { url: absoluteUrl(ROUTES.postList), lastModified: now },
-    { url: absoluteUrl(ROUTES.surveyList), lastModified: now },
-    { url: absoluteUrl(ROUTES.matchList), lastModified: now },
-    { url: absoluteUrl(ROUTES.noticeList), lastModified: now },
-    ...POST_CATEGORIES.map((category) => ({
-      url: absoluteUrl(ROUTES.postCategory(POST_CATEGORY_SLUG[category])),
-      lastModified: now,
-    })),
+    withLastModified(absoluteUrl(ROUTES.postList), last.posts),
+    withLastModified(absoluteUrl(ROUTES.surveyList), last.surveys),
+    { url: absoluteUrl(ROUTES.matchList) },
+    withLastModified(absoluteUrl(ROUTES.noticeList), last.notices),
+    ...POST_CATEGORIES.map((category) =>
+      withLastModified(
+        absoluteUrl(ROUTES.postCategory(POST_CATEGORY_SLUG[category])),
+        last.byCategory[category],
+      ),
+    ),
   ];
+}
+
+/** 가장 늦은 시각 — 비어 있으면 `undefined` */
+function latest(dates: Date[]): Date | undefined {
+  return dates.reduce<Date | undefined>((max, d) => (max && max >= d ? max : d), undefined);
 }
 
 /**
@@ -45,17 +83,17 @@ function staticEntries(now: Date): MetadataRoute.Sitemap {
  *   적어 두면 "관리해야 하는데 아무 일도 하지 않는 값"만 는다. `lastModified`는 읽는다.
  */
 const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
-  const now = new Date();
-  const statics = staticEntries(now);
+  const statics = staticEntries({ byCategory: {} });
 
   try {
-    const supabase = await createSupabaseServerClient();
+    const supabase = createSupabaseAnonClient();
     if (!supabase) return statics;
 
     const [posts, surveys, matches, notices] = await Promise.all([
       supabase
         .from("post")
-        .select("id, updated_at")
+        // `category`는 말머리 목록의 lastModified를 가르는 데 쓴다
+        .select("id, updated_at, category")
         .order("id", { ascending: false })
         .limit(URL_LIMIT),
       supabase
@@ -81,9 +119,22 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
         .limit(URL_LIMIT),
     ]);
 
+    const postRows = posts.data ?? [];
+    const byCategory: ListLastModified["byCategory"] = {};
+    for (const category of POST_CATEGORIES) {
+      byCategory[category] = latest(
+        postRows.filter((post) => post.category === category).map((post) => new Date(post.updated_at)),
+      );
+    }
+
     return [
-      ...statics,
-      ...(posts.data ?? []).map((post) => ({
+      ...staticEntries({
+        posts: latest(postRows.map((post) => new Date(post.updated_at))),
+        byCategory,
+        surveys: latest((surveys.data ?? []).map((survey) => new Date(survey.created_at))),
+        notices: latest((notices.data ?? []).map((notice) => new Date(notice.updated_at))),
+      }),
+      ...postRows.map((post) => ({
         url: absoluteUrl(ROUTES.post(post.id)),
         lastModified: new Date(post.updated_at),
       })),
@@ -105,7 +156,7 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
       })),
     ];
   } catch (e) {
-    // cookies()가 던지는 프레임워크 내부 에러를 삼키면 안 된다
+    // 프레임워크 내부 에러를 삼키면 라우트가 조용히 망가진다
     unstable_rethrow(e);
     console.error("[sitemap] 조회 실패:", e);
     // ⚠ 빈 사이트맵을 내보내지 않는다 — 조회가 잠깐 실패했다고 목록 URL까지 사라지면
