@@ -1,18 +1,28 @@
-import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound, unstable_rethrow } from "next/navigation";
+import { cache } from "react";
+// ⚠ 배럴이 아니라 직접 경로 — 매퍼는 "use client"가 없어 서버에서 쓸 수 있다.
+//   select 문자열·빌더를 클라이언트 훅과 **공유해야** 프리페치가 같은 모양을 만든다.
+import {
+	buildSurvey,
+	buildSurveyResult,
+	SURVEY_SELECT,
+} from "@/entities/survey/api/mappers";
+import type { Survey, SurveyResult } from "@/entities/survey/model/types";
+import { createSupabaseServerClient } from "@/shared/api/supabase-server";
+import {
+	absoluteUrl,
+	NOT_FOUND_TITLE,
+	OG_IMAGE,
+	OG_SITE,
+	ROUTES,
+} from "@/shared/config";
 // ⚠ **새 파서를 만들지 않는다.** 하는 일이 "URL의 [id] → 엄격한 십진수 id"라 게시글 전용이
 //   아니고, 이름은 첫 호출자를 기록할 뿐이다(`normalizeNickname`과 같은 사정).
 //   전에 `\d+`와 `Number()`로 판정이 갈려 가드가 뚫린 적이 있어 규약이 "파서는 하나"다.
 import { parsePostId } from "@/shared/lib/post-id";
-import { NOT_FOUND_TITLE, OG_IMAGE, OG_SITE, ROUTES, absoluteUrl } from "@/shared/config";
-import { createSupabaseServerClient } from "@/shared/api/supabase-server";
 // ⚠ 배럴(@/shared/lib)이 아니라 직접 경로 — 배럴은 "use client" 훅을 포함한다.
 import { clamp } from "@/shared/lib/text";
-// ⚠ 배럴이 아니라 직접 경로 — 매퍼는 "use client"가 없어 서버에서 쓸 수 있다.
-//   select 문자열·빌더를 클라이언트 훅과 **공유해야** 프리페치가 같은 모양을 만든다.
-import { SURVEY_SELECT, buildSurvey, buildSurveyResult } from "@/entities/survey/api/mappers";
-import type { Survey, SurveyResult } from "@/entities/survey/model/types";
 import { SurveyDetailView } from "@/views/survey-detail";
 
 const FALLBACK_METADATA: Metadata = { title: "입축구" };
@@ -22,29 +32,30 @@ const META_TITLE_MAX = 60;
 /** 공유 프리뷰·검색 결과 설명 길이 — 글 상세와 같은 값 */
 const META_DESCRIPTION_MAX = 120;
 
+type SurveyHeadState = "found" | "missing" | "unknown";
 type SurveyHead =
-  | {
-      state: "found";
-      survey: Survey;
-      /** ⚠ 쿼리 키가 userId로 스코프된다 — 그 값도 함께 내려야 캐시에 닿는다 */
-      userId: string | undefined;
-      /**
-       * 집계. **참여했을 때만 채운다** — `undefined`면 클라이언트가 쿼리를 켜지 않고
-       * `SurveyBlock`이 "아직 볼 수 없다"로 읽는다. `[]`는 "열렸는데 0표"라는 다른 뜻이다.
-       */
-      results: SurveyResult[] | undefined;
-      /**
-       * 이 데이터를 읽은 시각.
-       * ⚠ **없으면 마감된 입축구가 참여 가능한 상태로 SSR된다** — `SurveyVote`의
-       *   `useNowMs()`가 서버에서 `null`이라 마감 분기를 타지 못한다(실측). 하이드레이션
-       *   직후 읽기 전용 UI로 통째로 갈아치워지고 크롤러에게는 참여 가능한 문항으로 나간다.
-       * ⚠ 렌더 본문이 아니라 여기서 찍는다(`react-hooks/purity`가 서버 컴포넌트도 막는다).
-       */
-      nowMs: number;
-    }
-  | { state: "missing" }
-  /** 조회 자체가 실패 — 일시 장애로 멀쩡한 입축구를 없다고 단정하면 안 되므로 구분한다 */
-  | { state: "unknown" };
+	| {
+			state: SurveyHeadState;
+			survey: Survey;
+			/** ⚠ 쿼리 키가 userId로 스코프된다 — 그 값도 함께 내려야 캐시에 닿는다 */
+			userId: string | undefined;
+			/**
+			 * 집계. **참여했을 때만 채운다** — `undefined`면 클라이언트가 쿼리를 켜지 않고
+			 * `SurveyBlock`이 "아직 볼 수 없다"로 읽는다. `[]`는 "열렸는데 0표"라는 다른 뜻이다.
+			 */
+			results: SurveyResult[] | undefined;
+			/**
+			 * 이 데이터를 읽은 시각.
+			 * ⚠ **없으면 마감된 입축구가 참여 가능한 상태로 SSR된다** — `SurveyVote`의
+			 *   `useNowMs()`가 서버에서 `null`이라 마감 분기를 타지 못한다(실측). 하이드레이션
+			 *   직후 읽기 전용 UI로 통째로 갈아치워지고 크롤러에게는 참여 가능한 문항으로 나간다.
+			 * ⚠ 렌더 본문이 아니라 여기서 찍는다(`react-hooks/purity`가 서버 컴포넌트도 막는다).
+			 */
+			nowMs: number;
+	  }
+	| { state: SurveyHeadState }
+	/** 조회 자체가 실패 — 일시 장애로 멀쩡한 입축구를 없다고 단정하면 안 되므로 구분한다 */
+	| { state: SurveyHeadState };
 
 /**
  * ⚠ `cache()`로 감싼다 — `generateMetadata`와 `Page`가 같은 데이터를 쓰므로
@@ -59,108 +70,128 @@ type SurveyHead =
  *   세션 복원 전까지 이 값을 키로 쓰면 서버·클라이언트가 같은 키를 본다.
  */
 const fetchSurveyHead = cache(async (surveyId: number): Promise<SurveyHead> => {
-  try {
-    const supabase = await createSupabaseServerClient();
-    if (!supabase) return { state: "unknown" };
+	try {
+		const supabase = await createSupabaseServerClient();
+		if (!supabase) return { state: "unknown" };
 
-    // ⚠ 쿠키 기반 클라이언트라 `auth.uid()`가 잡힌다 → `survey_vote` 임베딩("내 행만")이
-    //   그 사용자 기준으로 채워져 `myOptionId`가 서버·클라에서 갈리지 않는다.
-    // ⚠ 셋은 서로의 결과를 쓰지 않는다(RLS가 쿠키 세션으로 걸린다) → **병렬로** 보낸다.
-    //   직렬로 두면 왕복 세 번이 그대로 쌓여 TTFB에 더해진다.
-    // ⚠ **집계(`survey_results`)도 여기서 함께 쏜다.** 전에는 입축구 응답을 받은 뒤
-    //   `myOptionId`를 보고 직렬로 매달았는데, 게이팅이 UI가 아니라 definer 함수 안에 있어
-    //   (미참여자는 0행) 무조건 쏴도 뜻이 달라지지 않는다. 목록에서 바로 투표하고 들어오는
-    //   화면이라 **참여자 비율이 높아** 그 한 왕복이 그대로 체감되던 자리다.
-    // ⚠ **집계 조회의 `error`도 받는다.** supabase-js는 실패해도 reject하지 않으므로
-    //   `?? []`로 접으면 **실패가 "열렸는데 0표"로 굳는다** — 참여자에게 자기 표까지 0표인
-    //   결과 패널이 SSR되고, `initialData`가 fresh로 앉아 그 방문 내내 교정되지 않는다
-    //   (같은 결함을 이미 고쳐 둔 선례: `app/matches/[id]/page.tsx`).
-    const [{ data: auth }, { data, error }, { data: resultRows, error: resultsError }] =
-      await Promise.all([
-        supabase.auth.getUser(),
-        supabase.from("survey").select(SURVEY_SELECT).eq("id", surveyId).maybeSingle(),
-        supabase.rpc("survey_results", { p_survey_id: surveyId }),
-      ]);
+		// ⚠ 쿠키 기반 클라이언트라 `auth.uid()`가 잡힌다 → `survey_vote` 임베딩("내 행만")이
+		//   그 사용자 기준으로 채워져 `myOptionId`가 서버·클라에서 갈리지 않는다.
+		// ⚠ 셋은 서로의 결과를 쓰지 않는다(RLS가 쿠키 세션으로 걸린다) → **병렬로** 보낸다.
+		//   직렬로 두면 왕복 세 번이 그대로 쌓여 TTFB에 더해진다.
+		// ⚠ **집계(`survey_results`)도 여기서 함께 쏜다.** 전에는 입축구 응답을 받은 뒤
+		//   `myOptionId`를 보고 직렬로 매달았는데, 게이팅이 UI가 아니라 definer 함수 안에 있어
+		//   (미참여자는 0행) 무조건 쏴도 뜻이 달라지지 않는다. 목록에서 바로 투표하고 들어오는
+		//   화면이라 **참여자 비율이 높아** 그 한 왕복이 그대로 체감되던 자리다.
+		// ⚠ **집계 조회의 `error`도 받는다.** supabase-js는 실패해도 reject하지 않으므로
+		//   `?? []`로 접으면 **실패가 "열렸는데 0표"로 굳는다** — 참여자에게 자기 표까지 0표인
+		//   결과 패널이 SSR되고, `initialData`가 fresh로 앉아 그 방문 내내 교정되지 않는다
+		//   (같은 결함을 이미 고쳐 둔 선례: `app/matches/[id]/page.tsx`).
+		const [
+			{ data: auth },
+			{ data, error },
+			{ data: resultRows, error: resultsError },
+		] = await Promise.all([
+			supabase.auth.getUser(),
+			supabase
+				.from("survey")
+				.select(SURVEY_SELECT)
+				.eq("id", surveyId)
+				.maybeSingle(),
+			supabase.rpc("survey_results", { p_survey_id: surveyId }),
+		]);
 
-    if (error) return { state: "unknown" };
-    if (!data) return { state: "missing" };
+		if (error) return { state: "unknown" };
+		if (!data) return { state: "missing" };
 
-    const survey = buildSurvey(data);
+		const survey = buildSurvey(data);
 
-    // ⚠ **참여했을 때만 넘긴다.** `undefined`(조회 안 함)와 `[]`(열렸는데 0표)는 **다른 뜻**이라,
-    //   미참여자에게 오는 0행을 `[]`로 접으면 결과 패널이 열려 버린다.
-    //   ⚠ 이걸 서버가 그리지 않으면 참여자의 막대가 스켈레톤에서 늘어나며 시프트한다.
-    const results =
-      !resultsError && survey.myOptionId !== null
-        ? (resultRows ?? []).map(buildSurveyResult)
-        : undefined;
+		// ⚠ **참여했을 때만 넘긴다.** `undefined`(조회 안 함)와 `[]`(열렸는데 0표)는 **다른 뜻**이라,
+		//   미참여자에게 오는 0행을 `[]`로 접으면 결과 패널이 열려 버린다.
+		//   ⚠ 이걸 서버가 그리지 않으면 참여자의 막대가 스켈레톤에서 늘어나며 시프트한다.
+		const results =
+			!resultsError && survey.myOptionId !== null
+				? (resultRows ?? []).map(buildSurveyResult)
+				: undefined;
 
-    return { state: "found", survey, userId: auth.user?.id, results, nowMs: Date.now() };
-  } catch (e) {
-    // createSupabaseServerClient의 cookies()는 "이 라우트를 동적 렌더로 전환하라"는
-    // Next 내부 에러를 throw해서 동작한다. 삼키면 페이지가 스켈레톤 상태로 정적
-    // 프리렌더되어 조용히 망가지므로 반드시 되던진다.
-    unstable_rethrow(e);
-    console.error("[surveys/[id]] 입축구 조회 실패:", e);
-    return { state: "unknown" };
-  }
+		return {
+			state: "found",
+			survey,
+			userId: auth.user?.id,
+			results,
+			nowMs: Date.now(),
+		};
+	} catch (e) {
+		// createSupabaseServerClient의 cookies()는 "이 라우트를 동적 렌더로 전환하라"는
+		// Next 내부 에러를 throw해서 동작한다. 삼키면 페이지가 스켈레톤 상태로 정적
+		// 프리렌더되어 조용히 망가지므로 반드시 되던진다.
+		unstable_rethrow(e);
+		console.error("[surveys/[id]] 입축구 조회 실패:", e);
+		return { state: "unknown" };
+	}
 });
 
-export async function generateMetadata(props: PageProps<"/surveys/[id]">): Promise<Metadata> {
-  const { id } = await props.params;
-  const surveyId = parsePostId(id);
-  if (surveyId === null) return FALLBACK_METADATA;
+export async function generateMetadata(
+	props: PageProps<"/surveys/[id]">,
+): Promise<Metadata> {
+	const { id } = await props.params;
+	const surveyId = parsePostId(id);
+	if (surveyId === null) return FALLBACK_METADATA;
 
-  const head = await fetchSurveyHead(surveyId);
-  if (head.state === "missing") return NOT_FOUND_METADATA;
-  if (head.state !== "found") return FALLBACK_METADATA;
+	const head = await fetchSurveyHead(surveyId);
+	if (head.state === "missing") return NOT_FOUND_METADATA;
+	if (head.state !== "found") return FALLBACK_METADATA;
 
-  // DB 한도(1,000 코드포인트)가 <title>보다 훨씬 넓어 클램프가 필요하다
-  const title = clamp(head.survey.title, META_TITLE_MAX);
-  // ⚠ 비우면 모든 입축구가 루트의 사이트 소개 한 줄로 검색 결과·공유 카드에 나간다(공지와 같은 결함).
-  //   선택지 라벨은 화면이 그대로 그리는 값이라 "보이는 것"으로 설명을 만든다.
-  const description = clamp(
-    `${head.survey.options.map((option) => option.label).join(" vs ")} — 온더볼 입축구`,
-    META_DESCRIPTION_MAX,
-  );
+	// DB 한도(1,000 코드포인트)가 <title>보다 훨씬 넓어 클램프가 필요하다
+	const title = clamp(head.survey.title, META_TITLE_MAX);
+	// ⚠ 비우면 모든 입축구가 루트의 사이트 소개 한 줄로 검색 결과·공유 카드에 나간다(공지와 같은 결함).
+	//   선택지 라벨은 화면이 그대로 그리는 값이라 "보이는 것"으로 설명을 만든다.
+	const description = clamp(
+		`${head.survey.options.map((option) => option.label).join(" vs ")} — 온더볼 입축구`,
+		META_DESCRIPTION_MAX,
+	);
 
-  return {
-    title,
-    description,
-    // ⚠ 자기 참조 canonical — 추적 파라미터(`?utm_…`)가 붙은 URL이 별개 페이지로
-    //   색인되는 것을 막는다(목록·말머리와 같은 처리).
-    alternates: { canonical: ROUTES.survey(surveyId) },
-    // Next는 `og:url`을 canonical에서 만들어 주지 않는다 — 네이버가 읽는 값이라 명시한다
-    openGraph: {
-      ...OG_SITE,
-      type: "article",
-      title,
-      description,
-      url: absoluteUrl(ROUTES.survey(surveyId)),
-      images: OG_IMAGE,
-    },
-    twitter: { card: "summary_large_image", title, description, images: OG_IMAGE },
-  };
+	return {
+		title,
+		description,
+		// ⚠ 자기 참조 canonical — 추적 파라미터(`?utm_…`)가 붙은 URL이 별개 페이지로
+		//   색인되는 것을 막는다(목록·말머리와 같은 처리).
+		alternates: { canonical: ROUTES.survey(surveyId) },
+		// Next는 `og:url`을 canonical에서 만들어 주지 않는다 — 네이버가 읽는 값이라 명시한다
+		openGraph: {
+			...OG_SITE,
+			type: "article",
+			title,
+			description,
+			url: absoluteUrl(ROUTES.survey(surveyId)),
+			images: OG_IMAGE,
+		},
+		twitter: {
+			card: "summary_large_image",
+			title,
+			description,
+			images: OG_IMAGE,
+		},
+	};
 }
 
 export default async function Page(props: PageProps<"/surveys/[id]">) {
-  const { id } = await props.params;
-  const surveyId = parsePostId(id);
-  if (surveyId === null) notFound();
+	const { id } = await props.params;
+	const surveyId = parsePostId(id);
+	if (surveyId === null) notFound();
 
-  // ⚠ notFound()는 반드시 여기(세그먼트 렌더)에서 불러야 404가 나간다.
-  //   generateMetadata에서 부르면 메타데이터 생성만 중단되고 응답은 200으로 나간다.
-  const head = await fetchSurveyHead(surveyId);
-  if (head.state === "missing") notFound();
+	// ⚠ notFound()는 반드시 여기(세그먼트 렌더)에서 불러야 404가 나간다.
+	//   generateMetadata에서 부르면 메타데이터 생성만 중단되고 응답은 200으로 나간다.
+	const head = await fetchSurveyHead(surveyId);
+	if (head.state === "missing") notFound();
 
-  // state가 "unknown"이면 404로 단정하지 않고 화면을 띄운다
-  return (
-    <SurveyDetailView
-      surveyId={surveyId}
-      initialSurvey={head.state === "found" ? head.survey : undefined}
-      initialUserId={head.state === "found" ? head.userId : undefined}
-      initialResults={head.state === "found" ? head.results : undefined}
-      serverNowMs={head.state === "found" ? head.nowMs : undefined}
-    />
-  );
+	// state가 "unknown"이면 404로 단정하지 않고 화면을 띄운다
+	return (
+		<SurveyDetailView
+			surveyId={surveyId}
+			initialSurvey={head.state === "found" ? head.survey : undefined}
+			initialUserId={head.state === "found" ? head.userId : undefined}
+			initialResults={head.state === "found" ? head.results : undefined}
+			serverNowMs={head.state === "found" ? head.nowMs : undefined}
+		/>
+	);
 }
