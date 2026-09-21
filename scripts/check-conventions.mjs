@@ -110,6 +110,10 @@ const ROUTE_HANDLER_ALLOWED = new Map([
     "app/api/admin/sync-matches/route.ts",
     "경기 일정 동기화 — API-Football 키와 service_role이 서버 전용이라 브라우저가 부를 수 없다",
   ],
+  [
+    "app/api/cron/sync-matches/route.ts",
+    "경기 일정 정기 동기화 — Vercel Cron이 부른다. 관리자 세션이 없어 CRON_SECRET으로 인가한다",
+  ],
 ]);
 
 /** styling.md가 못박은 예외 위치. 여기 없는 파일에 나타나면 실패한다. */

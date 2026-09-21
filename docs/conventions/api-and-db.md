@@ -3,13 +3,15 @@
 ## 데이터 접근 경로
 
 - **클라이언트가 supabase를 직접 호출한다.** Route Handler(`app/api/*`)를 두지 않는다.
-  - ⚠ **예외는 `app/api/admin/sync-matches/route.ts` 하나다.** 금지의 근거는 "중간 검증층 없이
+  - ⚠ **예외는 경기 일정 동기화뿐이다** — 어드민 버튼(`app/api/admin/sync-matches/route.ts`)과
+    정기 실행(`app/api/cron/sync-matches/route.ts`). 금지의 근거는 "중간 검증층 없이
     RLS가 방어선"인데, 그 자리는 데이터 접근이 아니라 **외부 API(API-Football)를 서버
     비밀로 부르는 곳**이라 근거가 닿지 않는다(키를 브라우저에 내려보낼 수 없다).
     목록은 `scripts/check-conventions.mjs`의 `ROUTE_HANDLER_ALLOWED`가 **양방향으로**
     대조한다 — 목록 밖 route.ts도, 목록에만 있고 사라진 파일도 실패다.
   - ⚠ 그 핸들러의 순서가 곧 방어다: Origin 검사 → `getUser()` → `rpc("is_admin")` →
-    **그 뒤에야** service_role 클라이언트 생성. service_role로 관리자 확인을 하면 세션이
+    **그 뒤에야** service_role 클라이언트 생성(크론은 인가 자리가 `CRON_SECRET` 대조일 뿐
+    순서가 같다 — 그래서 동기화 본체 `app/api/_lib/run-season-sync.ts`가 인가를 갖지 않는다). service_role로 관리자 확인을 하면 세션이
     없어 "누가 요청했는가"를 본문에서 받아야 하는데 그건 위조된다(definer RPC가 유저 id를
     인자로 받지 않는 것과 같은 함정). `SUPABASE_SERVICE_ROLE_KEY`는 **`shared/config/env`에
     넣지 않는다** — 그 모듈은 클라이언트 번들에 실린다.

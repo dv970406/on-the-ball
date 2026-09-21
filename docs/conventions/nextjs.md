@@ -360,11 +360,25 @@ React `<ViewTransition name>`으로 목록 카드의 엠블럼이 상세 `h1`의
 `staleTime`이 30초라, 이미 글 상세를 열어 둔 다른 사용자에게는 화면을 옮기기 전까지 옛
 내용이 남는다. 실시간 채널이 없어 고칠 수 있는 성질이 아니므로 **운영 기대치로 다룬다.**
 
-### Route Handler의 유일한 예외 — `app/api/admin/sync-matches`
+### Route Handler의 유일한 예외 — 경기 일정 동기화
 
 이 앱은 Route Handler를 두지 않는다(`api-and-db.md`). 근거가 "중간 검증층 없이 RLS가
 방어선"인데, 경기 일정 동기화는 **데이터 접근이 아니라 외부 API를 서버 비밀로 부르는
 자리**라 그 근거가 닿지 않는다 — API-Football 키와 service_role 키는 브라우저에 못 내려간다.
+
+| 경로 | 부르는 쪽 | 인가 |
+|---|---|---|
+| `app/api/admin/sync-matches` (`POST`) | 어드민 화면의 버튼 | Origin → `getUser()` → `rpc("is_admin")` |
+| `app/api/cron/sync-matches` (`GET`) | Vercel Cron(`vercel.json`) | `Authorization: Bearer ${CRON_SECRET}` 상수 시간 대조 |
+
+- **인가 방법마다 핸들러 하나, 동기화 본체는 `app/api/_lib/run-season-sync.ts` 하나다.**
+  한 핸들러에 두 인가를 섞으면 "인가 → 그 뒤에 service_role"이라는 순서가 두 갈래로 얽힌다.
+  `_lib`는 Next의 private 폴더라 라우트가 되지 않는다.
+- ⚠ **`CRON_SECRET`이 비어 있으면 크론 핸들러는 닫는다(500).** 통과시키면 설정 누락 하나로
+  누구나 API-Football 예산을 태운다.
+- ⚠ 크론 스케줄은 **UTC**다 — `0 21 * * *`가 KST 06시다. Hobby 플랜은 하루 1회까지이고
+  지정한 시각이 속한 한 시간 안 어딘가에 돈다. 결과(스코어)는 이 동기화가 아니라
+  `scripts/sync-match-detail.mjs`가 쓰므로, 일정 변경만 받는 이 주기로 충분하다.
 
 - 예외 목록은 `scripts/check-conventions.mjs`의 `ROUTE_HANDLER_ALLOWED`가 **양방향으로**
   대조한다(목록 밖 route.ts도, 목록에만 있고 사라진 파일도 실패다).
@@ -374,8 +388,10 @@ React `<ViewTransition name>`으로 목록 카드의 엠블럼이 상세 `h1`의
 - ⚠ **JSON 매핑은 정적 import다.** `readFileSync`는 cwd 상대 경로라 서버리스에서 깨지고,
   동적 경로라 outputFileTracing이 `scripts/`를 번들에 넣지 않는다. 대가로 매핑을 고치면
   재배포가 필요하다(`public/crests`와 같은 운영 모델이다).
-- ⚠ **부분 실패를 HTTP 상태로 접지 않는다** — 200 + 명시 필드로 두고 화면이 읽는다.
-  상태 코드로 접으면 fetch 래퍼가 삼켜 "성공"으로 보인다. 계통적 실패만 502다.
+- ⚠ **어드민 핸들러는 부분 실패를 HTTP 상태로 접지 않는다** — 200 + 명시 필드로 두고 화면이
+  읽는다. 상태 코드로 접으면 fetch 래퍼가 삼켜 "성공"으로 보인다. 계통적 실패만 502다.
+  ⚠ **크론 핸들러는 반대로 부분 실패를 500으로 낸다** — 읽는 화면이 없어 상태 코드가 유일한
+  신호이고, 200이면 대시보드에 초록으로 지나간다(CLI가 종료 코드를 올리는 것과 같은 이유).
 - ⚠ `/api`는 proxy matcher에서 이미 제외돼 있다. 그래도 **Route Handler는 쿠키를 쓸 수
   있으므로** `getUser()`와 세션 갱신이 정상 동작한다(`supabase-server.ts`의 `setAll`이
   throw를 삼키는 것은 *서버 컴포넌트 렌더 중*일 때다).
@@ -507,7 +523,7 @@ HTTP 상태가 200이면 색인·공유에서 정상 페이지로 취급된다.
 - **존재 이유는 "서버가 쿠키를 쓸 수 있는 자리가 여기뿐"이다.** access token은 만료되고 갱신하면
   새 쿠키를 **저장**해야 하는데, 서버 컴포넌트는 쿠키를 쓸 수 없다(`supabase-server.ts`의 `setAll`이
   throw를 삼킨다). 쓸 수 있는 곳은 proxy · Server Action · Route Handler 셋인데 Server Action은
-  쓰지 않고 Route Handler는 어드민 동기화 하나뿐이라 화면 렌더 경로에 없다(`api-and-db.md`)
+  쓰지 않고 Route Handler는 경기 일정 동기화뿐이라 화면 렌더 경로에 없다(`api-and-db.md`)
   → 남는 것이 proxy다.
 - ⚠ **없애면 조용히 간헐적으로 로그아웃된다.** 오래 떠나 있다 돌아오면 서버 렌더가 만료 토큰을
   보고 스스로 리프레시하는데 저장을 못 해 쿠키에는 **회전된 옛 refresh token**이 남는다.

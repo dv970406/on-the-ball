@@ -1,24 +1,15 @@
-import { createClient } from "@supabase/supabase-js";
 import { env } from "@/shared/config";
 import { createSupabaseServerClient } from "@/shared/api/supabase-server";
-import type { Database } from "@/types/database.types";
-// ⚠ **정적 import다.** `readFileSync("scripts/team-names-ko.json")`은 cwd 상대 경로라
-//   서버리스에서 깨지고, 동적 경로라 Next의 outputFileTracing이 `scripts/`를 번들에 넣지
-//   않는다. 정적 import면 번들러가 JSON을 모듈로 인라인한다(`resolveJsonModule`이 켜져 있다).
-// ⚠ 대가: 매핑을 고치면 **재배포가 필요하다.** `public/crests`와 같은 운영 모델이다.
-import namesKo from "../../../../scripts/team-names-ko.json";
-import providerIds from "../../../../scripts/team-provider-ids.json";
-import { createApiFootball, EPL_LEAGUE_ID } from "../../../../scripts/lib/api-football.mjs";
-import { syncSeason } from "../../../../scripts/lib/sync-matches-core.mjs";
+import { json, runSeasonSync } from "../../_lib/run-season-sync";
 
 /**
- * 경기 일정 가져오기 — **이 앱의 유일한 Route Handler**다.
+ * 경기 일정 가져오기 — 어드민 화면의 버튼이 부른다(정기 실행은 `app/api/cron/sync-matches`).
  *
  * ⚠ 규약(`api-and-db.md`)은 Route Handler를 금지한다. 그 근거는 "중간 검증층 없이 RLS가
  *   방어선"인데, **여기는 데이터 접근이 아니라 외부 API를 서버 비밀로 부르는 자리**라
  *   그 근거가 닿지 않는다. API-Football 키와 service_role 키는 브라우저에 내려갈 수 없다.
- *   예외는 이 경로 하나이고 `scripts/check-conventions.mjs`의 `ROUTE_HANDLER_ALLOWED`가
- *   그 사실을 양방향으로 대조한다.
+ *   예외 목록은 `scripts/check-conventions.mjs`의 `ROUTE_HANDLER_ALLOWED`가 양방향으로 대조한다.
+ * ⚠ 이 파일은 **인가만** 갖는다. 동기화 본체는 크론과 함께 쓰는 `runSeasonSync`에 있다.
  *
  * ⚠ **`runtime = "nodejs"`가 필수다.** Edge에는 `node:fs`가 없어 `scripts/lib/*.mjs`
  *   import 자체가 깨진다.
@@ -30,12 +21,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/** 서버리스 시간 상한 안에서 끝나도록 행 단위 폴백을 좁힌다(CLI는 상한이 없다) */
-const ROW_FALLBACK_LIMIT = 50;
-
 export async function POST(request: Request): Promise<Response> {
-  const startedAt = Date.now();
-
   /*
    * 0) Origin 검사.
    * ⚠ Route Handler에는 Server Actions 같은 **내장 CSRF 방어가 없다.** 쿠키 인증 + POST라
@@ -72,111 +58,27 @@ export async function POST(request: Request): Promise<Response> {
   if (admin !== true) return json(403, { error: "관리자만 할 수 있어요." });
 
   /*
-   * 4) ★ **인가가 끝난 뒤에야 처음으로** service_role 클라이언트를 만든다.
-   *
+   * 4) ★ **인가가 끝난 뒤에야** 동기화에 들어간다 — service_role 클라이언트는 그 안에서
+   *   처음 만들어진다.
    * ⚠ service_role로 관리자 확인을 하면 안 된다 — 그 클라이언트에는 세션이 없어
    *   "누가 요청했는가"를 본문·헤더에서 받아야 하는데 그건 위조된다. definer RPC가
    *   유저 id를 인자로 받지 않는 것과 **글자 그대로 같은 함정**이다.
-   * ⚠ 순서 자체가 방어다. 클라이언트를 먼저 만들어 두면 다음 리팩터가 "만들어 두고 나중에
-   *   검사"로 바뀌는 순간 인증 없는 쓰기 경로가 된다.
-   * ⚠ **`SUPABASE_SERVICE_ROLE_KEY`를 `@/shared/config/env`에 넣지 않는다.** 그 모듈은
-   *   클라이언트 번들에 실린다 — 거기 두면 언젠가 누가 클라이언트에서 읽고 프로덕션
-   *   마스터 키가 브라우저 번들에 인라인된다.
    */
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const apiKey = process.env.API_FOOTBALL_KEY;
-  if (!serviceKey || !apiKey) {
-    console.error("[api/admin/sync-matches] 동기화 환경변수가 없습니다");
-    return json(500, { error: "동기화 설정이 서버에 없어요." });
-  }
-
-  const service = createClient<Database>(env.supabaseUrl, serviceKey, {
-    auth: { persistSession: false },
-  });
+  const outcome = await runSeasonSync("api/admin/sync-matches");
+  if (!outcome.ok) return json(outcome.status, outcome.body);
 
   /*
-   * 5) 동기화.
-   * ⚠ **경고를 삼키지 않는다.** 이 동기화의 운영 정보 전부가 `console.warn`에 있다
-   *   (한국어 표기가 없는 팀 · 종료됐는데 스코어를 못 읽은 경기 · 건너뛴 경기) —
-   *   삼키면 화면이 "성공"만 말한다.
+   * ⚠ **부분 실패를 HTTP 상태로 접지 않는다.** 207 같은 코드로 표현하면 fetch 래퍼가
+   *   삼켜 "성공"으로 보인다 — 200 + 명시 필드로 두고 화면이 그 필드를 읽어 알린다.
+   *
+   * ⚠⚠ **`aborted`도 200이다.** 그 값이 곧 "환경 문제라 남은 행도 전부 실패했다"는 뜻이
+   *   아니다 — `upsertRows`는 **행 단위 재시도 상한을 넘겼을 때도** `aborted`를 켜고,
+   *   그때는 이미 저장된 행이 있다(`saved > 0`, 나머지는 `skipped`). 502로 내보내면
+   *   클라이언트가 `body.error`만 찾다가 payload를 통째로 버려 "50건 저장, 330건 미시도"가
+   *   화면에 **한 글자도 닿지 않고** 고정 문구로 접힌다. 목록 무효화도 일어나지 않는다.
+   *   → 계통적 실패는 `runSeasonSync`가 502로 낸다(그쪽은 payload 자체가 없다).
    */
-  const warnings: string[] = [];
-  const log = {
-    log: (...args: unknown[]) => console.log("[sync-matches]", ...args),
-    warn: (...args: unknown[]) => {
-      const line = args.map(String).join(" ").trim();
-      if (line) warnings.push(line);
-      console.warn("[sync-matches]", ...args);
-    },
-    error: (...args: unknown[]) => {
-      const line = args.map(String).join(" ").trim();
-      if (line) warnings.push(line);
-      console.error("[sync-matches]", ...args);
-    },
-  };
-
-  try {
-    // 시즌은 **시작 연도**다(2026-27 → 2026). 8월 이전이면 지난 시즌이 맞다.
-    const now = new Date();
-    const season = now.getUTCMonth() >= 6 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
-
-    const api = createApiFootball(apiKey);
-    const body = await api.getSeasonFixtures(season);
-    const fixtures = Array.isArray(body?.response) ? body.response : null;
-
-    let teamList: unknown[] = [];
-    try {
-      const teams = await api.get(`/teams?league=${EPL_LEAGUE_ID}&season=${season}`);
-      teamList = Array.isArray(teams?.response)
-        ? teams.response.map((x: { team: unknown }) => x.team)
-        : [];
-    } catch (e) {
-      // 실패해도 계속 간다 — 한국어 매핑이 있으면 약칭이 거기서 나온다
-      log.warn(`팀 목록을 받지 못했습니다(${(e as Error).message}) — 약칭이 이름에서 유도됩니다`);
-    }
-
-    const result = await syncSeason({
-      supabase: service,
-      fixtures,
-      teamList,
-      namesKo,
-      providerIds,
-      log,
-      rowFallbackLimit: ROW_FALLBACK_LIMIT,
-    });
-
-    /*
-     * ⚠ **부분 실패를 HTTP 상태로 접지 않는다.** 207 같은 코드로 표현하면 fetch 래퍼가
-     *   삼켜 "성공"으로 보인다 — 200 + 명시 필드로 두고 화면이 그 필드를 읽어 알린다.
-     *
-     * ⚠⚠ **`aborted`도 200이다.** 한때 이것만 502로 냈는데, 그 코드가 곧 "환경 문제라 남은
-     *   행도 전부 실패했다"는 뜻이 아니다 — `upsertRows`는 **행 단위 재시도 상한을 넘겼을
-     *   때도** `aborted`를 켜고, 그때는 이미 저장된 행이 있다(`saved > 0`, 나머지는 `skipped`).
-     *   502로 내보내면 클라이언트가 `body.error`만 찾다가 payload를 통째로 버려
-     *   "50건 저장, 330건 미시도"가 화면에 **한 글자도 닿지 않고** 고정 문구로 접힌다.
-     *   목록 무효화도 일어나지 않아 방금 저장된 행이 화면에 반영되지 않는다.
-     *   → 계통적 실패는 아래 `catch`가 502로 낸다(그쪽은 payload 자체가 없다).
-     */
-    const payload = {
-      season: `${season}-${String((season + 1) % 100).padStart(2, "0")}`,
-      teams: result.teams,
-      matches: result.matches,
-      api: { used: api.used, dayRemaining: api.budget.dayRemaining },
-      warnings,
-      durationMs: Date.now() - startedAt,
-    };
-    return json(200, payload);
-  } catch (e) {
-    console.error("[api/admin/sync-matches] 동기화 실패:", e);
-    return json(502, { error: (e as Error).message || "일정을 가져오지 못했어요." });
-  }
-}
-
-function json(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json; charset=utf-8" },
-  });
+  return json(200, outcome.body);
 }
 
 /** 요청이 우리 사이트에서 왔는가 — `env.siteUrl`이 비어 있을 수 있어 요청 URL도 함께 본다 */
