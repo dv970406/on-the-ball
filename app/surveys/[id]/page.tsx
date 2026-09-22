@@ -35,7 +35,7 @@ const META_DESCRIPTION_MAX = 120;
 type SurveyHeadState = "found" | "missing" | "unknown";
 type SurveyHead =
 	| {
-			state: SurveyHeadState;
+			state: Extract<SurveyHeadState, "found">;
 			survey: Survey;
 			/** ⚠ 쿼리 키가 userId로 스코프된다 — 그 값도 함께 내려야 캐시에 닿는다 */
 			userId: string | undefined;
@@ -53,9 +53,9 @@ type SurveyHead =
 			 */
 			nowMs: number;
 	  }
-	| { state: SurveyHeadState }
+	| { state: Extract<SurveyHeadState, "missing"> }
 	/** 조회 자체가 실패 — 일시 장애로 멀쩡한 입축구를 없다고 단정하면 안 되므로 구분한다 */
-	| { state: SurveyHeadState };
+	| { state: Extract<SurveyHeadState, "unknown"> };
 
 /**
  * ⚠ `cache()`로 감싼다 — `generateMetadata`와 `Page`가 같은 데이터를 쓰므로
