@@ -6,18 +6,21 @@
 //    `check:conventions`가 이 유형을 **잡지 못하므로**(상대 경로 소비도 "현역"으로 센다)
 //    손으로 지킨다. `entities/survey`가 `SurveyOption`·`SplitCount`를 같은 이유로 뺐다.
 export type {
+  LeaderboardEntry,
   Match,
   MatchEvent,
   MatchLineup,
   MatchListPage,
   MatchPick,
   MatchPredictionResult,
+  MatchRanking,
   MatchStat,
 } from "./model/types";
 export { matchKeys } from "./api/keys";
 // ⚠ 상한은 서버 안전한 api/mappers에 있다 — 목록 SSR이 같은 값을 써야 한다.
 //    구역별로 갈린 이유는 그 파일 주석에(한 상한이면 지난 경기가 다가오는 경기를 굶긴다).
-export { MATCH_PAST_LIMIT, MATCH_UPCOMING_LIMIT } from "./api/mappers";
+// ⚠ 랭킹 상한도 같은 자리다 — 화면이 "상위 N명까지"를 이 값으로 말한다.
+export { LEADERBOARD_LIMIT, MATCH_PAST_LIMIT, MATCH_UPCOMING_LIMIT } from "./api/mappers";
 export {
   useMatchEventsQuery,
   useMatchStatsQuery,
@@ -25,6 +28,7 @@ export {
   useMatchListQuery,
   useMatchPredictionResultsQuery,
   useMatchQuery,
+  useMatchRankingQuery,
   useMyAccuracyQuery,
 } from "./api/queries";
 // ⚠ 시각 판정을 함수가 단독으로 소유한다 — **features와 SSR 페이지가 같은 답**을 내야 하고,

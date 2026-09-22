@@ -219,6 +219,51 @@ export interface PredictionAccuracy {
   truncated: boolean;
 }
 
+export type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+
+/**
+ * 랭킹 한 줄 — `match_leaderboard` RPC의 행.
+ *
+ * ⚠ **순위를 화면이 다시 매기지 않는다.** 규칙(적중 수 → 적은 예측 수 → 공동 순위)은 그 함수가
+ *   단독으로 소유한다 — 클라이언트가 정렬·순위를 다시 짜면 공동 순위의 판정이 두 곳으로 갈린다.
+ * ⚠ 적중률(%)은 **표시용 파생값**이라 여기 두지 않는다(순위 기준이 아니다 — 그 사유는 마이그레이션).
+ */
+export interface LeaderboardEntry {
+  /** 공동 순위면 같은 값이다(1, 1, 3) */
+  rank: number;
+  userId: ProfileRow["id"];
+  nickname: ProfileRow["nickname"];
+  /** ⚠ **경로**다(전체 URL이 아니다) — 조립은 `avatarUrl()` 한 곳에서만 */
+  avatarPath: ProfileRow["avatar_path"];
+  hits: number;
+  /** 채점이 끝난 예측 수 — 무효·삭제·미채점 경기는 빠진다 */
+  total: number;
+  /**
+   * 요청한 사람 본인의 행인가.
+   * ⚠ **이 값 때문에 응답이 "나"에 종속된다** — 키를 `userId`로 스코프하는 이유다.
+   * ⚠ 상한 밖이어도 본인 행은 함께 온다(RPC가 붙여 준다) — 그 행은 늘 **마지막**이다.
+   */
+  isMe: boolean;
+}
+
+/**
+ * 랭킹 화면 한 페이지 — 시즌 전체와 최근 라운드.
+ *
+ * ⚠ **범위(시즌·라운드)가 데이터 안에 있다.** "지금 어느 시즌인가"를 화면이 시계로 추측하지
+ *   않고 **채점이 끝난 가장 최근 경기**가 정한다 — 비시즌에는 지난 시즌의 최종 순위가 뜬다.
+ * ⚠ `null`은 "채점된 경기가 하나도 없다"이고, `undefined`(프리페치 안 함)와 다른 뜻이다 —
+ *   하나로 접으면 비시즌 첫 배포에서 이 화면을 열 때마다 조회가 한 번 더 나간다.
+ * ⚠ `api/queries.ts`가 아니라 여기 있다 — 서버 페이지가 이 타입으로 값을 조립해 넘긴다
+ *   (`MatchListPage`와 같은 이유).
+ */
+export interface MatchRanking {
+  season: MatchRow["season"];
+  /** 최근 라운드 — 그 시즌에서 채점된 경기가 있는 **가장 큰** 라운드 */
+  matchday: MatchRow["matchday"];
+  seasonBoard: LeaderboardEntry[];
+  roundBoard: LeaderboardEntry[];
+}
+
 /**
  * 경기 목록 한 페이지.
  *

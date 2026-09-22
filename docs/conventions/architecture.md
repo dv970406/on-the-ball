@@ -9,7 +9,7 @@
 - `app` — FSD app 레이어: `providers`(QueryClient + AuthProvider), `fonts`, `styles/globals.css`
 - `views` — 화면 조립. ⚠ **`pages` 금지** (Next Pages Router로 오감지됨 → 반드시 `views`)
   post-list / post-detail / post-write / post-edit / survey-list / survey-detail /
-  match-list / match-detail / notice-list / notice-detail / sign-in / profile /
+  match-list / match-detail / match-ranking / notice-list / notice-detail / sign-in / profile /
   admin-match-list / admin-match-edit / admin-survey-list / admin-survey-form /
   admin-post-list / admin-post-manage / admin-notice-list / admin-notice-form
   ⚠ 어드민의 **등록·수정이 한 슬라이스**인 것(`admin-*-form`)은 취향이 아니다 — `views`끼리는

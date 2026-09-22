@@ -8,11 +8,13 @@ import type {
   MatchLineup,
   MatchListPage,
   MatchPredictionResult,
+  MatchRanking,
   MatchStat,
   PredictionAccuracy,
 } from "../model/types";
 import { matchKeys } from "./keys";
 import { buildMatchListQueries } from "./list-query";
+import { fetchMatchRanking } from "./ranking-query";
 import {
   EVENT_SELECT,
   LINEUP_SELECT,
@@ -233,6 +235,39 @@ export function useMatchPredictionResultsQuery(
       return (data ?? []).map(buildMatchPredictionResult);
     },
     enabled: enabled && Number.isSafeInteger(matchId) && matchId > 0,
+  });
+}
+
+/**
+ * 랭킹 — 시즌 전체와 최근 라운드 한 벌.
+ *
+ * ⚠ **범위·상한·순위는 `fetchMatchRanking`과 RPC가 소유한다** — 여기서 정렬하거나 거르지 않는다.
+ * ⚠ **세션이 확정되기 전에는 부르지 않는다**(`enabled`) — 키가 userId로 스코프돼 있어 복원
+ *   중에 `undefined`로 한 번 조회하면 세션이 선 뒤 키가 바뀌며 목록이 다시 그려진다.
+ *   **단 프리페치가 있으면 열어 둔다**(서버가 준 userId로 이미 키가 맞춰져 있다 —
+ *   `useMatchListQuery`와 같은 규약이라 호출부가 그 판정을 갖는다).
+ * ⚠ `initialData`의 `null`은 "채점된 경기가 없다"는 **데이터**다 — TanStack이 `undefined`만
+ *   "초기 데이터 없음"으로 보므로 `null`을 넘기면 조회하지 않고 그대로 쓴다(의도다).
+ */
+export function useMatchRankingQuery(
+  userId: string | undefined,
+  enabled = true,
+  initialData?: MatchRanking | null,
+) {
+  return useQuery<MatchRanking | null, Error>({
+    initialData,
+    queryKey: matchKeys.ranking(userId),
+    // 계정이 바뀌는 동안 이전 순위를 흐리게 남겨 둔다(목록과 같은 처리)
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      const { data, error } = await fetchMatchRanking(requireBrowserSupabase());
+      if (error) {
+        console.error("[match] 랭킹 조회 실패:", error);
+        throw new Error(toDbErrorMessage(error));
+      }
+      return data;
+    },
+    enabled,
   });
 }
 

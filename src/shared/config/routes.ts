@@ -35,6 +35,14 @@ export const ROUTES = {
    */
   matchList: "/matches",
   match: (id: number | string) => `/matches/${id}`,
+  /**
+   * 승부예측 랭킹(시즌·최근 라운드).
+   * ⚠ `/matches/[id]`와 겹치지 않는다 — Next가 정적 세그먼트(`ranking`)를 동적보다 먼저 맞춘다
+   *   (`/posts/category/…`가 `/posts/[id]`와 공존하는 것과 같은 형태).
+   * ⚠ `activeTabHref`에 넣지 않는다 — 서브헤더 화면이다(공지 목록과 같은 자리). 진입점은
+   *   경기 목록 머리의 적중률 줄이다.
+   */
+  matchRanking: "/matches/ranking",
 
   // 인증 — 소셜 로그인은 로그인과 가입이 같은 동작이라 화면이 하나다
   signIn: "/sign-in",

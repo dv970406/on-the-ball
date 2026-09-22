@@ -41,6 +41,8 @@ interface ListLastModified {
   byCategory: Partial<Record<PostCategory, Date>>;
   surveys?: Date;
   notices?: Date;
+  /** 랭킹 — 순위가 움직이는 것은 경기가 채점될 때다 */
+  ranking?: Date;
 }
 
 /** 값이 있을 때만 `lastModified`를 싣는다 */
@@ -57,12 +59,16 @@ function withLastModified(url: string, lastModified: Date | undefined) {
  *   그래서 그 목록에 실리는 항목의 최신 시각을 쓰고, 알 수 없으면 **생략한다.**
  * ⚠ 경기 목록은 생략한다 — 창(`MATCH_LIST_LOOKBACK_MS`)이 시간에 따라 움직여 내용이
  *   행의 변경 없이도 바뀌므로 행 시각으로는 그 목록의 변경을 말할 수 없다.
+ * ⚠ 랭킹은 **가장 최근 `finished_at`** 이다 — 순위는 채점된 경기로만 매겨지므로 결과가 들어온
+ *   시각이 곧 마지막 변경이다. 어드민의 스코어 정정은 `finished_at`을 옮기지 않아 실제보다
+ *   **이르게** 말할 수 있는데, 늦게 말하는 것(거짓 신호)보다 안전한 쪽이다.
  */
 function staticEntries(last: ListLastModified): MetadataRoute.Sitemap {
   return [
     withLastModified(absoluteUrl(ROUTES.postList), last.posts),
     withLastModified(absoluteUrl(ROUTES.surveyList), last.surveys),
     { url: absoluteUrl(ROUTES.matchList) },
+    withLastModified(absoluteUrl(ROUTES.matchRanking), last.ranking),
     withLastModified(absoluteUrl(ROUTES.noticeList), last.notices),
     ...POST_CATEGORIES.map((category) =>
       withLastModified(
@@ -133,6 +139,11 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
         byCategory,
         surveys: latest((surveys.data ?? []).map((survey) => new Date(survey.created_at))),
         notices: latest((notices.data ?? []).map((notice) => new Date(notice.updated_at))),
+        ranking: latest(
+          (matches.data ?? []).flatMap((match) =>
+            match.finished_at ? [new Date(match.finished_at)] : [],
+          ),
+        ),
       }),
       ...postRows.map((post) => ({
         url: absoluteUrl(ROUTES.post(post.id)),

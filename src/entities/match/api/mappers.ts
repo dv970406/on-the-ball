@@ -1,5 +1,6 @@
 import type {
   AdminMatch,
+  LeaderboardEntry,
   LineupPlayer,
   LineupRole,
   Match,
@@ -157,6 +158,46 @@ export function buildAdminMatch(row: AdminMatchSelectRow): AdminMatch {
     deletedAt: row.deleted_at,
     adminLockedAt: row.admin_locked_at,
     externalId: row.external_id,
+  };
+}
+
+/**
+ * 랭킹 상위 몇 명까지 받을지.
+ *
+ * ⚠ **RPC가 1~100으로 클램프한다** — 이 값을 100 위로 올려도 그 이상은 오지 않는다.
+ * ⚠ 화면이 "상위 N명까지 표시한다"를 이 값으로 말한다 — 그래서 서버 안전한 여기 있다
+ *   (`api/queries.ts`는 `"use client"`라 서버 페이지가 import할 수 없다).
+ */
+export const LEADERBOARD_LIMIT = 50;
+
+/**
+ * `match_leaderboard` RPC의 행.
+ *
+ * ⚠ **`avatar_path`를 nullable로 적는다.** 생성 타입은 `returns table`의 열을 전부 non-null로
+ *   만들지만(실측: `avatar_path: string`) 사진이 없는 사용자는 null이 온다 — 생성 타입을 믿으면
+ *   `avatarUrl`이 `"…/avatars/null"`을 조립하는 자리가 생긴다.
+ */
+export interface LeaderboardRow {
+  rank: number;
+  user_id: string;
+  nickname: string;
+  avatar_path: string | null;
+  hits: number;
+  total: number;
+  is_me: boolean;
+}
+
+export function buildLeaderboardEntry(row: LeaderboardRow): LeaderboardEntry {
+  return {
+    rank: row.rank,
+    userId: row.user_id,
+    nickname: row.nickname,
+    avatarPath: row.avatar_path,
+    hits: row.hits,
+    total: row.total,
+    // ⚠ `?? false` — 함수가 `is not distinct from`으로 null을 막지만, 여기서 셋째 상태가
+    //   새면 화면의 "나" 표시가 undefined를 참으로 읽는 자리가 생긴다
+    isMe: row.is_me ?? false,
   };
 }
 

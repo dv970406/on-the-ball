@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { CalendarDays } from "lucide-react";
+import Link from "next/link";
+import { CalendarDays, ChevronRight } from "lucide-react";
 import {
   MATCH_PAST_LIMIT,
   MATCH_UPCOMING_LIMIT,
@@ -9,8 +10,9 @@ import {
   MatchCard,
   groupMatchesByDay,
 } from "@/entities/match";
+import { ROUTES } from "@/shared/config";
 import { cn, formatCount, useNowMs } from "@/shared/lib";
-import { CountUp, EmptyState, StaleBanner } from "@/shared/ui";
+import { CountUp, EmptyState, Icon, StaleBanner } from "@/shared/ui";
 import { AppBar } from "@/widgets/app-bar";
 import { AuthStatus } from "@/widgets/auth-status";
 import { BottomTabBar } from "@/widgets/bottom-tab-bar";
@@ -131,23 +133,40 @@ export function MatchListView({
           ⚠ **잘렸으면 그 사실을 말한다.** 그냥 숨기면 가장 오래 쓴 사용자가 어느 날 자기
             숫자가 사라진 것을 발견하고 아무 설명도 받지 못한다(사유는 `useMyAccuracyQuery`).
         */}
-        {accuracyTruncated && (
-          <p className="border-b border-hairline-cool bg-canvas-soft px-5 py-3 text-[13px] text-ink-mute">
-            예측이 많아 적중률을 정확히 셀 수 없어요.
-          </p>
-        )}
-
-        {accuracy && (
-          <p className="border-b border-hairline-cool bg-canvas-soft px-5 py-3 text-[13px] text-ink-mute">
-            내 적중률{" "}
-            <span className="font-mono font-semibold tabular-nums text-ink">
-              <CountUp value={Math.round((accuracy.hits / accuracy.total) * 100)} />%
-            </span>{" "}
-            <span className="text-ink-mute-2">
-              ({formatCount(accuracy.hits)}/{formatCount(accuracy.total)})
+        {/*
+          ⚠ **랭킹으로 가는 진입점을 겸한다 — 그래서 늘 그린다.** 적중률이 없는 사람(비로그인·
+            신규)에게도 이 줄이 있어야 랭킹에 닿고, 크롤러도 이 앵커로 `/matches/ranking`을 발견한다.
+            적중률이 올 때만 줄을 새로 만들던 때는 도착하는 순간 목록이 한 줄만큼 밀렸는데,
+            줄이 먼저 있고 **문구만 바뀌므로** 그 시프트도 함께 사라진다.
+          ⚠ 줄 전체가 링크다 — 적중률은 랭킹의 요약이라 그걸 누르면 순위로 가는 것이 자연스럽다.
+          ⚠ 로그인 사용자는 첫 프레임에 기본 문구를 보고 적중률이 오면 문구가 바뀐다(적중률은
+            클라이언트 조회다). 높이가 같아 밀리지 않으므로 수용한다 — 없애려면 적중률도 SSR해야 한다.
+        */}
+        <Link
+          href={ROUTES.matchRanking}
+          className="flex items-center justify-between gap-3 border-b border-hairline-cool bg-canvas-soft px-5 py-3 text-[13px] text-ink-mute transition-colors duration-150 ease-otb active:bg-hairline-cool"
+        >
+          {accuracy ? (
+            <span className="min-w-0 truncate">
+              내 적중률{" "}
+              <span className="font-mono font-semibold tabular-nums text-ink">
+                <CountUp value={Math.round((accuracy.hits / accuracy.total) * 100)} />%
+              </span>{" "}
+              <span className="text-ink-mute-2">
+                ({formatCount(accuracy.hits)}/{formatCount(accuracy.total)})
+              </span>
             </span>
-          </p>
-        )}
+          ) : accuracyTruncated ? (
+            <span className="min-w-0 truncate">예측이 많아 적중률을 정확히 셀 수 없어요.</span>
+          ) : (
+            <span className="min-w-0 truncate">누가 가장 많이 맞혔을까요?</span>
+          )}
+          <span className="flex shrink-0 items-center gap-0.5 font-medium text-ink">
+            랭킹 보기
+            {/* 셰브론 색은 공지 배너와 같다 — 라벨만 잉크로 둔다 */}
+            <Icon as={ChevronRight} size={16} className="text-ink-mute-2" />
+          </span>
+        </Link>
 
         {isLoading && <MatchListSkeleton />}
 

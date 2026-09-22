@@ -45,6 +45,8 @@ const DEEP_IMPORT_ALLOWED = new Set([
   "@/entities/survey/lib/open",
   "@/entities/comment/api/list-query",
   "@/entities/match/api/list-query",
+  // 랭킹 조립(범위 → 두 판) — 랭킹 SSR이 훅과 같은 범위·상한·RPC 인자를 써야 한다
+  "@/entities/match/api/ranking-query",
   "@/entities/notice/api/list-query",
   // 마감 판정의 단일 소스. `"use client"`가 없어 서버 안전하고, SSR 페이지가 클라이언트와
   // **같은 판정**을 써야 한다(`lib/plain-summary`와 같은 형태).

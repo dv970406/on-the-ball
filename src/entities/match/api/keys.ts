@@ -40,6 +40,15 @@ export const matchKeys = {
   accuracy: (userId: string | undefined) =>
     [...matchKeys.all, "accuracy", userScope(userId)] as const,
   /**
+   * 랭킹(시즌·최근 라운드 한 벌).
+   * ⚠ **`userScope`를 붙인다** — 행마다 `isMe`가 실려 응답이 "나"에 종속된다. 키에 유저가
+   *   없으면 계정이 바뀐 뒤에도 이전 사용자의 행이 "나"로 칠해진 채 남는다.
+   * ⚠ `matchKeys.all` 아래에 둔다 — 어드민이 스코어를 정정하면 그 무효화(`matchKeys.all`)가
+   *   순위까지 함께 되돌린다(적중이 스코어에서 파생되므로 순위도 그렇다).
+   */
+  ranking: (userId: string | undefined) =>
+    [...matchKeys.all, "ranking", userScope(userId)] as const,
+  /**
    * 어드민 목록·단건.
    *
    * ⚠ **`userScope`를 붙이지 않고 대신 `admin` 조각으로 가른다.** 이 캐시는 "나"에 종속된

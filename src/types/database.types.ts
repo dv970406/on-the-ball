@@ -1055,6 +1055,18 @@ export type Database = {
       is_plain_nickname: { Args: { p_text: string }; Returns: boolean }
       match_is_alive: { Args: { p_match_id: number }; Returns: boolean }
       match_is_open: { Args: { p_match_id: number }; Returns: boolean }
+      match_leaderboard: {
+        Args: { p_limit?: number; p_matchday?: number; p_season: string }
+        Returns: {
+          avatar_path: string
+          hits: number
+          is_me: boolean
+          nickname: string
+          rank: number
+          total: number
+          user_id: string
+        }[]
+      }
       match_prediction_results: {
         Args: { p_match_id: number }
         Returns: {

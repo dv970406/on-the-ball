@@ -474,6 +474,9 @@ select p.proname
 \echo '        is_plain_nickname(닉네임 허용 문자 — has_visible_char·normalize_nickname과 같은'
 \echo '        사유다. profiles_nickname_plain CHECK 안에서 평가되므로 닫으면 가입과 닉네임'
 \echo '        변경이 전부 42501로 죽는다. 호출자가 넘긴 문자열의 형태만 돌려준다)'
+\echo '        match_leaderboard(승부예측 랭킹 — 비로그인·크롤러가 보는 공개 콘텐츠다. 돌려주는 것은'
+\echo '        이미 공개인 닉네임·아바타 경로와 **채점이 끝난** 경기의 개인별 합계뿐이라 마감 전'
+\echo '        선택이 새는 경로가 없다. 검사는 섹션 34)'
 \echo '   ⚠ **is_admin은 여기 없다.** 어떤 RLS 정책도 그 함수를 부르지 않기 때문이다 —'
 \echo '     어드민 조회조차 definer RPC를 지나므로 anon에 열 이유가 없다.'
 \echo '[0행 기대] 화이트리스트 밖에서 anon에 열린 함수'
@@ -483,7 +486,7 @@ select p.proname
    and has_function_privilege('anon', p.oid, 'EXECUTE')
    and p.proname not in ('post_is_alive', 'has_visible_char', 'normalize_nickname',
                          'increment_post_view', 'is_blocked',
-                         'match_prediction_results',
+                         'match_prediction_results', 'match_leaderboard',
                          'match_is_alive', 'survey_is_alive',
                          'is_plain_nickname');
 
@@ -3215,6 +3218,214 @@ select
            and policyname = 'survey_images_delete_admin' and cmd = 'DELETE') as survey_delete;
 
 rollback to s33;
+
+-- =====================================================================
+\echo ''
+\echo '=== 34. 승부예측 랭킹 (20260922000001) ==='
+\echo '  설계 요약: 채점된 경기(result not null, 삭제 제외)의 적중 수 → 적은 예측 수 순이고,'
+\echo '  같으면 공동 순위다. 개인별 합계만 돌려주고, 호출자 본인의 행은 상한 밖이어도 붙는다.'
+\echo '  ⚠ 시즌을 **테스트 전용 값(1999-00)** 으로 둔다 — 동기화된 실제 경기가 섞이면 합계가'
+\echo '    조용히 틀어진다(섹션 31e가 실측으로 겪은 "운영 데이터가 검사에 새어 든다").'
+\echo '  ⚠ 팀 코드도 테스트 전용 네임스페이스다(섹션 31a와 같은 이유 — team_pkey 충돌).'
+savepoint s34;
+
+select id as carol from auth.users where email = 'carol@test.com' \gset
+\set login_carol 'select set_config(''request.jwt.claims'', json_build_object(''sub'', ''':carol''', ''role'', ''authenticated'')::text, true); set local role authenticated;'
+
+insert into public.team (code, name, short_name, external_id) values
+  ('rlstest-lb-a', '랭킹알파', 'LBA', 'rlstest-lb-t-a'),
+  ('rlstest-lb-b', '랭킹베타', 'LBB', 'rlstest-lb-t-b');
+
+-- l1·l2 = 1라운드(홈승·무) · l3 = 2라운드 원정승 · l4 = 2라운드 미채점 · l5 = 2라운드 무효
+-- l6 = 2라운드 삭제 · l7 = 3라운드 예정 · l8 = 3라운드 홈승
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, home_score, away_score, finished_at, external_id)
+values ('1999-00', 1, 'rlstest-lb-a', 'rlstest-lb-b', now() - interval '20 days', 2, 0, now() - interval '20 days', 'lb-1')
+returning id as l1 \gset
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, home_score, away_score, finished_at, external_id)
+values ('1999-00', 1, 'rlstest-lb-b', 'rlstest-lb-a', now() - interval '19 days', 1, 1, now() - interval '19 days', 'lb-2')
+returning id as l2 \gset
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, home_score, away_score, finished_at, external_id)
+values ('1999-00', 2, 'rlstest-lb-a', 'rlstest-lb-b', now() - interval '12 days', 0, 1, now() - interval '12 days', 'lb-3')
+returning id as l3 \gset
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, external_id)
+values ('1999-00', 2, 'rlstest-lb-b', 'rlstest-lb-a', now() - interval '11 days', 'lb-4')
+returning id as l4 \gset
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, home_score, away_score, finished_at, voided_at, external_id)
+values ('1999-00', 2, 'rlstest-lb-a', 'rlstest-lb-b', now() - interval '11 days', 1, 0, now() - interval '11 days', now() - interval '10 days', 'lb-5')
+returning id as l5 \gset
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, home_score, away_score, finished_at, deleted_at, external_id)
+values ('1999-00', 2, 'rlstest-lb-b', 'rlstest-lb-a', now() - interval '11 days', 1, 0, now() - interval '11 days', now() - interval '10 days', 'lb-6')
+returning id as l6 \gset
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, external_id)
+values ('1999-00', 3, 'rlstest-lb-a', 'rlstest-lb-b', now() + interval '3 days', 'lb-7')
+returning id as l7 \gset
+insert into public.match (season, matchday, home_team, away_team, kickoff_at, home_score, away_score, finished_at, external_id)
+values ('1999-00', 3, 'rlstest-lb-b', 'rlstest-lb-a', now() - interval '5 days', 3, 0, now() - interval '5 days', 'lb-8')
+returning id as l8 \gset
+
+-- ⚠ 예측은 superuser로 넣는다 — 킥오프가 지난 경기라 정책(match_is_open)이 막는다.
+--   시즌 합계:   alice 3/4 (l1✓ l2✓ l3✗ l8✓) · bob 3/3 (l1✓ l3✓ l8✓) · carol 1/2 (l2✗ l8✓)
+--   alice의 l4(미채점)·l5(무효)·l6(삭제)·l7(예정)은 **맞았어도 세지 않아야 한다**(l5·l6은 적중이다).
+insert into public.match_prediction (match_id, user_id, pick) values
+  (:l1, :'alice', 'home'), (:l2, :'alice', 'draw'), (:l3, :'alice', 'home'),
+  (:l4, :'alice', 'home'), (:l5, :'alice', 'home'), (:l6, :'alice', 'home'),
+  (:l7, :'alice', 'home'), (:l8, :'alice', 'home'),
+  (:l1, :'bob',   'home'), (:l3, :'bob',   'away'), (:l8, :'bob',   'home'),
+  (:l2, :'carol', 'away'), (:l8, :'carol', 'home');
+
+\echo ''
+\echo '-- 34a. 비로그인이 시즌 순위를 본다 (크롤러가 색인하는 콘텐츠다) --'
+\echo '   ⚠ claims까지 비운다 — :login_anon은 role만 바꿔 앞선 sub가 남는다(섹션 28·33a의 함정).'
+\echo '     여기서는 그 sub가 남으면 is_me가 참으로 새어 아래 [f 기대]가 조용히 틀린다.'
+savepoint s;
+select set_config('request.jwt.claims', null, true);
+:login_anon
+\echo '[3 기대] 채점된 예측이 있는 사람만 오른다'
+select count(*) from public.match_leaderboard('1999-00');
+\echo '[t 기대] 순서·순위 — 적중이 같으면(3) **예측이 적은** bob이 앞선다'
+select array_agg(r.nickname order by r.n) = array['bob', 'alice', 'carol']
+   and array_agg(r.rank     order by r.n) = array[1, 2, 3]::bigint[]
+  from public.match_leaderboard('1999-00') with ordinality
+       as r(rank, user_id, nickname, avatar_path, hits, total, is_me, n);
+\echo '[t 기대] 합계 — 미채점·무효·삭제·예정 경기는 맞았어도 세지 않는다 (alice 3/4)'
+select array_agg(r.hits  order by r.n) = array[3, 3, 1]::bigint[]
+   and array_agg(r.total order by r.n) = array[3, 4, 2]::bigint[]
+  from public.match_leaderboard('1999-00') with ordinality
+       as r(rank, user_id, nickname, avatar_path, hits, total, is_me, n);
+\echo '[f 기대] 비로그인에게는 "나"가 없다 (null도 아니다 — is not distinct from)'
+select bool_or(coalesce(is_me, true)) from public.match_leaderboard('1999-00');
+rollback to s;
+
+\echo ''
+\echo '-- 34b. 라운드 순위 · 제외 규칙을 하나씩 --'
+savepoint s;
+select set_config('request.jwt.claims', null, true);
+:login_anon
+\echo '[t 기대] 1라운드 — alice 2/2, bob 1/1, carol 0/1 (적중 0도 순위에 오른다)'
+select array_agg(r.nickname order by r.n) = array['alice', 'bob', 'carol']
+   and array_agg(r.hits     order by r.n) = array[2, 1, 0]::bigint[]
+   and array_agg(r.rank     order by r.n) = array[1, 2, 3]::bigint[]
+  from public.match_leaderboard('1999-00', 1::smallint) with ordinality
+       as r(rank, user_id, nickname, avatar_path, hits, total, is_me, n);
+\echo '[t 기대] 2라운드 — alice의 total이 1이다 (l4 미채점·l5 무효·l6 삭제가 빠졌다)'
+select total = 1 and hits = 0 from public.match_leaderboard('1999-00', 2::smallint) where nickname = 'alice';
+rollback to s;
+
+savepoint s;
+update public.match set deleted_at = null where id = :l6;
+select set_config('request.jwt.claims', null, true);
+:login_anon
+\echo '[t 기대] 삭제를 되돌리면 그 경기가 다시 센다 — 위 제외가 **삭제 판정** 때문이었다는 증거'
+\echo '        (definer라 RLS가 닿지 않는다. 함수가 deleted_at을 안 보면 이 둘이 같아져 위가 틀린다)'
+select total = 2 and hits = 1 from public.match_leaderboard('1999-00', 2::smallint) where nickname = 'alice';
+rollback to s;
+
+savepoint s;
+update public.match set voided_at = null where id = :l5;
+select set_config('request.jwt.claims', null, true);
+:login_anon
+\echo '[t 기대] 무효를 풀면 다시 센다 — 무효 제외는 result의 생성식이 한다(따로 거르지 않는다)'
+select total = 2 and hits = 1 from public.match_leaderboard('1999-00', 2::smallint) where nickname = 'alice';
+rollback to s;
+
+\echo ''
+\echo '-- 34c. 공동 순위 --'
+savepoint s;
+select set_config('request.jwt.claims', null, true);
+:login_anon
+\echo '[t 기대] 3라운드 — 셋 다 1/1이라 전부 1위, 화면 순서는 user_id로 고정된다'
+\echo '        (예정 경기 l7의 alice 예측은 세지 않아 alice도 1/1이다)'
+select array_agg(r.rank     order by r.n) = array[1, 1, 1]::bigint[]
+   and array_agg(r.nickname order by r.n) = array['alice', 'bob', 'carol']
+   and array_agg(r.total    order by r.n) = array[1, 1, 1]::bigint[]
+  from public.match_leaderboard('1999-00', 3::smallint) with ordinality
+       as r(rank, user_id, nickname, avatar_path, hits, total, is_me, n);
+rollback to s;
+
+\echo ''
+\echo '-- 34d. 내 행 · 상한 --'
+savepoint s; :login_alice
+\echo '[t 기대] 상한이 1이어도 **내 행은 붙는다** — 끝에, is_me로'
+select array_agg(r.nickname order by r.n) = array['bob', 'alice']
+   and array_agg(r.is_me    order by r.n) = array[false, true]
+  from public.match_leaderboard('1999-00', null, 1) with ordinality
+       as r(rank, user_id, nickname, avatar_path, hits, total, is_me, n);
+rollback to s;
+
+savepoint s; :login_bob
+\echo '[1 기대] 내가 상한 안에 있으면 중복으로 붙지 않는다'
+select count(*) from public.match_leaderboard('1999-00', null, 1);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[t 기대] **차단한 사람도 순위에 있다** — alice는 carol을 차단했다(seed).'
+\echo '        차단은 글·댓글의 취향 필터이고 definer에 뷰어 종속성을 넣지 않는다(의도된 경계)'
+select exists (select 1 from public.match_leaderboard('1999-00') where nickname = 'carol');
+rollback to s;
+
+savepoint s;
+select set_config('request.jwt.claims', null, true);
+:login_anon
+\echo '[1 기대] 상한 0은 1로 클램프된다'
+select count(*) from public.match_leaderboard('1999-00', null, 0);
+\echo '[1 기대] 음수도 1로 클램프된다'
+select count(*) from public.match_leaderboard('1999-00', null, -5);
+\echo '[3 기대] null은 기본값(50)으로 — 인자를 믿지 않는다'
+select count(*) from public.match_leaderboard('1999-00', null, null);
+\echo '[3 기대] 과도한 상한도 에러가 나지 않는다 (100에서 멈추는지는 34e가 본다)'
+select count(*) from public.match_leaderboard('1999-00', null, 100000);
+\echo '[0 기대] 없는 시즌은 0행이다'
+select count(*) from public.match_leaderboard('1998-99');
+\echo '[0 기대] 예측이 없는 라운드도 0행이다'
+select count(*) from public.match_leaderboard('1999-00', 38::smallint);
+rollback to s;
+
+\echo ''
+\echo '-- 34e. 상한의 위쪽 · 공동 순위 다음 번호 · 킥오프 게이트 --'
+savepoint s;
+insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
+select gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+       'rlstest-lb-' || g || '@test.com', 'x', now(), now()
+  from generate_series(1, 101) g;
+insert into public.match_prediction (match_id, user_id, pick)
+select :l1, id, 'home' from auth.users where email like 'rlstest-lb-%@test.com';
+select set_config('request.jwt.claims', null, true);
+:login_anon
+\echo '[100 기대] 과도한 상한은 100에서 멈춘다 (참여자 104명)'
+select count(*) from public.match_leaderboard('1999-00', null, 100000);
+rollback to s;
+
+savepoint s;
+delete from public.match_prediction where match_id = :l3 and user_id = :'alice';
+select set_config('request.jwt.claims', null, true);
+:login_anon
+\echo '[t 기대] 공동 1위 둘 다음은 3위다 — rank()이지 dense_rank()가 아니다'
+select array_agg(r.rank order by r.n) = array[1, 1, 3]::bigint[]
+  from public.match_leaderboard('1999-00') with ordinality
+       as r(rank, user_id, nickname, avatar_path, hits, total, is_me, n);
+rollback to s;
+
+\echo '   ⚠ "킥오프 전에는 스코어가 없다"를 DB가 강제하지 않는다 — 동기화는 제공자의 kickoff_at과'
+\echo '     종료 상태를 그대로 쓴다. 제공자가 "종료 + 미래 날짜"를 주면 예측이 열린 경기의 적중이'
+\echo '     순위에 잡혀 **마감 전 남의 선택이 샌다.** superuser로 그 상태를 직접 만들어 본다.'
+savepoint s;
+update public.match set home_score = 1, away_score = 0, finished_at = now() where id = :l7;
+select set_config('request.jwt.claims', null, true);
+:login_anon
+\echo '[t 기대] 스코어가 들어온 **예정 경기**는 세지 않는다 (alice의 3라운드는 l8 하나 — 1/1)'
+select total = 1 and hits = 1 from public.match_leaderboard('1999-00', 3::smallint) where nickname = 'alice';
+rollback to s;
+
+\echo ''
+\echo '-- 34f. 드러나는 것은 합계뿐이다 --'
+\echo '   ⚠ 이 함수는 "내 행만" 정책을 넘어 남의 예측을 센다. 경기별 선택(pick·match_id)을 돌려주는'
+\echo '     열이 하나라도 붙으면 **마감 전 분포를 막아 둔 설계**(match_prediction_results)를 옆문으로'
+\echo '     우회하게 된다 — 반환 형태를 문자 그대로 못박는다.'
+\echo '[t 기대] 반환 열이 정확히 이것뿐이다'
+select pg_get_function_result('public.match_leaderboard(text, smallint, integer)'::regprocedure)
+     = 'TABLE(rank bigint, user_id uuid, nickname text, avatar_path text, hits bigint, total bigint, is_me boolean)';
+
+rollback to s34;
 
 rollback;
 \echo ''

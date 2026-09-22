@@ -43,6 +43,7 @@
 | `app/surveys/page.tsx` | 목록 SSR | 〃 — ⚠ 세션이 없으면 **익명 클라이언트**다(글 목록과 같은 `hasSessionCookie()` 갈림). 집계는 참여자에게만 나가 익명 경로에는 애초에 없다 |
 | `app/matches/[id]/page.tsx` | `<title>`·`og:*` + 404 판정 + **대진·스코어·예측 분포 SSR** | **필수** — `generateMetadata`와 `Page`가 같은 데이터를 쓴다 |
 | `app/matches/page.tsx` | 목록 SSR | 지금은 불필요(메타데이터가 정적). ⚠ **조회 창(`gte kickoff_at`)과 화면 구역 판정이 같은 `nowMs`를 봐야** 경계에 걸친 경기가 실렸는데 어느 구역에도 없는 일이 안 생긴다 |
+| `app/matches/ranking/page.tsx` | 랭킹 SSR(시즌 전체 + 최근 라운드) | 지금은 불필요(메타데이터가 정적). ⚠ 세션이 없으면 **익명 클라이언트**다(`hasSessionCookie()` 갈림) — 비로그인에게는 `is_me`가 전부 false라 응답이 모든 요청에 같다. ⚠ 그 캐시가 동작하려면 **RPC를 GET으로** 불러야 한다(`fetchMatchRanking`의 `get: true` — Data Cache는 GET만 탄다). POST로 되돌리면 빌드도 화면도 멀쩡한 채 크롤마다 DB가 전 참여자를 다시 센다 |
 | `app/notices/page.tsx` | 공지 목록 SSR | 지금은 불필요(메타데이터가 정적). ⚠ **쿠키를 보지 않고 항상 익명 클라이언트다** — 공지에는 개인화가 한 조각도 없어(`notice_select_live`가 `auth.uid()`를 아예 보지 않는다) `hasSessionCookie()` 갈림 자체가 필요 없다. ⚠ 그래서 이 라우트는 빌드 로그에 **`○`(정적) + `30s`** 로 찍힌다 — 쿠키를 읽지 않아 라우트가 통째로 프리렌더되고 `ANON_REVALIDATE`가 ISR 주기가 된다. **아래 "동적이어야 할 라우트가 `○`면 가드가 삼킨 것"의 예외가 이 행과 `app/sitemap.ts`다** — 쿠키를 읽지 않는 라우트만 `○`가 정상이다 |
 | `app/notices/[id]/page.tsx` | `<title>`·`og:*` + 404 판정 + **본문 SSR** | **필수** — `generateMetadata`와 `Page`가 같은 데이터를 쓴다 |
 | `app/posts/list-page.tsx`(배너) | 피드 최상단의 최신 **필독** 공지 한 줄 | 목록 조회와 **같은 `cache()` 안에서 병렬로** 나간다 |
@@ -163,6 +164,7 @@ React `<ViewTransition name>`으로 목록 카드의 엠블럼이 상세 `h1`의
 | `app/surveys/[id]/page.tsx` | 입축구 제목 + 선택지 + **집계** (+ **서버가 본 `userId`**) |
 | `app/posts/list-page.tsx` | 글 목록(말머리·정렬 적용) (+ **서버 시각**) |
 | `app/surveys/page.tsx` | 입축구 목록 (+ `userId` · **서버 시각**) |
+| `app/matches/ranking/page.tsx` | 시즌·최근 라운드 순위 + **범위(시즌·라운드)** (+ `userId`). ⚠ `null`(채점된 경기가 없다)과 `undefined`(프리페치 실패)를 가른다. 서버 시각은 내리지 않는다 — 시각에 따라 달라지는 표시가 없다 |
 | `app/matches/[id]/page.tsx` | 대진·스코어 + **예측 분포**(킥오프 후에만) + **확정 라인업·사건·팀 스탯** (+ `userId` · **서버 시각**) |
 
 #### ⚠ 화면을 탭으로 갈라도 **HTML에는 전부 남긴다**
@@ -341,12 +343,13 @@ React `<ViewTransition name>`으로 목록 카드의 엠블럼이 상세 `h1`의
   수용한다 — 실제 방어는 언제나 RPC 안의 `is_admin()`이다.
 - 화면 차단은 **안내**이고 실제 방어는 어드민 definer RPC 안의 `is_admin()`이다.
 
-⚠ **어드민 조치가 `/posts`·`/surveys` 목록과 `/sitemap.xml`에는 최대 30초 늦게 반영된다.** 그 화면들이 익명 요청에
+⚠ **어드민 조치가 `/posts`·`/surveys` 목록, `/matches/ranking`과 `/sitemap.xml`에는 최대 30초 늦게 반영된다.** 그 화면들이 익명 요청에
 `createSupabaseAnonClient()`(Next Data Cache, `ANON_REVALIDATE`)를 타기 때문이다 —
 실측으로 글을 지운 뒤 **+31초까지 목록에 카드가 남았고 눌러도 404**였다. 본문 가리기도 같은
 창에 걸린다(목록 카드의 `excerpt`가 그동안 원문이다). 나머지 화면은 지연이 없다
 (`/posts/[id]`·`/surveys/[id]`·`/matches`는 쿠키 클라이언트이고,
-로그인 사용자는 `/posts`·`/surveys`도 즉시 반영된다).
+로그인 사용자는 `/posts`·`/surveys`·`/matches/ranking`도 즉시 반영된다). 랭킹은 경기 삭제·무효·스코어 정정이
+그 창에 걸린다 — 적중이 스코어에서 파생되므로 순위도 그만큼 늦게 따라온다.
 → 긴급 조치라면 **삭제**가 즉시 듣는다(상세가 곧바로 404다). 목록 카드가 잠깐 남는 것은
   수용하되, "가렸는데 목록에 그대로 있다"를 버그로 착각하지 않도록 여기 적어 둔다.
 
