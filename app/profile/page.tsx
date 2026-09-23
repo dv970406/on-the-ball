@@ -23,7 +23,9 @@ export default async function Page(props: PageProps<"/profile">) {
     <AuthRequired>
       <ProfileView
         // 코드 교환은 createBrowserClient의 detectSessionInUrl이 한다.
-        // 성공하면 SIGNED_IN → 캐시 무효화 → 연결 목록이 갱신되므로 배너는 저절로 사라진다.
+        // 교환이 끝나야 첫 인증 이벤트가 와서 `AuthRequired`가 화면을 연다 — 그래서 연결 목록은
+        // 교환 **뒤에** 처음 조회되어 새 수단을 담는다(프로바이더를 다녀온 전체 로드라 캐시도 새것이다).
+        // 같은 유저의 SIGNED_IN은 캐시를 무효화하지 않으므로 거기에 기대지 않는다(`use-session-sync`).
         linkPending={first(params.code) !== null}
         // ⚠ `error`는 상위 분류, `error_code`가 구체 사유다 — 둘 다 내려야 한국어 문구가 붙는다
         errorKind={first(params.error)}

@@ -16,6 +16,7 @@
 - 구독은 반드시 셀렉터로: `useSessionStore((s) => s.user)`.
 - ⚠ `onAuthStateChange` 콜백을 **async로 만들지 않는다**. `@supabase/auth-js` 2.110에서 async 오버로드는 `@deprecated`이며 `TOKEN_REFRESHED` 처리 중 중첩 리프레시가 나면 데드락된다. 콜백 안에서 `supabase.auth.*`를 다시 호출하는 것도 금지.
 - 캐시 무효화는 `SIGNED_IN`·`SIGNED_OUT`·`USER_UPDATED`에서만 한다. `TOKEN_REFRESHED`까지 포함하면 토큰 갱신마다 화면 전체가 리페치된다.
+  - ⚠ **`SIGNED_IN`·`SIGNED_OUT`은 유저 id가 실제로 바뀔 때만 센다.** auth-js 2.110은 저장된 세션을 복원할 때마다(페이지 로드, 다른 탭의 로드) `SIGNED_IN`을 발행해서, 이벤트 이름만 보면 로그인 사용자는 **매 로드마다** SSR이 넘긴 데이터를 버리고 전량 재조회한다(실측). 첫 이벤트는 기준만 세운다 — 그때의 캐시는 같은 쿠키 세션으로 SSR한 값이다(`use-session-sync`).
 
 ### ⚠ 서버가 세션을 부정하는데 클라이언트만 유효하다고 믿는 구간
 

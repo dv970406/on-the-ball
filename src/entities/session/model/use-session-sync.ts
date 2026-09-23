@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getBrowserSupabase } from "@/shared/api";
 import { rememberAuthProvider } from "../lib/last-auth-provider";
@@ -26,6 +26,17 @@ export function useSessionSync() {
    * `AuthProvider`를 한 번 더 렌더시키는 것이 목적이다(아래 리싱크 effect 주석).
    */
   const [resyncNonce, setResyncNonce] = useState(0);
+  /**
+   * 지금 캐시가 **누구 기준으로** 채워져 있는가. `undefined`는 "아직 첫 이벤트 전"이다.
+   *
+   * ⚠ **이벤트 이름으로 리싱크를 판정하지 않는다.** auth-js 2.110은 저장된 세션을 복원할 때마다
+   *   (`_recoverAndRefresh`) `SIGNED_IN`을 발행하고, 다른 탭이 열릴 때도 BroadcastChannel로 같은
+   *   이벤트가 온다. 이름만 보면 로그인 사용자는 **페이지를 열 때마다** 서버가 그려 준 데이터를
+   *   전량 버리고 다시 조회한다(실측: 랭킹 화면에서 하이드레이션 직후 3건).
+   * ⚠ 첫 이벤트는 기준만 세우고 리싱크하지 않는다 — 그때의 캐시는 비어 있거나 **같은 쿠키
+   *   세션으로 SSR한** 값이다. OAuth 복귀도 전체 페이지 로드라 캐시가 새로 시작한다.
+   */
+  const cacheUserIdRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     const supabase = getBrowserSupabase();
@@ -45,8 +56,8 @@ export function useSessionSync() {
       applySession(session);
 
       // 이번 세션이 어느 프로바이더로 섰는지 남긴다 — 로그인 화면의 "최근 사용" 배지가 읽는다.
-      // ⚠ **이벤트를 가리지 않는다.** SIGNED_IN은 이미 로그인해 둔 사용자에게 다시 발행되지
-      //   않고 복원은 INITIAL_SESSION으로 오므로, 그것까지 받아야 값이 채워진다.
+      // ⚠ **이벤트를 가리지 않는다.** 복원이 INITIAL_SESSION으로도(SIGNED_IN으로도) 오므로
+      //   어느 쪽이 먼저 오든 값이 채워지게 한다.
       // ⚠ SIGNED_OUT은 session이 null이라 아무 일도 일어나지 않는다 — 로그아웃으로 지우면
       //   정작 필요한 순간(다시 왔을 때)에 값이 없다.
       rememberAuthProvider(session?.user.app_metadata.provider);
@@ -55,10 +66,18 @@ export function useSessionSync() {
       // 로그아웃하면 신호가 남고, 그대로 두면 다음 세션 만료가 "직접 로그아웃"으로 오인된다.
       if (event === "SIGNED_IN") clearSignOutIntent();
 
-      // 로그인·로그아웃 시 개인화된 데이터(isLiked, 내 글 여부)를 전량 리싱크한다.
-      // TOKEN_REFRESHED·INITIAL_SESSION은 유저가 바뀐 게 아니므로 제외 — 무효화하면
-      // 토큰 갱신마다 화면 전체가 리페치된다.
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
+      // 로그인·로그아웃 시 개인화된 데이터(isLiked, 내 글 여부)를 전량 리싱크한다 —
+      // 단 **유저가 실제로 바뀐 경우에만**(이 ref의 주석). TOKEN_REFRESHED·INITIAL_SESSION도
+      // 유저가 바뀐 게 아니므로 제외 — 무효화하면 토큰 갱신마다 화면 전체가 리페치된다.
+      // USER_UPDATED는 같은 유저라도 프로필 메타데이터가 바뀐 것이라 그대로 리싱크한다.
+      const prevUserId = cacheUserIdRef.current;
+      const nextUserId = session?.user.id ?? null;
+      cacheUserIdRef.current = nextUserId;
+      const userChanged = prevUserId !== undefined && prevUserId !== nextUserId;
+      if (
+        event === "USER_UPDATED" ||
+        ((event === "SIGNED_IN" || event === "SIGNED_OUT") && userChanged)
+      ) {
         setResyncNonce((n) => n + 1);
       }
     });
