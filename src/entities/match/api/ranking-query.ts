@@ -3,6 +3,12 @@ import type { Database } from "@/types/database.types";
 import type { MatchRanking } from "../model/types";
 import { LEADERBOARD_LIMIT, buildLeaderboardEntry } from "./mappers";
 
+const MINUTE_MS = 60_000;
+
+function floorToMinute(ms: number) {
+  return Math.floor(ms / MINUTE_MS) * MINUTE_MS;
+}
+
 /**
  * 랭킹 화면 조립의 **단일 소스** — 훅과 SSR 페이지가 같은 함수를 부른다.
  *
@@ -21,9 +27,10 @@ import { LEADERBOARD_LIMIT, buildLeaderboardEntry } from "./mappers";
  * ⚠ 삭제된 경기는 정책(`match_select_alive`)이, 무효 경기는 `result is null`이 거른다 —
  *   범위를 정하는 조회와 RPC의 집계가 **같은 경기 집합**을 본다.
  *
- * ⚠ **RPC를 GET으로 부른다**(`get: true`). 비로그인 SSR은 Data Cache를 타는데 캐시되는 것은
- *   GET뿐이다(`supabase-anon.ts`) — POST로 두면 크롤러가 올 때마다 DB가 전 참여자를 다시 센다.
- *   함수가 `stable`이라 PostgREST가 GET을 받아 준다.
+ * ⚠ **캐시 키는 URL(과 본문)이다.** 비로그인 SSR은 Data Cache를 타므로 요청마다 바뀌는 값을
+ *   조회 조건에 싣지 않는다 — 범위 조회의 기준 시각을 분 단위로 내리는 이유다(아래).
+ *   RPC를 GET(`get: true`)으로 부르는 것은 인자가 URL에 드러나 키를 로그에서 대조할 수 있어서다
+ *   (POST도 명시적 `revalidate`가 있으면 캐시된다). 함수가 `stable`이라 PostgREST가 GET을 받아 준다.
  *
  * ⚠ 에러를 던지지 않고 돌려준다 — 서버는 실패하면 `undefined`로 폴백하고(프리페치는
  *   최적화일 뿐이다) 훅은 한국어 메시지로 바꿔 던진다. 쓰임이 갈려 호출부가 정한다.
@@ -38,7 +45,11 @@ export async function fetchMatchRanking(
     // ⚠ RPC와 **같은 경기 집합**을 봐야 한다 — 함수가 킥오프 전 경기를 세지 않으므로(제공자가
     //   "종료 + 미래 날짜"를 준 경우) 범위도 그 경기로 정하지 않는다. 안 그러면 그 경기뿐인
     //   라운드가 "최근 라운드"로 뽑혀 빈 판이 뜬다.
-    .lte("kickoff_at", new Date().toISOString())
+    // ⚠ **기준 시각을 분 단위로 내린다.** Data Cache의 키는 URL 전체라, ms까지 찍힌 시각을
+    //   그대로 넣으면 익명 SSR의 이 조회만 **요청마다 캐시 미스 + 새 캐시 엔트리**가 된다
+    //   (실측: 5회 요청에 fetch-cache 5개 증가, 매번 DB 도달 — 두 RPC는 히트).
+    //   내려서 잃는 것은 "킥오프 1분 안에 결과까지 들어온 경기"뿐이라 범위 판정이 달라지지 않는다.
+    .lte("kickoff_at", new Date(floorToMinute(Date.now())).toISOString())
     .order("season", { ascending: false })
     .order("matchday", { ascending: false })
     .limit(1)

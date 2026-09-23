@@ -45,7 +45,7 @@ interface RankingPrefetch {
  * ⚠ **세션이 없으면 익명 클라이언트로 갈아탄다**(`app/surveys/page.tsx`와 같은 갈림).
  *   비로그인에게 랭킹은 모든 요청에 동일하다 — `is_me`가 전부 false라 사용자별 값이 한 조각도
  *   없다 → Data Cache를 태워 크롤러의 조회가 DB에서 전 참여자를 다시 세지 않게 한다
- *   (RPC를 GET으로 부르는 이유가 이것이다 — `fetchMatchRanking` 주석).
+ *   (조회 조건에 요청 시각을 그대로 싣지 않는 이유가 이것이다 — `fetchMatchRanking` 주석).
  * ⚠ 판정은 쿠키만 본다 — 헛짚어도 평소 경로로 갈 뿐이다(사유는 `hasSessionCookie` 주석).
  * ⚠ 로그인 사용자는 쿠키 클라이언트라 `auth.uid()`가 잡혀 **본인 행(`is_me`)이 서버에서부터**
  *   칠해진다 — 서버·클라 판정이 갈리지 않는다.

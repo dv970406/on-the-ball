@@ -39,7 +39,8 @@ export function createSupabaseAnonClient(): SupabaseClient<Database> | null {
     auth: { persistSession: false, autoRefreshToken: false },
     global: {
       // Next가 패치한 전역 fetch가 `next.revalidate`를 읽어 Data Cache에 태운다.
-      // GET만 캐시되는데 목록 조회(`.select()`)가 곧 GET이다.
+      // ⚠ 키는 URL·메서드·본문이다 — 요청마다 바뀌는 값(ms 시각)을 조회 조건에 실으면
+      //   그 조회만 매번 미스가 되고 엔트리가 요청 수만큼 쌓인다(`nextjs.md`).
       fetch: (input, init) => fetch(input, { ...init, next: { revalidate: ANON_REVALIDATE } }),
     },
   });
