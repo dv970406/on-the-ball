@@ -110,7 +110,11 @@ function MyRank({
           <span className="font-mono font-semibold tabular-nums text-ink">
             {formatCount(me.rank)}위
           </span>{" "}
-          {/* ⚠ 어순을 경기 목록의 적중률 띠("내 적중률 33% (2/6)")와 맞춘다 — 같은 사실이다 */}
+          {/*
+            ⚠ 어순을 경기 목록의 적중률 띠("통산 적중률 33% (2/6)")와 맞춘다. 다만 **범위가 다르다** —
+              띠는 통산이고 여기는 이 판(시즌·라운드)이라 시즌이 바뀌면 숫자가 갈린다. 세는 경기의
+              **판정**(채점 + 킥오프 경과 + 삭제 제외)만 같다.
+          */}
           <span className="text-ink-mute-2">
             · 적중률 {accuracyPercent(me)}% ({formatCount(me.hits)}/{formatCount(me.total)})
           </span>

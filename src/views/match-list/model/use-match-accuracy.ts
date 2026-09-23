@@ -4,7 +4,7 @@ import { useMyAccuracyQuery } from "@/entities/match";
 import { useSessionStore } from "@/entities/session";
 
 /**
- * 목록 머리의 "내 적중률".
+ * 목록 머리의 "통산 적중률".
  *
  * ⚠ **`useMatchList`에서 떼어 냈다.** 목록 데이터와 값을 다투지 않는 **독립 관심사**라
  *   한 훅에 얹으면 반환값이 한도를 넘고 그 훅이 관심사를 둘 들게 된다

@@ -281,6 +281,8 @@ export function useMatchRankingQuery(
  * ⚠ 무효 경기는 `result`가 이미 null이라 **따로 거를 필요가 없다** — DB가 두 술어를
  *   하나로 접어 둔 덕이다.
  * ⚠ RLS가 "내 행만"이라 남의 예측은 애초에 오지 않는다. `user_id` 필터는 그 위의 안전망이다.
+ * ⚠ **범위는 통산이다**(시즌을 가르지 않는다). 랭킹의 "내 순위 · 적중률"은 그 판의 시즌·라운드라
+ *   시즌이 바뀌면 숫자가 원래 다르다 — 같아야 하는 것은 **무엇을 세는가의 판정**뿐이다(아래 필터).
  */
 export function useMyAccuracyQuery(userId: string | undefined) {
   return useQuery<PredictionAccuracy, Error>({
@@ -305,7 +307,12 @@ export function useMyAccuracyQuery(userId: string | undefined) {
         .from("match_prediction")
         .select("pick, match!inner(result)", { count: "exact" })
         .eq("user_id", userId)
-        .not("match.result", "is", null);
+        .not("match.result", "is", null)
+        // ⚠ 랭킹(`match_leaderboard`)과 **같은 판정**으로 센다 — 그 함수는 스코어가 들어온
+        //   미래 킥오프 경기(제공자 오류)를 세지 않는다. 빼면 같은 시즌 안에서도 목록의 "통산 적중률"과
+        //   랭킹의 "내 순위 · 적중률"이 다른 숫자를 말하고(실측: 2/3 ↔ 1/2), 아직 바꿀 수 있는 예측이
+        //   "적중"으로 세어진다.
+        .lte("match.kickoff_at", new Date().toISOString());
 
       if (error) {
         console.error("[match] 적중률 조회 실패:", error);
