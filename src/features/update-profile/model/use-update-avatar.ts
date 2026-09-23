@@ -5,6 +5,7 @@ import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
 import { AVATAR_BUCKET } from "@/shared/config";
 import { useToast } from "@/shared/lib";
 import { commentKeys } from "@/entities/comment";
+import { matchKeys } from "@/entities/match";
 import { postKeys } from "@/entities/post";
 import { profileKeys } from "@/entities/profile";
 import {
@@ -120,6 +121,8 @@ export function useUpdateAvatar(userId: string | undefined) {
         queryClient.invalidateQueries({ queryKey: profileKeys.all }),
         queryClient.invalidateQueries({ queryKey: postKeys.all }),
         queryClient.invalidateQueries({ queryKey: commentKeys.all }),
+        // 랭킹 행도 닉네임·아바타를 싣는다(`match_leaderboard`)
+        queryClient.invalidateQueries({ queryKey: matchKeys.rankings() }),
       ]),
     // ⚠ 실패를 반드시 알린다 — 이 훅은 업로드 전에 기존 사진을 지우므로,
     //   놓치면 사진이 사라진 이유를 알 수 없다.

@@ -45,9 +45,11 @@ export const matchKeys = {
    *   없으면 계정이 바뀐 뒤에도 이전 사용자의 행이 "나"로 칠해진 채 남는다.
    * ⚠ `matchKeys.all` 아래에 둔다 — 어드민이 스코어를 정정하면 그 무효화(`matchKeys.all`)가
    *   순위까지 함께 되돌린다(적중이 스코어에서 파생되므로 순위도 그렇다).
+   * ⚠ 행에 닉네임·`avatar_path`가 실린다 — 프로필을 바꾸는 쪽이 `rankings()`를 함께 무효화한다
+   *   (`features/update-profile`). 유저별로 키가 갈려 있어 prefix로 지운다.
    */
-  ranking: (userId: string | undefined) =>
-    [...matchKeys.all, "ranking", userScope(userId)] as const,
+  rankings: () => [...matchKeys.all, "ranking"] as const,
+  ranking: (userId: string | undefined) => [...matchKeys.rankings(), userScope(userId)] as const,
   /**
    * 어드민 목록·단건.
    *

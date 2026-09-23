@@ -17,6 +17,7 @@ import type {
   Team,
   TeamRow,
 } from "../model/types";
+import type { Database } from "@/types/database.types";
 
 /**
  * 구역별 상한.
@@ -170,22 +171,16 @@ export function buildAdminMatch(row: AdminMatchSelectRow): AdminMatch {
  */
 export const LEADERBOARD_LIMIT = 50;
 
+type LeaderboardRpcRow = Database["public"]["Functions"]["match_leaderboard"]["Returns"][number];
+
 /**
- * `match_leaderboard` RPC의 행.
+ * `match_leaderboard` RPC의 행 — **생성 타입에서 뽑는다**(반환 열이 바뀌면 여기서 컴파일 에러가 난다).
  *
- * ⚠ **`avatar_path`를 nullable로 적는다.** 생성 타입은 `returns table`의 열을 전부 non-null로
+ * ⚠ **`avatar_path`만 nullable로 넓힌다.** 생성 타입은 `returns table`의 열을 전부 non-null로
  *   만들지만(실측: `avatar_path: string`) 사진이 없는 사용자는 null이 온다 — 생성 타입을 믿으면
  *   `avatarUrl`이 `"…/avatars/null"`을 조립하는 자리가 생긴다.
  */
-export interface LeaderboardRow {
-  rank: number;
-  user_id: string;
-  nickname: string;
-  avatar_path: string | null;
-  hits: number;
-  total: number;
-  is_me: boolean;
-}
+export type LeaderboardRow = Omit<LeaderboardRpcRow, "avatar_path"> & { avatar_path: string | null };
 
 export function buildLeaderboardEntry(row: LeaderboardRow): LeaderboardEntry {
   return {

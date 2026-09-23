@@ -59,9 +59,11 @@ function withLastModified(url: string, lastModified: Date | undefined) {
  *   그래서 그 목록에 실리는 항목의 최신 시각을 쓰고, 알 수 없으면 **생략한다.**
  * ⚠ 경기 목록은 생략한다 — 창(`MATCH_LIST_LOOKBACK_MS`)이 시간에 따라 움직여 내용이
  *   행의 변경 없이도 바뀌므로 행 시각으로는 그 목록의 변경을 말할 수 없다.
- * ⚠ 랭킹은 **가장 최근 `finished_at`** 이다 — 순위는 채점된 경기로만 매겨지므로 결과가 들어온
- *   시각이 곧 마지막 변경이다. 어드민의 스코어 정정은 `finished_at`을 옮기지 않아 실제보다
- *   **이르게** 말할 수 있는데, 늦게 말하는 것(거짓 신호)보다 안전한 쪽이다.
+ * ⚠ 랭킹은 **순위에 잡히는 경기 중 가장 최근 `finished_at`** 이다. 동기화는 제공자가 종료 시각을
+ *   주지 않아 `finished_at`에 **킥오프 시각**을 쓰므로 실제 변경보다 이르게 말하는데, 늦게 말하는
+ *   것(거짓 신호)보다 안전한 쪽이다. 어드민의 스코어 정정도 같은 방향이다.
+ *   ⚠ 순위가 세는 경기만 본다(`result` 있음 + 킥오프 경과 — `match_leaderboard`의 판정) —
+ *     스코어가 들어온 미래 킥오프 경기(제공자 오류)의 `finished_at`은 **미래 시각**이다.
  */
 function staticEntries(last: ListLastModified): MetadataRoute.Sitemap {
   return [
@@ -113,7 +115,7 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
         // ⚠ `kickoff_at`을 lastModified로 쓰지 않는다 — 예정 경기는 **미래 시각**이다
         //   (입축구의 `closes_at`과 같은 함정). 결과가 들어온 시각이 실제 마지막 변경이고,
         //   아직 없으면 그 경기는 바뀐 적이 없다.
-        .select("id, finished_at")
+        .select("id, finished_at, kickoff_at, result")
         .order("id", { ascending: false })
         .limit(URL_LIMIT),
       supabase
@@ -125,6 +127,8 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
         .limit(URL_LIMIT),
     ]);
 
+    // 미래 시각을 lastmod로 싣지 않기 위한 기준 — 데이터를 읽은 시각이다
+    const nowMs = Date.now();
     const postRows = posts.data ?? [];
     const byCategory: ListLastModified["byCategory"] = {};
     for (const category of POST_CATEGORIES) {
@@ -141,7 +145,9 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
         notices: latest((notices.data ?? []).map((notice) => new Date(notice.updated_at))),
         ranking: latest(
           (matches.data ?? []).flatMap((match) =>
-            match.finished_at ? [new Date(match.finished_at)] : [],
+            match.finished_at && match.result !== null && Date.parse(match.kickoff_at) <= nowMs
+              ? [new Date(match.finished_at)]
+              : [],
           ),
         ),
       }),
@@ -157,7 +163,10 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
         url: absoluteUrl(ROUTES.match(match.id)),
         // 결과가 없으면 lastModified를 생략한다 — 없는 값을 now()로 채우면 사이트맵을 부를
         // 때마다 "방금 바뀌었다"는 거짓 신호가 나간다
-        ...(match.finished_at ? { lastModified: new Date(match.finished_at) } : {}),
+        // ⚠ 미래 시각도 싣지 않는다 — 스코어가 들어온 미래 킥오프 경기(제공자 오류)가 그렇다
+        ...(match.finished_at && Date.parse(match.finished_at) <= nowMs
+          ? { lastModified: new Date(match.finished_at) }
+          : {}),
       })),
       ...(notices.data ?? []).map((notice) => ({
         url: absoluteUrl(ROUTES.notice(notice.id)),
