@@ -47,8 +47,7 @@ const JOURNALIST = {
 const SOURCE = {
   "gnews:romano": "로마노", "gnews:ornstein": "온스테인", "gnews:mokbel": "목벨",
   "bsky:theathletic": "디 애슬레틱", "rss:bbc-football": "BBC", "rss:bbc-gossip": "BBC",
-  "rss:sky-transfers": "스카이스포츠", "rss:espn-soccer": "ESPN", "rss:guardian-football": "가디언",
-  "rss:transfermarkt": "트랜스퍼마크트",
+  "rss:sky-transfers": "스카이스포츠", "rss:guardian-football": "가디언",
 };
 const reporter = (r) => SOURCE[r.source_id] ?? JOURNALIST[r.attributed_to] ?? r.attributed_to ?? r.source_id;
 const isJournalist = (name) => Object.values(JOURNALIST).includes(name) || name === "목벨";

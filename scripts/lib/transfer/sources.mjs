@@ -325,7 +325,7 @@ function parseFeedDate(s) {
   if (!s) return null;
   const raw = s.trim();
   const direct = new Date(raw);
-  if (!Number.isNaN(direct.getTime())) return fixMislabeledDst(raw, direct);
+  if (!Number.isNaN(direct.getTime())) return direct;
 
   const m = raw.match(/\s([A-Z]{1,4})$/);
   const offset = m && TZ_ABBR[m[1].toUpperCase()];
@@ -334,22 +334,6 @@ function parseFeedDate(s) {
     if (!Number.isNaN(retry.getTime())) return retry;
   }
   return null;
-}
-
-/**
- * 서머타임 기간에 **표준시 약어를 붙이는 피드**를 바로잡는다.
- *
- * ⚠ ESPN은 9월(EDT, UTC-4)에도 "10:02:11 EST"라고 쓴다(실측). 그대로 읽으면 UTC-5라 한 시간 뒤의
- *   시각이 되어, 방금 올라온 기사가 **미래 시각**으로 걸러졌다(20건 중 9건). 한 시간 뒤에 들어오긴
- *   하지만 시각이 1시간 틀린 채로 저장된다.
- * ⚠ 판정은 "해석한 시각이 지금보다 미래인가"다 — 표준시 약어가 맞는 겨울에는 미래가 되지 않으므로
- *   그대로 두고, 미래일 때만 같은 지역의 서머타임(한 시간 이르게)으로 다시 읽는다.
- */
-const US_STANDARD = /\s(EST|CST|MST|PST)$/;
-function fixMislabeledDst(raw, parsed) {
-  if (!US_STANDARD.test(raw) || parsed.getTime() <= Date.now()) return parsed;
-  const shifted = new Date(parsed.getTime() - 3_600_000);
-  return shifted.getTime() <= Date.now() + 60_000 ? shifted : parsed;
 }
 
 function entryLink(e) {

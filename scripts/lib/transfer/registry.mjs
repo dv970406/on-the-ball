@@ -127,7 +127,9 @@ export const SOURCES = [
 
   // ────────────────────────────────────────────────────────────────
   // 매체 공식 RSS
-  // ⚠ BBC·Sky·Transfermarkt는 ETag/Last-Modified를 주지 않는다 — 조건부 요청은
+  // ⚠ ESPN·Transfermarkt는 넣지 않는다 — GitHub 러너(데이터센터 IP)에서 빈 응답(200·0바이트)을 받아
+  //   정기 수집이 불가능했고, 거기 실리는 소식은 이미 다른 소스가 다룬 뒤라 얻는 것도 적다.
+  // ⚠ BBC·Sky는 ETag/Last-Modified를 주지 않는다 — 조건부 요청은
   //   항상 200이라 구현해도 트래픽이 줄지 않는다. 시도하지 말 것.
   // ────────────────────────────────────────────────────────────────
   {
@@ -162,16 +164,6 @@ export const SOURCES = [
     retentionHours: 8.7,
   },
   {
-    id: "rss:espn-soccer",
-    label: "ESPN",
-    kind: "rss",
-    tier: 2,
-    defaultAttribution: "outlet",
-    enabled: true,
-    config: { url: "https://www.espn.com/espn/rss/soccer/news" },
-    retentionHours: 42.5,
-  },
-  {
     id: "rss:guardian-football",
     label: "Guardian",
     kind: "rss",
@@ -180,16 +172,6 @@ export const SOURCES = [
     enabled: true,
     config: { url: "https://www.theguardian.com/football/rss" },
     retentionHours: 89,
-  },
-  {
-    id: "rss:transfermarkt",
-    label: "Transfermarkt",
-    kind: "rss",
-    tier: 2,
-    defaultAttribution: "outlet",
-    enabled: true,
-    config: { url: "https://www.transfermarkt.com/rss/news" },
-    retentionHours: 14.9,
   },
 
   // ────────────────────────────────────────────────────────────────
