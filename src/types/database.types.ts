@@ -801,6 +801,78 @@ export type Database = {
         }
         Relationships: []
       }
+      transfer_news: {
+        Row: {
+          attributed_to: string | null
+          attribution: Database["public"]["Enums"]["transfer_attribution"]
+          author_handle: string | null
+          body: string
+          body_excerpt: string | null
+          clubs: string[]
+          cluster_key: string | null
+          external_id: string
+          fee_amount: number | null
+          fee_currency: string | null
+          fee_text: string | null
+          fetched_at: string
+          id: number
+          players: string[]
+          provenance_url: string | null
+          published_at: string
+          relevance: number
+          source_id: string
+          stage: Database["public"]["Enums"]["transfer_stage"]
+          tier: number
+          url: string | null
+        }
+        Insert: {
+          attributed_to?: string | null
+          attribution: Database["public"]["Enums"]["transfer_attribution"]
+          author_handle?: string | null
+          body: string
+          body_excerpt?: string | null
+          clubs?: string[]
+          cluster_key?: string | null
+          external_id: string
+          fee_amount?: number | null
+          fee_currency?: string | null
+          fee_text?: string | null
+          fetched_at?: string
+          id?: never
+          players?: string[]
+          provenance_url?: string | null
+          published_at: string
+          relevance: number
+          source_id: string
+          stage: Database["public"]["Enums"]["transfer_stage"]
+          tier: number
+          url?: string | null
+        }
+        Update: {
+          attributed_to?: string | null
+          attribution?: Database["public"]["Enums"]["transfer_attribution"]
+          author_handle?: string | null
+          body?: string
+          body_excerpt?: string | null
+          clubs?: string[]
+          cluster_key?: string | null
+          external_id?: string
+          fee_amount?: number | null
+          fee_currency?: string | null
+          fee_text?: string | null
+          fetched_at?: string
+          id?: never
+          players?: string[]
+          provenance_url?: string | null
+          published_at?: string
+          relevance?: number
+          source_id?: string
+          stage?: Database["public"]["Enums"]["transfer_stage"]
+          tier?: number
+          url?: string | null
+        }
+        Relationships: []
+      }
       user_block: {
         Row: {
           blocked_id: string
@@ -1105,6 +1177,18 @@ export type Database = {
       notice_type: "필독" | "공지"
       post_category: "이적설" | "경기" | "선수" | "유니폼" | "잡담"
       report_reason: "spam" | "abuse" | "sexual" | "false_info" | "etc"
+      transfer_attribution: "verified_author" | "linked_mirror" | "outlet"
+      transfer_stage:
+        | "rumour"
+        | "talks"
+        | "offer"
+        | "agreement"
+        | "personal_terms"
+        | "medical"
+        | "here_we_go"
+        | "official"
+        | "collapsed"
+        | "unknown"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1239,6 +1323,19 @@ export const Constants = {
       notice_type: ["필독", "공지"],
       post_category: ["이적설", "경기", "선수", "유니폼", "잡담"],
       report_reason: ["spam", "abuse", "sexual", "false_info", "etc"],
+      transfer_attribution: ["verified_author", "linked_mirror", "outlet"],
+      transfer_stage: [
+        "rumour",
+        "talks",
+        "offer",
+        "agreement",
+        "personal_terms",
+        "medical",
+        "here_we_go",
+        "official",
+        "collapsed",
+        "unknown",
+      ],
     },
   },
 } as const

@@ -3427,6 +3427,216 @@ select pg_get_function_result('public.match_leaderboard(text, smallint, integer)
 
 rollback to s34;
 
+-- =====================================================================
+\echo ''
+\echo '=== 35. 이적 소식 (20260924000001) ==='
+\echo '  설계 요약: 유일한 writer는 service_role 동기화 스크립트(scripts/sync-transfer-news.mjs)이고'
+\echo '  앱에는 쓰기 경로가 없다. 읽기는 비로그인에게 열려 있다. 저자 미상 항목은 저장하지 않는다.'
+\echo '  ⚠ 소스 id를 테스트 전용(rss:rlstest-*)으로 둔다 — 동기화된 실제 행이 섞이면 개수 검사가'
+\echo '    조용히 틀어진다(섹션 34의 시즌 1999-00과 같은 이유).'
+savepoint s35;
+
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, attributed_to, tier, stage, relevance)
+values ('rss:rlstest-a', 'x1', 'Liverpool agree deal for Barcola', now() - interval '1 hour', 'outlet', null, 1, 'agreement', 0.8)
+returning id as tn1 \gset
+
+\echo ''
+\echo '-- 35a. 앱에는 쓰기 경로가 없다 (team·match와 같은 취급) --'
+
+savepoint s; :login_alice
+\echo '[❌차단] 소식을 직접 만든다 — 쓰기 정책도 grant도 없다'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, attributed_to, tier, stage, relevance)
+values ('rss:rlstest-a', 'fake', 'Fake here we go', now(), 'verified_author', 'fabrizioromano', 1, 'here_we_go', 1);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 단계 조작 — 합의를 HERE WE GO로 올린다'
+update public.transfer_news set stage = 'here_we_go' where id = :tn1;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 저자 바꿔치기 — 매체 기사를 기자 본인의 말로 만든다'
+update public.transfer_news set attribution = 'verified_author', attributed_to = 'david-ornstein.bsky.social' where id = :tn1;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 소식을 지운다'
+delete from public.transfer_news where id = :tn1;
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[❌차단] 비로그인 쓰기'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, tier, stage, relevance)
+values ('rss:rlstest-a', 'anon', 'Anon', now(), 'outlet', 2, 'rumour', 0);
+rollback to s;
+
+\echo ''
+\echo '-- 35b. 읽기는 비로그인에게도 열린다 (개인화가 없는 공개 보도다) --'
+
+savepoint s; :login_anon
+\echo '[t 기대] 비로그인이 읽는다 — 원문 대신 공개용 앞부분(body_excerpt)으로'
+select count(*) = 1 and bool_and(body_excerpt = body_excerpt) from public.transfer_news where source_id = 'rss:rlstest-a';
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[❌차단] 원문 전문(body)은 공개 키로 읽을 수 없다 — 재배포 범위를 컬럼 권한이 지킨다'
+select body from public.transfer_news where source_id = 'rss:rlstest-a';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 로그인 사용자도 원문 전문은 못 읽는다'
+select body from public.transfer_news where source_id = 'rss:rlstest-a';
+rollback to s;
+
+\echo '[t 기대] 공개용 앞부분은 원문의 앞 280자다(생성 컬럼 — writer가 어긋나게 채울 수 없다)'
+select body_excerpt = left(body, 280) from public.transfer_news where id = :tn1;
+
+\echo ''
+\echo '-- 35c. 스키마 불변식 (writer가 service_role이라 CHECK가 유일한 방어다) --'
+
+savepoint s;
+\echo '[❌차단] 저자 미상 등급은 저장할 수 없다 — enum에 그 값이 없다'
+\echo '        ⚠ 그 값이 생기면 "오른스테인이 말했다"로 잘못 나갈 행이 다시 성립한다(마이그레이션 머리말)'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, tier, stage, relevance)
+values ('rss:rlstest-a', 'u1', 'Unattributed mirror copy', now(), 'unattributed', 2, 'rumour', 0.5);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 인증 계정 등급인데 저자가 비어 있다 — "누구의 말인지"가 그 등급의 정의다'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, attributed_to, tier, stage, relevance)
+values ('rss:rlstest-a', 'v1', 'Verified but anonymous', now(), 'verified_author', null, 1, 'rumour', 0.5);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 확증된 미러 등급인데 저자가 비어 있다'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, attributed_to, tier, stage, relevance)
+values ('rss:rlstest-a', 'm1', 'Mirror but anonymous', now(), 'linked_mirror', null, 1, 'rumour', 0.5);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 이적료가 금액 없이 통화만 있다 — 셋은 한 덩어리다'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, tier, stage, fee_currency, relevance)
+values ('rss:rlstest-a', 'f1', 'Fee without amount', now(), 'outlet', 2, 'offer', 'EUR', 0.5);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 단일 이적료로 불가능한 액수(350m 초과) — 구단 가치·총지출일 확률이 압도적이다'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, tier, stage, fee_text, fee_amount, fee_currency, relevance)
+values ('rss:rlstest-a', 'f2', 'Club sold for 449m', now(), 'outlet', 2, 'offer', '£449m', 449, 'GBP', 0.5);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 같은 소스의 같은 글을 두 번 — 동기화의 멱등성이 이 제약에 기대고 있다'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, tier, stage, relevance)
+values ('rss:rlstest-a', 'x1', 'Duplicate', now(), 'outlet', 2, 'rumour', 0.1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 보이지 않는 본문(제로폭 공백만)'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, tier, stage, relevance)
+values ('rss:rlstest-a', 'z1', U&'\200B', now(), 'outlet', 2, 'unknown', 0);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 이적료 0 — numeric(6,2)로 반올림된 0.00도 여기 걸린다(writer는 0.005m 미만을 비운다)'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, tier, stage, fee_text, fee_amount, fee_currency, relevance)
+values ('rss:rlstest-a', 'f3', 'Free transfer €0m', now(), 'outlet', 2, 'official', '€0m', 0, 'EUR', 0.5);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 관련성 1 초과'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, tier, stage, relevance)
+values ('rss:rlstest-a', 'r1', 'Over relevant', now(), 'outlet', 2, 'rumour', 1.01);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 등급 3 — 1(1급 기자·공식)과 2뿐이다'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, tier, stage, relevance)
+values ('rss:rlstest-a', 't3', 'Tier three', now(), 'outlet', 3, 'rumour', 0.1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 묶음 키 형식(16자리 소문자 hex가 아니다)'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, tier, stage, cluster_key, relevance)
+values ('rss:rlstest-a', 'c1', 'Bad cluster', now(), 'outlet', 2, 'rumour', 'NOT-A-HASH', 0.1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] http(s)가 아닌 원문 링크 — 화면이 그대로 href에 싣는다'
+insert into public.transfer_news (source_id, external_id, url, body, published_at, attribution, tier, stage, relevance)
+values ('rss:rlstest-a', 'l1', 'javascript:alert(1)', 'Script link', now(), 'outlet', 2, 'rumour', 0.1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 빈 저자 표기'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, attributed_to, tier, stage, relevance)
+values ('rss:rlstest-a', 'e1', 'Empty author', now(), 'outlet', '', 2, 'rumour', 0.1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 소스 안 id 301자'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, tier, stage, relevance)
+values ('rss:rlstest-a', repeat('k', 301), 'Long key', now(), 'outlet', 2, 'rumour', 0.1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 게시 시각이 수집 시각보다 하루 넘게 미래 — 소스별 커서(max(published_at))를 잠근다'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, tier, stage, relevance)
+values ('rss:rlstest-a', 'fut', 'From the future', now() + interval '2 days', 'outlet', 2, 'rumour', 0.1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 레지스트리 형식이 아닌 소스 id'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, tier, stage, relevance)
+values ('twitter:romano', 'y1', 'X API is paid', now(), 'outlet', 2, 'unknown', 0);
+rollback to s;
+
+\echo ''
+\echo '-- 35d. 수집한 원문은 바꿀 수 없다 — service_role에도 걸린다 (transfer_news_freeze_collected) --'
+\echo '   ⚠ 여기 검사는 전부 superuser로 돈다 — grant·정책은 writer(service_role)를 막지 못하므로'
+\echo '     트리거가 superuser에게도 걸리는지가 이 설계의 전부다.'
+
+savepoint s;
+\echo '[❌차단] 원문을 고친다 — 기자가 지운 말도 우리 스냅샷에는 남아야 한다'
+update public.transfer_news set body = 'Rewritten' where id = :tn1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 게시 시각을 옮긴다 — 소스별 커서가 이 값의 max다'
+update public.transfer_news set published_at = now() + interval '1 day' where id = :tn1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 재처리 upsert가 원문을 다른 값으로 실으면 멈춘다'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, tier, stage, relevance)
+values ('rss:rlstest-a', 'x1', 'Different body', now(), 'outlet', 1, 'medical', 0.9)
+on conflict (source_id, external_id) do update
+  set body = excluded.body, published_at = excluded.published_at, stage = excluded.stage;
+rollback to s;
+
+savepoint s;
+-- 재처리가 실제로 보내는 모양: 수집 컬럼은 읽은 값 그대로, 추출 컬럼만 새 값
+insert into public.transfer_news (source_id, external_id, url, provenance_url, author_handle, body, published_at, fetched_at,
+                                  attribution, attributed_to, tier, stage, relevance)
+select source_id, external_id, url, provenance_url, author_handle, body, published_at, fetched_at,
+       attribution, attributed_to, tier, 'medical', 0.95
+  from public.transfer_news where id = :tn1
+on conflict (source_id, external_id) do update
+  set url = excluded.url, provenance_url = excluded.provenance_url, author_handle = excluded.author_handle,
+      body = excluded.body, published_at = excluded.published_at, fetched_at = excluded.fetched_at,
+      stage = excluded.stage, relevance = excluded.relevance;
+\echo '[t 기대] 재처리 경로(원문 그대로 + 추출 컬럼만 새 값)는 통과한다 — 트리거가 재처리까지 막으면 안 된다'
+select stage = 'medical' and relevance = 0.95 from public.transfer_news where id = :tn1;
+rollback to s;
+
+savepoint s;
+delete from public.transfer_news where id = :tn1;
+\echo '[t 기대] 삭제는 막지 않는다 — 잘못 들어온 행을 걷어내는 유일한 길이다(트리거는 UPDATE만 본다)'
+select not exists (select 1 from public.transfer_news where id = :tn1);
+rollback to s;
+
+rollback to s35;
+
 rollback;
 \echo ''
-\echo '=== 끝 (전체 rollback — DB에 흔적을 남기지 않는다) ==='
+\echo '=== 끝 (전체 rollback — 행은 남기지 않는다. identity 시퀀스 값은 rollback되지 않는다) ==='

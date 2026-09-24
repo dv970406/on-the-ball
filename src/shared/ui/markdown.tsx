@@ -123,6 +123,25 @@ const MARKDOWN_COMPONENTS: Components = {
     const safeSrc = usableUrl(src);
     if (!safeSrc) return alt ? <span className="text-ink-mute-2">{alt}</span> : null;
 
+    // `![이름](주소 "icon")` — 글자 옆에 붙는 아이콘 크기(구단 엠블럼 등). 기본 이미지는 블록처럼
+    // 여백을 두고 원래 크기로 그려져 표 칸 안에서 팀명 앞에 놓을 수가 없다.
+    // ⚠ 판정은 **제목 문자열**로만 한다 — 주소 형태(`/crests/…`)로 가르면 이 범용 렌더러가
+    //   우리 자산의 경로 규약을 알게 된다(`api-and-db.md`의 본문 이미지 절과 같은 판단).
+    if (props.title === "icon") {
+      const { title: _title, ...rest } = props;
+      return (
+        // eslint-disable-next-line @next/next/no-img-element -- 본문 이미지와 같은 이유(외부 임의 호스트)
+        <img
+          {...rest}
+          src={safeSrc}
+          alt={alt ?? ""}
+          loading="lazy"
+          decoding="async"
+          className="mr-1 inline-block size-[1.25em] object-contain align-[-0.25em]"
+        />
+      );
+    }
+
     return (
       // loading="lazy"는 **뷰포트 밖 이미지를 미리 받지 않게** 한다.
       //   ⚠ 지우지 않는다 — 없으면 React 19가 서버 렌더에서 <link rel="preload" as="image">를

@@ -65,7 +65,7 @@ export function AdminPostManageView({ postId }: { postId: number }) {
   }
   if (!post) return shell(<EmptyState title="글을 찾을 수 없어요" />);
 
-  const images = extractImageUrls(post.content);
+  const images = extractImageUrls(post.content).filter(isModeratedImage);
 
   return shell(
     <>
@@ -226,12 +226,24 @@ export function AdminPostManageView({ postId }: { postId: number }) {
           setConfirm(null);
           if (target === "mask") moderation.actions.mask(reason);
           else if (target === "remove") moderation.actions.remove();
-          else if (target === "stripAll") moderation.actions.stripImages(null);
+          // ⚠ null(=본문의 모든 이미지)을 넘기지 않는다 — 사이트 자산(구단 엠블럼)까지 함께 빠진다
+          else if (target === "stripAll") moderation.actions.stripImages(images);
           else if (target && typeof target === "object") moderation.actions.stripImages([target.url]);
         }}
       />
     </>,
   );
+}
+
+/**
+ * 어드민이 관리할 이미지인가 — 같은 사이트의 절대 경로(`/crests/…`)는 제외한다.
+ *
+ * 이적설 글은 구단 엠블럼을 `/crests/{code}.png` 아이콘으로 싣는데, 그건 글쓴이가 올린 사진이 아니라
+ * **저장소에 커밋된 사이트 자산**이다. 목록에 섞이면 [전부 빼기]가 문제 사진과 함께 엠블럼까지 지운다.
+ * ⚠ `//host/…`(스킴 생략 외부 주소)는 외부 이미지라 남긴다.
+ */
+function isModeratedImage(url: string): boolean {
+  return !(url.startsWith("/") && !url.startsWith("//"));
 }
 
 function confirmTitle(confirm: Confirm): string {
@@ -248,5 +260,6 @@ function confirmDescription(confirm: Confirm): string {
   if (confirm === "remove") {
     return "목록·상세에서 사라져요. 소프트 삭제라 어드민에서 되돌릴 수 있어요.";
   }
-  return "본문에서 빼고 올라간 파일도 지워요. 이건 되돌릴 수 없어요.";
+  // ⚠ 파일 삭제는 우리 저장소에 올라간 이미지일 때만 일어난다(`toStoragePath`) — 외부 주소는 본문에서만 빠진다
+  return "본문에서 빼요. 우리 저장소에 올라간 사진이면 파일도 지워지고, 되돌릴 수 없어요.";
 }
