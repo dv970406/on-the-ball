@@ -1,0 +1,54 @@
+# 이적 소식 정기 수집 — scripts/sync-transfer-news.mjs를 원격 Supabase에 대해 돌린다.
+#
+# ⚠ 주기는 **1시간**이다. 근거는 둘이다.
+#   - 상한: 피드 보관시간이 가장 짧은 소스(Sky 8.7시간) ÷ 3 = 174분 — 넘기면 기사가 피드에서 밀려나
+#     유실된다(`node scripts/sync-transfer-news.mjs --verify`가 이 값을 찍는다). 1시간은 GitHub 크론이
+#     몇십 분씩 밀려도 상한 안에 든다.
+#   - 비용: 공개 저장소는 Actions가 무료·무제한이지만, **비공개로 바뀌어도** 무료 한도(월 2,000분)
+#     안에 들게 잡았다 — 1회 약 1~2분(설치 포함) × 월 720회 ≈ 최대 1,440분. 주기를 30분으로 줄이면
+#     비공개일 때 한도를 넘는다.
+# ⚠ 정각(:00)을 피한다 — GitHub 크론은 정각에 몰려 지연·누락이 잦다.
+# ⚠ 공개 저장소의 예약 실행은 저장소에 **60일간 활동이 없으면 GitHub이 자동으로 끈다.**
+#   Actions 탭에서 다시 켜야 한다.
+# ⚠ 실패(소스 하나라도 실패 · 행 단위 저장 실패)는 종료 코드 1이라 이 작업이 빨간색이 된다 —
+#   읽는 화면이 없어 그게 유일한 신호다(`sync-transfer-news.mjs` 머리말).
+#
+# 필요한 저장소 시크릿: SUPABASE_URL(원격 프로젝트 URL) · SUPABASE_SERVICE_ROLE_KEY
+name: 이적 소식 수집
+
+on:
+  schedule:
+    - cron: "17 * * * *" # 매시 17분(UTC 기준이지만 매시라 시간대와 무관)
+  workflow_dispatch: {} # Actions 탭에서 수동 실행
+
+# 앞 실행이 끝나기 전에 다음 예약이 오면 기다리게 한다 — 겹쳐 돌면 같은 피드를 두 번 읽는다
+concurrency:
+  group: sync-transfer-news
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # 요청마다 20초 타임아웃이 있어 정상 실행은 1분 안쪽이다 — 멈춘 실행이 한도를 먹지 않게 끊는다
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4 # 버전은 package.json의 packageManager를 따른다
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: 수집
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        # --remote: 원격 URL에 쓰는 것을 명시한다(없으면 로컬이 아닌 URL을 거부한다 — sync-db.mjs guardTarget)
+        run: node scripts/sync-transfer-news.mjs --remote
