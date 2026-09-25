@@ -9,9 +9,13 @@
  *   단순 매칭하면 HERE WE GO 확정 건이 '무산'으로 뒤집힌다(크롤러에서 실제로 났다).
  */
 import { extractTransfer } from "./lib/transfer/extract.mjs";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { detectClubs, isKnownClub } from "./lib/transfer/clubs.mjs";
 import { clubDisplay, presetClubs } from "./lib/transfer/club-display.mjs";
+import { normalizePlayer } from "./lib/transfer/derive-deals.mjs";
+import { SOURCES } from "./lib/transfer/registry.mjs";
+
+const readJson = (rel) => JSON.parse(readFileSync(new URL(rel, import.meta.url), "utf8"));
 
 const CASES = [
   { expect: "agreement",      text: "🚨 EXCLUSIVE: Aston Villa reach agreement in principle to sign Ibrahim Mbaye from Paris Saint-Germain. #AVFC move for 18yo #PSG winger in process of being finalised: €55m. Nasser Al-Khelaifi & Nassef Sawiris relationship key to closing deal" },
@@ -63,7 +67,85 @@ const FEE_CASES = [
   { expectFee: null, why: "주급(단위 없음)",         text: "The 27yo attacker was offered €250,000 per week to move." },
   { expectFee: 125,  why: "총 패키지 = 최대값 채택", text: "Deal worth £106m + up to £17m add-ons (€125m + €20m package)." },
   { expectFee: 55,   why: "단일 이적료",             text: "Aston Villa reach agreement in principle to sign Ibrahim Mbaye: €55m." },
+  // 주급·옵션이 이적료로 세어지지 않는다 — 추출 규칙(WAGE_RE·ADD_ON_RE)과 같은 소스를 쓴다
+  { expectFee: null, why: "주급(m 단위여도 -a-week)", text: "Wolves offered him £1m-a-week." },
+  { expectFee: 60,   why: "주급 문장 옆의 이적료는 산다", text: "Alexander Isak has agreed a £250,000-a-week contract. Newcastle accept £60m." },
+  { expectFee: null, why: "옵션만 있는 문장",          text: "Chelsea agree deal for the winger plus €5m in add-ons." },
+  { expectFee: 40,   why: "이적료 + 옵션",            text: "Chelsea agree £40m plus £8m in add-ons for the winger." },
 ];
+
+// ── 주급·옵션 추출 (실제 수집 문장 + 로마노 문형) ──
+// ⚠ 정밀도 우선 — 오탐 케이스(단위 없음·연봉·금액 없는 옵션 언급)가 null이어야 한다
+const WAGE_CASES = [
+  { wage: "€250k", text: "The 27yo attacker was offered €250,000 per week to move." },
+  { wage: "£250k", text: "Alexander Isak has agreed a £250,000-a-week contract with Liverpool." },
+  { wage: "£300k", text: "Salah's new deal is worth £300k-a-week." },
+  { wage: "£150k", text: "Personal terms agreed: £150k a week over five years." },
+  { wage: "€200k", text: "He will earn €200k weekly in Riyadh." },
+  { wage: "£250k", text: "£250k-a-week offer, up from £180k-a-week — the first one is the new proposal." },
+  { wage: null, text: "The 27yo attacker offered €10-12m net salary." },
+  { wage: null, text: "He earns £20m per season at Al Hilal." },
+  { wage: null, text: "Youth deal worth £250 a week." },
+  { wage: null, text: "Chelsea's wage bill is £400m." },
+];
+const ADD_ON_CASES = [
+  { addOn: 17, cur: "GBP", text: "Deal worth £106m + up to £17m add-ons (€125m + €20m package)." },
+  { addOn: 5, cur: "EUR", text: "€55m plus €5m in bonuses." },
+  { addOn: 10, cur: "EUR", text: "Fee €50m + €10m add-ons." },
+  { addOn: 8, cur: "GBP", text: "£60m plus £8m in variables." },
+  { addOn: 2.5, cur: "EUR", text: "€30m plus €2.5m in add-ons." },
+  { addOn: null, cur: null, text: "Initial fee worth £100m plus add-ons — up to €140m possible total package." },
+  { addOn: null, cur: null, text: "€125m + €20m package." },
+];
+let extraPass = 0;
+console.log("── 주급·옵션 추출 테스트");
+for (const c of WAGE_CASES) {
+  const got = extractTransfer(c.text).wageText;
+  const ok = got === c.wage;
+  if (ok) extraPass++;
+  else console.log(`❌ 주급 기대 ${c.wage} 실제 ${got} — ${c.text}`);
+}
+for (const c of ADD_ON_CASES) {
+  const r = extractTransfer(c.text);
+  const ok = r.addOnAmount === c.addOn && r.addOnCurrency === c.cur;
+  if (ok) extraPass++;
+  else console.log(`❌ 옵션 기대 ${c.addOn} ${c.cur} 실제 ${r.addOnAmount} ${r.addOnCurrency} — ${c.text}`);
+}
+const extraTotal = WAGE_CASES.length + ADD_ON_CASES.length;
+console.log(`주급·옵션 ${extraPass}/${extraTotal} 통과\n`);
+
+// ── 선수 앵커 (확장분 + 오탐) ──
+// 잡힌 선수는 딜 키가 된다 — 오탐이 곧 보드의 거짓 딜이다. 대문자 매체명·구단명·요일·행사명은 선수가 아니다.
+const PLAYER_CASES = [
+  { players: ["David Alaba"], text: "🚨⚪️⚫️ David Alaba to Udinese, exclusive story confirmed and here we go!" },
+  { players: ["Nico Jackson"], text: "Nico Jackson to Aston Villa from Chelsea, here we go" },
+  { players: ["Morgan Gibbs-White", "Nico Williams"], text: "Spurs target Morgan Gibbs-White in January. Arsenal's top target Nico Williams." },
+  { players: ["Marc Guiu"], text: "Marc Guiu's move to Sunderland is done." },
+  { players: ["Marc Guiu"], text: "Waiting for Marc Guiu's signing." },
+  { players: ["David Alaba"], text: "David Alaba arrives for medical tests and contract signing next at Udinese." },
+  { players: ["Michail Antonio"], text: "Watford confirm Michail Antonio has joined." },
+  // BBC의 비분리 하이픈(U+2011) — 이름이 "Morgan Gibbs"에서 잘리지 않는다
+  { players: ["Morgan Gibbs‑White"], text: "Spurs could move for Morgan Gibbs‑White, JJ Gabriel's next step remains unresolved" },
+  // 오탐
+  { players: [], text: "Fabrizio Romano confirms Liverpool’s £47m agreement to sign South American star" },
+  { players: [], text: "Liverpool to Anfield on Monday to Friday." },
+  { players: [], text: "Everything you need to know ahead of Transfer Deadline Day." },
+  { players: [], text: "Sky Sports to Chelsea: no comment. Monday's gossip to Arsenal." },
+  { players: [], text: "Real Madrid to Barcelona: nothing." },
+  { players: [], text: "Manchester United target Premier League title." },
+  { players: [], text: "Arsenal confirm Champions League fixture." },
+  { players: [], text: "The Athletic to Liverpool: sources say no." },
+  { players: [], text: "Wednesday's gossip to Tottenham Hotspur." },
+  { players: [], text: "Yahoo Sports's move to Chelsea." },
+];
+let playerPass = 0;
+for (const c of PLAYER_CASES) {
+  const got = extractTransfer(c.text).players;
+  const ok = got.length === c.players.length && c.players.every((p) => got.includes(p));
+  if (ok) playerPass++;
+  else console.log(`❌ 선수 ${JSON.stringify(got)} (기대 ${JSON.stringify(c.players)}) — ${c.text}`);
+}
+console.log(`선수 앵커 ${playerPass}/${PLAYER_CASES.length} 통과\n`);
 
 let feePass = 0;
 console.log("── 이적료 오탐 테스트");
@@ -84,7 +166,90 @@ for (const c of CASES) {
   console.log(`     선수=${JSON.stringify(r.players)} 구단=${JSON.stringify(r.clubs)} 이적료=${r.feeText ?? "-"}${r.feeAmount ? ` (${r.feeAmount}m ${r.feeCurrency})` : ""}`);
 }
 console.log(`\n단계 판정 ${pass}/${CASES.length} 통과`);
-if (pass !== CASES.length || feePass !== FEE_CASES.length) process.exit(1);
+if (pass !== CASES.length || feePass !== FEE_CASES.length || extraPass !== extraTotal || playerPass !== PLAYER_CASES.length) process.exit(1);
+
+// ── 운영 JSON 형식 ───────────────────────────────────────────────────────
+// 파생기·화면이 같은 파일을 읽는다 — 형식이 틀리면 화면이 CHECK에 걸린 값을 그리거나 사전이 조용히 안 맞는다.
+let jsonBad = 0;
+const bad = (m) => { jsonBad++; console.log(`❌ ${m}`); };
+
+// players-ko.json — 키는 normalizePlayer 결과, 값은 DB CHECK 범위(position ≤20 · birthYear 1950~2015 · nationality ^[A-Z]{3}$)
+const players = readJson("./lib/transfer/players-ko.json");
+for (const [key, v] of Object.entries(players)) {
+  if (key.startsWith("_")) continue;
+  if (normalizePlayer(key) !== key) bad(`players-ko.json 키 "${key}"가 정규형이 아니다(→ "${normalizePlayer(key)}")`);
+  if (typeof v?.ko !== "string" || !v.ko.trim() || [...v.ko].length > 120) bad(`players-ko.json "${key}": ko가 없거나 120자를 넘는다`);
+  if (v.position != null && (typeof v.position !== "string" || !v.position.trim() || [...v.position].length > 20)) bad(`players-ko.json "${key}": position 형식`);
+  if (v.birthYear != null && !(Number.isInteger(v.birthYear) && v.birthYear >= 1950 && v.birthYear <= 2015)) bad(`players-ko.json "${key}": birthYear 범위`);
+  if (v.nationality != null && !/^[A-Z]{3}$/.test(v.nationality)) bad(`players-ko.json "${key}": nationality 형식`);
+  const extra = Object.keys(v).filter((k) => !["ko", "position", "birthYear", "nationality"].includes(k));
+  if (extra.length) bad(`players-ko.json "${key}": 모르는 필드 ${extra.join(", ")}`);
+}
+
+// windows.json — 창마다 5대 리그 전부 · 리그마다 opensAt < closesAt(ISO) · 창은 시간순(합친 기간 기준)
+// ⚠ 리그 키는 프리셋의 리그 이름과 같아야 한다 — 화면의 리그 필터·구단 리그가 같은 글자를 쓴다
+const LEAGUES = [...new Set(presetClubs().map((name) => clubDisplay(name).league))].sort();
+const windows = readJson("./lib/transfer/windows.json").windows;
+if (!Array.isArray(windows) || !windows.length) bad("windows.json: windows 배열이 비었다");
+let prevOpen = -Infinity;
+for (const [i, w] of (windows ?? []).entries()) {
+  if (!w.key || !w.label || typeof w.leagues !== "object") { bad(`windows.json[${i}]: key·label·leagues 형식`); continue; }
+  const keys = Object.keys(w.leagues).sort();
+  if (JSON.stringify(keys) !== JSON.stringify(LEAGUES)) bad(`windows.json[${i}] ${w.key}: 리그가 프리셋과 다르다 — ${keys.join(",")} ≠ ${LEAGUES.join(",")}`);
+  for (const [lg, lw] of Object.entries(w.leagues)) {
+    const o = Date.parse(lw.opensAt), c = Date.parse(lw.closesAt);
+    if (Number.isNaN(o) || Number.isNaN(c) || !/Z$/.test(lw.opensAt) || !/Z$/.test(lw.closesAt)) bad(`windows.json ${w.key}/${lg}: UTC ISO(Z) 형식`);
+    else if (o >= c) bad(`windows.json ${w.key}/${lg}: opensAt가 closesAt보다 늦다`);
+  }
+  const open = Math.min(...Object.values(w.leagues).map((lw) => Date.parse(lw.opensAt)));
+  if (open <= prevOpen) bad(`windows.json[${i}] ${w.key}: 시간순이 아니다`);
+  prevOpen = open;
+}
+
+// glossary-ko.json — 사람이 고친 표기·용어. 값은 한글을 담아야 하고, 구단 키는 구단 사전의 정규명이어야 한다
+// (모르는 키는 아무 데서도 쓰이지 않는다). 5대 리그 구단은 프리셋이 갖으므로 여기 적지 않는다(적어도 프리셋이 이긴다).
+const glossary = readJson("./lib/transfer/glossary-ko.json");
+for (const [en, ko] of Object.entries(glossary.clubs ?? {})) {
+  if (typeof ko !== "string" || !/[가-힣]/.test(ko)) bad(`glossary-ko.json clubs["${en}"]: 한글 표기가 아니다`);
+  if (!isKnownClub(en)) bad(`glossary-ko.json clubs["${en}"]: 구단 사전(clubs.mjs)의 정규명이 아니다`);
+  if (clubDisplay(en).league) bad(`glossary-ko.json clubs["${en}"]: 5대 리그 구단은 club-presets.json이 갖는다`);
+}
+for (const [en, ko] of Object.entries(glossary.terms ?? {})) {
+  if (!/[a-z]/i.test(en) || /[가-힣]/.test(en)) bad(`glossary-ko.json terms["${en}"]: 키는 영문 용어`);
+  if (typeof ko !== "string" || !/[가-힣]/.test(ko)) bad(`glossary-ko.json terms["${en}"]: 한글 표기가 아니다`);
+}
+for (const [wrong, right] of Object.entries(glossary.corrections ?? {})) {
+  if (wrong.startsWith("_")) continue;
+  if (!/[가-힣]/.test(wrong) || typeof right !== "string" || !/[가-힣]/.test(right) || right.includes(wrong)) {
+    bad(`glossary-ko.json corrections["${wrong}"]: 한국어 → 한국어이고 바른 말이 틀린 말을 품지 않아야 한다(교정이 되풀이된다)`);
+  }
+}
+
+// reporters.json credibility — 매체는 소스 id(registry)로, 기자는 보도 주체 표기로 매긴다. 값은 "medal" 또는 1~5
+{
+  const rep = readJson("./lib/transfer/reporters.json");
+  const cred = rep.credibility ?? {};
+  const names = new Set([...Object.values(rep.journalists), ...Object.values(rep.sources), ...Object.values(rep.bylines ?? {})]);
+  for (const [id, v] of Object.entries(cred.outlets ?? {})) {
+    if (!SOURCES.some((s) => s.id === id)) bad(`reporters.json credibility.outlets["${id}"]는 registry에 없는 소스다`);
+    if (v !== "medal" && !(Number.isInteger(v) && v >= 1 && v <= 5)) bad(`reporters.json credibility.outlets["${id}"]: "medal" 또는 1~5`);
+  }
+  for (const [name, v] of Object.entries(cred.journalists ?? {})) {
+    if (!names.has(name)) bad(`reporters.json credibility.journalists["${name}"]: journalists·sources에 없는 보도 주체 표기다(아무 보도에도 붙지 않는다)`);
+    if (!(Number.isInteger(v) && v >= 1 && v <= 5)) bad(`reporters.json credibility.journalists["${name}"]: 1~5`);
+  }
+}
+
+// reporters.json — outlets는 registry.mjs의 label과 양방향으로 같아야 한다(소스를 더하거나 빼면 여기도 고친다)
+const reporters = readJson("./lib/transfer/reporters.json");
+for (const s of SOURCES) if (reporters.outlets[s.id] !== s.label) bad(`reporters.json outlets["${s.id}"]가 registry label("${s.label}")과 다르다`);
+for (const id of Object.keys(reporters.outlets)) if (!SOURCES.some((s) => s.id === id)) bad(`reporters.json outlets["${id}"]는 registry에 없는 소스다`);
+for (const id of Object.keys(reporters.sources)) if (!SOURCES.some((s) => s.id === id)) bad(`reporters.json sources["${id}"]는 registry에 없는 소스다`);
+for (const [k, v] of [...Object.entries(reporters.journalists), ...Object.entries(reporters.sources)]) {
+  if (typeof v !== "string" || !v.trim()) bad(`reporters.json "${k}": 표기가 비었다`);
+}
+console.log(`운영 JSON(players-ko·windows·reporters) ${jsonBad ? `${jsonBad}건 문제` : "정합"}`);
+if (jsonBad) process.exit(1);
 
 // ── 구단 프리셋 정합성 ──────────────────────────────────────────────────
 // 프리셋(club-presets.json) · 구단 사전(clubs.mjs) · 엠블럼 파일(public/crests) 셋이 맞아야 한다.

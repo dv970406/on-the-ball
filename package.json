@@ -16,6 +16,7 @@
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "check:conventions": "node scripts/check-conventions.mjs",
+    "test:transfer": "node scripts/test-transfer-extract.mjs && node scripts/test-transfer-compose.mjs && node scripts/test-transfer-derive.mjs && node scripts/test-transfer-summarize.mjs && node scripts/test-transfer-names.mjs && node scripts/test-transfer-sources.mjs",
     "db:types": "supabase gen types --local --schema public > src/types/database.types.ts",
     "build:prod": "set -a && . ./.env.prod && set +a && next build",
     "start:prod": "set -a && . ./.env.prod && set +a && next start"
@@ -35,6 +36,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

@@ -5,7 +5,7 @@
  * 출력은 `{ title, content }` 또는 `{ error }`다. 조회·저장은 호출자(`scripts/compose-transfer-post.mjs`).
  *
  * 형식(사용자 결정):
- *   - 말머리는 대표 보도 기자의 **성**(로마노·온스테인…), 매체면 매체명.
+ *   - 말머리는 대표 보도 기자의 **한국어 전체 이름**(파브리지오 로마노·데이비드 온스테인…), 매체면 매체명.
  *   - 특정 기자의 관용구("HERE WE GO")를 말머리·단계·진행 경과에 쓰지 않는다 — 중립 어휘로 통일.
  *   - 한 줄 요약 + 표(선수·소속팀·행선지·추정 이적료·계약·진행 단계·보도·최종 업데이트) + 짧은 인용 + 진행 경과.
  *   - 5대 리그 구단은 한국어명 + 엠블럼 아이콘, 그 밖은 원문 영문명 그대로(엠블럼 없음).
@@ -14,9 +14,13 @@
  * ⚠ **틀린 값보다 빈 칸이 낫다.** 소속팀·행선지·이적료·계약은 그 선수가 나오는 **문장에서만** 읽고,
  *   못 읽으면 "미확인"으로 둔다. 이적이 아니라고 보이면 글을 만들지 않는다.
  */
+import { readFileSync } from "node:fs";
 import { clubDisplay } from "./club-display.mjs";
 import { detectClubs } from "./clubs.mjs";
+import { contractLabel, parseContract } from "./contract.mjs";
+import { DEST, FORMER, FROM, LEFT_FREE, vote } from "./direction.mjs";
 import { extractTransfer } from "./extract.mjs";
+import { RANK, RENEWAL, cleanBody, escapeRe, isRoundup, mentionRe, sentencesOf } from "./story.mjs";
 
 // ── 표기 ────────────────────────────────────────────────────────────────
 const STAGE = {
@@ -27,33 +31,26 @@ const HEADLINE = {
   rumour: "관심", talks: "협상 중", offer: "오퍼 제출", agreement: "이적 합의", personal_terms: "개인 조건 합의",
   medical: "메디컬 진행", here_we_go: "이적 사실상 확정", official: "이적 공식 발표", collapsed: "이적 무산",
 };
-/** 진전 순서 — 무산은 여기 없다(따로 다룬다) */
-const RANK = ["rumour", "talks", "offer", "agreement", "personal_terms", "medical", "here_we_go", "official"];
 
-/** 기자 — 계정·핸들 → 성 */
-const JOURNALIST = {
-  fabrizioromano: "로마노",
-  fabrizioromanotg: "로마노",
-  "david-ornstein.bsky.social": "온스테인",
-  "jacobsben.bsky.social": "제이콥스",
-  "nizaarkinsella.bsky.social": "킨셀라",
-  "migueldelaney.bsky.social": "딜레이니",
-};
 /**
- * 소스 → 보도 주체.
+ * 보도 주체 표기 — `reporters.json`이 단일 소스다(이적시장 화면이 같은 파일을 읽는다).
+ *   journalists: 계정·핸들 → 성 / sources: 소스 id → 보도 주체.
  * ⚠ Google News 소스는 **그 기자의 보도를 인용한 기사**를 모은 피드라 보도 주체는 기자다 —
  *   `attributed_to`(Yahoo Sports·Football365 같은 재인용 매체)를 말머리로 쓰면 규칙 위반이다.
  */
-const SOURCE = {
-  "gnews:romano": "로마노", "gnews:ornstein": "온스테인", "gnews:mokbel": "목벨",
-  "bsky:theathletic": "디 애슬레틱", "rss:bbc-football": "BBC", "rss:bbc-gossip": "BBC",
-  "rss:sky-transfers": "스카이스포츠", "rss:guardian-football": "가디언",
-};
-const reporter = (r) => SOURCE[r.source_id] ?? JOURNALIST[r.attributed_to] ?? r.attributed_to ?? r.source_id;
-const isJournalist = (name) => Object.values(JOURNALIST).includes(name) || name === "목벨";
-
-/** 여러 선수를 한데 모은 가십 칼럼 — 한 선수의 이야기로 읽으면 남의 구단·금액이 섞인다 */
-const isRoundup = (r) => r.source_id === "rss:bbc-gossip" || /\bgossip\b/i.test(r.body.split("\n")[0]);
+const REPORTERS = JSON.parse(readFileSync(new URL("./reporters.json", import.meta.url), "utf8"));
+const JOURNALIST = REPORTERS.journalists;
+const SOURCE = REPORTERS.sources;
+const BYLINE = REPORTERS.bylines;
+// ⚠ byline이 등재된 기자면 매체보다 기자가 먼저다(지역지 RSS의 기자 기사). 화면(`entities/transfer/lib/reporter.ts`)과 같은 순서
+const reporter = (r) => BYLINE[r.attributed_to] ?? SOURCE[r.source_id] ?? JOURNALIST[r.attributed_to] ?? r.attributed_to ?? r.source_id;
+// 기자로 세는 이름 — 계정 매핑의 성 + Google News 소스의 보도 주체(그 피드는 기자 이름으로 검색한 것이다)
+const JOURNALIST_NAMES = new Set([
+  ...Object.values(JOURNALIST),
+  ...Object.values(BYLINE),
+  ...Object.entries(SOURCE).filter(([id]) => id.startsWith("gnews:")).map(([, name]) => name),
+]);
+const isJournalist = (name) => JOURNALIST_NAMES.has(name);
 
 // ── 마크다운 안전 ────────────────────────────────────────────────────────
 /**
@@ -73,74 +70,8 @@ function clampGraphemes(s, n) {
 }
 const graphemeLength = (s) => (segmenter ? [...segmenter.segment(s)].length : [...s].length);
 
-// ── 문장 ────────────────────────────────────────────────────────────────
-/** 인용·판정에 쓸 본문 — 링크·트윗 서명·Google News의 제목 반복을 걷어낸다 */
-function cleanBody(r) {
-  let t = r.body;
-  // Google News는 "제목 - 매체\n\n제목 - 매체" 형태로 같은 문장이 두 번 온다
-  if (r.source_id.startsWith("gnews:")) t = t.split(/\n\s*\n/)[0];
-  return t
-    .replace(/\s+—\s+[^—\n]{1,80}\(@\w+\)\s+[A-Z][a-z]{2} \d{1,2}, \d{4}\s*$/, "") // 텔레그램이 붙이는 트윗 서명(끝에 있을 때만)
-    .replace(/https?:\/\/\S+|\bwww\.\S+/g, "")
-    .replace(/^RT @\w+:\s*/, "");
-}
-
-const sentencesOf = (text) => text.split(/(?<=[.!?])\s+|\n+/).map((x) => x.trim()).filter(Boolean);
-const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 // ── 구단 ────────────────────────────────────────────────────────────────
-// 구단명 후보 — 대문자로 시작하는 토큰 1~4개(숫자 토큰 허용: "Kolkheti 1913", "Schalke 04")
-const NAME = String.raw`((?:[A-Z][\p{L}\p{N}'.-]*)(?:\s(?:[A-Z][\p{L}\p{N}'.-]*|\d{2,4}))*)`;
-/** 이름 앞에 붙는 속보 표식 — 구단명의 일부가 아니다 */
-const TAG = String.raw`(?:(?:EXCL|EXCLUSIVE|BREAKING|OFFICIAL|Official|Understand|RT)\b[:,]?\s+)*`;
-/**
- * 사전 밖 이름은 **구단처럼 생겼을 때만** 받는다 — "Verbal"·"Deal"·"Sources"·기자명·경기장·국가가
- * 행선지로 들어왔다(QA). 사전에 없는 구단은 대개 이런 표지를 달고 다닌다.
- */
-const CLUB_LIKE = /\b(?:FC|CF|SC|AC|AFC|CD|SV|FK|SK|IF|BK|SL|United|City|Town|Rovers|Athletic|Sporting|Club|Olympique|Dynamo|Dinamo)\b|\s\d{2,4}$/;
-
-function resolveClub(phrase, strong, player) {
-  const raw = phrase.trim();
-  const [known] = detectClubs(raw);
-  if (known) return known;
-  if (!strong || !CLUB_LIKE.test(raw)) return null;
-  if (player.split(/\s+/).some((w) => raw.split(/\s+/).includes(w))) return null;
-  return raw;
-}
-
-/** 패턴들이 잡은 구단을 모아 표가 가장 많은 것(확실한 문형 2표) */
-function vote(sentences, patterns, player) {
-  const votes = new Map();
-  for (const s of sentences) {
-    for (const { re, strong } of patterns) {
-      for (const m of s.matchAll(re)) {
-        // ⚠ 소유격("PSV's Paul Wanner")은 그 구단 소속의 **다른 선수** 이야기다
-        if (/^['’]s\b/.test(s.slice(m.index + m[0].length))) continue;
-        const name = resolveClub(m[1], strong, player);
-        if (name) votes.set(name, (votes.get(name) ?? 0) + (strong ? 2 : 1));
-      }
-    }
-  }
-  return [...votes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
-}
-const P = (src, strong) => ({ re: new RegExp(src, "gu"), strong });
-const VERB = String.raw`(?:confirm(?:s|ed)?|complete(?:s|d)?|sign(?:s|ed)?|seal(?:s|ed)?|agree(?:s|d)?|reach(?:es|ed)?|announce(?:s|d)?|land(?:s|ed)?|secure(?:s|d)?)\b`;
-
-const DEST = [
-  // 문장 주어 + 확정 동사 — "Arsenal confirm …", "Watford confirm X has joined"
-  P(String.raw`^[^\p{L}]*${TAG}${NAME}\s+(?:have\s+|has\s+)?${VERB}`, true),
-  // "X joins <구단>" — "joined from"은 소속팀 쪽이라 뺀다
-  P(String.raw`\bjoin(?:s|ed|ing)?\s+(?!from\b)${NAME}`, true),
-  P(String.raw`\bsign(?:s|ed|ing)?\s+for\s+${NAME}`, true),
-  P(String.raw`\b(?:to|move to|new)\s+${NAME}`, false),
-  P(String.raw`\bat\s+${NAME}`, false),
-];
-const FROM = [
-  P(String.raw`\bfrom\s+(?:his\s+parent\s+club\s+|the\s+)?${NAME}`, true),
-  P(String.raw`\bparent club\s+${NAME}`, true),
-];
-const LEFT_FREE = [P(String.raw`\b(?:leaving|left|leaves)\s+${NAME}\s+(?:as (?:a )?free agent|on a free)`, true)];
-const FORMER = [P(String.raw`\b(?:former|ex-)\s*${NAME}`, false)];
+// 문장 손질은 story.mjs, 방향 판정(소속팀·행선지·자유 계약·전 소속)은 direction.mjs — 딜 파생과 공유한다.
 
 /** 구단 → 표 칸 문자열. 엠블럼 아이콘의 대체 텍스트는 비운다 — 바로 옆 이름을 스크린리더가 두 번 읽는다 */
 function clubCell(name) {
@@ -150,24 +81,8 @@ function clubCell(name) {
 const clubName = (name) => clubDisplay(name).name;
 
 // ── 계약 ────────────────────────────────────────────────────────────────
-const MONTH = { January: 1, February: 2, March: 3, April: 4, May: 5, June: 6, July: 7, August: 8, September: 9, October: 10, November: 11, December: 12 };
-const NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
-
-/**
- * 계약 — 기간과 만료가 **같은 문장**에 함께 나온 것을 먼저 쓴다(최신 우선). 없으면 하나만 있는 문장.
- * ⚠ 서로 다른 문장의 기간과 만료를 조합하지 않는다 — 다른 선수의 "2030년까지"가 붙었다(QA).
- */
-function contract(sentences) {
-  const parsed = [...sentences].reverse().map((s) => ({
-    years: s.match(/\b(one|two|three|four|five|six|\d)[- ]year\b/i),
-    until: s.match(/\buntil (?:(January|February|March|April|May|June|July|August|September|October|November|December) (?:\d{1,2},? )?)?(20\d{2})\b/),
-  }));
-  const hit = parsed.find((x) => x.years && x.until) ?? parsed.find((x) => x.years || x.until);
-  if (!hit) return null;
-  const n = hit.years ? NUM[hit.years[1].toLowerCase()] ?? Number(hit.years[1]) : null;
-  const end = hit.until ? `${hit.until[2]}년${hit.until[1] ? ` ${MONTH[hit.until[1]]}월` : ""}까지` : null;
-  return [n ? `${n}년` : null, end].filter(Boolean).join(" · ");
-}
+/** 계약 칸 — 파싱은 contract.mjs(딜 파생과 공유), 여기서는 표 칸 문구만 만든다 */
+const contract = (sentences) => contractLabel(parseContract(sentences));
 
 // ── 시각 ────────────────────────────────────────────────────────────────
 /** KST "9/24 01:33" */
@@ -183,7 +98,7 @@ function kst(iso) {
  * ⚠ 기사 첫 선수를 그냥 쓰지 않는다 — 가십·다선수 기사에서 **다른 선수의 이름으로 제목이 났다**(QA).
  */
 function findPlayer(items, keyword) {
-  const kw = new RegExp(`(?<![\\p{L}])${escapeRe(keyword)}(?![\\p{L}])`, "iu");
+  const kw = mentionRe(keyword);
   const votes = new Map();
   const add = (n) => votes.set(n, (votes.get(n) ?? 0) + 1);
   for (const r of items) for (const p of r.players ?? []) if (kw.test(p)) add(p);
@@ -225,7 +140,6 @@ function stageFor(r, kwRe) {
 }
 
 /** 재계약·연장 — 이적 기사가 아니다 */
-const RENEWAL = /\b(?:new (?:deal|contract)|contract extension|extends?|extension|renew(?:s|ed|al)?|stay(?:s)? at)\b/i;
 
 // ── 조립 ────────────────────────────────────────────────────────────────
 const TITLE_MAX = 120; // 화면 한도(그래핌) — `TITLE_LIMIT`과 같은 값
@@ -240,7 +154,7 @@ const TIMELINE_MAX = 8;
 export function composeTransferPost(rows, keyword) {
   const kw = typeof keyword === "string" ? keyword.trim() : "";
   if (!/^[\p{L}][\p{L}'’. -]{1,40}$/u.test(kw)) return { error: "선수 이름(2~41자, 글자로 시작)이 필요합니다" };
-  const kwRe = new RegExp(`(?<![\\p{L}])${escapeRe(kw)}(?![\\p{L}])`, "iu");
+  const kwRe = mentionRe(kw);
 
   if (detectClubs(kw).length > 0) return { error: `"${kw}"는 구단 이름입니다 — 선수 이름을 넣어 주세요` };
 

@@ -51,7 +51,7 @@ const STAGE_RULES = [
   {
     stage: "official",
     pattern:
-      /^(?:RT @\w+:\s*)?[^\p{L}\p{N}]*official\b\s*[,:!.—–-](?![\s\S]*\b(?:new (?:deal|contract)|contract extension|extends?|extension|renew(?:s|ed|al)?|postponed|sacked|appoint(?:s|ed|ment)?|not for sale|full[- ]time)\b)(?=[\s\S]*\b(?:joins?|joined|signs?|signed|signing|completes?|completed|move|transfer|loan|arrives?)\b)/iu,
+      /^(?:RT @\w+:\s*)?[^\p{L}\p{N}]*official\b\s*[,:!.—–-](?![\s\S]*\b(?:new (?:deal|contract)|contract extension|extends?|extension|renew(?:s|ed|al)?|(?:first )?professional (?:contract|deal)|first senior (?:deal|contract)|postponed|sacked|appoint(?:s|ed|ment)?|not for sale|full[- ]time)\b)(?=[\s\S]*\b(?:joins?|joined|signs?|signed|signing|completes?|completed|move|transfer|loan|arrives?)\b)/iu,
   },
   { stage: "medical", pattern: /\bmedical\b/i },
   // 개인 조건. "on personal terms" 처럼 전치사가 붙는 형태까지 포함한다.
@@ -79,9 +79,17 @@ const STAGE_RULES = [
   },
 ];
 
+/** 부상 보도 표현 — "구단이 발표했다"가 이적 발표가 아닌 가장 흔한 경우다 */
+const INJURY = /\b(?:injur(?:y|ies|ed)|ligament|ruled out|surgery|fracture|diagnosed|hamstring|sidelined)\b/i;
+/** 이적을 말하는 동사·명사 — 부상 보도에 이게 없으면 이적 단계가 아니다 */
+const TRANSFER_WORD = /\b(?:sign(?:s|ed|ing)?|join(?:s|ed|ing)?|transfer|loan|deal|fee|move|agree(?:s|d|ment)?)\b/i;
+
 function detectStage(text) {
   // 따옴표를 걷고 공백을 접은 사본으로 판정한다 — 규칙들이 문구 사이 공백 하나를 전제로 짜여 있다
   const t = text.replace(/[“”"‘’'«»]/g, "").replace(/\s+/g, " ");
+  // ⚠ 부상 발표를 오피셜로 잡지 않는다 — "Real Madrid have announced … ligament injury"가 `have announced`
+  //   규칙에 걸려 오피셜 딜이 생겼다(지역지·유럽 매체 RSS를 넣으면서 실측). 이적 표현이 함께 있으면 그대로 판정한다.
+  if (INJURY.test(t) && !TRANSFER_WORD.test(t)) return "unknown";
   for (const r of STAGE_RULES) {
     if (r.pattern.test(t)) return r.stage;
   }
@@ -98,12 +106,64 @@ const CURRENCY = { "€": "EUR", "£": "GBP", "$": "USD" };
 const MAX_PLAUSIBLE_FEE_M = 350;
 
 /**
+ * 주급을 말하는 기간 표현 — "£250,000-a-week"·"€300k per week"·"£150k a week"·"£200k weekly".
+ * ⚠ **주급 추출(`WAGE_RE`)과 "주급은 이적료가 아니다"(`WAGE_TAIL`)가 같은 소스를 쓴다.**
+ *   한쪽만 넓히면 어떤 문형은 주급으로 잡히면서 이적료로도 세어지거나, 그 반대가 된다.
+ */
+const WAGE_PERIOD_SRC = String.raw`(?:-?\s*(?:a|per)[-\s]*week|\s*weekly)\b`;
+
+/**
  * 금액 주변에 이 표현들이 있으면 이적료가 아니다.
  * 실측에서 걸린 것들: 첼시 지분 매각 기업가치 £5bn,
  * 리버풀 여름 총지출 £449m, 스쿼드 총액 £322m.
  */
 const NOT_A_FEE_CONTEXT =
   /\b(enterprise value|valuation|valued at|shares?|takeover|stake|revenue|turnover|wage bill|wages|salary|net worth|worth of the club|spent|spending|total(?:ling)?|combined|squad cost|budget|profit|loss(?:es)?|debt|投資)\b/i;
+
+/** 금액 **바로 뒤**에 주급 기간이 붙으면 그 금액은 주급이지 이적료가 아니다 — `WAGE_RE`와 같은 소스다 */
+const WAGE_TAIL = new RegExp(`^${WAGE_PERIOD_SRC}`, "i");
+
+/**
+ * 주급 추출 → `'£250k'`.
+ *
+ * 받는 형태: `£250,000-a-week` · `€300k per week` · `£150k a week` · `£200k weekly`. 천 단위 셋(`,000`)이나
+ * `k`가 **반드시** 붙어야 한다 — 단위 없는 "£250 a week"는 유스 계약이거나 오타라 버린다.
+ * ⚠ 연봉("€10m net salary"·"£20m per season")은 잡지 않는다 — 화면이 주급만 그리고, 두 단위를 하나로
+ *   접으면 12배 차이가 조용히 섞인다.
+ * ⚠ 두 값이 있으면 **금액이 큰 쪽**이 아니라 **처음 나온 것**이다 — "£250k-a-week offer, up from £180k"처럼
+ *   앞이 새 제안이다(이적료의 "가장 큰 값" 규칙과 다르다).
+ */
+const WAGE_RE = new RegExp(String.raw`([€£$])\s?(\d{2,3})(?:,000|k)${WAGE_PERIOD_SRC}`, "i");
+
+function detectWage(text) {
+  const m = WAGE_RE.exec(text);
+  if (!m) return { wageText: null };
+  return { wageText: `${m[1]}${m[2]}k` };
+}
+
+/**
+ * 옵션(애드온) 추출 — 이적료에 **더해질 수 있는** 금액. 백만 단위.
+ *
+ * 받는 형태: `+ up to £17m add-ons` · `plus €5m in bonuses` · `€10m add-ons` · `plus £8m in variables`.
+ * ⚠ "plus add-ons"처럼 금액 없는 언급은 null이다 — 있다는 사실만으로는 칸을 채울 수 없다.
+ * ⚠ 통화를 함께 돌려준다 — 파생기가 이적료와 통화가 같을 때만 싣는다(£17m 옵션을 €125m 옆에 두면 거짓 합계가 된다).
+ */
+const ADD_ON_WORDS_SRC = String.raw`\s*(?:in\s+)?(?:add-?ons?|bonuses|variables)\b`;
+const ADD_ON_RE = new RegExp(
+  String.raw`(?:(?:plus|\+)\s*(?:up\s+to\s+)?([€£$])(\d+(?:[.,]\d+)?)\s?m(?:illion)?${ADD_ON_WORDS_SRC}|([€£$])(\d+(?:[.,]\d+)?)\s?m(?:illion)?\s*(?:in\s+)?add-?ons?\b)`,
+  "i",
+);
+/** 금액 **바로 뒤**에 옵션 표현이 붙으면 그 금액은 옵션이다(이적료 추출이 건너뛴다) */
+const ADD_ON_TAIL = new RegExp(`^${ADD_ON_WORDS_SRC}`, "i");
+
+function detectAddOn(text) {
+  const m = ADD_ON_RE.exec(text);
+  if (!m) return { addOnAmount: null, addOnCurrency: null };
+  const symbol = m[1] ?? m[3];
+  const amount = Number((m[2] ?? m[4]).replace(",", "."));
+  if (!Number.isFinite(amount) || amount <= 0 || amount > MAX_PLAUSIBLE_FEE_M) return { addOnAmount: null, addOnCurrency: null };
+  return { addOnAmount: amount, addOnCurrency: CURRENCY[symbol] ?? symbol };
+}
 
 /**
  * 이적료 추출.
@@ -128,6 +188,11 @@ function detectFee(text) {
     if (unit.startsWith("bn") || unit.startsWith("billion")) continue;
     // 단위 없는 금액은 주급·연봉일 가능성이 커서 제외
     if (!unit.startsWith("m")) continue;
+    const tail = text.slice(m.index + m[0].length);
+    // 주급 기간이 바로 뒤에 붙은 금액("£1m-a-week")은 주급이다
+    if (WAGE_TAIL.test(tail)) continue;
+    // 옵션 표현이 바로 뒤에 붙은 금액("plus €5m in add-ons")은 옵션이지 이적료가 아니다 — `ADD_ON_RE`와 같은 소스다
+    if (ADD_ON_TAIL.test(tail)) continue;
 
     const amount = num;
     if (amount > MAX_PLAUSIBLE_FEE_M) continue;
@@ -161,8 +226,20 @@ function detectFee(text) {
 const ROLE_PREFIX =
   "(?:the\\s+)?(?:\\d{1,2}yo\\s+)?(?:[a-z]+\\s+)?(?:winger|striker|midfielder|defender|goalkeeper|forward|attacker|centre-back|center-back|full-back|wing-back|left-back|right-back|centre-forward|playmaker|keeper)?\\s*";
 
-/** 사람 이름 덩어리: 대문자로 시작하는 토큰 2~4개 */
-const NAME = "([A-Z][\\p{L}'\u2019-]+(?: [A-Z][\\p{L}'\u2019-]+){1,3})";
+/**
+ * 사람 이름 덩어리: 대문자로 시작하는 토큰 2~4개.
+ * ⚠ 하이픈에 **비분리 하이픈(U+2011)** 도 넣는다 — BBC가 "Gibbs‑White"를 그 글자로 쓴다. 없으면 이름이
+ *   "Morgan Gibbs"에서 잘려 사전(`players-ko.json`) 키와 어긋난다(실제 수집 행).
+ */
+const NAME = "([A-Z][\\p{L}'’‑-]+(?: [A-Z][\\p{L}'’‑-]+){1,3})";
+
+/**
+ * `<name> to …` 문형은 뒤에 **사전에 있는 구단**이 와야 선수 앵커다. 없는 이름을 "to X" 하나로 인정하면
+ * "Liverpool to Anfield"·"Monday to Friday"가 선수가 된다.
+ */
+function knownClubAfter(text, from) {
+  return detectClubs(text.slice(from, from + 60)).length > 0;
+}
 
 const PLAYER_ANCHORS = [
   // sign / signing of / re-sign
@@ -176,30 +253,47 @@ const PLAYER_ANCHORS = [
     `\\b[A-Z][\\p{L}]+\\s+(?:winger|striker|midfielder|defender|goalkeeper|forward|attacker|centre-back|full-back|wing-back|centre-forward|keeper)\\s+${NAME}`,
     "gu"
   ),
-  // <name> completes move / joins / agrees ...  (이름이 동사 앞에 오는 어순)
-  new RegExp(`${NAME}\\s+(?:completes?|joins?|is joining|has joined|agrees?|signs?|will join|set to join)\\b`, "gu"),
+  // <name> completes move / joins / agrees / arrives ...  (이름이 동사 앞에 오는 어순)
+  new RegExp(`${NAME}\\s+(?:completes?|joins?|is joining|has joined|agrees?|signs?|will join|set to join|arrives?|lands?)\\b`, "gu"),
+  // <구단> target <name> / <구단>'s (top) target <name> — "Spurs target Morgan Gibbs-White"
+  new RegExp(`\\b[A-Z][\\p{L}]+(?:['’]s)?\\s+(?:top\\s+|main\\s+|priority\\s+)?target\\s+${ROLE_PREFIX}${NAME}`, "gu"),
+  // <name>'s move / signing / transfer — 소유격이 이적을 말할 때("for Marc Guiu's signing")
+  new RegExp(`${NAME}['’]s\\s+(?:signing|move|transfer|arrival|switch)\\b`, "gu"),
+  // <name> to <구단> — "David Alaba to Udinese, here we go". ⚠ 뒤 구단이 사전에 있을 때만
+  { re: new RegExp(`${NAME}\\s+to\\s+(?=[A-Z#])`, "gu"), requireClubAfter: true },
 ];
 
 /** 이름 뒤에 붙어 오는 잡음 단어들 — 잘라낸다 */
 const TRAILING_NOISE =
   /\b(From|To|For|And|The|Is|Has|Will|After|On|In|At|With|Deal|Move|Fee|Permanent|Loan|Contract|Terms|Medical|Talks|Bid|Offer)\b.*$/;
 
-/** 선수명이 아닌 게 확실한 토큰 */
-const NOT_A_PERSON = /^(?:Breaking|Exclusive|Excl|Understand|Here We Go|Official|Done Deal|Premier League|Champions League|Serie A|La Liga|Ligue|Bundesliga)$/i;
+/**
+ * 선수명이 아닌 게 확실한 토큰 — 속보 표식·대회명·매체명·요일·국적 형용사.
+ * ⚠ "sign South American star"가 선수 "South American"이 됐다(실제 수집 행) — 대륙·국적 형용사는
+ *   대문자 두 토큰이라 이름처럼 생겼다. 앵커를 넓힐수록 이 목록이 정밀도를 지킨다.
+ */
+const NOT_A_PERSON =
+  /^(?:Breaking|Exclusive|Excl|Understand|Here We Go|Official|Done Deal|Transfer Deadline(?: Day)?|Deadline Day|Transfer Window|Premier League|Champions League|Europa League|Serie A|La Liga|Ligue(?: 1)?|Bundesliga|Sky Sports|BBC Sport|The Athletic|Google News|Football Italia|Yahoo Sports|South American|North American|Latin American|Central American|(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)['’]s?(?: \p{L}+)?)$/iu;
 
 function detectPlayers(text, clubs) {
   const found = new Set();
-  for (const re of PLAYER_ANCHORS) {
+  for (const anchor of PLAYER_ANCHORS) {
+    const re = anchor instanceof RegExp ? anchor : anchor.re;
     re.lastIndex = 0;
     let m;
     while ((m = re.exec(text))) {
+      if (anchor.requireClubAfter && !knownClubAfter(text, m.index + m[0].length)) continue;
       const name = m[1].replace(TRAILING_NOISE, "").trim();
+      // ⚠ 소유격은 사람을 가리키지 않는다 — "signing for Mikel Arteta's side"(감독의 팀)가 선수로 잡혔다
+      if (/['’]s$/u.test(name)) continue;
       // 단어 하나짜리는 구단·국가명일 확률이 높아 버린다
       if (name.split(/\s+/).length < 2) continue;
       if (name.length > 40) continue;
       if (NOT_A_PERSON.test(name)) continue;
       if (isClubName(name)) continue;
       if (clubs.some((c) => name.includes(c) || c.includes(name))) continue;
+      // 토큰 하나라도 구단 별칭이면 사람이 아니다 — 새 앵커(to·target) 뒤에는 구단명이 자주 온다
+      if (detectClubs(name).length > 0) continue;
       found.add(name);
     }
   }
@@ -214,7 +308,9 @@ function scoreRelevance(text, stage, clubs, players) {
   if (clubs.length >= 2) s += 0.25;
   else if (clubs.length === 1) s += 0.1;
   if (players.length > 0) s += 0.2;
-  if (/\b(transfer|signing|deal|fee|contract|loan|move)\b/i.test(text)) s += 0.1;
+  // ⚠ 떠나는 쪽의 표현(계약 해지·방출·자유계약)도 이적 신호다 — 없으면 "합의 해지로 떠난다"는 보도가
+  //   관련도 0이 되었다(실측: 에릭센 볼프스부르크 합의 해지).
+  if (/\b(transfer|signing|deal|fee|contract|loan|move|mutual consent|terminat(?:e|es|ed|ion)|released|free agent)\b/i.test(text)) s += 0.1;
   // 이적과 무관한 전형적 콘텐츠는 감점
   if (/\b(injur(y|ed)|out for|sidelined|fitness|match report|full-time|kick-off|preview|highlights)\b/i.test(text)) s -= 0.25;
   return Math.max(0, Math.min(1, s));
@@ -230,5 +326,6 @@ export function extractTransfer(text) {
   const clubs = detectClubs(text);
   const players = detectPlayers(text, clubs);
   const fee = detectFee(text);
-  return { stage, players, clubs, ...fee, relevance: scoreRelevance(text, stage, clubs, players) };
+  // ⚠ 주급·옵션은 `transfer_news`에 저장하지 않는다(컬럼을 늘리지 않았다) — 딜 파생기가 body에서 다시 읽는다
+  return { stage, players, clubs, ...fee, ...detectWage(text), ...detectAddOn(text), relevance: scoreRelevance(text, stage, clubs, players) };
 }

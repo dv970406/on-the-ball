@@ -50,5 +50,7 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # 한국어 요약(LLM) — 없으면 --remote 실행은 실패로 끝난다(조용히 영문만 남지 않게)
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         # --remote: 원격 URL에 쓰는 것을 명시한다(없으면 로컬이 아닌 URL을 거부한다 — sync-db.mjs guardTarget)
         run: node scripts/sync-transfer-news.mjs --remote

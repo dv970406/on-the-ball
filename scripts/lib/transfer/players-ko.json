@@ -1,0 +1,17 @@
+{
+  "_comment": [
+    "선수 표기 사전 — 키는 derive-deals.mjs의 normalizePlayer(추출된 영문명) 결과다(NFD → 결합문자 제거 → 소문자 → 비영숫자 제거 → 공백 하나).",
+    "값: ko(한국어 표기, 필수) · position(≤20자, 'RW/LW' 형태) · birthYear(1950~2015) · nationality(ISO 3자리 대문자). 모르는 값은 적지 않는다.",
+    "없는 선수는 화면이 영문명으로 그린다 — 파생이 실패하지 않고 경고로 찍는다(엠블럼·팀 표기와 같은 운영 모델).",
+    "형식은 scripts/test-transfer-extract.mjs가 검사한다."
+  ],
+  "david alaba": { "ko": "다비드 알라바", "position": "CB/LB", "birthYear": 1992, "nationality": "AUT" },
+  "alexander isak": { "ko": "알렉산데르 이사크", "position": "ST", "birthYear": 1999, "nationality": "SWE" },
+  "michail antonio": { "ko": "미카일 안토니오", "position": "ST", "birthYear": 1990, "nationality": "JAM" },
+  "jadon sancho": { "ko": "제이든 산초", "position": "RW/LW", "birthYear": 2000, "nationality": "ENG" },
+  "anthony martial": { "ko": "앙토니 마르시알", "position": "ST", "birthYear": 1995, "nationality": "FRA" },
+  "philippe coutinho": { "ko": "필리페 쿠티뉴", "position": "AM", "birthYear": 1992, "nationality": "BRA" },
+  "tyrick mitchell": { "ko": "타이릭 미첼", "position": "LB", "birthYear": 1999, "nationality": "ENG" },
+  "morgan gibbswhite": { "ko": "모건 깁스화이트", "position": "AM", "birthYear": 2000, "nationality": "ENG" },
+  "bradley barcola": { "ko": "브래들리 바르콜라", "position": "LW/RW", "birthYear": 2002, "nationality": "FRA" }
+}

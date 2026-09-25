@@ -16,7 +16,9 @@ export function loadEnv(extraKeys = []) {
   const wanted = ["NEXT_PUBLIC_SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", ...extraKeys];
   const out = {};
   for (const k of wanted) out[k] = process.env[k];
-  if (out.NEXT_PUBLIC_SUPABASE_URL && out.SUPABASE_SERVICE_ROLE_KEY) return out;
+  // ⚠ 필요한 키가 **전부** 환경에 있을 때만 파일을 건너뛴다 — 추가 키(예: ANTHROPIC_API_KEY)만 파일에 있는
+  //   로컬 셸에서 Supabase 변수를 export해 두면 추가 키를 영영 못 읽었다.
+  if (wanted.every((k) => out[k])) return out;
 
   let file;
   try {

@@ -51,6 +51,16 @@ export function clubDisplay(canonical) {
   };
 }
 
+/**
+ * 정규 영문명 → 엠블럼 파일명이자 `transfer_club.code`. 프리셋 밖이면 null — 호출자(딜 파생)가
+ * `slugify(canonical)`로 만든다(파일은 없고, 화면은 약칭 모노그램으로 떨어진다).
+ */
+export function clubCode(canonical) {
+  const { presets } = load();
+  const p = Object.hasOwn(presets, canonical) ? presets[canonical] : null;
+  return p && typeof p === "object" && p.code ? p.code : null;
+}
+
 /** 프리셋에 오른 정규 영문명 목록(검사용) */
 export function presetClubs() {
   return Object.keys(load().presets).filter((k) => !k.startsWith("_"));
