@@ -7,6 +7,9 @@ export { Flag, type FlagCode } from "./flag";
 export { PlayerSilhouette } from "./player-silhouette";
 export { Shirt, type ShirtStripe } from "./shirt";
 export { Avatar } from "./avatar";
+// entities/match(TeamCrest)·entities/transfer가 공유하는 엠블럼류 메커니즘 — entities끼리는
+// import할 수 없어 여기로 승격했다(사유는 crest.tsx 주석)
+export { Crest } from "./crest";
 export { SectionHead } from "./section-head";
 export { TabHeader } from "./tab-header";
 export { NightCard } from "./night-card";
