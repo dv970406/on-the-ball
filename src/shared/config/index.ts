@@ -19,3 +19,10 @@ export { postImageUrl, POST_IMAGE_BUCKET } from "./post-image";
 //   어드민 화면이 업로드 경로를 가지면서 그 전제가 사라졌다(`AVATAR_BUCKET`·
 //   `POST_IMAGE_BUCKET`이 배럴에 있는 것과 같은 이유가 이제 여기에도 성립한다).
 export { SURVEY_IMAGE_BUCKET, surveyImageUrl } from "./survey-image";
+// 이적 창 — 일정의 단일 소스는 `scripts/lib/transfer/windows.json`(리그별 일정을 합친 기간으로 읽는다)
+export {
+  openTransferWindow,
+  trackedTransferWindow,
+  boardScopeStartMs,
+  type TransferWindow,
+} from "./transfer-window";

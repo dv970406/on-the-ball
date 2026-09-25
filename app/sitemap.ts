@@ -23,7 +23,7 @@ import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
  *
  * ⚠ **쿠키를 보지 않고 항상 익명 클라이언트다.** 사이트맵은 크롤러가 읽는 문서라 누가 부르든
  *   공개분만 담아야 한다 — 쿠키 클라이언트면 로그인 사용자가 열었을 때 그 사람의 차단 숨김이
- *   섞이고, `cookies()` 때문에 라우트가 동적이 되어 **크롤마다 DB 조회 4건**이 나간다.
+ *   섞이고, `cookies()` 때문에 라우트가 동적이 되어 **크롤마다 목록 수만큼 DB 조회**가 나간다.
  *   익명이면 fetch가 Data Cache를 타 라우트가 `ANON_REVALIDATE` 주기의 ISR이 된다(`/notices`와
  *   같은 자리). 대가로 새 글·삭제가 최대 그 주기만큼 늦게 반영된다.
  */
@@ -43,6 +43,8 @@ interface ListLastModified {
   notices?: Date;
   /** 랭킹 — 순위가 움직이는 것은 경기가 채점될 때다 */
   ranking?: Date;
+  /** 이적시장 보드 — 실리는 딜 중 가장 최근 보도 시각이다 */
+  transfers?: Date;
 }
 
 /** 값이 있을 때만 `lastModified`를 싣는다 */
@@ -72,6 +74,7 @@ function staticEntries(last: ListLastModified): MetadataRoute.Sitemap {
     { url: absoluteUrl(ROUTES.matchList) },
     withLastModified(absoluteUrl(ROUTES.matchRanking), last.ranking),
     withLastModified(absoluteUrl(ROUTES.noticeList), last.notices),
+    withLastModified(absoluteUrl(ROUTES.transferList), last.transfers),
     ...POST_CATEGORIES.map((category) =>
       withLastModified(
         absoluteUrl(ROUTES.postCategory(POST_CATEGORY_SLUG[category])),
@@ -97,7 +100,7 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
     const supabase = createSupabaseAnonClient();
     if (!supabase) return statics;
 
-    const [posts, surveys, matches, notices] = await Promise.all([
+    const [posts, surveys, matches, notices, transfers] = await Promise.all([
       supabase
         .from("post")
         // `category`는 말머리 목록의 lastModified를 가르는 데 쓴다
@@ -125,6 +128,13 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
         .select("id, updated_at")
         .order("id", { ascending: false })
         .limit(URL_LIMIT),
+      supabase
+        .from("transfer_deal")
+        // 상세도 보드도 `latest_reported_at`(최신 보도 시각)이 lastModified다 — 아래 주석 참고.
+        // ⚠ 범위 필터를 걸지 않는다 — 상세 URL은 창이 지나도 살아 있다(`/transfers/[id]`).
+        .select("id, latest_reported_at")
+        .order("id", { ascending: false })
+        .limit(URL_LIMIT),
     ]);
 
     // 미래 시각을 lastmod로 싣지 않기 위한 기준 — 데이터를 읽은 시각이다
@@ -150,6 +160,12 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
               : [],
           ),
         ),
+        // ⚠ 미래 시각을 싣지 않는다 — 수집기가 10분 여유로 거르지만 CHECK 상한은 +1일이다
+        transfers: latest(
+          (transfers.data ?? []).flatMap((deal) =>
+            Date.parse(deal.latest_reported_at) <= nowMs ? [new Date(deal.latest_reported_at)] : [],
+          ),
+        ),
       }),
       ...postRows.map((post) => ({
         url: absoluteUrl(ROUTES.post(post.id)),
@@ -173,6 +189,16 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
         // ⚠ `opens_at`이 아니라 `updated_at`이다 — 예약 공지의 `opens_at`은 **미래 시각**이라
         //   입축구의 `closes_at`과 같은 함정이다(정책이 감춰 여기 오지 않더라도 규약은 같다).
         lastModified: new Date(notice.updated_at),
+      })),
+      ...(transfers.data ?? []).map((deal) => ({
+        url: absoluteUrl(ROUTES.transfer(deal.id)),
+        // ⚠ `updated_at`(파생 시각)이 아니라 `latest_reported_at`이다 — 파생기가 매시 upsert하면서
+        //   값이 그대로여도 `updated_at`을 밀어, 그걸 실으면 모든 상세가 매시 "방금 바뀌었다"가 된다
+        //   (요청 시각을 싣지 말라는 규약과 같은 함정). 화면이 그리는 "업데이트 N분 전"도 이 값이다.
+        // ⚠ 미래 시각은 싣지 않는다(다른 행과 같은 규약)
+        ...(Date.parse(deal.latest_reported_at) <= nowMs
+          ? { lastModified: new Date(deal.latest_reported_at) }
+          : {}),
       })),
     ];
   } catch (e) {

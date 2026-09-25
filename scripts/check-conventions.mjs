@@ -48,6 +48,11 @@ const DEEP_IMPORT_ALLOWED = new Set([
   // 랭킹 조립(범위 → 두 판) — 랭킹 SSR이 훅과 같은 범위·상한·RPC 인자를 써야 한다
   "@/entities/match/api/ranking-query",
   "@/entities/notice/api/list-query",
+  "@/entities/transfer/api/list-query",
+  // 리그 필터·정렬 파싱 — SSR 페이지가 `?league=`·`?sort=`를 클라이언트 훅과 같은 판정으로 읽는다
+  "@/entities/transfer/lib/league",
+  // 단계 → 상태 뱃지 톤·라벨 — 상세 SSR이 화면과 같은 매핑으로 상태 문구를 그린다
+  "@/entities/transfer/lib/stage",
   // 마감 판정의 단일 소스. `"use client"`가 없어 서버 안전하고, SSR 페이지가 클라이언트와
   // **같은 판정**을 써야 한다(`lib/plain-summary`와 같은 형태).
   "@/entities/match/lib/open",
@@ -147,6 +152,11 @@ const STYLE_ALLOWED = {
     "src/entities/match/ui/lineup-pitch.tsx",
     "src/entities/match/ui/player-badges.tsx",
     "src/entities/match/ui/player-photo.tsx",
+    // "대상이 아닌 것" — 이적시장 상태 뱃지·관심 표시 원·결렬 X 원·타임라인 점(전부 컨트롤이 아니다)
+    "src/entities/transfer/ui/status-badge.tsx",
+    "src/entities/transfer/ui/watch-mark.tsx",
+    "src/entities/transfer/ui/club-route.tsx",
+    "src/views/transfer-detail/ui/report-timeline.tsx",
   ],
   // 그림자는 "떠 있는 레이어"만 — resting 카드·목록·헤더는 flat + 1px 헤어라인
   "shadow-": [
@@ -170,6 +180,8 @@ const STYLE_ALLOWED = {
     "src/entities/survey/ui/vs-badge.tsx", // 분할 카드의 VS 배지
     // 승부예측의 결과 띠 — 채점 뒤 결과 칸에만 1개(선택지 3개에는 쓰지 않는다)
     "src/entities/match/ui/prediction-block.tsx",
+    "src/entities/transfer/ui/status-badge.tsx", // 오피셜 뱃지 — 글자를 담은 상태 표시
+    "src/entities/transfer/ui/watch-mark.tsx", // 관심 표시 원 — 종 아이콘이 형태를 진다
   ],
   /*
    * ⚠ **에메랄드는 리터럴로만 오지 않는다.** `Pill variant="green"`은 `bg-primary`를
@@ -203,6 +215,8 @@ const STYLE_ALLOWED = {
     "src/entities/comment/ui/comment-item.tsx", // "내 댓글" 배지
     "src/views/post-detail/ui/comment-section.tsx", // 댓글 수
     "src/widgets/bottom-tab-bar/ui/bottom-tab-bar.tsx", // 활성 탭 아이콘
+    // 이적료 상승 화살표 — 리터럴은 `text-primary-deep`이고 부분 문자열로 이 대조에 걸린다
+    "src/entities/transfer/ui/fee-delta.tsx",
   ],
 };
 

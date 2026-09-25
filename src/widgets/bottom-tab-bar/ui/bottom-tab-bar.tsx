@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ClipboardList, MessagesSquare, Target, User } from "lucide-react";
+import { ArrowLeftRight, ClipboardList, MessagesSquare, Target, User } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/shared/lib";
 import { ROUTES, activeTabHref } from "@/shared/config";
@@ -30,6 +30,7 @@ const TABS: TabItem[] = [
   { label: "커뮤니티", icon: MessagesSquare, href: ROUTES.postList },
   { label: "입축구", icon: ClipboardList, href: ROUTES.surveyList },
   { label: "승부예측", icon: Target, href: ROUTES.matchList },
+  { label: "이적시장", icon: ArrowLeftRight, href: ROUTES.transferList },
   { label: "프로필", icon: User, href: ROUTES.profile, signInAction: "프로필을 보려면" },
 ];
 

@@ -44,6 +44,14 @@ export const ROUTES = {
    */
   matchRanking: "/matches/ranking",
 
+  /**
+   * 이적시장 — 크롤러(`transfer_news`)가 파생한 이적 딜 보드.
+   * ⚠ 상세(`/transfers/[id]`)에는 탭바가 없다(`activeTabHref`가 목록만 센다 — `postCategory`와
+   *   달리 상세는 목록과 별개 화면이라 활성 탭으로 되비칠 필요가 없다).
+   */
+  transferList: "/transfers",
+  transfer: (id: number | string) => `/transfers/${id}`,
+
   // 인증 — 소셜 로그인은 로그인과 가입이 같은 동작이라 화면이 하나다
   signIn: "/sign-in",
   // 프로필 — 닉네임·사진 수정과 로그인 수단 연결
@@ -104,6 +112,7 @@ export function activeTabHref(pathname: string): string | null {
   }
   if (pathname === ROUTES.surveyList) return ROUTES.surveyList;
   if (pathname === ROUTES.matchList) return ROUTES.matchList;
+  if (pathname === ROUTES.transferList) return ROUTES.transferList;
   if (pathname === ROUTES.profile) return ROUTES.profile;
   return null;
 }
