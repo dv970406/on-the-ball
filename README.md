@@ -1,6 +1,6 @@
 # ⚽ 온더볼 (On the Ball)
 
-> 모든 축구팬들을 위한 **모바일 전용** 커뮤니티
+> 모든 축구팬들을 위한 **모바일 전용** 이적시장 보드
 
 ![Next.js](https://img.shields.io/badge/Next.js-16.2-black?logo=next.js)
 ![React](https://img.shields.io/badge/React-19-149eca?logo=react)
@@ -15,42 +15,30 @@
 
 | 영역 | 내용 |
 |---|---|
-| 게시글 | 목록 · 상세 · 작성 · 수정 · 삭제(소프트). 본문은 **마크다운**(GFM) |
-| 댓글 | 작성 · 삭제. 글의 `comment_count`는 DB 트리거가 관리 |
-| 좋아요 | 토글(낙관적 업데이트). 동시성은 `SECURITY DEFINER` RPC의 행 잠금으로 직렬화 |
-| 투표 | 글에 딸린 2~4지선다(`post_poll`). 글과 **한 트랜잭션**으로 만들어지고 선택지는 생성 뒤 고정. 결과는 **투표한 사람에게만** 공개(DB 함수가 게이팅) |
-| 입축구 | 운영진이 등록하는 전 유저 대상 단일 선택 문항. 코드·DB·URL에서는 `survey`다(화면 라벨만 "입축구"). **참여한 사람에게만** 결과 공개(DB 함수가 게이팅). 색을 지정한 문항은 선택지 수(2·3·4)에 따라 면적을 등분하는 **분할 카드**로 그리고 목록에서 바로 투표한다. 면 배경은 **이미지 > 색** 순으로 폴백한다. 기간은 어드민이 정하고(`closes_at`) 마감 뒤 차단은 RLS가 한다 |
-| 승부예측 | EPL 경기의 승·무·패 예측(`/matches`). 마감·공개 시점이 둘 다 **킥오프**라 예측 중에는 분포가 닫히고 킥오프 뒤에는 비로그인에게도 열린다. 확정 라인업·사건·팀 스탯을 함께 보여주고, 일정·결과는 API-Football에서 동기화한다(`scripts/sync-*.mjs`) |
-| 공지 | 운영진 공지(`/notices`). 피드 최상단 배너에는 최신 **필독** 하나만 뜨고, 노출 기간은 RLS가 가른다 |
+| 이적시장 | 프리미어리그·유럽 5대 리그 이적 딜 보드(`/transfers`)와 딜 상세(`/transfers/[id]`, 보도 타임라인). 기자·매체 보도를 매시 수집해(`scripts/sync-transfer-news.mjs`, GitHub Actions) **딜을 파생**하고, 딜에 붙은 보도만 LLM이 한국어로 한두 문장 요약한다. 리그·정렬은 쿼리 파라미터 + canonical. `/`는 이 보드로 리다이렉트된다 |
+| 관심 딜 | 로그인 사용자가 딜을 관심 목록에 담는다(낙관적 업데이트, 복합 PK로 멱등) |
 | 인증 | **카카오 · 구글 소셜 로그인**(로그인 = 가입) · 로그아웃. 에러는 한국어로 매핑 |
-| 프로필 | 닉네임(가입 시 랜덤 배정 → 본인이 변경) · 프로필 사진 업로드 · **로그인 수단 연결** · 차단 목록 |
-| 차단 · 신고 | 사용자 차단(그 사람의 글·댓글이 **RLS 정책에서** 걸러진다 — 조회 훅이 아니다) · 글 신고(사유는 enum) |
-| 어드민 | `/admin-you-can-not-access` — 경기·입축구·공지·피드 관리. 서버 가드는 `notFound()`이고 실제 방어는 definer RPC 안의 `is_admin()` |
+| 프로필 | 닉네임(가입 시 랜덤 배정 → 본인이 변경) · 프로필 사진 업로드 · **로그인 수단 연결** |
 | 권한 | **2중 방어** — 클라이언트 가드(`AuthRequired`·`GuestOnly`, 안내) → **RLS + 컬럼 권한(실제 차단)**. `proxy.ts`는 세션 쿠키 갱신만 하고 라우트 가드를 두지 않는다(판정자가 둘이면 무한 리다이렉트가 된다 — `docs/conventions/nextjs.md`) |
-| 검색 유입 | 목록·상세 **SSR** · 말머리별 랜딩(`/posts/category/[slug]`) · 정렬은 쿼리 + canonical · `sitemap.xml` · `robots.txt` |
+| 검색 유입 | 보드·딜 상세 **SSR** · 정렬·리그는 쿼리 + canonical · `sitemap.xml` · `robots.txt` |
 
-> **색인 대상 화면은 전부 SSR**입니다 — 목록(글·말머리·입축구·경기·공지)과 상세(글·입축구·경기·공지)
-> 모두 서버가 본문·댓글·선택지·집계를 조립해 초기 HTML에 담습니다(작성·수정·프로필·어드민처럼
-> 색인하지 않는 화면만 클라이언트 쿼리). 프리페치는 최적화라 실패하면 클라이언트 조회로 폴백합니다 —
-> 자세한 규약은 [`docs/conventions/nextjs.md`](docs/conventions/nextjs.md).
+> **색인 대상 화면은 전부 SSR**입니다 — 보드와 딜 상세 모두 서버가 딜·보도 타임라인을 조립해
+> 초기 HTML에 담습니다(로그인·프로필처럼 색인하지 않는 화면만 클라이언트 쿼리). 프리페치는
+> 최적화라 실패하면 클라이언트 조회로 폴백합니다 — 자세한 규약은 [`docs/conventions/nextjs.md`](docs/conventions/nextjs.md).
 
 > 데이터 접근에 Route Handler를 두지 않고 **브라우저가 Supabase를 직접 호출**합니다.
 > 그래서 **RLS와 컬럼 권한이 유일한 방어선**이며, 마이그레이션이 곧 보안 설계입니다 —
 > 자세한 규칙은 [`docs/conventions/api-and-db.md`](docs/conventions/api-and-db.md).
-> 예외는 어드민의 경기 일정 동기화 하나뿐인데, 그건 데이터 접근이 아니라 **외부 API를
-> 서버 비밀로 부르는 자리**입니다(검사가 목록을 양방향으로 대조합니다).
+> 이적 데이터(`transfer_*`)는 앱에 쓰기 경로가 없고 service_role로 도는 수집 스크립트만 씁니다.
 
 <details>
-<summary>v1(밸런스·랭킹·유니폼·TMI·퀴즈) 청산 기록</summary>
+<summary>청산 기록</summary>
 
-집중할 축이 불분명해 DB 테이블·정책부터 새로 설계하기로 하고 전면 청산했습니다(2026-08-01).
-청산 시점의 실사용 데이터는 0건이었습니다. 화면 9개 · 테이블 13개 · RPC 2개 등 전체 스냅샷은
-[`docs/legacy/v1-inventory.md`](docs/legacy/v1-inventory.md)에, 코드 실물은 커밋 `5d02657` 이전 이력에 있습니다.
-
-그중 **단일 선택 문항(입축구) 1종만** 2026-08-23에 되살렸습니다 — 데이터 레이어는 물려받지 않고 v2 규약으로 다시 설계했습니다(결과 게이팅을 DB에, 집계 컬럼 없이, jsonb 없이).
-
-`src/shared/ui`의 일부 컴포넌트는 그때의 자산으로 **의도적으로 보존**돼 있습니다
-(현재 미사용, 트리셰이킹되어 번들 비용 0). 현역/보존 구분은 [`docs/conventions/reuse.md`](docs/conventions/reuse.md).
+- **v1(밸런스·랭킹·유니폼·TMI·퀴즈)** — 집중할 축이 불분명해 전면 청산했습니다(2026-08-01).
+  전체 스냅샷은 [`docs/legacy/v1-inventory.md`](docs/legacy/v1-inventory.md)에, 코드 실물은 커밋 `5d02657` 이전 이력에 있습니다.
+- **커뮤니티(글·댓글·투표·차단·신고)·입축구·승부예측·공지·어드민 백오피스** — 이적시장과 로그인·프로필만
+  남기기로 하고 걷어냈습니다. 테이블·함수·enum은 마이그레이션 `20260926000001_drop_community_survey_match.sql`이
+  지우고, 코드 실물은 그 커밋 이전 이력에 있습니다.
 </details>
 
 ---
@@ -66,8 +54,7 @@
 | Data Fetching | TanStack Query v5 |
 | Global State | zustand (세션) |
 | Backend / DB | Supabase (PostgreSQL, RLS, 카카오·구글 OAuth) |
-| Markdown | react-markdown + remark-gfm |
-| Validation | 손으로 쓴 순수 함수(`validatePost` 등) — 스키마 라이브러리 없음. DB CHECK가 실제 방어선 |
+| Validation | 손으로 쓴 순수 함수(`validateNickname` 등) — 스키마 라이브러리 없음. DB CHECK가 실제 방어선 |
 | Icons | lucide-react |
 | Architecture | FSD (Feature-Sliced Design) |
 
@@ -84,10 +71,11 @@
 pnpm install
 supabase start                          # 로컬 스택 기동 (643xx 포트)
 supabase db reset                       # 마이그레이션 적용 + seed.sql 자동 실행
-# 계정(alice/bob)·글·댓글은 supabase/seed.sql이 db reset 때 자동으로 넣는다
-node scripts/upload-survey-images.mjs supabase/seed-images   # 입축구 면 배경 (스토리지는 SQL 밖이다)
+# 개발 계정(alice/bob)은 supabase/seed.sql이 db reset 때 자동으로 넣는다
+node scripts/sync-transfer-news.mjs     # 이적 소식 수집 → 딜 파생 → 한국어 요약 (로컬 스택에 쓴다)
 # 구단 엠블럼(public/crests/)은 이미 커밋돼 있어 따로 받을 필요가 없다.
-#   승격팀이 생겨 빈 자리가 보이면: node scripts/fetch-team-crests.mjs   (API_FOOTBALL_KEY 필요)
+#   새 구단이 생겨 빈 자리가 보이면: node scripts/fetch-team-crests.mjs --team <id> --code <code>
+#   (API_FOOTBALL_KEY 필요 — 사용법은 스크립트 머리 주석)
 pnpm dev
 ```
 
@@ -121,9 +109,9 @@ pnpm dev
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon(publishable) 키 | 둘 다 | ✅ |
 | `NEXT_PUBLIC_SITE_URL` | `og:image` 절대 URL 기준(빌드 시점에 인라인) | 둘 다 | 배포 시 |
 | `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` / `NEXT_PUBLIC_NAVER_SITE_VERIFICATION` | Search Console·네이버 서치어드바이저 소유권 확인 메타(비우면 태그를 내보내지 않음). 등록 뒤 `/sitemap.xml` 제출 | `.env.prod` | 검색 등록 시 |
-| `NEXT_PUBLIC_SHOW_PLAYER_PHOTOS` | 선수 사진 표시. **기본 꺼짐** — `"true"`일 때만 켜진다(권리 미확인) | 둘 다 | — |
-| `SUPABASE_SERVICE_ROLE_KEY` | 어드민 경기 동기화(`/api/admin/sync-matches`)와 관리 스크립트 | 둘 다 | 어드민 동기화 시 |
-| `API_FOOTBALL_KEY` | 경기 일정·라인업·스탯 제공자 키 — 위 Route Handler와 `scripts/sync-*.mjs` | 둘 다 | 어드민 동기화 시 |
+| `SUPABASE_SERVICE_ROLE_KEY` | 운영 스크립트(`scripts/sync-transfer-news.mjs`) — 런타임에는 필요 없다 | `.env.local` | 원격 수집 시 |
+| `ANTHROPIC_API_KEY` | 이적 소식 한국어 요약(LLM). 없으면 로컬 실행은 요약을 건너뛰고, `--remote` 실행은 실패로 끝난다 | `.env.local` | 원격 수집 시 |
+| `API_FOOTBALL_KEY` | 구단 엠블럼 내려받기(`scripts/fetch-team-crests.mjs`) — 런타임에는 필요 없다 | `.env.local` | 엠블럼 추가 시 |
 | `SUPABASE_PROJECT_REF` | `supabase link`용 프로젝트 ref | `.env.local` | 배포 시 |
 | `SUPABASE_DB_PASSWORD` | `supabase db push`용 DB 비밀번호 | `.env.local` | 배포 시 |
 | `SUPABASE_ACCESS_TOKEN` | CLI/MCP 인증 토큰 | `.env.local` | 배포 시 |
@@ -159,13 +147,17 @@ supabase link --project-ref <ref>   # .env.local의 SUPABASE_PROJECT_REF
 supabase db reset                   # ① 로컬에서 먼저 마이그레이션 건전성 확인
 bash supabase/tests/run-rls.sh      #    (러너는 로컬 스택 전용입니다 — 127.0.0.1:64322 고정)
 
-supabase db push                    # ② 원격에 마이그레이션 적용 (Storage 버킷 3개도 여기서 생성)
+supabase db push                    # ② 원격에 마이그레이션 적용 (Storage 버킷도 여기서 생성)
 supabase migration list --linked    # ③ Local/Remote 열이 일치하는지 대조
 ```
 
 > 🔴 **`supabase db reset --linked`를 쓰면 원격에서 `seed.sql`이 돕니다** — 비밀번호가
-> `test1234`인 테스트 계정이 생기고 그중 하나에 `is_admin = true`가 붙습니다.
-> 시드는 로컬 전용이고, `db push`는 시드를 실행하지 않습니다.
+> `test1234`인 테스트 계정이 생깁니다. 시드는 로컬 전용이고, `db push`는 시드를 실행하지 않습니다.
+
+> ⚠ **`20260926000001_drop_community_survey_match.sql`은 되돌릴 수 없습니다** — 원격에 적용하는 순간
+> 글·댓글·투표·예측·공지 행이 전부 사라집니다. 적용 전에 원격 DB를 백업합니다. 이 마이그레이션은
+> `post-images`·`survey-images` 버킷의 **정책만** 걷습니다(호스팅 Supabase가 버킷 직접 삭제를 막습니다) —
+> 버킷과 남은 파일은 대시보드(Storage)에서 비운 뒤 지웁니다. 공개 버킷이라 그 전까지는 옛 파일의 공개 URL이 열려 있습니다.
 
 ### 2. Vercel 프로젝트
 
@@ -175,32 +167,28 @@ supabase migration list --linked    # ③ Local/Remote 열이 일치하는지 �
 | Build Command | **기본 `next build`** — ⚠ `build:prod`를 쓰면 안 됩니다(`.env.prod`는 저장소에 없습니다) |
 | Install Command | 자동 (`pnpm-lock.yaml`) |
 
-**환경변수는 아래 5개가 전부입니다.** `process.env`를 읽는 곳은
-`src/shared/config/env.ts` · `app/api/admin/sync-matches/route.ts` · `scripts/lib/sync-db.mjs` 셋뿐입니다.
+**환경변수는 아래 표가 전부입니다.** 앱에서 `process.env`를 읽는 곳은 `src/shared/config/env.ts` 하나이고,
+운영 스크립트는 `scripts/lib/sync-db.mjs`가 읽습니다(Vercel이 아니라 GitHub Actions 시크릿으로 받습니다).
 
 | 키 | 범위 | 없으면 |
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Production + Preview | 모든 조회가 "서비스 설정이 완료되지 않았어요."(빌드는 성공합니다) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Production + Preview | 〃 |
 | `NEXT_PUBLIC_SITE_URL` | **Production만** | Preview는 비워 둬야 `VERCEL_URL` 폴백이 배포별 도메인을 잡습니다 |
-| `SUPABASE_SERVICE_ROLE_KEY` | Production (Sensitive) | 어드민 '경기 일정 가져오기'가 500 |
-| `API_FOOTBALL_KEY` | Production (Sensitive) | 〃 |
 
 > ⚠ **`NEXT_PUBLIC_*`는 빌드 시점에 인라인됩니다** — 값을 바꾸면 **반드시 재배포**해야 합니다.
 > `NEXT_PUBLIC_SITE_URL`이 도메인 확정 전에 정해져야 하므로, Import 화면에서 프로젝트 이름을
 > 먼저 정하고 그 자리에서 `https://<이름>.vercel.app`을 넣은 뒤 첫 배포를 돌립니다.
 
-> ⚠ **`NEXT_PUBLIC_SHOW_PLAYER_PHOTOS`는 넣지 않습니다.** 기본 꺼짐이 의도된 안전 기본값이고
-> (선수 초상·퍼블리시티권 미확인), 꺼지면 `PlayerPhoto`가 실루엣으로 떨어집니다.
+> ⚠ **`SUPABASE_AUTH_EXTERNAL_*`·`SUPABASE_PROJECT_REF`·`SUPABASE_DB_PASSWORD`·
+> `SUPABASE_ACCESS_TOKEN`·`SUPABASE_SERVICE_ROLE_KEY`는 Vercel에 넣지 않습니다** — 소셜 로그인 키는
+> 대시보드가, CLI 값은 로컬이, service_role은 수집 워크플로의 시크릿이 소유합니다. 앱 런타임에는
+> service_role이 필요 없습니다.
 
-> ⚠ **`SUPABASE_AUTH_EXTERNAL_*` 4개와 `SUPABASE_PROJECT_REF`·`SUPABASE_DB_PASSWORD`·
-> `SUPABASE_ACCESS_TOKEN`은 Vercel에 넣지 않습니다** — 앞의 넷은 대시보드가, 뒤의 셋은
-> 로컬 CLI가 소유합니다.
-
-빌드 로그에서 확인할 것: `/posts`·`/posts/[id]`·`/surveys`·`/matches`가 **`ƒ`(동적)** 이어야
+빌드 로그에서 확인할 것: `/transfers`·`/transfers/[id]`가 **`ƒ`(동적)** 이어야
 합니다. `○`면 `unstable_rethrow` 가드가 `cookies()`의 내부 에러를 삼킨 것입니다
 ([`docs/conventions/nextjs.md`](docs/conventions/nextjs.md)).
-**`/notices`만 `○` + `30s`가 정상**입니다 — 쿠키를 읽지 않아 통째로 프리렌더되고
+**`/sitemap.xml`만 `○` + `30s`가 정상**입니다 — 쿠키를 읽지 않아 통째로 프리렌더되고
 `ANON_REVALIDATE`가 ISR 주기가 됩니다.
 
 ### 3. Supabase 대시보드 (배포 도메인이 정해진 뒤)
@@ -217,30 +205,22 @@ supabase migration list --linked    # ③ Local/Remote 열이 일치하는지 �
 등록합니다 → [소셜 로그인 설정](docs/oauth-setup.md).
 
 > ⚠ 앱 복귀 주소가 Redirect URLs에 없으면 GoTrue가 **조용히 Site URL로 되돌려** 보냅니다 —
-> `?next=`가 통째로 사라져 "글쓰기를 누르고 로그인했는데 목록으로 떨어지는" 증상이 됩니다.
+> `?next=`가 통째로 사라져 "딜 상세에서 로그인했는데 보드로 떨어지는" 증상이 됩니다.
 
-### 4. 첫 관리자 지정
+### 4. 이적 소식 수집 (GitHub Actions)
 
-앱에 자가 승격 경로가 없습니다(`profiles`의 UPDATE grant는 `(nickname, avatar_path)`뿐이고
-`is_admin`은 SELECT조차 막혀 있습니다). 배포 사이트에서 소셜 로그인을 한 번 한 뒤
-SQL Editor에서:
-
-```sql
-select id, nickname, created_at from public.profiles order by created_at desc limit 5;
-update public.profiles set is_admin = true where id = '<내 uuid>';
-```
-
-그다음 `/admin-you-can-not-access` → **경기 일정 가져오기**로 `team`·`match`를 채웁니다.
-비관리자에게 이 경로가 404인 것이 정상입니다.
+`.github/workflows/sync-transfer-news.yml`이 **매시** `node scripts/sync-transfer-news.mjs --remote`를 돌린다
+(수집 → 딜 파생 → 한국어 요약). 저장소 시크릿에 `SUPABASE_URL`·`SUPABASE_SERVICE_ROLE_KEY`·
+`ANTHROPIC_API_KEY`를 넣는다. 주기의 상한과 무료 한도는 [`docs/conventions/api-and-db.md`](docs/conventions/api-and-db.md)의
+이적 소식 동기화 절에 있다.
 
 ### 5. 배포 후 자동화되지 않는 것
 
 | 항목 | 상태 |
 |---|---|
-| **경기 상세 폴러**(`sync-match-detail.mjs`, 5분 주기 전제) | 실행 주체가 없습니다 — 라인업·기록 탭이 빕니다. `node scripts/sync-match-detail.mjs --remote`를 수동으로 돌립니다 |
-| **일정 동기화** | 어드민 화면 버튼으로만 돕니다. `/api/admin/sync-matches`는 쿠키 세션 + `is_admin` RPC로 인가해 크론이 부를 수 없습니다 |
-| **입축구 면 배경 이미지** | 마이그레이션이 파일을 옮기지 않습니다 → 어드민 화면에서 업로드합니다(`upload-survey-images.mjs`는 로컬 스택 전용입니다) |
-| **구단 엠블럼** | `public/crests/`에 커밋된 것만 뜹니다. 없는 팀은 약칭 모노그램으로 떨어지고, 채우려면 `node scripts/fetch-team-crests.mjs` 후 커밋·재배포입니다 |
+| **구단 엠블럼** | `public/crests/`에 커밋된 것만 뜹니다. 없는 구단은 약칭 모노그램으로 떨어지고, 채우려면 `node scripts/fetch-team-crests.mjs` 후 커밋·재배포입니다 |
+| **이적 창 일정·보도 주체 표기** | `scripts/lib/transfer/windows.json`·`reporters.json`을 시즌마다 사람이 갱신합니다 |
+| **옛 스토리지 버킷** | `post-images`·`survey-images`는 대시보드에서 비우고 지웁니다(위 1번의 경고) |
 
 > ⚠ **무료 플랜의 Supabase 프로젝트는 무활동이 이어지면 정지됩니다** — 정지되면 사이트 전체가
 > 데이터를 잃은 것처럼 보입니다.
@@ -255,30 +235,25 @@ update public.profiles set is_admin = true where id = '<내 uuid>';
 
 ```
 app/                     # Next.js 라우팅 전용 (view만 마운트)
+├── page.tsx             #   / → /transfers 리다이렉트
 ├── (auth)/              #   sign-in (GuestOnly 셸). 소셜 로그인 복귀 지점이기도 하다
-├── posts/               #   목록(list-page.tsx 공유) · category/[slug] · new · [id] · [id]/edit
-├── surveys/             #   목록 · [id] (운영진 문항 — 어드민이 등록한다)
-├── matches/             #   승부예측 목록 · [id] (대진·예측 분포·라인업·기록)
-├── notices/             #   공지 목록 · [id] (익명 클라이언트 — /notices만 ○ + 30s로 프리렌더된다)
-├── profile/             #   닉네임·사진 수정 + 계정 연결 + 차단 목록. 계정 연결의 복귀 지점
-├── admin-you-can-not-access/  # 어드민 백오피스 (layout이 is_admin()으로 판정 → 아니면 404)
-├── api/admin/sync-matches/    # ⚠ 유일한 Route Handler — 외부 API를 서버 비밀로 부르는 자리
-└── sitemap.ts / robots.ts  #   색인 신호 (Next 특수 파일이라 "route.ts 금지"에 걸리지 않는다)
+├── transfers/           #   이적 보드 · [id] (딜 + 보도 타임라인)
+├── profile/             #   닉네임·사진 수정 + 계정 연결. 계정 연결의 복귀 지점
+└── sitemap.ts / robots.ts  #   색인 신호 (Route Handler는 없다 — 이 둘은 Next 특수 파일이다)
 proxy.ts                 # 세션 쿠키 리프레시 (Next 16의 middleware). 라우트 가드는 없다
 src/
 ├── app/                 # providers(QueryClient + AuthProvider), fonts, globals.css
 ├── views/               # 화면 조립 (⚠ pages 금지)
-├── widgets/             # app-bar · bottom-tab-bar · sub-header · tab-scroll-area · auth-shell · auth-status · notice-banner · admin-shell
+├── widgets/             # app-bar · bottom-tab-bar · sub-header · tab-scroll-area · auth-shell · auth-status
 ├── features/            # 사용자 액션 1개 = 슬라이스 1개
-├── entities/            # session · post · comment · profile · poll · survey · match · block · notice
+├── entities/            # session · profile · transfer
 ├── shared/              # ui / api / lib / config
 └── types/               # database.types.ts (supabase 생성 — 손으로 고치지 않는다)
 supabase/
 ├── migrations/          # 스키마 = 보안 설계
-├── seed.sql             # db reset이 자동 실행 (계정·글·댓글·좋아요·투표·입축구)
-├── seed-images/         # 입축구 면 배경 (db reset이 올리지 않는다 — 위 스크립트로)
-└── tests/               # run-rls.sh · rls.sql · concurrency.sh
-handoff_community/       # 디자인 핸드오프 레퍼런스 (구현 대상 아님 — 린트 제외)
+├── seed.sql             # db reset이 자동 실행 (개발 계정 alice/bob)
+└── tests/               # run-rls.sh · rls.sql
+scripts/                 # 운영 스크립트 — 이적 소식 수집·파생·요약, 구단 엠블럼, 규약 검사
 docs/
 ├── conventions/         # 코딩 컨벤션
 ├── oauth-setup.md       # 카카오·구글 앱 등록 → 키 → 검증 절차
@@ -299,6 +274,7 @@ pnpm lint         # ESLint 실행
 pnpm lint:fix     # ESLint 자동 수정
 pnpm db:types     # 로컬 스키마 → src/types/database.types.ts 재생성 (마이그레이션 추가 후 필수)
 pnpm check:conventions  # FSD 레이어·배럴·스타일 화이트리스트 검사
+pnpm test:transfer      # 이적 파이프라인 회귀(추출·조립·파생·요약·이름·소스 — DB 없이 돈다)
 ```
 
 > ⚠ `build`와 `build:prod`는 **같은 `.next/`를 쓴다.** `build:prod` 뒤에 `pnpm start`를 부르면
@@ -312,9 +288,9 @@ pnpm check:conventions  # FSD 레이어·배럴·스타일 화이트리스트 �
 RLS가 유일한 방어선이라 정책을 고칠 때마다 돌려야 합니다.
 
 ```bash
-# RLS · 컬럼 권한 · RPC · 회귀 검사 (전체 rollback이라 DB에 흔적을 남기지 않는다)
+# RLS · 컬럼 권한 · 함수 · 회귀 검사 (전체 rollback이라 DB에 흔적을 남기지 않는다)
 bash supabase/tests/run-rls.sh
 
-# 좋아요 동시성 — N명 동시 클릭 후 like_count == count(post_like)
-bash supabase/tests/concurrency.sh
+# 이적 파이프라인 회귀 (DB·네트워크 없이 돈다)
+pnpm test:transfer
 ```

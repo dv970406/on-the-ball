@@ -18,7 +18,7 @@ import { buildDeal, buildDealListItem, buildReport } from "./mappers";
  *   복원 중에 `undefined`로 한 번 조회하면 세션이 선 뒤 키가 바뀌며 목록이 통째로
  *   다시 마운트된다. **단 프리페치가 있으면 열어 둔다** — 서버가 준 userId로 이미 키가
  *   맞춰져 있는데 게이트를 닫아 두면 서버가 그린 목록을 첫 프레임에 스켈레톤이 덮는다
- *   (`useMatchListQuery`와 같은 규약이라 호출부가 그 판정을 갖는다).
+ *   (호출부가 그 판정을 갖는다).
  * ⚠ `initialData`의 **키 `userId`·`scopeStartIso`도 서버가 준 값이어야 한다.**
  */
 export function useTransferDealListQuery(

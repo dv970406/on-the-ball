@@ -1,4 +1,4 @@
-/** 좋아요·댓글 수 등 숫자를 "28,412" 형태로 표기 */
+/** 숫자를 "28,412" 형태로 표기 */
 export function formatCount(n: number): string {
   return n.toLocaleString("ko-KR");
 }
@@ -20,29 +20,18 @@ export function formatCount(n: number): string {
  */
 const TIME_ZONE = "Asia/Seoul";
 
-/**
- * ⚠ `Intl.DateTimeFormat`은 생성 비용이 크다 — 모듈 스코프에 한 번만 만든다.
- * ⚠ `hourCycle: "h23"`이 필요하다. `hour12: false`만 주면 자정이 "24"로 나오는 구현이 있다.
- */
+/** ⚠ `Intl.DateTimeFormat`은 생성 비용이 크다 — 모듈 스코프에 한 번만 만든다. */
 const PARTS = new Intl.DateTimeFormat("ko-KR", {
   timeZone: TIME_ZONE,
   year: "numeric",
   month: "numeric",
   day: "numeric",
-  weekday: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
 });
 
 interface SeoulParts {
   year: number;
   month: number;
   day: number;
-  /** "월"·"화" … (ko-KR short weekday는 한 글자다) */
-  weekday: string;
-  hour: string;
-  minute: string;
 }
 
 /** 한국 시간 기준의 달력 조각 — 런타임 TZ와 무관하게 같은 값이 나온다 */
@@ -53,9 +42,6 @@ function seoulParts(date: Date): SeoulParts {
     year: Number(found.year),
     month: Number(found.month),
     day: Number(found.day),
-    weekday: found.weekday ?? "",
-    hour: found.hour ?? "00",
-    minute: found.minute ?? "00",
   };
 }
 
@@ -85,7 +71,7 @@ export function formatRelativeTime(iso: string, nowMs: number | null): string {
   // ⚠ **상대시각 구간을 먼저 판정한다.** 이 구간은 차이(ms)만 쓰므로 달력 조각이 필요 없다 —
   //   위에서 계산해 두면 목록의 거의 모든 항목("3분 전"·"2시간 전")이 쓰지도 않을
   //   `formatToParts`를 치른다(실측 1.93µs → 0.14µs, 30건 목록 0.058ms → 0.004ms).
-  //   절대값 자체는 작지만 이 함수는 글 카드·댓글마다 불리는 자리라 공짜인 절약은 취한다.
+  //   절대값 자체는 작지만 이 함수는 목록 행·카드마다 불리는 자리라 공짜인 절약은 취한다.
   if (nowMs !== null) {
     const minutes = Math.floor((nowMs - date.getTime()) / 60_000);
     if (minutes < 1) return "방금 전";
@@ -103,99 +89,4 @@ export function formatRelativeTime(iso: string, nowMs: number | null): string {
 
   if (nowMs === null) return withYear;
   return p.year === seoulParts(new Date(nowMs)).year ? monthDay : withYear;
-}
-
-/**
- * 날짜를 **연도까지 항상** 붙여 "2026년 8월 30일"로 표기. 공지 목록·상세가 쓴다.
- *
- * ⚠ **`formatRelativeTime`을 공지에 쓰지 않는다.** 그 함수는 올해 글의 연도를 생략하는데
- *   ("8월 30일"), 공지는 글과 달리 **문서로서 읽히는 자리**라 그 날짜만으로는 언제 것인지
- *   알 수 없다(실제로 "8월 30일"만 떠서 연도가 없다는 지적이 들어왔다). "3일 전" 같은
- *   상대시각도 같은 이유로 쓰지 않는다 — 공지에서 사용자가 기억하는 것은 날짜다.
- * ⚠ 그래서 `nowMs`를 받지 않는다 — 연도를 붙일지 정할 일이 없어 기준 시각이 필요 없다
- *   (`formatKickoffTime`과 같은 계약). 호출부에 `serverNowMs`를 흘려보낼 이유도 함께 사라진다.
- * ⚠ 달력 조각은 **KST 기준**이다(위 TIME_ZONE 주석).
- */
-export function formatDate(iso: string): string {
-  const p = seoulParts(new Date(iso));
-  return `${p.year}년 ${p.month}월 ${p.day}일`;
-}
-
-/**
- * 킥오프 시각을 "11월 3일 (일) 04:30"으로 표기. 해가 다르면 앞에 연도를 붙인다.
- *
- * ⚠ **`formatRelativeTime`을 쓸 수 없다.** 그 함수는 `nowMs - date`로 과거를 전제하는데
- *   킥오프는 대개 **미래**라 차이가 음수가 되어 전부 "방금 전"이 된다.
- *
- * ⚠ **요일을 함께 찍는다.** 축구 일정에서 요일은 장식이 아니라 정보다 — "11월 3일"만으로는
- *   주말 경기인지 알 수 없고, 사용자가 실제로 기억하는 단위가 요일이다.
- *
- * ⚠ `nowMs`를 받는 계약은 형제 함수와 같다 — **연도를 붙일지만** 그 값으로 정하고,
- *   `null`이면(서버·하이드레이션 직전) **항상 붙인다.** 연도를 빼는 쪽이 거짓이 될 수 있는
- *   방향이라 모를 때는 붙이는 쪽으로 기운다.
- */
-export function formatKickoff(iso: string, nowMs: number | null): string {
-  // ⚠ **런타임 TZ를 읽지 않는다** — 서버(UTC)와 브라우저(KST)가 다른 날짜를 그린다(위 주석).
-  const p = seoulParts(new Date(iso));
-  const base = `${p.month}월 ${p.day}일 (${p.weekday}) ${p.hour}:${p.minute}`;
-
-  if (nowMs !== null && p.year === seoulParts(new Date(nowMs)).year) return base;
-  return `${p.year}년 ${base}`;
-}
-
-/**
- * 한국 시간 기준의 달력 하루를 가리키는 키 — `"2026-09-05"`.
- *
- * 경기 목록을 날짜로 묶는 데 쓴다(`groupMatchesByDay`).
- *
- * ⚠ **표시 문구로 묶지 않는다.** `formatMatchDay`가 돌려주는 라벨은 해가 다른 같은 날짜에서
- *   똑같아지므로("9월 5일 (토)"), 그걸 키로 삼으면 1년 떨어진 두 경기가 한 그룹이 된다.
- * ⚠ 하루의 경계는 **KST**다 — 서버(UTC)에서 자르면 화면이 그리는 날짜와 어긋난다(위 주석).
- */
-export function seoulDayKey(iso: string): string {
-  const p = seoulParts(new Date(iso));
-  return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
-}
-
-/**
- * 경기 목록의 날짜 헤딩 — `"오늘 (금)"` · `"내일 (토)"` · `"9월 5일 (토)"`.
- *
- * 카드마다 되풀이되던 날짜를 헤딩 하나로 접기 위한 표기라, **시각을 담지 않는다**
- * (시각은 카드가 `formatKickoffTime`으로 그린다).
- *
- * ⚠ **요일은 오늘·내일에도 붙인다.** 축구 일정에서 요일은 장식이 아니라 정보이고
- *   (`formatKickoff`과 같은 판단), 헤딩끼리 형태가 갈리면 목록이 들쭉날쭉해 보인다.
- * ⚠ `nowMs`가 `null`이면(서버·하이드레이션 직전) 오늘/내일을 판정할 수 없다 → 절대 날짜에
- *   **연도까지 붙인다.** 형제 함수들과 같은 계약이다 — 모를 때는 붙이는 쪽으로 기운다.
- * ⚠ **`formatKickoff`을 이걸로 바꾸지 않는다.** 상세는 공유·색인되는 페이지라 "오늘"이
- *   크롤 시점에 굳어 거짓이 된다(`formatRelativeTime` 주석이 남긴 판단).
- */
-export function formatMatchDay(iso: string, nowMs: number | null): string {
-  const p = seoulParts(new Date(iso));
-  const suffix = `(${p.weekday})`;
-
-  if (nowMs === null) return `${p.year}년 ${p.month}월 ${p.day}일 ${suffix}`;
-
-  // ⚠ **날짜 차이를 ms로 재지 않는다.** `(kickoff - now) / 86400000`은 "24시간 뒤"를 재는
-  //   것이라 오늘 23시와 내일 01시가 같은 날로 접힌다 — 우리가 세는 것은 **달력 하루**다.
-  const today = seoulDayKey(new Date(nowMs).toISOString());
-  const day = seoulDayKey(iso);
-  if (day === today) return `오늘 ${suffix}`;
-  // 내일은 "오늘 + 하루"의 키와 대조한다 — 월·연 넘김을 Date가 알아서 처리한다
-  if (day === seoulDayKey(new Date(nowMs + 86_400_000).toISOString())) return `내일 ${suffix}`;
-
-  const n = seoulParts(new Date(nowMs));
-  const base = `${p.month}월 ${p.day}일 ${suffix}`;
-  return p.year === n.year ? base : `${p.year}년 ${base}`;
-}
-
-/**
- * 킥오프의 시:분만 — `"23:00"`.
- *
- * 날짜를 헤딩이 갖는 목록 카드용이다. 날짜까지 함께 필요하면 `formatKickoff`을 쓴다.
- * ⚠ `nowMs`를 받지 않는다 — 연도를 붙일지 정할 일이 없어 기준 시각이 필요 없다.
- */
-export function formatKickoffTime(iso: string): string {
-  const p = seoulParts(new Date(iso));
-  return `${p.hour}:${p.minute}`;
 }

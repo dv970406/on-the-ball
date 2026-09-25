@@ -5,7 +5,7 @@ import { userScope } from "@/shared/lib/query-scope";
  *
  * ⚠ **목록까지 userId로 스코프한다.** 행이 "내가 관심 등록했는가"를 `transfer_deal_watch`
  *   임베딩("내 행만")으로 그리므로 목록 응답 자체가 "나"에 종속된다 — 키에 유저가 없으면
- *   계정이 바뀐 뒤에도 이전 사용자의 관심 표시가 남는다(`matchKeys`·`surveyKeys`와 같은 이유).
+ *   계정이 바뀐 뒤에도 이전 사용자의 관심 표시가 남는다(`userScope` 주석).
  *
  * ⚠ **정렬·리그는 키에 넣지 않는다.** 서버가 범위 안 딜 전체(≤`TRANSFER_DEAL_LIMIT`)를 내리고
  *   뷰가 같은 데이터로 필터·정렬한다 — 필터 객체가 훅과 키 하나라도 어긋나면 `initialData`가

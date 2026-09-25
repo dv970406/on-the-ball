@@ -70,7 +70,7 @@ const fetchTransferBoard = cache(async (): Promise<TransferBoard> => {
   const scopeStartIso = toMinuteIso(boardScopeStartMs(nowMs));
   try {
     /*
-     * ⚠ **세션이 없으면 익명 클라이언트로 갈아탄다**(`app/posts/list-page.tsx`와 같은 갈림).
+     * ⚠ **세션이 없으면 익명 클라이언트로 갈아탄다**(`hasSessionCookie()` 갈림).
      *   비로그인에게 이 보드는 모든 요청에 동일하다 — 관심 임베딩(`transfer_deal_watch`, "내 행만")이
      *   빈 배열이고 나머지 정책은 전부 `using (true)`다. 그래서 Data Cache를 태워 크롤러·비로그인의
      *   조회가 캐시 히트에서 DB를 타지 않게 한다.

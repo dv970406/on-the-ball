@@ -14,25 +14,9 @@ import { useEffect, type RefObject } from "react";
  *
  * ⚠ 재시도는 rAF **와 타이머 양쪽**에 건다. 이유는 아래 `schedule` 주석에.
  */
-/** 저장 키의 단일 소스 — 아래 훅과 clearScrollRestore가 공유한다 */
+/** 저장 키의 단일 소스 */
 function scrollKey(pathname: string) {
   return `otb-scroll:${pathname}`;
-}
-
-/**
- * 저장된 스크롤 위치를 버린다 → 다음 진입에서 맨 위로 시작한다.
- *
- * 글 작성·삭제처럼 **목록 내용이 사용자 발밑에서 바뀐** 직후에 쓴다.
- * 그대로 복원하면 방금 올린 글이 화면 위쪽 밖에 있어 "등록됐다는데 안 보인다"가 된다
- * (핸드오프 3장의 "화면 전환 시 스크롤 최상단"이 겨냥한 상황이다).
- * 반대로 목록↔상세 왕복에서는 복원이 맞으므로 그쪽은 건드리지 않는다.
- */
-export function clearScrollRestore(pathname: string) {
-  try {
-    sessionStorage.removeItem(scrollKey(pathname));
-  } catch {
-    // 저장 불가 환경 — 어차피 복원할 값이 없다
-  }
 }
 
 export function useScrollRestore(ref: RefObject<HTMLElement | null>) {

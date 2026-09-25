@@ -17,7 +17,7 @@ interface GroupChipsProps {
  *
  * ⚠ `GROUP_ORDER` 다섯을 **전부** 그린다(빈 구간은 `disabled` + `opacity-40`) — `groupDeals`는
  *   빈 구간을 빼므로 그쪽 배열을 돌면 칩이 접속마다 늘고 준다.
- * ⚠ 형태는 말머리 칩(`chipClassName`)과 같다 — 활성은 잉크 채움이고 에메랄드가 아니다.
+ * ⚠ 형태는 `chipClassName`과 같다 — 활성은 잉크 채움이고 에메랄드가 아니다.
  * ⚠ ARIA 상태를 붙이지 않는다 — 토글이 아니라 `aria-pressed`가 틀리고, 활성 표시는 스크롤
  *   위치를 되비치는 장식이라 알릴 상태가 아니다(`code-quality.md`의 두 경우에 들지 않는다).
  */

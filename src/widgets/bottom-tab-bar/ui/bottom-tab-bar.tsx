@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeftRight, ClipboardList, MessagesSquare, Target, User } from "lucide-react";
+import { ArrowLeftRight, User } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/shared/lib";
 import { ROUTES, activeTabHref } from "@/shared/config";
@@ -27,9 +27,6 @@ interface TabItem {
  * 탭을 되살리려면 라우트를 **먼저** 만든다(빈 자리를 되넣지 말 것).
  */
 const TABS: TabItem[] = [
-  { label: "커뮤니티", icon: MessagesSquare, href: ROUTES.postList },
-  { label: "입축구", icon: ClipboardList, href: ROUTES.surveyList },
-  { label: "승부예측", icon: Target, href: ROUTES.matchList },
   { label: "이적시장", icon: ArrowLeftRight, href: ROUTES.transferList },
   { label: "프로필", icon: User, href: ROUTES.profile, signInAction: "프로필을 보려면" },
 ];
@@ -40,7 +37,7 @@ const TABS: TabItem[] = [
  * ⚠ backdrop-blur를 쓰는 **유일하게 허용된 요소**다. 헤더·모달 스크림에는 쓰지 않는다.
  * ⚠ 활성 탭은 흰 글자 + 흰 반투명 배경이고 **아이콘만 에메랄드**다.
  *   이 자리가 허용되는 근거는 원칙이 아니라 `styling.md`의 **에메랄드 자리 표**다 —
- *   같은 `aria-current="page"` 링크인 말머리 칩은 잉크인데, 그 차이를 문장으로는 그을 수 없다.
+ *   같은 선택 상태인 구간 칩(`chipClassName`)은 잉크인데, 그 차이를 문장으로는 그을 수 없다.
  */
 export function BottomTabBar() {
   /**
@@ -49,7 +46,7 @@ export function BottomTabBar() {
    *   (타입이 `string`이라 컴파일도 통과했다).
    */
   const pathname = usePathname();
-  // ⚠ 정확 일치로 두면 말머리 목록에서 커뮤니티 탭이 비활성이 된다 — 판정은 routes.ts가 갖는다
+  // ⚠ 판정은 routes.ts가 갖는다 — 토스트 위치와 같은 판정을 써야 둘이 갈리지 않는다
   const active = activeTabHref(pathname);
 
   /**
@@ -101,7 +98,7 @@ export function BottomTabBar() {
               key={tab.label}
               href={tab.href}
               aria-current={isActive ? "page" : undefined}
-              // ⚠ 수식어 클릭은 가로채지 않는다 — 사유는 `post-list-view`의 FAB 주석과 같다
+              // ⚠ 수식어 클릭은 가로채지 않는다 — 새 탭·새 창 열기는 브라우저의 기본 동작이다
               onClick={(e) => {
                 if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
                 if (!tab.signInAction || sessionStatus !== "guest") return;

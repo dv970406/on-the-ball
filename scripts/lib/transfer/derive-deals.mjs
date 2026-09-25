@@ -2,7 +2,7 @@
  * 딜 파생 — `transfer_news`(보도 행)에서 선수 단위 이적 건(`transfer_deal`)을 만든다.
  *
  * 보드는 어드민 큐레이션이 없다 — 이 파생이 유일한 원천이다. 그래서 **틀린 칸보다 빈 칸**이 규칙이다:
- * 방향·이적료·계약·주급은 그 선수가 나오는 문장에서만 읽고, 못 읽으면 null로 둔다(compose.mjs와 같은 판단).
+ * 방향·이적료·계약·주급은 그 선수가 나오는 문장에서만 읽고, 못 읽으면 null로 둔다(틀린 칸보다 빈 칸이 낫다).
  *
  * 두 층으로 나뉜다.
  *   - `deriveDeals(rows, opts)` — **순수 함수**. 행 배열 → 딜·구단·행 배정. 회귀 테스트(`test-transfer-derive.mjs`)가
@@ -129,7 +129,7 @@ function displayName(rows, key) {
 
 /**
  * 그 선수에게 해당하는 단계 — 추출기가 그 선수만 잡은 행이 아니면 선수가 나오는 문장만으로 다시 판정한다
- * (곁들여 나온 선수가 기사 주인공의 단계를 받는 것을 막는다 — compose.mjs의 `stageFor`와 같은 규칙).
+ * (곁들여 나온 선수가 기사 주인공의 단계를 받는 것을 막는다).
  */
 function stageFor(r, mentions, memo) {
   if (r.players.every((p) => mentions.test(p))) return r.stage;
@@ -205,7 +205,7 @@ function resolveDirection(items, player) {
   const fromClub = freeClub ?? topVote(from);
   const destClub = topVote(dest);
   const isFree = Boolean(freeClub) || anyFreeAgent;
-  // 같은 구단이 양쪽에 오면 어느 쪽도 믿지 않는다(compose.mjs와 같은 판단)
+  // 같은 구단이 양쪽에 오면 어느 쪽도 믿지 않는다
   const origin = fromClub && fromClub !== destClub ? fromClub : null;
   const destination = destClub && destClub !== fromClub ? destClub : null;
   // 소속을 못 읽었으면 전 소속이 출발 구단이다 — 자유 계약("former Real Madrid defender")도 그 구단을 떠나온 것이다
@@ -303,7 +303,7 @@ export function deriveDeals(rows, opts) {
     if (!items.length) continue;
 
     const dir = resolveDirection(items, player);
-    // 소속·행선지를 못 읽었는데 재계약·첫 프로 계약 표현이면 이적이 아니다(compose.mjs와 같은 판정) —
+    // 소속·행선지를 못 읽었는데 재계약·첫 프로 계약 표현이면 이적이 아니다 —
     // 유스 선수의 "first professional contract" 공지가 오피셜 딜로 잡혔다(실측)
     if (!dir.from && !dir.to && !dir.isFree && items.some((it) => it.storySentences.some((s) => RENEWAL.test(s)))) {
       skip("재계약·첫 프로 계약");

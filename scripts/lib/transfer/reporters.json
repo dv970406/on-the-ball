@@ -1,12 +1,11 @@
 {
   "_comment": [
-    "보도 주체의 화면 표기 — 이적설 글(compose.mjs)과 이적시장 화면(entities/transfer)이 같은 파일을 읽는다.",
-    "journalists: 계정·핸들(transfer_news.attributed_to) → 기자의 **한국어 전체 이름**(벤 제이콥스). 화면·이적설 글 어디서나 이 표기 하나를 쓴다.",
+    "보도 주체의 화면 표기 — 파이프라인과 이적시장 화면(entities/transfer)이 같은 파일을 읽는다.",
+    "journalists: 계정·핸들(transfer_news.attributed_to) → 기자의 **한국어 전체 이름**(벤 제이콥스). 화면 어디서나 이 표기 하나를 쓴다.",
     "sources: 소스 id → 보도 주체. Google News 소스는 그 기자의 보도를 인용한 기사를 모은 피드라 보도 주체가 기자다 —",
     "bylines: RSS 기사의 기자 이름(byline) → 화면 표기. 등재된 기자면 매체보다 **기자가 먼저**다(보도 주체·등급 모두). 우선순위: bylines → sources → journalists → attributed_to 원문 → source_id.",
     "  attributed_to(Yahoo Sports 같은 재인용 매체)를 쓰면 규칙 위반이다. 매체 피드는 매체명이다.",
     "outlets: 소스 id → 매체·계정 라벨. registry.mjs의 label과 같아야 한다(test-transfer-extract.mjs가 양방향으로 대조한다).",
-    "우선순위(compose.reporter): sources → journalists → attributed_to 원문 → source_id.",
     "credibility: 공신력 등급 — 화면이 출처 옆에 🎖️ 또는 달 5단계(🌑 1 ~ 🌕 5)로 그린다. 🎖️는 오피셜에 육박하는 매체에만 쓰고, 그 밖의 매체와 기자는 모두 달로 매긴다.",
     "  outlets(소스 id → \"medal\" | 1~5)가 먼저, 없으면 journalists(보도 주체 표기 → 1~5). 둘 다 없으면 표시하지 않는다.",
     "  ⚠ 매체는 소스 id로 매긴다 — 'BBC'라는 표기를 BBC Sport와 BBC 이적 가십(타블로이드 루머 모음)이 함께 쓴다.",

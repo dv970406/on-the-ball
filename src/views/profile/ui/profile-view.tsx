@@ -12,7 +12,6 @@ import { NICKNAME_LIMIT } from "@/features/update-profile";
 import { useAvatarUpload } from "../model/use-avatar-upload";
 import { useLinkReturn } from "../model/use-link-return";
 import { useNicknameForm } from "../model/use-nickname-form";
-import { BlockedUsers } from "./blocked-users";
 import { LinkedAccounts } from "./linked-accounts";
 
 interface ProfileViewProps {
@@ -56,10 +55,10 @@ export function ProfileView({
    */
   const signOut = useSignOut();
 
-  const header = <SubHeader title="프로필" fallbackHref={ROUTES.postList} />;
+  const header = <SubHeader title="프로필" fallbackHref={ROUTES.transferList} />;
   /**
    * 이 화면은 하단 탭바의 두 목적지 중 하나다 — 탭으로 들어왔는데 탭바가 사라지면
-   * 커뮤니티로 돌아갈 수단이 뒤로가기뿐이 된다. 상태 분기마다 함께 렌더한다.
+   * 이적시장으로 돌아갈 수단이 뒤로가기뿐이 된다. 상태 분기마다 함께 렌더한다.
    */
   const tabBar = <BottomTabBar />;
   /**
@@ -73,10 +72,10 @@ export function ProfileView({
 
   /*
    * ⚠ **로딩을 화면 전체의 조기 반환으로 두지 않는다.**
-   *   전에는 `if (profile.isPending) return <스켈레톤>`이라 아래 `LinkedAccounts`·`BlockedUsers`가
-   *   **마운트조차 되지 않았다** — 세 쿼리는 서로 의존이 없는데 프로필이 끝난 뒤에야 나머지 둘이
+   *   전에는 `if (profile.isPending) return <스켈레톤>`이라 아래 `LinkedAccounts`가
+   *   **마운트조차 되지 않았다** — 두 쿼리는 서로 의존이 없는데 프로필이 끝난 뒤에야 나머지가
    *   출발하는 직렬 워터폴이 됐다(이 화면은 서버 프리페치도 없어 전부 클라이언트 왕복이다).
-   *   지금은 프로필 자리만 스켈레톤으로 두고 나머지는 그대로 그려 셋이 동시에 출발한다.
+   *   지금은 프로필 자리만 스켈레톤으로 두고 나머지는 그대로 그려 둘이 동시에 출발한다.
    * ⚠ 아래 두 분기는 그대로 조기 반환이다 — 프로필이 아예 없으면 이 화면에 그릴 것이 없다.
    */
 
@@ -223,8 +222,6 @@ export function ProfileView({
 
         {/* 로그인 수단 */}
         <LinkedAccounts userId={user?.id} />
-
-        <BlockedUsers userId={user?.id} />
 
         {/*
           계정 — 공통 헤더(AppBar)에 있던 로그아웃이 내려온 자리다.

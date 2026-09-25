@@ -4,9 +4,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
 import { AVATAR_BUCKET } from "@/shared/config";
 import { useToast } from "@/shared/lib";
-import { commentKeys } from "@/entities/comment";
-import { matchKeys } from "@/entities/match";
-import { postKeys } from "@/entities/post";
 import { profileKeys } from "@/entities/profile";
 import {
   ACCEPTED_IMAGE_TYPES,
@@ -107,23 +104,15 @@ export function useUpdateAvatar(userId: string | undefined) {
       return path;
     },
     /**
-     * 아바타는 상세·댓글의 작성자 표기로도 나가므로 그쪽 캐시도 함께 무효화한다
-     * (POST_DETAIL_SELECT·COMMENT_SELECT의 author 임베딩에 avatar_path가 있다).
+     * ⚠ 아바타를 싣는 캐시가 새로 생기면(작성자 표기 등) 여기 함께 무효화한다.
      * 낙관적 업데이트가 없으므로 Promise를 반환해 리페치까지 isPending을 유지한다.
      *
      * ⚠ **`onSuccess`가 아니라 `onSettled`다.** 이 훅은 업로드 전에 폴더를 비우므로
      *   실패해도 **서버 상태가 이미 바뀌어 있다**(파일 삭제 + `avatar_path` null 정리).
      *   실패 경로에서 무효화를 안 하면 "기존 사진은 지워졌으니 다시 올려 주세요"라는 문구
-     *   바로 위에 **방금 지운 사진이 그대로** 떠 있다(staleTime 5분이라 목록·댓글까지).
+     *   바로 위에 **방금 지운 사진이 그대로** 떠 있다.
      */
-    onSettled: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: profileKeys.all }),
-        queryClient.invalidateQueries({ queryKey: postKeys.all }),
-        queryClient.invalidateQueries({ queryKey: commentKeys.all }),
-        // 랭킹 행도 닉네임·아바타를 싣는다(`match_leaderboard`)
-        queryClient.invalidateQueries({ queryKey: matchKeys.rankings() }),
-      ]),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: profileKeys.all }),
     // ⚠ 실패를 반드시 알린다 — 이 훅은 업로드 전에 기존 사진을 지우므로,
     //   놓치면 사진이 사라진 이유를 알 수 없다.
     onError: (error) => toast(error.message),

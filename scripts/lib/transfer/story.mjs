@@ -1,5 +1,5 @@
 /**
- * 한 선수의 이야기로 읽기 위한 **텍스트 손질** — 글 조립(compose)과 딜 파생(derive-deals)이 공유한다.
+ * 한 선수의 이야기로 읽기 위한 **텍스트 손질** — 딜 파생(derive-deals)이 쓴다.
  *
  * 순수 함수뿐이다. 둘이 각자 문장을 나누면 같은 원문에서 다른 문장 집합을 보게 되어
  * 글의 소속팀과 보드의 출발 구단이 갈린다.
@@ -11,7 +11,7 @@ export const RANK = ["rumour", "talks", "offer", "agreement", "personal_terms", 
 /** 여러 선수를 한데 모은 가십 칼럼 — 한 선수의 이야기로 읽으면 남의 구단·금액이 섞인다 */
 /**
  * 재계약·첫 프로 계약 — 같은 구단에 남는 계약이라 이적이 아니다. 소속·행선지를 못 읽었는데 이 표현이 있으면
- * 이적 기사로 보지 않는다(이적설 글 조립과 딜 파생이 같은 판정을 쓴다).
+ * 이적 기사로 보지 않는다.
  */
 export const RENEWAL = /\b(?:new (?:deal|contract)|contract extension|extends?|extension|renew(?:s|ed|al)?|stay(?:s)? at|(?:first )?professional (?:contract|deal)|first senior (?:deal|contract))\b/i;
 

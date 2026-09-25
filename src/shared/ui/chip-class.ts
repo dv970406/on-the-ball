@@ -1,12 +1,10 @@
 import { cn } from "@/shared/lib/cn";
 
 /**
- * 말머리 칩의 시각 스타일 — 형태의 단일 소스.
+ * 칩(필터·구간 레일)의 시각 스타일 — 형태의 단일 소스.
  *
- * ⚠ **`Chip`(`button`)과 파일을 나눈 이유**: 목록의 말머리 레일은 이제 **이동**이라
- *   `next/link`의 `<Link>`가 그려야 하는데(크롤러가 말머리 페이지를 발견하는 유일한 경로),
- *   `Link` 안에 `button`을 넣을 수 없다. 작성 폼은 이동이 아니라 **선택**이라 `Chip` 그대로다.
- *   `buttonClassName`↔`Button`, `actionChipClassName`↔`ActionChip`과 같은 형태다.
+ * ⚠ **컴포넌트가 아니라 클래스 함수다**: 레일이 **이동**이면 `next/link`의 `<Link>`가 그려야
+ *   하는데 `Link` 안에 `button`을 넣을 수 없다 — `buttonClassName`과 같은 이유다.
  *
  * ⚠ 선택 시 잉크 블랙이다(에메랄드 아님). 활성 탭 아이콘은 에메랄드인데 이 칩은 아닌 것이
  *   원칙으로는 갈리지 않는다(둘 다 `aria-current="page"`인 `Link`다) — **판정은 `styling.md`의

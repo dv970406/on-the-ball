@@ -35,39 +35,15 @@ const DEEP_IMPORT_ALLOWED = new Set([
   "@/shared/lib/format",
   "@/shared/lib/post-id",
   "@/shared/lib/text",
-  // 구조화 데이터 렌더 — "use client"가 없어 서버 page가 직접 경로로 렌더한다(배럴은 클라이언트 UI를 담는다)
-  "@/shared/ui/json-ld",
   // 쿼리 키 조각 — `api/keys.ts`는 서버 소비자라 "use client"를 담은 배럴을 거칠 수 없다
   "@/shared/lib/query-scope",
-  "@/entities/post/api/list-query",
-  "@/entities/survey/api/list-query",
-  // 목록 SSR이 "진행 중 + 참여함"을 가려 집계를 함께 그린다 — 판정은 이 함수가 단독 소유
-  "@/entities/survey/lib/open",
-  "@/entities/comment/api/list-query",
-  "@/entities/match/api/list-query",
-  // 랭킹 조립(범위 → 두 판) — 랭킹 SSR이 훅과 같은 범위·상한·RPC 인자를 써야 한다
-  "@/entities/match/api/ranking-query",
-  "@/entities/notice/api/list-query",
   "@/entities/transfer/api/list-query",
   // 리그 필터·정렬 파싱 — SSR 페이지가 `?league=`·`?sort=`를 클라이언트 훅과 같은 판정으로 읽는다
   "@/entities/transfer/lib/league",
   // 단계 → 상태 뱃지 톤·라벨 — 상세 SSR이 화면과 같은 매핑으로 상태 문구를 그린다
   "@/entities/transfer/lib/stage",
-  // 마감 판정의 단일 소스. `"use client"`가 없어 서버 안전하고, SSR 페이지가 클라이언트와
-  // **같은 판정**을 써야 한다(`lib/plain-summary`와 같은 형태).
-  "@/entities/match/lib/open",
-  "@/entities/post/lib/plain-summary",
-  "@/entities/post/lib/hot",
-  // 본문의 이미지 URL — `og:image`·구조화 데이터가 화면(어드민)과 같은 추출을 써야 한다
-  "@/entities/post/lib/post-images",
-  // 댓글 스레드 조립 — 구조화 데이터의 `comment` 중첩이 화면과 같은 판정(고아 승격)을 써야 한다
-  "@/entities/comment/lib/build-comment-threads",
   "@/entities/session/lib/auth-error-message",
   "@/features/sign-in/lib/pkce-verifier",
-  // 구조화 데이터(JSON-LD) 조립 — views 배럴은 "use client" 뷰를 담아 서버 page가 거칠 수 없다.
-  // 뷰 슬라이스에 두는 이유: "화면에 보이는 것만 적는다"가 규칙이라 그 화면을 소유한 슬라이스가 갖는다
-  "@/views/post-detail/lib/json-ld",
-  "@/views/notice-detail/lib/json-ld",
 ]);
 /** `@/entities/<slice>/...` 형태로 모든 엔티티에 공통 허용되는 서버 안전 경로 */
 const DEEP_IMPORT_ALLOWED_ENTITY_SUFFIX = ["model/types", "api/mappers", "api/keys"];
@@ -79,28 +55,7 @@ const DEEP_IMPORT_ALLOWED_ENTITY_SUFFIX = ["model/types", "api/mappers", "api/ke
  * 여기 있는데 현역이 돼도 실패한다(그래야 목록이 죽지 않는다).
  */
 const DOCUMENTED_UNUSED = new Map([
-  // reuse.md `@/shared/ui`의 "현재 미사용" 목록. 실측상 번들에 실리지 않는다
-  // (아래 목록 전량이 프로덕션 청크에서 0건) — 다만 그건 각 모듈이
-  // 순수해서이지 "배럴이라 공짜"여서가 아니다. 근거는 architecture.md의 트리셰이킹 절.
-  ["TabHeader", "v1 자산 (reuse.md 미사용 목록)"],
-  ["Flag", "v1 자산 (reuse.md 미사용 목록)"],
-  ["Shirt", "v1 자산 (reuse.md 미사용 목록)"],
-  ["SectionHead", "v1 자산 (reuse.md 미사용 목록)"],
-  ["LiveStatusPill", "v1 자산 (reuse.md 미사용 목록)"],
-  ["NightCard", "v1 자산 (reuse.md 미사용 목록)"],
-  ["PlayerSilhouette", "v1 자산 (reuse.md 미사용 목록)"],
-  // 위 컴포넌트들의 prop 타입 — 컴포넌트와 운명을 같이한다
-  ["FlagCode", "Flag의 prop 타입"],
-  ["ShirtStripe", "Shirt의 prop 타입"],
-  ["RatioSegment", "RatioBar의 prop 타입"],
-  // reuse.md가 공개 API로 문서화한 것들
-  ["PostInsert", "reuse.md '이미 뽑아 둔 것' — DB 행 타입"],
-  ["PostUpdate", "reuse.md '이미 뽑아 둔 것' — DB 행 타입"],
-  ["CommentInsert", "reuse.md '이미 뽑아 둔 것' — DB 행 타입"],
-  ["HOT_LIKE_THRESHOLD", "reuse.md가 HOT 판정 임계값으로 공개"],
-  ["HOT_WINDOW_MS", "reuse.md가 HOT 판정 창으로 공개"],
-  ["graphemeLength", "reuse.md가 공개 — 단 한도 판정은 lengthOverflow가 소유한다"],
-  ["PostDraft", "PostForm의 입력 타입 — validatePost와 한 쌍"],
+  // 지금은 없다 — 호출부 없이 남길 export가 생기면 [이름, 사유]로 여기 적는다.
 ]);
 
 /**
@@ -112,46 +67,23 @@ const DOCUMENTED_UNUSED = new Map([
  * ⚠ **양방향으로 본다** — 목록에 없는 route.ts가 나타나면 실패하고, 목록에 있는데 파일이
  *   사라져도 실패한다(그래야 목록이 죽지 않는다). 다른 화이트리스트와 같은 장치다.
  */
-const ROUTE_HANDLER_ALLOWED = new Map([
-  [
-    "app/api/admin/sync-matches/route.ts",
-    "경기 일정 동기화 — API-Football 키와 service_role이 서버 전용이라 브라우저가 부를 수 없다",
-  ],
-  [
-    "app/api/cron/sync-matches/route.ts",
-    "경기 일정 정기 동기화 — Vercel Cron이 부른다. 관리자 세션이 없어 CRON_SECRET으로 인가한다",
-  ],
-]);
+const ROUTE_HANDLER_ALLOWED = new Map([]);
 
 /** styling.md가 못박은 예외 위치. 여기 없는 파일에 나타나면 실패한다. */
 const STYLE_ALLOWED = {
   "rounded-full": [
-    // 알약 예외 — 아래 목록이 전부다
-    "src/shared/ui/action-chip-class.ts",
-    "src/views/post-detail/ui/comment-bar.tsx",
-    "src/views/post-list/ui/post-list-view.tsx",
+    // 알약 예외 — 지금은 없다(styling.md의 알약 예외 표와 한 쌍이다)
     // "대상이 아닌 것" — 원형 히트 영역
     "src/widgets/sub-header/ui/sub-header.tsx",
-    "src/views/post-detail/ui/post-detail-view.tsx",
     "src/views/profile/ui/profile-view.tsx",
     // "대상이 아닌 것" — 원형 아이콘 컨테이너
     "src/shared/ui/empty-state.tsx",
     // "대상이 아닌 것" — 표시 요소
-    "src/shared/ui/live-dot.tsx",
     "src/shared/ui/avatar.tsx",
     "src/shared/ui/pill.tsx",
-    "src/shared/ui/ratio-bar.tsx",
     "src/shared/ui/wordmark.tsx",
-    "src/entities/post/ui/post-card.tsx",
     // "대상이 아닌 것" — 바텀시트 그래버(드래그 어포던스, 클릭 대상이 아니다)
     "src/shared/ui/sheet.tsx",
-    // "대상이 아닌 것" — 분할 카드의 VS 배지(aria-hidden 장식, 컨트롤이 아니다)
-    "src/entities/survey/ui/vs-badge.tsx",
-    // 등번호 원·센터서클·사건 배지 — 컨트롤이 아니라 피치와 선수를 그리는 표시 요소다
-    // (전부 원이 아니면 성립하지 않는 형태다)
-    "src/entities/match/ui/lineup-pitch.tsx",
-    "src/entities/match/ui/player-badges.tsx",
-    "src/entities/match/ui/player-photo.tsx",
     // "대상이 아닌 것" — 이적시장 상태 뱃지·관심 표시 원·결렬 X 원·타임라인 점(전부 컨트롤이 아니다)
     "src/entities/transfer/ui/status-badge.tsx",
     "src/entities/transfer/ui/watch-mark.tsx",
@@ -162,24 +94,17 @@ const STYLE_ALLOWED = {
   "shadow-": [
     "src/shared/ui/sheet.tsx",
     "src/shared/ui/dialog.tsx",
-    "src/features/write-post/ui/link-insert-dialog.tsx",
-    "src/views/post-list/ui/post-list-view.tsx",
     "src/widgets/bottom-tab-bar/ui/bottom-tab-bar.tsx",
   ],
   "backdrop-blur": ["src/widgets/bottom-tab-bar/ui/bottom-tab-bar.tsx"],
   // 에메랄드가 나타나는 자리 — styling.md의 표와 한 쌍이다.
-  // ⚠ 원칙("눌러야 할 곳 하나")으로는 경계가 갈리지 않아(활성 탭 아이콘 ↔ 활성 말머리 칩은
-  //   둘 다 aria-current인 Link다) 자리를 센다. 새 에메랄드는 여기와 표에 함께 적는다.
+  // ⚠ 원칙("눌러야 할 곳 하나")으로는 경계가 갈리지 않아(활성 탭 아이콘 ↔ 활성 구간 칩은
+  //   둘 다 선택 상태를 그린다) 자리를 센다. 새 에메랄드는 여기와 표에 함께 적는다.
   "bg-primary": [
     "src/shared/ui/button-class.ts", // primary 버튼 — 그 화면의 CTA
     "src/shared/ui/dialog.tsx", // confirmTone="primary"
-    "src/shared/ui/action-chip-class.ts", // 좋아요 활성(상세)
     "src/shared/ui/wordmark.tsx", // 워드마크의 볼 — 브랜드 마크
     "src/shared/ui/pill.tsx", // green 배지
-    "src/shared/ui/live-dot.tsx", // primary 도트
-    "src/entities/survey/ui/vs-badge.tsx", // 분할 카드의 VS 배지
-    // 승부예측의 결과 띠 — 채점 뒤 결과 칸에만 1개(선택지 3개에는 쓰지 않는다)
-    "src/entities/match/ui/prediction-block.tsx",
     "src/entities/transfer/ui/status-badge.tsx", // 오피셜 뱃지 — 글자를 담은 상태 표시
     "src/entities/transfer/ui/watch-mark.tsx", // 관심 표시 원 — 종 아이콘이 형태를 진다
   ],
@@ -198,22 +123,8 @@ const STYLE_ALLOWED = {
   "Pill variant={": [],
   // 에메랄드 확인 버튼 — `bg-primary` 리터럴이 아니라 위 대조에 걸리지 않던 자리
   'confirmTone="primary"': ["src/shared/ui/sign-in-dialog.tsx"],
-  'variant="green"': [
-    "src/shared/ui/live-status-pill.tsx", // v1 자산(미사용)
-    "src/entities/match/ui/match-card.tsx", // 예측 적중 배지 — 예측했고 채점된 카드에만 1개
-    "src/views/match-detail/ui/match-detail-view.tsx", // 상세의 적중 배지 — 한 화면에 1개
-    // '필독' 배지 — 공지가 닿는 네 자리에서 같은 색이어야 한 종류로 읽힌다.
-    // CTA가 아니라 상태 표시라 "눌러야 할 곳 하나" 셈에 들어가지 않고,
-    // 글자를 담고 있어 "색이 정보를 혼자 지지 않는다"도 만족한다.
-    "src/widgets/notice-banner/ui/notice-banner.tsx",
-    "src/views/notice-list/ui/notice-list-view.tsx",
-    "src/views/notice-detail/ui/notice-detail-view.tsx",
-    "src/views/admin-notice-list/ui/admin-notice-list-view.tsx",
-  ],
+  'variant="green"': [],
   "text-primary": [
-    "src/entities/post/ui/post-card.tsx", // 목록 카드의 좋아요 하트
-    "src/entities/comment/ui/comment-item.tsx", // "내 댓글" 배지
-    "src/views/post-detail/ui/comment-section.tsx", // 댓글 수
     "src/widgets/bottom-tab-bar/ui/bottom-tab-bar.tsx", // 활성 탭 아이콘
     // 이적료 상승 화살표 — 리터럴은 `text-primary-deep`이고 부분 문자열로 이 대조에 걸린다
     "src/entities/transfer/ui/fee-delta.tsx",

@@ -70,7 +70,6 @@ export function useNicknameForm(
     /**
      * ⚠ 호출부 `onSuccess`는 훅의 무효화 Promise가 **끝난 뒤에야** 실행된다(data-and-state.md).
      *   그 사이 사용자가 이어서 입력했을 수 있으므로, 제출 시점 값과 달라졌으면 덮지 않는다.
-     *   선례: `use-comment-composer`가 같은 방식으로 입력 손실을 막는다.
      * ⚠ 판정을 클로저 값으로 하지 말 것 — 함수형 업데이트로 **현재 값**과 비교해야 맞는다.
      */
     const submitted = value;

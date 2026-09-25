@@ -38,7 +38,7 @@ export type TransferLeague = "프리미어리그" | "분데스리가" | "라리�
 /**
  * 리그 시트에 노출하는 순서.
  * ⚠ `as const satisfies`가 **없는 값**을 막고, 아래 망라성 가드가 **빠뜨린 값**을 막는다
- *   (`MATCH_PICKS`·`POST_CATEGORIES`와 같은 형태).
+ *   (`api-and-db.md`의 노출 순서 배열 + 망라성 가드 형태).
  */
 export const TRANSFER_LEAGUES = [
   "프리미어리그",
@@ -142,7 +142,7 @@ export interface TransferDeal {
   /**
    * 내가 관심 등록했는가.
    * ⚠ `transfer_deal_watch`의 SELECT 정책이 "내 행만"이라 **임베딩 배열 길이가 곧 이 값**이다
-   *   (`post_like`·`match_prediction`과 같은 트릭 — 남의 관심이 새는 사고가 구조적으로 불가능하다).
+   *   (남의 관심이 새는 사고가 구조적으로 불가능하다).
    *   비로그인은 정책이 `to authenticated`라 빈 배열 → `false`.
    * ⚠ 목록과 상세 **둘 다** 이 값을 갖는다 — 상세의 토글이 이 값을 읽고 낙관적으로 뒤집는다.
    */

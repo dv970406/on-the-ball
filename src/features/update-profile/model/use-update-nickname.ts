@@ -10,9 +10,6 @@ import {
   useToast,
   type TextLimit,
 } from "@/shared/lib";
-import { commentKeys } from "@/entities/comment";
-import { matchKeys } from "@/entities/match";
-import { postKeys } from "@/entities/post";
 import { profileKeys } from "@/entities/profile";
 
 /**
@@ -103,16 +100,9 @@ export function useUpdateNickname(userId: string | undefined) {
      * isPending을 유지해 저장 직후 재클릭으로 중복 요청이 나가는 것을 막는다
      * (data-and-state.md의 표 참고).
      *
-     * 닉네임은 글·댓글의 작성자 표기로도 나가므로 그쪽 캐시도 함께 무효화한다.
+     * ⚠ 닉네임을 싣는 캐시가 새로 생기면(작성자 표기 등) 여기 함께 무효화한다.
      */
-    onSuccess: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: profileKeys.all }),
-        queryClient.invalidateQueries({ queryKey: postKeys.all }),
-        queryClient.invalidateQueries({ queryKey: commentKeys.all }),
-        // 랭킹 행도 닉네임·아바타를 싣는다(`match_leaderboard`)
-        queryClient.invalidateQueries({ queryKey: matchKeys.rankings() }),
-      ]),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: profileKeys.all }),
     // 실패를 앱의 유일한 알림 채널로 — 필드 아래 문구는 조건부 평문이라 낭독되지 않는다
     onError: (error) => toast(error.message),
   });

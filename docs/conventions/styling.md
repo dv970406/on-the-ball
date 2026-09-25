@@ -6,7 +6,7 @@
 - **토큰과 동일한 hex를 하드코딩하지 않는다.**
   - Tailwind 유틸로 표현: `bg-primary`, `text-ink`, `border-hairline` …
   - 알파는 토큰+투명도: `bg-primary/[0.12]` (❌ `bg-[rgba(62,207,142,0.12)]`).
-  - 인라인 `style`에 JS 색이 필요하면(예: `RatioBar` segment) `COLOR`(`@/shared/config`)를 참조. 뷰별 로컬 색 상수 재정의 금지.
+  - 인라인 `style`·SVG 속성에 JS 색이 필요해지면 토큰과 같은 값의 상수를 `@/shared/config`에 **한 곳만** 두고 참조한다. 뷰별 로컬 색 상수 재정의 금지.
 
 ## 스타일 적용 방식
 
@@ -29,14 +29,14 @@
 - prop으로 받은 px: `style={{ width: size, height: size }}`
 
 **값이 유한한 열거형(tone·side·상태)은 동적이 아니다** — `Record<K, string>` 클래스 맵으로 만든다.
-(예: `shared/ui/live-dot.tsx`의 `DOT_TONE`, `shared/ui/button-class.ts`의 `BUTTON_VARIANT`)
+(예: `shared/ui/pill.tsx`의 `PILL_VARIANT`, `shared/ui/button-class.ts`의 `BUTTON_VARIANT`)
 
 CSS 변수를 `style`로 주입해 클래스에서 읽는 패턴(`style={{ "--w": ... }}` + `w-[var(--w)]`)은 쓰지 않는다 — 간접 계층만 늘어난다.
 
 ### `CSSProperties`를 반환하는 헬퍼 함수 금지
 
 상태별 스타일은 **className 문자열을 반환하는 함수**나 `cn()` 분기로 표현한다.
-선례: `shared/ui/button-class.ts`의 `buttonClassName`, `shared/ui/action-chip-class.ts`의 `actionChipClassName`.
+선례: `shared/ui/button-class.ts`의 `buttonClassName`, `shared/ui/chip-class.ts`의 `chipClassName`.
 
 ```tsx
 // ❌ 금지
@@ -54,14 +54,14 @@ function cardClassName(peek: boolean) {
 
 `translate-*` / `scale-*` / `rotate-*` 표준 유틸은 **`transform`이 아니라 개별 CSS 프로퍼티**를 출력한다(Tailwind v4). 그래서 `transform`과 **합성**되고, 이게 두 가지 사고를 낸다.
 
-1. **`@keyframes`와의 합성.** `vs-pop`은 `transform: translate(-50%,-50%) rotate(-12deg) scale(...)`을 애니메이트한다. 같은 요소에 `-translate-x-1/2`를 얹으면 `translate` 프로퍼티가 **추가로** 적용되어 -50%가 두 번 먹고 위치가 깨진다.
+1. **`@keyframes`와의 합성.** 키프레임이 `transform: translate(-50%,-50%) rotate(-12deg) scale(...)`을 애니메이트하는데 같은 요소에 `-translate-x-1/2`를 얹으면 `translate` 프로퍼티가 **추가로** 적용되어 -50%가 두 번 먹고 위치가 깨진다.
 2. **`transition-property` 불일치.** `transition-[transform,opacity]`는 `translate`/`scale`/`rotate` 변화를 **트랜지션하지 않는다**(`transition-transform`만 `transform, translate, scale, rotate`를 전부 커버). `scale-[1.04]`로 바꾸면 애니메이션이 조용히 사라지고 순간이동한다.
 
 ```tsx
 // ❌
-<span className="animate-vs-pop -translate-x-1/2 -translate-y-1/2 rotate-[-12deg]" />
+<span className="animate-[pop_300ms] -translate-x-1/2 -translate-y-1/2 rotate-[-12deg]" />
 // ✅
-<span className="animate-vs-pop [transform:translate(-50%,-50%)_rotate(-12deg)]" />
+<span className="animate-[pop_300ms] [transform:translate(-50%,-50%)_rotate(-12deg)]" />
 ```
 
 **유일한 예외**: 같은 요소에 animation도, transform을 건드리는 transition도 **없는** 순수 정적 배치는 `-translate-x-1/2 -translate-y-1/2` 센터링을 그대로 써도 된다.
@@ -79,21 +79,13 @@ function cardClassName(peek: boolean) {
 2. **슬라이스 내부 `Record<K, string>` 클래스 맵** — 판별자(tone·side·상태)가 **이미 있고** 값들이 반드시 함께 바뀔 때만. 새 추상화를 만드는 게 아니라 기존 맵의 값 타입을 바꾸는 수준이어야 한다.
 3. 그 외는 전부 **인라인 arbitrary**. 길어도 1회 사용이면 이름을 붙이지 않는다 — 바로 위 한국어 주석이 이미 의미를 설명한다.
 
-### 마크다운 렌더
-
-- **Tailwind Typography(`prose`)를 도입하지 않는다.** 새 의존성인 데다 자체 색·간격 스케일이 Tifo 토큰과 충돌한다. 대신 `shared/ui/markdown.tsx`의 `components` 맵에 태그별 클래스를 명시한다(판별자가 태그명이라 `styling.md`의 "슬라이스 내부 클래스 맵" 기준을 충족).
-- **본문 링크를 에메랄드로 칠하지 않는다.** 본문에 링크가 많으면 "뷰포트당 컬러 이벤트 1개"가 깨진다 — 밑줄만으로 충분히 구분된다. GFM 체크박스도 `accent-ink`.
-- 넘칠 수 있는 블록(`pre`·`table`)은 **자기 안에서만 가로 스크롤**시킨다(`overflow-x-auto` 래퍼). 페이지 본문이 가로로 밀리면 안 된다.
-- react-markdown은 기본적으로 raw HTML을 렌더하지 않는다(rehype-raw 미사용). 본문이 사용자 입력이므로 **이 기본값을 절대 풀지 않는다**.
-- 본문 이미지는 블록(원래 크기·위아래 여백)으로 그린다. 예외는 제목이 `"icon"`인 이미지뿐이다 — 글자 높이 인라인 아이콘(`reuse.md`의 `Markdown`).
-
 ## 디자인 규칙 (Tifo)
 
 - **한 화면에서 "눌러야 할 곳"을 가리키는 에메랄드는 하나다.** 나머지는 잉크 그레이 래더.
   - ⚠ **원칙은 이유를 설명할 뿐이고, 판정은 아래 표가 한다.** 브랜드 마크·상태 표시·메타
     액센트는 CTA가 아니라서 이 셈에 들어가지 않는데, 그 경계를 문장으로 그으면 반드시
-    갈린다 — 실제로 활성 탭 아이콘(에메랄드)과 활성 말머리 칩(잉크)은 둘 다
-    `aria-current="page"`인 `Link`라 어떤 원칙으로도 나뉘지 않는다. 그래서 **자리를 센다.**
+    갈린다 — 실제로 활성 탭 아이콘(에메랄드)과 선택된 칩(잉크)은 둘 다 선택 상태를 그리는
+    컨트롤이라 어떤 원칙으로도 나뉘지 않는다. 그래서 **자리를 센다.**
   - ⚠ **에메랄드가 나타나는 자리는 아래가 전부다.** 새로 칠하려면 이 표와
     `scripts/check-conventions.mjs`의 `bg-primary`·`text-primary` 항목에 함께 적는다 —
     `pnpm check:conventions`가 양방향으로 대조한다(알약·그림자 예외와 같은 장치).
@@ -102,34 +94,23 @@ function cardClassName(peek: boolean) {
     |---|---|
     | `shared/ui/button-class.ts` | `primary` 버튼 — 그 화면의 CTA |
     | `shared/ui/dialog.tsx` | `confirmTone="primary"` 확인 버튼 |
-    | `shared/ui/action-chip-class.ts` | 좋아요 활성(상세) |
     | `shared/ui/wordmark.tsx` | 워드마크의 볼 — 브랜드 마크 |
     | `shared/ui/pill.tsx` | `green` 배지 |
     | `shared/ui/sign-in-dialog.tsx` | `confirmTone="primary"` — 로그인 안내의 확인 버튼 |
-    | `shared/ui/live-status-pill.tsx` | `green` 배지 소비 — v1 자산(현재 미사용) |
-    | `shared/ui/live-dot.tsx` | `primary` 도트 |
-    | `entities/post/ui/post-card.tsx` | 목록 카드의 좋아요 하트 |
-    | `entities/comment/ui/comment-item.tsx` | "내 댓글" 배지 |
-    | `entities/survey/ui/vs-badge.tsx` | 분할 카드의 VS 배지 |
-    | `views/match-detail/ui/match-detail-view.tsx` | 승부예측 상세의 "적중" 배지 — 한 화면에 1개 |
-    | `entities/match/ui/prediction-block.tsx` | 승부예측 **결과 띠** — 채점이 끝난 뒤 **결과 칸에만 1개**. 같은 블록의 선택지 3개에는 쓰지 않는 것과 갈리는 지점이고, 체크 아이콘이 형태를 지어 "색이 정보를 혼자 지지 않는다"도 만족한다 |
-    | `entities/match/ui/match-card.tsx` | 승부예측 "적중" 배지 — **예측했고 채점까지 끝난 카드에만 1개**. 선택지(카드당 3개)에 에메랄드를 쓰지 않는 것과 갈리는 지점이고, 글자를 담아 "색이 정보를 혼자 지지 않는다"도 만족한다 |
-    | `widgets/notice-banner/ui/notice-banner.tsx` · `views/notice-list` · `views/notice-detail` · `views/admin-notice-list` | `'필독'` 배지 — 공지가 닿는 네 자리에서 **같은 색이어야 한 종류로 읽힌다**. CTA가 아니라 상태 표시라 이 셈에 들어가지 않고(`match-card`의 적중 배지와 같은 자리), 글자를 담아 "색이 정보를 혼자 지지 않는다"도 만족한다. ⚠ 피드에서는 글쓰기 FAB과 한 뷰포트에 함께 뜨는데, **CTA는 여전히 FAB 하나**다 |
     | `entities/transfer/ui/status-badge.tsx` | 이적시장 오피셜 뱃지 — CTA가 아니라 상태 표시라 이 셈에 들어가지 않고, 글자("오피셜")를 담아 "색이 정보를 혼자 지지 않는다"도 만족한다 |
     | `entities/transfer/ui/watch-mark.tsx` | 이적시장 관심 표시 원(목록 행) — 상태 표시. 글자 대신 종 아이콘(`Bell`, `fill-current`)이 형태를 지고 `sr-only` 텍스트가 스크린리더에 같은 뜻을 준다 |
     | `entities/transfer/ui/fee-delta.tsx` | 이적시장 이적료 상승 화살표(`text-primary-deep`) — 콘텐츠 값의 방향 표시라 CTA 셈에 들어가지 않고, `ArrowUp` 아이콘이 형태를 진다(하락은 `text-crimson`) |
-    | `views/post-detail/ui/comment-section.tsx` | 댓글 수 |
     | `widgets/bottom-tab-bar/ui/bottom-tab-bar.tsx` | 활성 탭 아이콘 |
 
     (검사는 **주석을 걷어낸 소스**를 훑는다 — 주석에 적힌 `bg-primary`는 세지 않는다.)
 
-  - ⚠ **리터럴만 세면 새는 자리가 있다.** `Pill variant="green"`은 `bg-primary`를 간접으로 쓰므로 리터럴 대조를 구조적으로 통과할 수 없다 — 실제로 그 경로로 목록 카드에 에메랄드가 들어왔는데 검사도 이 표도 알지 못했다. 그래서 `check-conventions.mjs`가 `variant="green"`도 함께 센다. **에메랄드를 감싼 컴포넌트를 새로 만들면 그 prop도 검사에 등재한다.**
+  - ⚠ **리터럴만 세면 새는 자리가 있다.** `Pill variant="green"`은 `bg-primary`를 간접으로 쓰므로 리터럴 대조를 구조적으로 통과할 수 없다 — 실제로 그 경로로 목록 카드에 에메랄드가 카드 수만큼 들어왔는데 검사도 이 표도 알지 못했다. 그래서 `check-conventions.mjs`가 `variant="green"`도 함께 센다. **에메랄드를 감싼 컴포넌트를 새로 만들면 그 prop도 검사에 등재한다.**
   - ⚠ **그마저도 리터럴일 때만 보인다.** `variant={ok ? "green" : …}` 같은 동적 값은 어떤 문자열 대조도 통과하므로, 검사가 **`Pill variant={` 자체를 금지**한다 — 에메랄드가 걸린 prop은 리터럴로 쓴다.
 
   - ⚠ **색이 정보를 혼자 지지 않는다.** 에메랄드(#3ecf8e)는 흰 배경 대비가 **1.99:1**이라
     WCAG의 비텍스트 최소 3:1에 못 미친다 — 이 색에 **글자나 형태 없는 표시를 싣지 않는다.**
-    좋아요 하트가 성립하는 것은 채우기(`fill-current`)가 상태를 함께 지기 때문이고
-    (빈 윤곽 ↔ 꽉 찬 면), 그래서 옆 숫자는 잉크로 남는다.
+    관심 표시 원이 성립하는 것은 종 아이콘의 채우기(`fill-current`)가 형태를 함께 지기 때문이고,
+    오피셜 뱃지는 글자가 뜻을 진다.
 - 에메랄드(`bg-primary`) 위 텍스트는 항상 `text-on-primary`(#171717) — **흰색 금지**.
 - 버튼은 **6px 라운드**(`rounded-sm`) — pill 버튼 금지. **예외는 아래 표에 못박아 두었다.**
 - 그림자 대신 **1px 헤어라인**이 카드 구조를 담당, resting 상태는 flat. **예외는 "떠 있는 레이어"뿐이다(아래).**
@@ -152,22 +133,15 @@ function cardClassName(peek: boolean) {
     - ⚠ **사진 위에 얹는 스피너는 스크림 없이 성립하지 않는다.** 아래 깔린 것이 사용자가 올린
       이미지라 밝기를 가정할 수 없다 — 순백 사진 위 흰 링의 대비는 `bg-ink/40`에서 **1.6:1**로
       비텍스트 최소 3:1에 한참 못 미쳐 링이 묻힌다. `bg-ink/75`가 3.4:1로 그 선을 넘는 지점이다.
-    - ⚠ **라이브 도트의 펄스도 같은 예외다**(`LiveDot pulse` — "진행 중" 배지). 끝이 없는 표시라
-      시간 규칙 밖이고, `ease-in-out`이지만 목표값을 지나쳤다 돌아오는 키프레임이 없어 바운스가
-      아니다. 목록에 진행 중 경기가 여럿이면 도트도 여럿이므로 **`current` 톤(배지 글자색)**을
-      쓴다 — `primary`면 에메랄드가 카드 수만큼 는다.
-  - ⚠ **등장 모션은 "늦게 도착하는 것"에만 건다.** 투표 뒤 열리는 집계, 이동으로 새로 그려지는
-    분포, 탭을 골라 드러나는 라인업이 대상이고 **SSR로 이미 그려진 HTML에는 걸지 않는다** —
-    첫 페인트를 300ms 늦추고 카운트업 숫자가 서버 HTML과 어긋난다. 판정은
-    `useEntranceMotion`(`@/shared/lib`)이 단독으로 갖고 `CountUp`·`RatioBar`는 그 판정을 **안에서**
-    하므로 호출부가 기억할 것이 없다. 라인업·기록처럼 탭 뒤에 숨는 것은 뷰가 "탭을 골랐는가"를
-    함께 본다(`views/match-detail`). **목록 전체에 스태거를 거는 것은 이 규칙의 반대편이다** —
+  - ⚠ **등장 모션은 "늦게 도착하는 것"에만 건다.** 사용자의 행동 뒤에 열리는 결과, 이동으로 새로
+    그려지는 구역이 대상이고 **SSR로 이미 그려진 HTML에는 걸지 않는다** — 첫 페인트를 늦추고
+    숫자 카운트업이 서버 HTML과 어긋난다. 판정은 "하이드레이션 이후에 마운트됐는가"로 하고, 그 판정을
+    화면마다 다시 짜지 않고 한 곳에 둔다. **목록 전체에 스태거를 거는 것은 이 규칙의 반대편이다** —
     목록은 SSR이고 스크롤 복원이 있어 뒤로가기마다 재생된다.
-  - ⚠ **실패에는 모션을 주지 않는다.** 예측 `실패` 배지·틀린 칸은 정적이다 — 강조할 감정이 아니고,
-    오답 흔들기류는 오버슛이라 어차피 규약 밖이다. 적중 배지와 결과 띠만 떠오른다.
+  - ⚠ **실패에는 모션을 주지 않는다.** 강조할 감정이 아니고, 흔들기류는 오버슛이라 어차피 규약 밖이다.
   - ⚠ **transform을 애니메이트하는 키프레임은 표준 translate/scale 유틸이 있는 요소에 얹지 않는다**
-    (위 transform 절의 합성 사고). 센터링이 필요한 요소는 안쪽 래퍼에 건다 — `lineup-pitch`의
-    선수 마커가 그 형태다. 키프레임 목록은 `globals.css`의 "결과·데이터 도착 모션" 절이 갖는다.
+    (위 transform 절의 합성 사고). 센터링이 필요한 요소는 **안쪽 래퍼**에 애니메이션을 건다.
+    키프레임은 `globals.css`에 일반 `@keyframes`로 두고 arbitrary 유틸로 소비한다(`@theme`는 동결).
 - 강한 컬러(클럽 컬러·국기)는 **콘텐츠**로만 허용 — 크롬(버튼·네비)에는 금지.
 - `prefers-reduced-motion` 존중(전역 처리됨).
   - ⚠ **언마운트를 `animationend`에 거는 요소에는 `motion-safe:`를 붙이지 않는다.** reduce 환경에서
@@ -184,32 +158,29 @@ function cardClassName(peek: boolean) {
 
 `border-dashed`는 헤어라인 규칙의 예외가 아니라 **의미가 다른 선**이다 — 실선 헤어라인이
 "여기까지가 이 구조"를 그린다면, 파선은 **비어 있고 채울 수 있는 자리**를 그린다.
-그래서 "선택지 추가"처럼 **누르면 항목이 하나 생기는 컨트롤**에만 쓴다
-(선례: `features/write-post/ui/poll-composer.tsx`).
+그래서 "선택지 추가"처럼 **누르면 항목이 하나 생기는 컨트롤**에만 쓴다.
 
 ⚠ 카드·입력창·구분선을 파선으로 바꾸지 않는다. 그 자리에서 파선은 "미완성"으로 읽힌다.
 
 ### 알약(`rounded-full`) 예외
 
-프로토타입 치수를 그대로 옮긴 자리다. **이 목록에 없으면 `rounded-sm`이다.**
+프로토타입 치수를 그대로 옮긴 자리를 여기 적는다. **이 목록에 없으면 `rounded-sm`이다.**
 
 | 자리 | 파일 |
 |---|---|
-| `ActionChip` (좋아요·댓글 카운터 칩) | `shared/ui/action-chip-class.ts` |
-| 댓글 입력창 | `views/post-detail/ui/comment-bar.tsx` |
-| 댓글 전송 버튼 | `views/post-detail/ui/comment-bar.tsx` |
-| 글쓰기 FAB | `views/post-list/ui/post-list-view.tsx` |
+| (지금은 없다) | — |
+
+⚠ 알약 컨트롤을 새로 두려면 이 표와 `scripts/check-conventions.mjs`의 `STYLE_ALLOWED["rounded-full"]`에
+**함께** 적는다 — 한쪽만 적으면 검사가 실패한다.
 
 **이 규칙이 말하는 "버튼"은 라벨을 담은 직사각형 컨트롤이다.** 그 밖의 `rounded-full`은 애초에 이 규칙의 대상이 아니므로 예외 목록에 넣지 않는다:
 
 | 대상이 아닌 것 | 이유 | 실제 위치 |
 |---|---|---|
-| `size-11`/`size-9` 원형 아이콘 **버튼** | 버튼 라운드가 아니라 **원형 히트 영역** | `sub-header` · `post-detail-view` · `profile-view`(사진 변경) |
+| `size-11`/`size-9` 원형 아이콘 **버튼** | 버튼 라운드가 아니라 **원형 히트 영역** | `sub-header` · `profile-view`(사진 변경) |
 | 원형 아이콘 **컨테이너**(클릭 불가) | 히트 영역도 아닌 순수 장식 | `shared/ui/empty-state.tsx` |
-| 도트·아바타·`Pill`·`RatioBar`·워드마크의 볼 | 컨트롤이 아닌 **표시 요소** | `live-dot` · `avatar` · `pill` · `ratio-bar` · `wordmark` · `post-card`의 구분점 · `profile-view`의 아바타 스켈레톤·업로드 스피너 |
+| 아바타·`Pill`(과 그 도트)·워드마크의 볼 | 컨트롤이 아닌 **표시 요소** | `avatar` · `pill` · `wordmark` · `profile-view`의 아바타 스켈레톤·업로드 스피너 |
 | 바텀시트 **그래버**(36×4px 바) | 누르는 컨트롤이 아니라 **드래그 어포던스** — 아래로 끌면 시트가 따라 내려간다 | `shared/ui/sheet.tsx` |
-| 분할 카드의 **VS 배지** | `aria-hidden` 장식이라 컨트롤이 아니다 — 원이 아니면 성립하지 않는 형태다 | `entities/survey/ui/vs-badge.tsx` |
-| 라인업의 **선수 사진**·**등번호 배지**·**센터서클**·**사건 배지**(득점·교체) | 누르는 컨트롤이 아니라 피치와 선수를 그리는 표시 요소다 — 전부 원이 아니면 성립하지 않는다(사진은 `Avatar`와 같은 얼굴 원이다) | `entities/match/ui/lineup-pitch.tsx` · `player-badges.tsx` · `player-photo.tsx` |
 | 이적시장 **상태 뱃지**·**관심 표시 원**·**결렬 X 원**·**보도 타임라인 점** | 누르는 컨트롤이 아니라 상태·경로·시간순을 그리는 표시 요소다 | `entities/transfer/ui/status-badge.tsx` · `watch-mark.tsx` · `club-route.tsx` · `views/transfer-detail/ui/report-timeline.tsx` |
 
 ⚠ 위의 알약 예외 표와 이 "대상이 아닌 것" 표는 **`pnpm check:conventions`가 대조한다** — 목록에 없는 `rounded-full`이 생기면 검사가 실패한다. 그림자·`backdrop-blur` 예외도 같다.
@@ -217,39 +188,25 @@ function cardClassName(peek: boolean) {
 
 경계가 헷갈리는 대비 선례:
 
-- **`Chip`(말머리)은 `rounded-sm`이다.** "칩이니까 알약"이 아니다. 실제로 같은 화면에서 `Chip`은 6px, `ActionChip`은 알약으로 공존한다.
+- **칩(`chipClassName`)은 `rounded-sm`이다.** "칩이니까 알약"이 아니다 — 이적 보드의 구간 칩이 6px이다.
 
-### 입축구 분할 카드 예외 — 면 색은 **콘텐츠**다
+### 콘텐츠가 정하는 색은 크롬 규칙 밖이다
 
-`entities/survey/ui/split-card.tsx`의 각 면은 배경·글자색을 문항이 정한다(`survey_option`의
-`bg_color`·`text_color`). "한 뷰포트당 컬러 이벤트는 에메랄드 1개"와 부딪혀 보이지만, 이 규칙이
-막는 것은 **크롬**의 색이고 여기 색은 선택지 자체다 — "강한 컬러는 콘텐츠로만 허용"에 해당한다.
+면·배지의 색을 **데이터가 정하는** 자리(DB에서 온 색, 구단·국가 색)는 "한 뷰포트당 에메랄드 1개"와
+부딪혀 보이지만, 그 규칙이 막는 것은 **크롬**의 색이고 여기 색은 콘텐츠 자체다 —
+"강한 컬러는 콘텐츠로만 허용"에 해당한다.
 
-**VS 배지도 카드의 일부다.** 도형이 맞물리는 시임을 덮는 요소라 카드 없이는 성립하지 않는다 —
-그래서 목록이 진행 중 문항을 N장 그리면 배지도 N개가 되고, 그건 이 규칙의 위반이 아니다.
-
-- 다만 **크롬(버튼·네비·헤더)의 에메랄드 1개 규칙은 그대로다.** 카드 바깥에 에메랄드를 더하지 않는다.
-- 그래서 입축구 화면의 액션 버튼은 `dark`·`secondary`를 쓴다 — `primary`를 쓰면 카드가 아닌
-  자리에 에메랄드가 하나 더 생긴다.
-  ⚠ **말하는 대상은 카드와 같은 층에 있는 버튼이다.** 스크림 위로 뜬 `Dialog`는 여기 해당하지
-  않는다(위 "층에서 따로 센다") — 입축구 화면에서도 로그인 안내의 확인 버튼은 에메랄드다.
-- 목록의 일반 카드·상세의 비율 바는 지금처럼 잉크 래더만 쓴다.
-
-⚠ 색은 `style`로 준다 — DB에서 오는 런타임 값이라 클래스로 확정할 수 없다(위 "동적 값" 규칙).
-⚠ **결과가 열리면 카드를 버리지 않는다.** 시임이 득표비로 움직이고(2분할) 면 위에 퍼센트와
-  체크가 얹힌다 — 도형·클램프·시임 방향은 `entities/survey/lib/split-layout.ts`의 `splitSeam`이
-  단독으로 갖는다. 그 시임 값은 런타임이라 `style`이고, 정적 도형만 완성된 클래스 문자열이다.
-  ⚠ 2분할 시임은 **왼쪽이 낮다** — 이름이 붙는 모서리가 각 면의 두꺼운 쪽이어야 시임이 밀려도
-  글자가 잘리지 않는다. 방향을 뒤집으면 진 면의 이름이 얇은 쐐기에 갇힌다.
-⚠ **카드에도 배지에도 그림자를 두지 않는다.** resting 카드는 flat + 1px 헤어라인이고,
-  배지는 `border-4 border-white`가 이미 면과 배지를 갈라 놓는다.
+- 다만 **크롬(버튼·네비·헤더)의 에메랄드 1개 규칙은 그대로다.** 콘텐츠 바깥에 에메랄드를 더하지 않는다 —
+  색 있는 콘텐츠와 같은 층의 액션 버튼은 `dark`·`secondary`를 쓴다. 스크림 위로 뜬 `Dialog`는 층이
+  달라 따로 센다.
+- ⚠ 색은 `style`로 준다 — DB에서 오는 런타임 값이라 클래스로 확정할 수 없다(위 "동적 값" 규칙).
 
 #### ⚠ clip-path 도형은 **완성된 클래스 문자열**로 둔다
 
-`entities/survey/lib/split-layout.ts`의 맵이 `[clip-path:polygon(...)]`을 통째로 담는 이유다.
+도형을 `[clip-path:polygon(...)]` 클래스로 그릴 때는 그 문자열을 **통째로** 맵에 담는다.
 Tailwind는 소스 텍스트에서 클래스 후보를 훑으므로 `` `[clip-path:${x}]` ``처럼 런타임에
-조립하면 **그 유틸이 아예 생성되지 않아 카드가 통짜 사각형으로 나온다** — 빌드는 조용히 통과한다.
-arbitrary 값 안의 공백은 `_`로 쓴다.
+조립하면 **그 유틸이 아예 생성되지 않아 도형이 통짜 사각형으로 나온다** — 빌드는 조용히 통과한다.
+arbitrary 값 안의 공백은 `_`로 쓴다. 값이 정말 런타임이면(비율에 따라 움직이는 좌표) 그 부분만 `style`로 준다.
 
 ### 브랜드 버튼 예외 — 소셜 로그인 2개
 
@@ -275,9 +232,7 @@ resting 상태의 카드·목록·헤더는 **여전히 flat + 1px 헤어라인*
 | 자리 | 값 |
 |---|---|
 | `Dialog` | `shadow-[0_16px_48px_rgba(0,0,0,0.12)]` |
-| `LinkInsertDialog` (`features/write-post/ui/link-insert-dialog.tsx`) | 〃 — `Dialog`와 같은 층이라 같은 값 |
 | `Sheet` | `shadow-[0_-8px_32px_rgba(0,0,0,0.12)]` — **위로** 던진다(아래는 화면 밖이라 그림자가 갈 곳이 없다) |
-| 글쓰기 FAB | `shadow-[0_8px_24px_rgba(0,0,0,0.18)]` |
 | `BottomTabBar` | `shadow-[0_12px_32px_rgba(0,0,0,0.18),inset_...]` (blur도 여기만 허용) |
 
 새 그림자를 넣고 싶으면 **"이 요소가 정말 떠 있는가"** 를 먼저 답한다. 카드에 얹고 싶은 거라면 답은 헤어라인이다.
@@ -294,8 +249,8 @@ resting 상태의 카드·목록·헤더는 **여전히 flat + 1px 헤어라인*
   어포던스 거짓말이다.
 - ⚠ **그 밴드는 `button aria-label="닫기"`여야 한다.** 스크림 탭·Escape·스와이프 셋은 전부
   포인터이거나 물리 키보드라 **터치 스크린리더에 닿는 것이 하나도 없다**(스크림·그래버는
-  `aria-hidden`이고 `aria-modal`이 바깥을 가린다). 오버플로 메뉴는 남의 글이면 항목이 전부
-  `disabled`라 **시트 안 활성 컨트롤이 0개**가 되는데, 그때 이 버튼이 유일한 탈출구다.
+  `aria-hidden`이고 `aria-modal`이 바깥을 가린다). 항목이 전부 `disabled`인 메뉴라면
+  **시트 안 활성 컨트롤이 0개**가 되는데, 그때 이 버튼이 유일한 탈출구다.
   높이도 44px(`py-5` + 바 4px)로 잡는다 — 짚어야 끌 수 있는 띠라 히트 영역 기준을 지킨다.
 - 항목 사이에 **헤어라인을 긋지 않는다.** 좌우 여백이 없어 구분선이 화면을 가로지르는 선이 된다.
 - ⚠ 라운드 20px은 **서피스** 값이라 "버튼 6px" 규칙과 무관하다(카드 14px · `Dialog` 16px과 같은 계열).

@@ -1,5 +1,5 @@
 // ⚠ "use client" 모듈 포함 — 서버에서는 model/types·api/mappers·api/keys·api/list-query와
-//    lib/stage·lib/rumors·lib/sort·lib/league를 직접 import한다(`entities/match`와 같은 형태).
+//    lib/stage·lib/rumors·lib/sort·lib/league를 직접 import한다.
 //
 // ⚠ **다른 레이어가 소비하지 않는 것은 올리지 않는다.** `TransferClubRow`·`TransferNewsRow`·
 //    `TransferDealWatchRow`·`TransferStatus`·`STAGE_GROUP`·`STAGE_STATUS`·

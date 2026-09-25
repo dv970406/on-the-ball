@@ -15,7 +15,7 @@ import { TRANSFER_LEAGUES } from "../model/types";
  * 상한·창 상수.
  *
  * ⚠ **`api/queries.ts`가 아니라 여기 있다** — 그 파일은 `"use client"`라 서버가 import할 수
- *   없는데, SSR 프리페치가 같은 값을 써야 한다(`POST_LIST_LIMIT`·`MATCH_PAST_LIMIT`과 같은 자리).
+ *   없는데, SSR 프리페치가 같은 값을 써야 한다.
  */
 /**
  * 보드에 싣는 딜 상한. 범위(현재/직전 창 개장~지금) 안의 딜을 **전부** 내려 뷰가 리그·정렬을
@@ -40,14 +40,14 @@ const REPORT_COLUMNS =
  * PostgREST select 문자열의 단일 소스 — 스키마가 바뀌면 여기 한 곳만 고친다.
  *
  * ⚠ **`transfer_club!컬럼명` 형태로 경로를 못박는다.** `transfer_deal → transfer_club` 경로가
- *   출발·도착 둘이라 그냥 `transfer_club(...)`은 PGRST201이다(`MATCH_SELECT`의 홈/원정과 같다).
+ *   출발·도착 둘이라 그냥 `transfer_club(...)`은 PGRST201이다.
  * ⚠ `transfer_deal_watch(user_id)` 임베딩은 SELECT 정책이 "내 행만"이라 **배열 길이가 곧
  *   "내가 관심 등록했는가"** 다. 목록에도 실려야 행이 관심 표시를 그릴 수 있다.
  * ⚠ `latest:transfer_news!deal_id(...)`는 **최신 1건만** 받는다 — 정렬·상한은 select 문자열이
  *   아니라 `list-query.ts`가 `.order(…, { referencedTable })`·`.limit(1, { referencedTable })`로
  *   건다(임베딩 정렬은 select 안에 적을 수 없다).
  * ⚠ **문자열을 `+`로 잇지 않는다** — 리터럴 타입이 `string`으로 넓어지면 추론이 통째로
- *   `GenericStringError`가 된다(실측, `MATCH_SELECT` 주석). 한 템플릿 리터럴로 둔다.
+ *   `GenericStringError`가 된다(실측). 한 템플릿 리터럴로 둔다.
  */
 export const DEAL_LIST_SELECT =
   `${DEAL_COLUMNS}, from:transfer_club!from_club_code(${CLUB_COLUMNS}), to:transfer_club!to_club_code(${CLUB_COLUMNS}), transfer_deal_watch(user_id), latest:transfer_news!deal_id(${REPORT_COLUMNS})` as const;
@@ -179,7 +179,7 @@ export function buildDeal(row: DealSelectRow): TransferDeal {
     latestReportedAt: row.latest_reported_at,
     reportCount: row.report_count,
     isFreeAgent: row.is_free_agent,
-    // 정책이 "내 행만"이라 임베딩 결과에 남의 관심이 섞일 수 없다(`post_like` 트릭)
+    // 정책이 "내 행만"이라 임베딩 결과에 남의 관심이 섞일 수 없다
     isWatched: (row.transfer_deal_watch?.length ?? 0) > 0,
   };
 }

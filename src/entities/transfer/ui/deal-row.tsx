@@ -24,7 +24,7 @@ interface DealRowProps {
 
 /**
  * 목록 행(진행 중 · 루머 · 결렬) — handoff §4-8. 링크로 감싼 리스트 행이라 `li` + `Link`다
- * (`MatchCard`·`PostCard`와 같은 형태).
+ * 
  *
  * 레이아웃: grid `minmax(0,1fr) auto` — 좌: 이름·경로 / 우: 이적료·변동폭 / 3행(meta)은 전폭.
  * 정렬선: `mx-2` + `px-3` = 콘텐츠 x=20 → 구간 제목·칩·카드와 같은 선.

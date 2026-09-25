@@ -50,46 +50,6 @@
 
   /* 이징 — 바운스/스프링 금지, 150–350ms */
   --ease-otb: cubic-bezier(0.2, 0, 0, 1);
-
-  /* 애니메이션 */
-  --animate-fade-up: fade-up 0.35s cubic-bezier(0.2, 0, 0, 1) both;
-  --animate-otb-pulse: otb-pulse 1.6s ease-in-out infinite;
-  --animate-vs-pop: vs-pop 0.3s cubic-bezier(0.2, 0, 0, 1) both;
-
-  @keyframes fade-up {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @keyframes otb-pulse {
-    0%,
-    100% {
-      transform: scale(1);
-    }
-    50% {
-      transform: scale(1.06);
-    }
-  }
-
-  /* vs-pop: 중앙 absolute(translate -50%,-50%) 배치 요소 전용.
-     ⚠ 목표값을 지나쳤다 되돌아오는 중간 키프레임을 두지 않는다 — 스케일이든 회전이든
-        오버슛은 바운스이고, 디자인 규약이 바운스·스프링을 금지한다(styling.md). */
-  @keyframes vs-pop {
-    0% {
-      transform: translate(-50%, -50%) rotate(-12deg) scale(0.8);
-      opacity: 0;
-    }
-    100% {
-      transform: translate(-50%, -50%) rotate(-12deg) scale(1);
-      opacity: 1;
-    }
-  }
 }
 
 /* 폰트 패밀리 연결
@@ -185,94 +145,6 @@ button:not(:disabled) {
   }
 }
 
-/* =========================================================
-   결과·데이터 도착 모션 (입축구 · 승부예측 · 경기 상세)
-
-   ⚠ 위 오버레이 블록과 같은 규약이다 — 일반 @keyframes + 소비처의 arbitrary 유틸.
-   ⚠ **"늦게 도착하는 것"에만 건다.** 집계·분포·라인업처럼 사용자 행동이나 탭 전환 뒤에
-     나타나는 내용이 대상이고, SSR로 이미 그려진 HTML에는 걸지 않는다(첫 페인트를 늦추고
-     뒤로가기마다 재생된다). 판정은 `useEntranceMotion`(shared/lib)이 단독으로 갖는다.
-   ⚠ **transform을 애니메이트하는 키프레임은 표준 translate/scale 유틸이 없는 요소에만**
-     얹는다 — Tailwind v4는 그 유틸을 개별 프로퍼티로 내보내 transform과 합성된다
-     (styling.md의 vs-pop 사례). 센터링이 필요한 요소는 안쪽 래퍼에 건다(lineup-pitch).
-   ========================================================= */
-/* 비율 막대가 왼쪽(또는 transform-origin)에서 자란다 — width가 아니라 scale이라 리플로우가 없다 */
-@keyframes ratio-grow {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
-  }
-}
-
-/* 체크 아이콘의 획이 그려진다 — stroke-dasharray는 소비처가 path 길이에 맞춰 준다 */
-@keyframes check-draw {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-/* 결과 띠가 칸 위에서 내려온다 — 소비하는 칸이 overflow-hidden이어야 위로 삐져나오지 않는다 */
-@keyframes band-drop {
-  from {
-    transform: translateY(-100%);
-  }
-  to {
-    transform: translateY(0);
-  }
-}
-
-/* 피치의 선수 마커가 제자리에서 커지며 나타난다 */
-@keyframes pop-in {
-  from {
-    opacity: 0;
-    transform: scale(0.7);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* 라이브 도트 — 끝이 없는 표시라 스피너와 같은 예외다(styling.md). 등속이 아니라
-   ease-in-out인 것은 숨 쉬는 리듬을 만들기 위해서이고, 오버슛(바운스)은 없다. */
-@keyframes live-pulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.55;
-    transform: scale(1.4);
-  }
-}
-
-/* 스코어가 바뀐 순간 칸이 한 번 밝아졌다 가라앉는다 */
-@keyframes score-flash {
-  from {
-    background-color: var(--color-hairline-cool);
-  }
-  to {
-    background-color: transparent;
-  }
-}
-
-/* 라우트 전환의 셰어드 엘리먼트(엠블럼) — 이름을 준 요소만 움직인다(next.config 주석).
-   ⚠ UA 스타일시트가 `:root`에 `view-transition-name: root`를 줘서 그대로 두면 전환마다
-     페이지 전체가 크로스페이드한다(그라데이션·블러 금지와 같은 층위의 "덧씌우는 효과"이고,
-     스크롤 복원과 겹친다) — 루트 이름을 끄면 나머지 화면은 즉시 바뀌고 엠블럼만 날아간다.
-   브라우저 기본(0.25s ease)을 Tifo 이징·시간으로 맞춘다. */
-:root {
-  view-transition-name: none;
-}
-
-::view-transition-group(*) {
-  animation-duration: 300ms;
-  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
-}
-
 /* 모션 최소화 환경 존중 — 트랜지션/애니메이션 0ms */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -281,12 +153,6 @@ button:not(:disabled) {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0ms !important;
-  }
-  /* 뷰 트랜지션 의사 요소는 위 선택자에 걸리지 않는다 — 따로 끈다 */
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none !important;
   }
 }
 
@@ -303,7 +169,7 @@ button:not(:disabled) {
  * 스크롤바 숨김.
  *
  * ⚠ **앱 프레임 안의 스크롤 영역은 전부 이걸 단다** — 세로(상세·프로필·폼·인증 셸·탭 영역)든
- *   가로(마크다운 코드블록·표·말머리 레일)든 같다. 프레임이 데스크톱에서 `max-w-[430px]`로
+ *   가로(필터·구간 칩 레일)든 같다. 프레임이 데스크톱에서 `max-w-[430px]`로
  *   보이는 모바일 앱 모형이라, 스크롤바가 화면마다 나타났다 사라지면 그 껍데기가 깨진다.
  * ⚠ 대가는 **스크롤 어포던스**다 — 특히 가로로 넘치는 코드블록은 넘친다는 단서가 사라진다.
  *   그걸 감수하고 통일한 것이므로, 새 스크롤 영역을 만들면 여기에 맞춘다.

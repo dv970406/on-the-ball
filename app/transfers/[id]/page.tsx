@@ -2,7 +2,7 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound, unstable_rethrow } from "next/navigation";
 // ⚠ **새 파서를 만들지 않는다.** 하는 일이 "URL의 [id] → 엄격한 십진수 id"라 게시글 전용이
-//   아니고, 이름은 첫 호출자를 기록할 뿐이다(`app/matches/[id]/page.tsx`가 같은 판단).
+//   아니고, 이름은 첫 호출자를 기록할 뿐이다.
 import { parsePostId } from "@/shared/lib/post-id";
 import { NOT_FOUND_TITLE, OG_IMAGE, OG_SITE, ROUTES, absoluteUrl } from "@/shared/config";
 // ⚠ 배럴(@/shared/lib)이 아니라 직접 경로 — 배럴은 "use client" 훅을 포함한다.

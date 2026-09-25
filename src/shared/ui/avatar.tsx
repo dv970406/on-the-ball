@@ -15,7 +15,7 @@ interface AvatarProps {
 }
 
 /**
- * 원형 아바타 — 사진이 있으면 사진, 없으면 이니셜 (댓글·프로필).
+ * 원형 아바타 — 사진이 있으면 사진, 없으면 이니셜 (프로필).
  *
  * ⚠ `next/image`가 아니라 `<img>`를 쓴다. 아바타 호스트가 환경마다 다른데
  *   (로컬 `127.0.0.1:64321` ↔ 원격 `*.supabase.co`) `next.config`의 `remotePatterns`는

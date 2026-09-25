@@ -53,7 +53,7 @@ export function SignInView({
       belowForm={
         <div className="mt-5 text-center">
           <Link
-            href={ROUTES.postList}
+            href={ROUTES.transferList}
             className="text-[13px] font-medium text-ink-mute underline decoration-hairline-strong underline-offset-[3px]"
           >
             먼저 둘러볼게요

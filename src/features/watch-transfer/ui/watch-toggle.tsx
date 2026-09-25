@@ -13,7 +13,7 @@ interface WatchToggleProps {
    * 비로그인이 버튼을 눌렀다.
    * ⚠ **다이얼로그를 여기서 렌더하지 않고 위로 올린다.** `Dialog`는 `absolute`라 가장 가까운
    *   positioned 조상을 기준으로 잡는데, 이 버튼은 상세의 하단 고정 바 안이다
-   *   (`LikeButton`·`SurveyVote`와 같은 형태·같은 이유).
+   *   (`data-and-state.md`의 세션 3분기).
    */
   onSignInRequired: () => void;
 }
@@ -67,7 +67,7 @@ export function WatchToggle({ dealId, watched, onSignInRequired }: WatchTogglePr
       <button
         type="button"
         aria-haspopup="dialog"
-        // ⚠ 인자 없이 감싼다 — `onClick`은 MouseEvent를 실어 부른다(`LikeButton`과 같은 이유)
+        // ⚠ 인자 없이 감싼다 — `onClick`은 MouseEvent를 실어 부른다
         onClick={() => onSignInRequired()}
         className={buttonClassName({ variant: "secondary", block: true })}
       >

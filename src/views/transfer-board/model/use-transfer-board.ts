@@ -38,7 +38,7 @@ export type BoardGroup = ReturnType<typeof groupDeals<TransferDealListItem>>[num
 export type GroupCounts = Record<TransferGroupKey, number>;
 
 /**
- * 이적 보드의 **조회·대기 판정과 파생 계산**을 소유한다(`useMatchList`와 같은 자리·같은 이유).
+ * 이적 보드의 **조회·대기 판정과 파생 계산**을 소유한다.
  *
  * ⚠ 리그·정렬은 **여기서** 계산한다 — 쿼리 키에 넣지 않는다. 서버가 범위 안 딜 전체를 내리고
  *   뷰가 같은 데이터로 필터·정렬한다(사유는 `transferKeys` 주석 — 필터 객체가 키와 어긋나면

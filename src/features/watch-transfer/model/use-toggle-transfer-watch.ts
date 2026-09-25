@@ -31,7 +31,7 @@ function toggled<T extends Pick<TransferDeal, "id" | "isWatched">>(deal: T, deal
  * 관심 토글 — `transfer_deal_watch`에 행 하나를 만들거나 지운다.
  *
  * ⚠ **RPC가 없다.** 카운터가 없어 지킬 불변조건이 행 하나뿐이고, 그 행은 `(user_id, deal_id)`
- *   기본키가 이미 하나로 묶는다(`features/block-user`와 같은 형태 — insert/delete 직접).
+ *   기본키가 이미 하나로 묶는다(insert/delete 직접).
  * ⚠ **`if (!user) throw`는 이중 방어다.** 실제 차단은 RLS(`insert_own`·`delete_own`,
  *   `to authenticated`)가 한다. 비로그인은 `WatchToggle`이 로그인 안내로 보낸다.
  * ⚠ 이미 담긴 딜을 다시 담는 것(23505)은 **성공으로 흡수한다** — 목표 상태에 이미 도달했으므로

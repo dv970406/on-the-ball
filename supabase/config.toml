@@ -56,7 +56,7 @@ enabled = true
 schema_paths = []
 
 [db.seed]
-# seed.sql이 계정·글·댓글·좋아요를 전부 만든다.
+# seed.sql이 로컬 테스트 계정(alice·bob)을 만든다.
 # ⚠ 시드가 없던 시절에는 마이그레이션을 고칠 때마다 `db reset`이 개발 데이터를 통째로
 #   날렸다(실제로 그랬다). 시드를 코드로 관리해 reset을 안전하게 만든다.
 # ⚠ 비밀번호 해시는 SQL로 만들 수 있다 — pgcrypto의 crypt(..., gen_salt('bf'))가

@@ -16,17 +16,12 @@ interface CrestProps {
 /**
  * 엠블럼류 이미지 + 하이드레이션 전 실패 감지 + 모노그램 폴백의 공통 메커니즘.
  *
- * ⚠ **`entities/match/ui/team-crest.tsx`에서 승격했다.** 도메인을 모르는 순수 메커니즘인데
- *   두 엔티티(`match`의 구단 엠블럼과 `transfer`의 이적 구단 엠블럼)가 같은 것을 써야 한다.
- *   entities끼리는 import할 수 없어(`architecture.md` 단방향 규칙) 여기로 올렸다 —
- *   `avatarUrl`이 `shared`에 있는 것과 같은 사정이다. `code-quality.md`의 공용화 기준(중복
- *   3회 이상·형태가 진짜 같음)에는 지금 2곳뿐이라 못 미치지만, entities 교차 재사용이 그
- *   레이어 규칙상 애초에 불가능한 구조적 제약이라 "성급한 추상화" 쪽이 아니라 `avatarUrl`·
- *   `OAUTH_PROVIDERS`와 같은 "공유해야만 하는 메커니즘" 쪽으로 판단했다.
+ * ⚠ 도메인을 모르는 순수 메커니즘이라 `shared`에 둔다 — 구단 엠블럼(`entities/transfer`의
+ *   `TransferCrest`)이 감싸 쓰고, 경기·팀처럼 엠블럼을 그리는 엔티티가 다시 생기면 같은 것을 쓴다
+ *   (entities끼리는 import할 수 없다 — `architecture.md` 단방향 규칙).
  * ⚠ 도메인(팀·구단) 지식은 이 컴포넌트에 없다 — 호출부가 `src`·`label`을 조립한다.
- *   `TeamCrest`(`@/entities/match`)는 이 컴포넌트를 감싸는 얇은 래퍼로 남는다(렌더 결과 불변).
  *
- * ⚠ **`next/image`가 아니라 `<img>`다** — `avatar.tsx`·`markdown.tsx`·`split-card.tsx`와 같은
+ * ⚠ **`next/image`가 아니라 `<img>`다** — `avatar.tsx`와 같은
  *   판단이다. 자산이 이미 목표 크기라 최적화 파이프라인이 줄 이득이 없다.
  * ⚠ **`Avatar`를 재사용할 수 없다.** 그쪽은 `rounded-full` + `object-cover`라 방패 모양
  *   엠블럼의 모서리가 잘린다. 여기는 `object-contain`으로 원본 비율을 지킨다.

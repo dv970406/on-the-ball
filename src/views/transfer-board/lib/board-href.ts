@@ -3,7 +3,7 @@ import { ROUTES } from "@/shared/config";
 
 /**
  * 보드 URL — 리그·정렬을 쿼리(`?league=`·`?sort=`)로 싣는다. 두 상태는 **URL이 소유한다**
- * (계획서 §0-1 — `AdminFilterRail`과 같은 판단이라 로컬 state가 아니다).
+ * (로컬 state면 뒤로가기·공유 링크가 필터를 잃는다).
  *
  * ⚠ **기본값에는 파라미터를 붙이지 않는다** — `?sort=latest`·빈 `?league=`라는 중복 URL을
  *   만들지 않는다(`nextjs.md` "필터는 색인 대상인가"). canonical은 서버 page가 쿼리 없이 적는다.

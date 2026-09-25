@@ -12,7 +12,7 @@ interface SubHeaderProps {
   title: string;
   /**
    * 라벨을 그리지 않는다(공유에는 그대로 쓴다).
-   * 바로 아래에 같은 문구가 이미 있는 화면용 — 상세는 말머리 칩이 그 자리다.
+   * 바로 아래에 같은 문구가 이미 있는 화면용 — 
    */
   titleHidden?: boolean;
   /** 딥링크 진입 등 history가 없을 때 돌아갈 경로 */

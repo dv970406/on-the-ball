@@ -21,9 +21,9 @@ import type { SessionStatus } from "./types";
  *   그쪽은 `?next=`로 돌아올 자리가 있어야 한다.
  *
  * ⚠ **신호만 보고 판정하지 않는다 — "이 화면에서 세션이 사라졌는가"를 함께 본다.**
- *   신호는 소비되기 전까지 전역에 남고 가드는 이 화면 말고도 둘이 더 있다(`/posts/new`·
- *   `/posts/[id]/edit`). 소비되지 않은 신호가 남아 있으면 **비로그인 사용자가 글쓰기를
- *   눌렀을 때 로그인 화면 대신 목록으로 되튕긴다** — 아무 일도 일어나지 않은 것처럼 보인다.
+ *   신호는 소비되기 전까지 전역에 남고 가드(`AuthRequired`)는 화면마다 하나씩이다.
+ *   소비되지 않은 신호가 남아 있으면 **비로그인 사용자가 로그인 필수 화면을 열었을 때
+ *   로그인 화면 대신 목록으로 되튕긴다** — 아무 일도 일어나지 않은 것처럼 보인다.
  *   들어올 때 이미 비로그인이었다면 그 신호는 남의 것이므로 읽고 버리기만 한다.
  *   (덤으로 개발 모드의 StrictMode 이중 effect에서도 판정이 갈리지 않는다.)
  */
@@ -42,7 +42,7 @@ export function useRedirectGuestToSignIn(status: SessionStatus) {
 
     // ⚠ 읽으면서 지운다 — 쓰지 않는 경우에도 버려야 다음 가드가 남의 신호를 먹지 않는다
     const signedOut = consumeSignOutIntent() && wasAuthenticated.current;
-    router.replace(signedOut ? ROUTES.postList : signInWithNext(pathname));
+    router.replace(signedOut ? ROUTES.transferList : signInWithNext(pathname));
   }, [status, router, pathname]);
 }
 
@@ -76,6 +76,6 @@ export function useRedirectAfterSignIn(status: SessionStatus) {
   useEffect(() => {
     if (status !== "authenticated") return;
     const next = new URLSearchParams(window.location.search).get("next");
-    router.replace(safeNextPath(next, window.location.origin) ?? ROUTES.postList);
+    router.replace(safeNextPath(next, window.location.origin) ?? ROUTES.transferList);
   }, [status, router]);
 }

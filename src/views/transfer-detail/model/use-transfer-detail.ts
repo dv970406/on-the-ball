@@ -22,7 +22,7 @@ interface UseTransferDetailArgs {
 }
 
 /**
- * 이적 상세의 **조회·대기 판정**을 소유한다(`useMatchDetail`·`useSurveyDetail`과 같은 자리·같은 이유).
+ * 이적 상세의 **조회·대기 판정**을 소유한다.
  *
  * 세션 상태와 서버가 내려준 prop이 서로를 조건으로 삼고, 어긋나면 서버가 그린 HTML이 스켈레톤에
  * 덮인다 — 그 판정을 뷰에 두면 다른 상세와 갈린다.

@@ -2,19 +2,11 @@
 
 ## 데이터 접근 경로
 
-- **클라이언트가 supabase를 직접 호출한다.** Route Handler(`app/api/*`)를 두지 않는다.
-  - ⚠ **예외는 경기 일정 동기화뿐이다** — 어드민 버튼(`app/api/admin/sync-matches/route.ts`)과
-    정기 실행(`app/api/cron/sync-matches/route.ts`). 금지의 근거는 "중간 검증층 없이
-    RLS가 방어선"인데, 그 자리는 데이터 접근이 아니라 **외부 API(API-Football)를 서버
-    비밀로 부르는 곳**이라 근거가 닿지 않는다(키를 브라우저에 내려보낼 수 없다).
-    목록은 `scripts/check-conventions.mjs`의 `ROUTE_HANDLER_ALLOWED`가 **양방향으로**
-    대조한다 — 목록 밖 route.ts도, 목록에만 있고 사라진 파일도 실패다.
-  - ⚠ 그 핸들러의 순서가 곧 방어다: Origin 검사 → `getUser()` → `rpc("is_admin")` →
-    **그 뒤에야** service_role 클라이언트 생성(크론은 인가 자리가 `CRON_SECRET` 대조일 뿐
-    순서가 같다 — 그래서 동기화 본체 `app/api/_lib/run-season-sync.ts`가 인가를 갖지 않는다). service_role로 관리자 확인을 하면 세션이
-    없어 "누가 요청했는가"를 본문에서 받아야 하는데 그건 위조된다(definer RPC가 유저 id를
-    인자로 받지 않는 것과 같은 함정). `SUPABASE_SERVICE_ROLE_KEY`는 **`shared/config/env`에
-    넣지 않는다** — 그 모듈은 클라이언트 번들에 실린다.
+- **클라이언트가 supabase를 직접 호출한다.** Route Handler(`app/api/*`)를 두지 않는다 — 중간 검증층 없이
+  **RLS가 방어선**이다. 외부 API를 서버 비밀로 불러야 하는 자리가 생겨 예외를 둘 때의 규약은
+  `nextjs.md`의 "Route Handler를 두지 않는다" 절이 갖는다.
+  - ⚠ `SUPABASE_SERVICE_ROLE_KEY`는 **`shared/config/env`에 넣지 않는다** — 그 모듈은 클라이언트
+    번들에 실린다. service_role은 `scripts/`의 운영 스크립트만 쓴다.
 - 단 컴포넌트가 supabase를 직접 만지지 않는다. **모든 접근은 `entities/*/api`의 TanStack Query 훅을 경유**한다. 이유는 raw fetch를 금지했던 것과 같다 — 중복 제거·캐싱·로딩/에러 상태를 잃지 않기 위해서다. 게다가 낙관적 업데이트가 queryKey를 전제로 한다.
 - 브라우저 클라이언트는 `requireBrowserSupabase()`(`@/shared/api`)로 얻는다. 모든 호출부가 같은 null 가드를 반복하지 않도록 한 곳에서 한국어 에러로 바꾼다.
 - 브라우저 클라이언트는 **`@supabase/ssr`의 `createBrowserClient`(쿠키 저장)** 를 쓴다. `@supabase/supabase-js`의 `createClient`(localStorage)로 바꾸면 `proxy.ts`가 쿠키를 못 읽어 **서버 토큰 리프레시가 통째로 죽고**(오래 비운 뒤 돌아온 사용자가 조용히 로그아웃된다) SSR이 세션을 보지 못해 개인화도 사라진다.
@@ -30,21 +22,21 @@ pnpm db:types   # supabase gen types --local --schema public > src/types/databas
 ```
 
 - `src/types/database.types.ts`는 **생성 파일**이다. 손으로 고치지 않는다(ESLint 제외 목록에 있다).
-- supabase 클라이언트에 `Database`를 붙여 두었다 → **테이블명·컬럼명·RPC명·RPC 인자·insert 컬럼이 전부 컴파일 타임에 검증된다.** `.rpc("toggle_post_like", { p_postid: 1 })` 같은 오타가 빌드에서 잡힌다.
+- supabase 클라이언트에 `Database`를 붙여 두었다 → **테이블명·컬럼명·RPC명·RPC 인자·insert 컬럼이 전부 컴파일 타임에 검증된다.** `.from("transfer_dael")`·`.insert({ deal: 1 })` 같은 오타가 빌드에서 잡힌다.
 - 엔티티의 도메인 타입은 행과 1:1이 아니지만(camelCase + 파생 필드), **각 필드 타입을 행에서 가져와** 스키마와 묶어 둔다:
   ```ts
-  export type PostRow = Database["public"]["Tables"]["post"]["Row"];
-  export interface PostListItem {
-    id: PostRow["id"];
-    likeCount: PostRow["like_count"];
-    isLiked: boolean;          // 파생 — 행에 없다
+  export type TransferDealRow = Database["public"]["Tables"]["transfer_deal"]["Row"];
+  export interface TransferDeal {
+    id: TransferDealRow["id"];
+    latestReportedAt: TransferDealRow["latest_reported_at"];
+    isWatched: boolean;        // 파생 — 행에 없다
     // ...
   }
   ```
-- select 결과 형태도 마찬가지다(`mappers.ts`의 `PostSelectRow`) — `Pick<PostRow, ...>` + 임베딩만 직접 적는다.
+- select 결과 형태도 마찬가지다(`entities/transfer/api/mappers.ts`의 select 행 타입) — `Pick<…Row, ...>` + 임베딩만 직접 적는다.
 - 마이그레이션으로 컬럼이 바뀌면 `pnpm db:types` → **매퍼·화면에서 컴파일 에러로 드러난다**. 이게 이 구조의 목적이다.
 - ⚠ **`generated always as … stored` 컬럼은 이 보증에서 빠진다.** 생성기가 identity(`id?: never`)는
-  걸러내면서 생성 컬럼은 `Insert`·`Update`에 **쓰기 가능한 것처럼** 남긴다(실측: `match.result`).
+  걸러내면서 생성 컬럼은 `Insert`·`Update`에 **쓰기 가능한 것처럼** 남긴다(실측: `transfer_news.body_excerpt` 같은 생성 컬럼).
   ⚠ 다만 이것은 **무결성 문제가 아니라 DX 문제다** — Postgres가 `cannot insert a non-DEFAULT
   value into column` / `can only be updated to DEFAULT`로 **superuser에게도** 거부하므로,
   grant를 열어도 값이 들어가지 않는다(실측). 타입이 통과시킨 코드가 런타임에 죽을 뿐이다.
@@ -56,153 +48,99 @@ pnpm db:types   # supabase gen types --local --schema public > src/types/databas
 이어받는다 — 루트만 바꾸고 자식을 두면 부모와 자식의 이름이 어긋나 안 하느니만 못하다.
 
 ```
-post_like · post_report · post_poll · post_poll_option · post_poll_vote   ← post에 딸린다
-survey · survey_option · survey_vote                                      ← 부모가 없다
+transfer_deal · transfer_deal_watch   ← watch는 deal에 딸린다
 ```
 
 **판정은 취향이 아니라 컬럼이 한다** — 그 테이블의 PK·FK가 부모를 향하면 종속이다.
-`post_poll`은 기본키가 곧 `post_id`이고(1글 : 1투표) 자식들도 전부 `post_id`로 도는데,
-`poll_id`라는 컬럼은 이 서브트리에 아예 없다. 반면 `survey`는 자체 `id`가 PK이고 자식이
-`survey_id`로 돈다 → **접두어가 없다는 것 자체가 "부모가 없다"는 신호**다.
+`transfer_deal_watch`는 기본키가 `(user_id, deal_id)`이고 딜이 지워지면 함께 지워진다 → 딜의 자식이다.
+반대로 자체 PK를 갖고 다른 행에 매달리지 않는 테이블은 접두어를 부모 이름으로 달지 않는다 —
+**접두어가 없다는 것 자체가 "부모가 없다"는 신호**다.
 
 ⚠ **FSD 슬라이스명은 여기 따라오지 않는다.** 슬라이스는 앱 안의 도메인 개념이라 테이블명과
-1:1인 적이 없다(`entities/block` ↔ `user_block`, `features/report-post` ↔ `post_report`,
-`entities/profile` ↔ `profiles`). 연결고리는 각 슬라이스의 `model/types.ts`가
-`Tables["…"]`로 한 줄 갖는다.
+1:1인 적이 없다(`entities/transfer` ↔ `transfer_deal`·`transfer_news`·`transfer_club`,
+`features/watch-transfer` ↔ `transfer_deal_watch`, `entities/profile` ↔ `profiles`). 연결고리는
+각 슬라이스의 `model/types.ts`가 `Tables["…"]`로 한 줄 갖는다.
 
-⚠ **개명은 URL을 보고 결정한다.** 자기 경로를 갖지 않는 테이블(글 상세에 임베드되는 `post_poll`)은
-언제든 고칠 수 있지만, `/surveys`처럼 사이트맵에 실린 경로를 낳는 이름은 **영구 계약**이라
-그 비용이 이름의 정확도를 넘어선다(`nextjs.md`).
+⚠ **개명은 URL을 보고 결정한다.** 자기 경로를 갖지 않는 테이블은 언제든 고칠 수 있지만,
+`/transfers`처럼 사이트맵에 실린 경로를 낳는 이름은 **영구 계약**이라 그 비용이 이름의
+정확도를 넘어선다(`nextjs.md`).
 
 ## 열거값은 **enum**으로 둔다 — lookup 테이블이 아니라
 
-말머리·신고 사유처럼 값의 목록이 정해진 컬럼은 `create type ... as enum`으로 만든다.
+값의 목록이 정해진 컬럼(이적 단계 `transfer_stage` 같은)은 `create type ... as enum`으로 만든다.
 `text + check`도, 코드 테이블 + FK도 아니다. 바로 위 절이 말한 **생성 타입**을 그대로 얻기 때문이다.
 
 - 생성 파일이 **유니온 타입과 런타임 배열을 둘 다** 내려준다
-  (`Database["public"]["Enums"]["post_category"]` · `Constants.public.Enums.post_category`).
+  (`Database["public"]["Enums"]["transfer_stage"]` · `Constants.public.Enums.transfer_stage`).
   FK로 두면 그 자리가 `number`가 되어 도메인이 통째로 사라진다.
 - 슬라이스가 **노출 순서 배열 + 라벨맵**을 얹으면 값 추가 시 누락이 **양방향 컴파일 에러**가 된다:
   `as const satisfies readonly T[]`(없는 값 금지) + `Exclude<T, (typeof ARR)[number]> extends never`
-  (빠뜨린 값 금지) + `Record<T, string>`(라벨 누락 금지). 선례는 `entities/post`의 `POST_CATEGORIES`와
-  `features/report-post`의 `REPORT_REASONS`.
+  (빠뜨린 값 금지) + `Record<T, string>`(라벨 누락 금지). 선례는 `entities/transfer`의
+  `Record<TransferStage, …>` 맵(`STAGE_GROUP`·`STAGE_STATUS`)과 `TRANSFER_LEAGUES`의 망라성 가드.
   ⚠ 망라성 가드는 **타입 별칭만 선언하면 아무것도 검사하지 못한다** — 실제 값에 할당해야 컴파일러가 대조한다.
-- **런타임 배열이 그대로 입력 검증이 된다** — `POST_CATEGORIES`를 `readonly string[]`로 넓혀
-  `includes`로 좁히는 타입 가드 하나면 끝난다(`features/write-post`의 `post-schema.ts`의
-  `isPostCategory`). 값이 lookup 테이블 행이면 배열이 조회 결과가 되어 이 검사가 **비동기**가 된다.
+- **런타임 배열이 그대로 입력 검증이 된다** — 노출 배열을 `readonly string[]`로 넓혀
+  `includes`로 좁히는 타입 가드 하나면 끝난다(`parseTransferLeague`가 같은 형태다). 값이 lookup
+  테이블 행이면 배열이 조회 결과가 되어 이 검사가 **비동기**가 된다.
 - 화면이 **동기**로 끝난다(`.map()`). 조회 훅이면 목록에 Skeleton·EmptyState가 붙는데,
   칩 레일처럼 첫 화면 최상단에 있는 요소에서는 "로딩 중 레이아웃이 튀지 않게 한다"와 정면으로 부딪힌다.
 
 ### 값이 곧 라벨이면 한국어, 문장으로 보여야 하면 영문 키 + 라벨맵
 
-| | enum 값 | 라벨맵 |
-|---|---|---|
-| `post_category` | 한국어(`'이적설'`) | **없다** — 칩에 값을 그대로 렌더한다 |
-| `report_reason` | 영문 키(`'spam'`) | `REPORT_REASON_LABEL` |
+- 화면에 그 단어가 **그대로** 나가는 값은 저장값을 한국어로 둔다 — 라벨맵을 두면 같은 문자열을
+  두 곳에 적는 셈이 된다.
+- 문장·문구로 다듬어 보여야 하는 값은 **영문 키 + 라벨맵**이다 — 저장값을 문장으로 두면 문구를
+  다듬을 때마다 `alter type`이 필요하다. `transfer_stage`가 이쪽이다(영문 키 → 상태 뱃지 라벨 맵).
 
-사유는 "스팸이거나 광고예요"처럼 **문장**으로 보여야 하는데, 저장값을 문장으로 두면 문구를 다듬을
-때마다 `alter type`이 필요하다. 그래서 저장값과 표시값을 가른다. 반대로 말머리는 화면에 그 단어가
-그대로 나가므로 라벨맵을 두면 같은 문자열을 두 곳에 적는 셈이 된다.
+#### 운영 데이터의 한국어 표기는 **유일한 writer가 입힌다**
 
-#### lookup 테이블도 같은 기준을 따른다 — `team.name`은 **한국어**다
+구단 이름처럼 화면에 그대로 나가는 운영 데이터는 저장값이 한국어여야 한다. API가 주는 영문
+이름을 그대로 저장하고 화면에서 옮기는 형태로 두지 않는다.
 
-팀 이름은 화면에 그 단어가 그대로 나가므로 저장값이 한국어여야 한다(`post_category`와 같은
-판단 — 라벨맵을 두면 같은 문자열을 두 곳에 적는 셈이다). API가 주는 영문 이름을 그대로
-저장하고 화면에서 옮기는 형태로 두지 않는다.
+⚠ **매핑은 그 컬럼의 유일한 writer 안에 있어야 한다.** `transfer_club`에는 쓰기 정책도 grant도
+없어 딜 파생 스크립트가 유일한 writer인데, 매핑이 마이그레이션이나 클라이언트에 있으면
+**다음 파생이 통째로 덮어쓴다.** 그래서 표기는 `scripts/lib/transfer/club-presets.json`·
+`scripts/team-names-ko.json`이 갖고 파생이 쓰기 직전에 입힌다.
 
-⚠ **매핑은 그 컬럼의 유일한 writer 안에 있어야 한다.** `team`에는 정책도 grant도 없어
-`scripts/sync-matches.mjs`가 유일한 writer인데, 매핑이 마이그레이션이나 클라이언트에 있으면
-**다음 동기화가 통째로 덮어쓴다.** 그래서 표기는 `scripts/team-names-ko.json`이 갖고 동기화가
-쓰기 직전에 입힌다.
+⚠ **매핑이 없으면 실패시키지 않고 경고한다.** 새 구단이 생겨도 파생은 성공해야 한다
+(영문으로라도 화면에 떠야 한다) — 대신 스크립트가 빠진 이름을 로그에 찍어 무엇을 채울지 남긴다.
 
-⚠ **매핑이 없으면 실패시키지 않고 경고한다.** 승격팀이 생겨도 동기화는 성공해야 한다
-(영문으로라도 화면에 떠야 한다) — 대신 스크립트가 빠진 팀을 로그에 찍어 무엇을 채울지 남긴다.
+⚠ `name`(정식)과 `short_name`(약칭)의 **쓰임이 다르다.** 좁은 폭에 두 구단을 좌우로 놓는
+자리(목록 행·경로 표시)는 **약칭**이다 — 정식명은 잘리는데 **잘린 구단 이름은 어느 구단인지
+알 수 없다.** 정식명은 가로 폭을 이름에 전부 내줄 수 있는 자리에서만 쓴다.
 
-⚠ `name`(정식)과 `short_name`(약칭)의 **쓰임이 다르다.** 상세의 제목(`h1`)만 정식명이고,
-**목록 카드와 예측 버튼은 약칭**이다 — 좁은 폭에 좌우로 두 팀을 놓는 자리에서
-"맨체스터 유나이티드 승"은 잘리는데, **잘린 팀 이름은 어느 팀인지 알 수 없어 고를 수가 없다.**
-상세만 정식명을 감당하는 것은 엠블럼을 이름 **위**에 얹어 가로 폭을 이름에 전부 내주기 때문이다.
+### 엠블럼은 **DB에 두지 않는다** — 구단 코드에서 유도한다
 
-### 엠블럼은 **DB에 두지 않는다** — 팀 코드에서 유도한다
+구단 엠블럼은 컬럼이 아니라 **저장소에 커밋한 정적 자산**이다
+(`public/crests/{code}.png`, `scripts/fetch-team-crests.mjs`가 만든다). 파일명이 곧
+`transfer_club.code`이고 조립은 `TransferCrest`가 한다.
 
-구단 엠블럼은 `team`의 컬럼이 아니라 **저장소에 커밋한 정적 자산**이다
-(`public/crests/{team.code}.png`, `scripts/fetch-team-crests.mjs`가 만든다).
-
-- **이적 소식의 해외 구단**(라리가·분데스리가·세리에 A·리그 1)도 같은 디렉터리에 둔다. `team` 행이
-  없으므로 파일명은 API 이름을 `slugify`한 값이고, 그 값과 한국어 표기는 표시 프리셋
-  `scripts/lib/transfer/club-presets.json`이 갖는다(프리미어리그 한국어는 `team-names-ko.json`만 본다).
-  받는 명령은 `fetch-team-crests.mjs --league <id>`다 — **이미 있는 파일은 덮지 않는다**(`--force` 제외).
-  리그 구성이 바뀌면 그 명령을 다시 돌려 프리셋과 구단 사전을 함께 고치고,
-  `scripts/test-transfer-extract.mjs`가 프리셋·사전·파일 셋을 대조한다.
-- ⚠ **파일명은 영구 계약이다.** 이적설 글 본문에 `/crests/{code}.png`가 박혀 있어, 이름을 바꾸거나
-  지우면 이미 쓴 글의 엠블럼이 깨진다(본문 렌더러는 `TeamCrest`처럼 폴백을 둘 수 없다).
-
-- **왜 컬럼이 아닌가**: 파일명이 `team.code`라 경로가 결정적이다 — 컬럼을 두면 같은 사실을
+- 코드와 한국어 표기는 표시 프리셋 `scripts/lib/transfer/club-presets.json`이 갖는다(프리미어리그
+  한국어는 `team-names-ko.json`만 본다). 해외 리그(라리가·분데스리가·세리에 A·리그 1)는
+  `fetch-team-crests.mjs --league <id>`로 받는다 — 파일명은 API 이름을 `slugify`한 값이다.
+  ⚠ **프리셋 코드가 슬러그와 다른 구단(프리미어리그 전부)은 `--team <id> --code <code>`로 받는다** —
+  `--league`로 받으면 같은 구단의 파일이 둘 생긴다. **이미 있는 파일은 덮지 않는다**(`--force` 제외).
+  리그 구성이 바뀌면 프리셋과 구단 사전을 함께 고치고, `scripts/test-transfer-extract.mjs`가
+  프리셋·사전·파일 셋을 대조한다.
+- ⚠ **파일명을 바꾸면 프리셋의 `code`도 함께 바꾼다** — 화면이 `code`로 경로를 만들어, 한쪽만 바꾸면
+  그 구단이 모노그램으로 떨어진다.
+- **왜 컬럼이 아닌가**: 파일명이 코드라 경로가 결정적이다 — 컬럼을 두면 같은 사실을
   두 곳이 갖게 되고, 값의 형식을 지키는 CHECK와 그것을 채우는 스크립트가 **한 쌍으로 묶여**
-  둘이 갈리는 순간 그 팀 행이 통째로 거부된다. 유도하면 그 계약 자체가 없어진다.
-- **왜 제공자 CDN을 직접 걸지 않는가**: 원본이 200×200 PNG인데 화면은 24·44px로 그려
-  8배 가까이 과하고, 제공자가 리사이즈 파라미터를 지원하지 않는다(실측). 근거 수치와
-  포맷·크기 선택은 그 스크립트가 갖는다.
-- ⚠ **런타임에 늘어나지 않는다.** 승격팀은 사람이 스크립트를 돌려 커밋해야 채워지고, 그동안
-  화면은 약칭 모노그램으로 떨어진다(`TeamCrest`) — `scripts/team-names-ko.json`의 한국어
-  표기와 **같은 운영 모델**이다. 크론이 도는 서버에서는 `public/`에 쓸 수 없으므로 이 부분을
-  동기화 스크립트에 합치지 않는다.
+  둘이 갈리는 순간 그 행이 통째로 거부된다. 유도하면 그 계약 자체가 없어진다.
+- **왜 제공자 CDN을 직접 걸지 않는가**: 원본이 화면 크기의 8배 가까이 과하고, 제공자가 리사이즈
+  파라미터를 지원하지 않는다(실측). 근거 수치와 포맷·크기 선택은 그 스크립트가 갖는다.
+- ⚠ **런타임에 늘어나지 않는다.** 새 구단은 사람이 스크립트를 돌려 커밋해야 채워지고, 그동안
+  화면은 약칭 모노그램으로 떨어진다(`Crest`) — `scripts/team-names-ko.json`의 한국어
+  표기와 **같은 운영 모델**이다. 정기 실행 환경에서는 `public/`에 쓸 수 없으므로 이 부분을
+  수집·파생 스크립트에 합치지 않는다.
 - ⚠ **자산이 제공자의 것이다.** 핫링크에서 사본 서빙으로 옮긴 것이라 재배포에 해당한다 —
-  공개 배포 전에 제공자 약관을 한 번 확인한다. 해외 구단 엠블럼도 같은 확인 대상이다.
-  ⚠ **선수 사진도 같은 확인 대상이다.** 그쪽은 사본을 두지 않고 제공자 CDN을 그대로 쓰지만
-    (`entities/match/lib/player-photo` — 670명이라 커밋 운영이 성립하지 않는다), 약관이
-    "identification and descriptive purposes"로 제공할 뿐 **게시 라이선스를 주지 않고**
-    권리자에게 직접 받으라고 명시한다. 엠블럼의 상표권에 **초상권**까지 겹치는 자리다.
-    ⚠ **그래서 사진 표시는 플래그가 통제한다** — `env.showPlayerPhotos`가 **기본 꺼짐**이라,
-    켜지 않은 환경(= 새로 만든 배포 환경)은 자동으로 실루엣으로 그린다. 켜는 것이 언제나
-    명시적인 행위여야 위험이 "코드를 되돌리는 일"이 아니라 "설정을 바꾸는 일"로 남는다.
-    ⚠ 다만 **엠블럼에는 그 스위치가 없다** — 사본을 저장소에 커밋했기 때문이다. 끄는
-    선택지를 만들려면 `TeamCrest`의 폴백(약칭 모노그램)을 같은 방식으로 가르면 된다.
-
-### 경기 상세 폴러는 **창이 아니라 상태로** 고른다 — 라이브 폴링은 Pro와 한 쌍이다
-
-`scripts/sync-match-detail.mjs`(라인업·사건·스탯)는 **"이 경기가 지금 받을 게 있는가"** 로
-대상을 정한다. 킥오프 창에 걸린 경기를 전부 받는 형태로 되돌리지 않는다.
-
-- **왜 창이 아닌가**: EPL은 하루에 킥오프 슬롯이 여럿이라(토 12:30·15:00·17:30 …) 경기당
-  5시간짜리 창이 **하나로 병합되어 10~15시간**이 된다. 한 시즌 일정(380경기)으로 시뮬레이션하면
-  하루 최대 **221요청**이라 무료 한도(100/day)를 **86일 중 27일에서** 넘고, 넘는 순간
-  **그날 남은 경기를 통째로 놓친다.** 상태로 고르면 같은 일정이 하루 최대 **45요청**이다.
-- 상태는 셋뿐이다 — ① 라인업 대기(킥오프 60분 전부터, 라인업이 아직 없을 때)
-  ② 진행 중(`--live`일 때만) ③ 종료 확인(킥오프 +105분부터, 최종 데이터가 없을 때).
-  셋 다 아니면 **API를 부르지 않고 정상 종료**한다.
-- ⚠ **"받을 게 없음"을 실패로 두지 않는다.** 크론이 5분마다 도는데 받을 게 있는 순간은
-  하루 중 일부라, 실패로 두면 알림이 노이즈가 되어 진짜 실패를 덮는다.
-- ⚠ **판정에 쓰는 "라인업·스탯이 있는가"는 우리 DB에 묻는다.** 왕복이 늘지만 아끼려는 것은
-  제공자 API 호출이다.
-
-⚠⚠ **지금은 라이브 폴링이 꺼져 있다(`--live` 없음). 화면에 `refetchInterval`을 붙이는 작업과
-요금제를 Pro로 올리는 작업은 한 커밋에 함께 간다.**
-
-| 전략 | 하루 최악 | 중앙 | 한도 초과 |
-|---|---:|---:|---|
-| 킥오프 창(-1h~+4h) · 3분 | 221 | 81 | 27/86일 |
-| 킥오프 창(-1h~+4h) · 5분 | 133 | 49 | 13/86일 |
-| 상태 기반 + 라이브 · 3분 (B) | 178 | 40 | 14/86일 |
-| 상태 기반 + 라이브 · 5분 (B) | 108 | 24 | 1/86일 |
-| **상태 기반, 라이브 없음 · 5분 (C, 지금)** | **45** | 12 | **0/86일** |
-
-(EPL 한 시즌 380경기 일정 · 무료 = 100/day · 10/min 기준. 틱마다 `/fixtures?ids=`로
-20경기씩 묶어 보내므로 **요청 수는 경기 수가 아니라 틱 수**를 따라간다.)
-
-- **지금 C인 이유는 요금이 아니라 쓸모다.** 화면에 자동 갱신이 없고 `refetchOnWindowFocus`도
-  꺼져 있어, 경기 중에 받아 봐야 사용자는 새로고침 전까지 못 본다 → **기능 손실이 0**이다.
-- **그래서 자동 갱신을 붙이는 순간 C의 근거가 사라진다.** 그때 폴러를 B(`--live`)로 옮기는데,
-  B를 무료로 돌리면 최악 108요청이라 **여유가 없다** → 같은 시점에 Pro(7,500/day)로 옮긴다.
-  한쪽만 하면 둘 다 무의미하다 — 요금제만 올리면 화면이 여전히 안 갱신되고, `--live`만 켜면
-  한도를 넘는 날 경기를 놓친다.
-- ⚠ **분당 한도(무료 10/min)도 함께 본다.** 한 틱이 20경기씩 묶어 보내므로 한 라운드는
-  요청 하나로 끝나지만, 창을 넓히거나 `MAX_IDS`를 줄이면 그 순간 분당 한도가 먼저 걸린다.
+  공개 배포 전에 제공자 약관을 한 번 확인한다. 끄는 선택지가 필요해지면 `Crest`의 폴백
+  (약칭 모노그램)으로 가르는 환경 플래그를 둔다 — 켜는 것이 명시적인 행위여야 위험이
+  "코드를 되돌리는 일"이 아니라 "설정을 바꾸는 일"로 남는다.
 
 ### 이적 소식 동기화는 **저자를 확증한 항목만** 저장한다
 
 `transfer_news`는 `scripts/sync-transfer-news.mjs`(service_role)가 유일한 writer인 운영 데이터다
-(`team`·`match`와 같은 취급 — 쓰기 정책도 grant도 없다). 소스 선정 근거와 실측 수치는
+(`transfer_club`·`transfer_deal`과 같은 취급 — 쓰기 정책도 grant도 없다). 소스 선정 근거와 실측 수치는
 `scripts/lib/transfer/registry.mjs`가 갖는다.
 
 - ⚠ **귀속은 소스가 아니라 항목 단위로 판정한다.** 비공식 미러 채널은 기자의 속보를 충실히
@@ -337,30 +275,13 @@ survey · survey_option · survey_vote                                      ← 
 - 사람 JSON의 형식(한글 표기 · 구단 키가 구단 사전의 정규명 · 5대 리그 구단은 프리셋 쪽)은
   `test-transfer-extract.mjs`가 검사한다.
 
-### 이적설 글은 **틀린 칸보다 빈 칸**이 낫다
+### 이적시장 보드는 `transfer_news`에서 **파생**한다 — 사람의 큐레이션이 없다
 
-`scripts/compose-transfer-post.mjs`가 수집 행으로 이적설 게시글(제목 + 마크다운)을 조립해
-**출력만** 한다(DB에 쓰지 않는다). 규칙은 `scripts/lib/transfer/compose.mjs`가 단독으로 갖고
-회귀는 `scripts/test-transfer-compose.mjs`가 지킨다.
-
-- ⚠ 소속팀·행선지는 **그 선수가 나오는 문장에서만** 읽는다. 기사 단계도 여러 선수가 나오는
-  기사라면 그 문장으로 다시 판정한다 — 곁들여 나온 선수가 기사 주인공의 단계를 받았다.
-- ⚠ 사전 밖 구단명은 구단처럼 생겼을 때(FC·United·연도 등)만 받는다 — "Verbal"·"Deal"·기자명이
-  행선지로 들어갔다. 못 읽으면 "미확인"으로 두고, 이적이 아니라고 보이면(재계약·소속팀과
-  행선지를 둘 다 못 읽음) **글을 만들지 않는다.**
-- ⚠ 원문에서 온 값(인용·구단명·매체명)은 마크다운을 이스케이프하고 링크는 `<주소>`로 감싼다 —
-  `|` 하나가 표를 깨고 `[x](…)`가 링크가 된다.
-- 엠블럼은 `![](/crests/{code}.png "icon")`로 싣는다 — **상대 경로**여야 공유 카드(`og:image`)가
-  되지 않고, 대체 텍스트를 비워야 바로 옆 구단명을 스크린리더가 두 번 읽지 않는다.
-
-### 이적시장 보드는 `transfer_news`에서 **파생**한다 — 어드민 큐레이션이 없다
-
-`transfer_club`·`transfer_deal`은 `team`·`match`·`transfer_news`와 같은 운영 데이터다. 유일한
+`transfer_club`·`transfer_deal`은 `transfer_news`와 같은 운영 데이터다. 유일한
 writer는 `scripts/lib/transfer/derive-deals.mjs`(`scripts/sync-transfer-news.mjs`의 마지막
 단계, service_role)이고 **정책도 grant도 SELECT뿐**이다 — 앱에는 쓰기 경로가 전혀 없다
-(위 "운영진만 쓰는 데이터는 쓰기 경로를 만들지 않는다"와 같은 판단이지만, 여기는 그 유일
-경로가 마이그레이션이 아니라 **파생 스크립트**라는 점이 다르다 — 문항처럼 사람이 미리 써
-두는 데이터가 아니라 보도에서 매시 다시 계산되는 데이터다).
+(아래 "운영진만 쓰는 데이터는 쓰기 경로를 만들지 않는다"와 같은 판단이다 — 사람이 미리 써
+두는 데이터가 아니라 보도에서 매시 다시 계산되는 데이터라 그 유일 경로가 **파생 스크립트**다).
 
 - **후보 행**: `stage <> 'unknown'` and 선수가 1명 이상 잡혔고 and `relevance >= 0.3`(`MIN_RELEVANCE`)
   and 라운드업(가십 모음)이 아니고 and 보드 범위 시작(`boardScopeStartMs`) − 14일 이후인 보도.
@@ -371,7 +292,7 @@ writer는 `scripts/lib/transfer/derive-deals.mjs`(`scripts/sync-transfer-news.mj
   ⚠ 한 토큰 이름("Isak")은 같은 범위의 두 토큰 이름("Alexander Isak")의 **마지막 토큰**과 같을
   때만 그 딜로 합친다 — 두 토큰 이름끼리는 합치지 않는다(동성이인).
 - **방향**: 딜에 속한 모든 보도를 시간순으로 투표에 태운다(최신 보도 2배 가중). 선수가 나오는
-  문장만 본다 — 곁들여 나온 선수의 구단이 섞이면 안 된다(이적설 글 조립과 같은 규칙).
+  문장만 본다 — 곁들여 나온 선수의 구단이 섞이면 안 된다.
 - **단계**: 속한 보도 중 가장 진전된 단계. 단 `collapsed`(결렬) 보도가 그 진전 보도보다
   **나중**이면 `collapsed`로 뒤집힌다 — `official`은 그 뒤 어떤 보도도 뒤집지 못한다.
 - **이적료**: 최신 보도(이적료 있는 것 중) → `fee_*`. 그 이전 보도 중 같은 통화·**다른 금액**의
@@ -380,11 +301,11 @@ writer는 `scripts/lib/transfer/derive-deals.mjs`(`scripts/sync-transfer-news.mj
   최신 보도부터 거슬러 처음 잡히는 값이다.
 - **사전**: 한국어 표기·포지션·생년·국적은 `scripts/lib/transfer/players-ko.json`(운영 사전,
   키는 `normalizePlayer` 결과)에서 온다. **매핑이 없으면 파생을 실패시키지 않고 경고만 남긴다**
-  (엠블럼·`team.name`의 한국어 표기와 같은 운영 모델) — 화면은 영문명으로 그 줄을 생략한다.
+  (엠블럼·구단 한국어 표기와 같은 운영 모델) — 화면은 영문명으로 그 줄을 생략한다.
 - **구단**: `scripts/lib/transfer/club-presets.json` + `scripts/team-names-ko.json`으로 만든
   `transfer_club` 행을 딜보다 먼저 upsert한다(FK 방향). 프리셋 밖 구단은 정규 영문명을
   slugify한 코드로 들어가고, 그 코드의 엠블럼 파일이 없으면 화면이 약칭 모노그램으로 떨어진다
-  (`Crest`의 폴백 — `TeamCrest`와 같은 판단).
+  (`Crest`의 폴백).
 - **옵션 통화 일치**: `add_on_amount`는 그 딜의 `fee_currency`와 같은 통화로 잡힌 값만 쓴다 —
   통화가 다른 옵션을 섞으면 금액이 거짓말을 한다.
 - **삭제 규칙**: 딜은 **삭제하지 않고 다시 파생한다** — 범위 밖으로 나간 딜은 화면의 범위
@@ -424,21 +345,19 @@ writer는 `scripts/lib/transfer/derive-deals.mjs`(`scripts/sync-transfer-news.mj
   `import`한다. 시즌·시장 상황이 바뀌면 **사람이 갱신한다** — 엠블럼(`public/crests`)·팀
   한국어 표기(`team-names-ko.json`)와 같은 운영 모델이라 런타임에 늘지 않는다.
 
-### `transfer_deal_watch` — 관심은 `post_like`·`user_block`과 같은 형태다
+### `transfer_deal_watch` — 관심은 행 하나가 곧 상태다
 
-카운터가 없으므로(득표수 컬럼을 두지 않는 이유와 같다 — "투표에는 왜 쓰기 RPC도, 카운터
-트리거도 없는가" 참고) 지킬 불변조건이 행 하나뿐이고, `(user_id, deal_id)` 복합 PK가 그
+카운터가 없으므로(아래 "카운터가 없으면 쓰기 RPC도 없다" 참고) 지킬 불변조건이 행 하나뿐이고, `(user_id, deal_id)` 복합 PK가 그
 불변조건을 이미 쥔다 → **RPC가 필요 없다.** 훅이 insert/delete를 직접 보낸다.
 
 - SELECT·INSERT·DELETE 정책이 전부 `to authenticated` + 본인 행만이고, **UPDATE 정책은 없다**
   — 관심 행은 불변이다(표를 다른 딜로 옮기는 경로가 닫힌다. 빼기는 delete뿐).
 - 목록 select의 `transfer_deal_watch(user_id)` 임베딩 — SELECT 정책이 "내 행만"이라 **배열
-  길이가 곧 `isWatched`** 다(`post_like` 트릭). 비로그인은 정책이 `to authenticated`라 빈 배열.
+  길이가 곧 `isWatched`** 다(아래 PostgREST 임베딩 절). 비로그인은 정책이 `to authenticated`라 빈 배열.
 - 같은 딜을 두 번 담는 것(23505)은 **성공으로 흡수한다**(멱등) — 이미 목표 상태에 도달했으므로.
-  그대로 흘리면 `toDbErrorMessage`가 닉네임 문구로 접어 뜻이 어긋난다(`useBlockUser`와 같은 판단).
-- `created_at`은 INSERT grant 목록 밖이다(시각 위조 차단 — 아래 검증 자산 표의 `rls.sql` 섹션 18과 같은 규약이다) — `default now()`가 채운다.
-- ⚠ **anon에도 `(user_id, deal_id)` SELECT를 연다** — `match_prediction`·`post_like`와 같은
-  형태다. 행을 막는 것은 정책(`to authenticated`)이고 grant는 **임베딩의 통로**다. grant를
+  그대로 흘리면 `toDbErrorMessage`가 닉네임 문구로 접어 뜻이 어긋난다(아래 "설명과 흡수" 표).
+- `created_at`은 INSERT grant 목록 밖이다(시각 위조 차단 — `rls.sql`의 INSERT 시점 위조 검사가 지킨다) — `default now()`가 채운다.
+- ⚠ **anon에도 `(user_id, deal_id)` SELECT를 연다.** 행을 막는 것은 정책(`to authenticated`)이고 grant는 **임베딩의 통로**다. grant를
   빼면 목록 select의 관심 임베딩이 42501로 죽어 비로그인에게 보드가 통째로 안 보인다 —
   anon은 정책에서 걸려 항상 빈 배열(= `isWatched` false)을 받을 뿐이다.
 - 딜이 지워지면(`report_count`가 0이 된 재파생) 관심도 함께 사라진다(`on delete cascade`).
@@ -467,19 +386,20 @@ writer는 `scripts/lib/transfer/derive-deals.mjs`(`scripts/sync-transfer-news.mj
 
 - **정수 id가 아니라 `code text primary key`.** 저장값이 `spam` 그대로 읽혀야 참조 테이블을
   열었을 때 뜻을 알 수 있다. 숫자 FK는 조인 없이는 아무 말도 하지 않는다.
-- 이름은 `report_reason`처럼 **무엇의 목록인지** 드러낸다. `report`는 "신고 접수 건"으로 읽혀
-  `post_report`와 헷갈린다.
-- 따라오는 것을 미리 세어 둔다: RLS enable + 정책 최소 하나(`rls.sql` 17b) +
-  `revoke all` / `grant select`(17a) + 시퀀스 revoke + `rls.sql` 새 섹션 + `supabase/seed.sql` 초기 행 +
+- 이름은 **무엇의 목록인지** 드러낸다(`…_reason`·`…_stage`) — 뭉뚱그린 명사는 "접수 건" 같은
+  행 테이블로 읽혀 헷갈린다.
+- 따라오는 것을 미리 세어 둔다: RLS enable + 정책 최소 하나 + `revoke all` / `grant select` +
+  시퀀스 revoke(셋 다 `rls.sql`의 전수 가드가 본다) + `rls.sql` 새 섹션 + `supabase/seed.sql` 초기 행 +
   `entities`의 조회 훅(queryKey·staleTime·Skeleton·EmptyState) + 배럴 노출.
   ⚠ 그 테이블은 **비로그인에게도 열린 새 조회 표면**이 된다(칩·시트는 로그인 전에도 보인다).
+
 
 ## ⚠ RLS + 컬럼 권한이 유일한 방어선
 
 중간 검증층(Route Handler)이 없다. **정책 하나만 빠뜨려도 즉시 프로덕션 구멍**이다.
 
-- **컬럼 권한은 선택이 아니라 필수다.** `post_update_own` 정책만 두면 작성자가 자기 글의 `like_count`를 9999로 UPDATE하는 게 통과한다. 카운터·타임스탬프는 `revoke` 후 필요한 컬럼만 `grant`한다.
-- **UPDATE 정책에는 `with check`를 반드시 함께 둔다.** 없으면 `author_id`를 남의 uuid로 바꾸는 소유권 이전이 가능하다.
+- **컬럼 권한은 선택이 아니라 필수다.** "본인 행만 UPDATE" 정책만 두면 작성자가 자기 행의 카운터 컬럼을 9999로 UPDATE하는 게 통과한다(실측). 카운터·타임스탬프는 `revoke` 후 필요한 컬럼만 `grant`한다.
+- **UPDATE 정책에는 `with check`를 반드시 함께 둔다.** 없으면 소유자 컬럼을 남의 uuid로 바꾸는 소유권 이전이 가능하다.
 - **클라이언트 검증은 UX이지 방어가 아니다.** 길이 제한은 DB `check` 제약으로도 반드시 건다. ⚠ 단 **화면 한도와 DB 한도는 단위도 값도 다르다**(그래핌 vs 코드포인트, K=10배) — 아래 "길이 한도는 두 단위로 겹쳐 건다"를 먼저 읽는다. 어긋남을 없애는 건 **클라이언트가 두 한도를 함께 검사하는 것**이지 두 값을 같게 두는 게 아니다.
 - `(select auth.uid())`로 감싼다 — 행마다 재평가되지 않고 InitPlan으로 승격되어 쿼리당 1회 평가된다(Supabase 공식 성능 권고).
 - 정책을 고치면 **`bash supabase/tests/run-rls.sh`를 돌린다**(`rls.sql`을 직접 `psql`로 돌리지 말 것 — 래퍼가 결과를 양방향으로 대조해 준다). 실패를 기대하는 검사마다 savepoint를 쓴다(없으면 첫 에러가 트랜잭션을 abort시켜 뒤쪽 검사가 전부 무의미해진다).
@@ -489,29 +409,31 @@ writer는 `scripts/lib/transfer/derive-deals.mjs`(`scripts/sync-transfer-news.mj
 UPDATE/DELETE의 `using` 절은 **필터로 동작**한다 → 권한이 없으면 에러 없이 0행이 지나간다. 훅에서 `.select()`를 붙여 영향 행 수를 확인하고 0이면 에러로 승격해야 "수정됐다"고 거짓말하지 않는다.
 
 ```ts
-const { data, error } = await supabase.from("post")
-  .update({ title, content }).eq("id", postId).select("id");
-if (!error && data.length === 0) throw new Error("수정 권한이 없거나 삭제된 글이에요.");
+const { data, error } = await supabase.from("profiles")
+  .update({ nickname }).eq("id", userId).select("id");
+if (!error && data.length === 0) throw new Error("수정 권한이 없거나 없는 프로필이에요.");
 ```
+
+⚠ 단 **SELECT 권한이 없는 테이블에는 `.select()`를 붙이지 않는다** — 붙이면 쓰기 자체가 42501이 된다.
 
 ## ⚠ CHECK 제약 안의 함수는 **호출자 EXECUTE 권한**으로 평가된다
 
 `has_visible_char`를 만들고 다른 함수들처럼 `revoke execute from public, anon, authenticated`를
-걸었더니 **모든 글쓰기가 `42501 permission denied for function has_visible_char`로 막혔다**(실측).
+걸었더니 **그 CHECK가 걸린 테이블의 쓰기가 전부 `42501 permission denied for function has_visible_char`로 막혔다**(실측).
 
 RPC(`security definer`, 호출자가 직접 부른다)와 성질이 다르다 — 제약 평가 함수는 **쓰기 권한이
 있는 역할이 EXECUTE도 가져야 한다.** 노출이 걱정되면 함수가 입력 외의 정보를 돌려주지 않게
-설계하고 열어라(`post_is_alive`·`has_visible_char` 둘 다 그렇다).
+설계하고 열어라(`has_visible_char`·`normalize_nickname`·`is_plain_nickname` 모두 그렇다).
 
 ### 그래서 검증 로직을 정책이 아니라 **트리거**에 두는 경우가 있다
 
 RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 권한으로 평가**된다. 즉
 "정책에 넣고 함수는 revoke"라는 조합은 성립하지 않는다 — revoke하는 순간 그 테이블의 쓰기가 전부 42501로 죽는다.
 
-- 선례: 답글 깊이 제한(`check_comment_depth`)은 `comment`의 insert 정책이 아니라 **before insert 트리거**다.
+- 그런 검증은 insert 정책이 아니라 **before insert 트리거**에 둔다.
 - 부수 효과로 **에러 메시지가 좋아진다.** 정책 위반은 Postgres의 영어 42501뿐이라 "왜 거부됐는지"를 설명하지 못하는데, 트리거는 `P0001`로 한국어 사유를 그대로 노출한다(`toDbErrorMessage`가 P0001을 통과시킨다).
 - 판단 기준: **거부 사유를 사용자에게 설명해야 하면 트리거**, 단순 접근 차단이면 정책.
-- 두 번째 선례가 신고 거부(`check_post_report`)다. 자기 글 신고·중복 신고를 막는데, 유니크 제약에 맡기면 **23505가 `toDbErrorMessage`에서 닉네임 문구인 "이미 사용 중인 값이에요."로 접혀** 뜻이 어긋난다(`create_post_with_poll`이 선택지 중복에서 P0001을 직접 던진 것과 같은 사유).
+- 중복 거부를 유니크 제약에만 맡기면 **23505가 `toDbErrorMessage`에서 닉네임 문구인 "이미 사용 중인 값이에요."로 접혀** 뜻이 어긋난다 — 사유를 말해야 하는 중복은 트리거(또는 함수)가 P0001로 직접 던진다.
 
 #### ⚠ 트리거는 **정책이 통과시킬 행에 대해서만** 말한다
 
@@ -519,12 +441,11 @@ RLS의 `with check` 안에서 부르는 함수도 **똑같이 호출자 EXECUTE 
 그래서 트리거가 정책이 어차피 거부할 행에까지 사유를 말하면 **에러 코드가 오라클이 된다** —
 `P0001`(조건 성립) vs `42501`(불성립)로 갈리기 때문이다.
 
-실제로 `post_report`가 그랬다. 컬럼 grant에 `reporter_id`가 있어 payload에 실을 수 있고
-`profiles_select_all`이라 uuid는 전부 공개이므로, **남의 uuid를 실어 insert를 시도하는 것만으로**
+실제로 신고 테이블이 그랬다. 컬럼 grant에 신고자 컬럼이 있어 payload에 실을 수 있고
+`profiles`의 uuid는 전부 공개이므로, **남의 uuid를 실어 insert를 시도하는 것만으로**
 "그 사람이 이 글을 신고했는가"와 "이 글의 작성자가 누구인가"가 읽혔다(실측 — HTTP 400/403으로 갈렸다).
-트리거가 `security definer`라 두 `exists`가 RLS를 넘어 읽으므로 **소프트 삭제되어 아무에게도
-보이지 않는 글의 작성자까지** 특정됐다. SELECT 정책을 일부러 두지 않아 감춘 테이블이
-에러 채널로 통째로 새어 나간 셈이다.
+트리거가 `security definer`라 `exists`가 RLS를 넘어 읽으므로 **아무에게도 보이지 않는 행까지**
+특정됐다. SELECT 정책을 일부러 두지 않아 감춘 테이블이 에러 채널로 통째로 새어 나간 셈이다.
 
 → **트리거의 첫 줄은 "이 행이 정책을 통과할 명의인가"를 확인하고, 아니면 판정을 정책에 넘긴다.**
 
@@ -537,7 +458,7 @@ end if;
 ⚠ AFTER INSERT로 옮겨 해결하지 않는다 — 그러면 유니크 제약이 먼저 발화해 중복이 `23505`로 나가고,
 `toDbErrorMessage`가 닉네임 문구로 접어 **트리거를 택한 이유 자체가 무너진다.**
 ⚠ 이 회귀는 라벨만으로는 안 잡힌다 — `run-rls.sh`는 "차단 기대인데 통과했는가"만 보고
-**어떤 코드로 차단됐는지는 보지 않는다.** `rls.sql` 섹션 29처럼 sqlstate를 직접 찍어 대조한다.
+**어떤 코드로 차단됐는지는 보지 않는다.** `rls.sql`에서 sqlstate를 직접 찍어 대조한다.
 
 #### ⚠ 같은 23505라도 "설명"과 "흡수"로 갈린다
 
@@ -545,8 +466,8 @@ end if;
 
 | 자리 | 처리 | 왜 |
 |---|---|---|
-| 차단(`user_block`) | 훅이 23505를 **성공으로 흡수** | 이미 차단한 사람을 또 차단하면 목표 상태 그대로다 — 멱등이 맞다 |
-| 신고(`post_report`) | 트리거가 **P0001로 설명** | "접수했어요"를 두 번 말하면 거짓말이다 |
+| 관심 담기(`transfer_deal_watch`) | 훅이 23505를 **성공으로 흡수** | 이미 담은 딜을 또 담으면 목표 상태 그대로다 — 멱등이 맞다 |
+| "접수했어요"류 쓰기 | 트리거가 **P0001로 설명** | 같은 접수를 두 번 "접수했어요"라고 말하면 거짓말이다 |
 
 ⚠ 트리거는 BEFORE라 **동시 요청 두 건이 둘 다 통과하는 창**이 남는다. 그 창은 복합 PK가 막고(23505), 훅이 그 코드를 같은 한국어 문구로 접는다. **트리거는 "설명", 제약은 "보장"**이라 둘 다 필요하다.
 
@@ -558,7 +479,7 @@ end if;
 한때 `raw_user_meta_data`의 표시 이름을 base로 썼는데 세 가지가 걸렸다:
 
 - 사용자가 카카오/구글 프로필을 바꾸면 우리 닉네임과 어긋난다
-- 표시 이름이 실명인 경우가 많아 **커뮤니티에 실명이 노출된다**
+- 표시 이름이 실명인 경우가 많아 **화면에 실명이 노출된다**
 - 무엇보다 base가 **클라이언트가 정하는 값**이라 사칭 방어를 계속 짊어져야 했다
   (실제로 제로폭 문자로 `alice`를 흉내내는 구멍이 열렸다 — 아래 정규형이 그 대응이다)
 
@@ -569,9 +490,11 @@ end if;
 문자 집합이 하이픈을 거부하므로, 그대로 두면 480조합이 포화되는 순간부터 **그 사용자의
 가입 자체가 영구히 실패한다** — 재시도 루프 안이라 무한 루프가 되는 형태다. 포화될
 때까지는 아무 증상이 없어 배포 뒤 한참 지나 터진다.
-→ `rls.sql` 섹션 23이 **실제로 500명을 연속 가입시켜 포화**시키고(실측 폴백 25회 발동)
+→ `rls.sql`의 닉네임 검사가 **실제로 500명을 연속 가입시켜 포화**시키고(실측 폴백 25회 발동)
   그 값들이 CHECK를 통과하는지 본다. 표현식을 복제해 검사하지 않는 이유가 이것이다 —
   폴백은 트리거 내부라 복제하면 트리거를 고쳤을 때 검사만 옛 표현식을 통과시킨다.
+  ⚠ 같은 검사가 **폴백이 실제로 발동했는지**도 함께 증명한다 — 그 값이 0이 되면 포화 검사는
+  폴백을 전혀 보지 못한 채 통과하는 셈이다.
 
 ### 닉네임 정규형 — 사용자가 고칠 수 있게 되면서 필수가 됐다
 
@@ -593,9 +516,9 @@ end if;
 - `profiles_normalize_nickname` **트리거**가 쓰기 직전에 정규화하므로, 사용자가 공백을 붙여
   보내도 CHECK 위반(23514)이 아니라 조용히 다듬어진다.
 - ⚠ **`normalize_nickname`은 닉네임 전용이 아니다.** 이름이 첫 호출자를 기록할 뿐 하는 일은
-  "보이는 텍스트의 정규형"이라, **화면에서 구분되어야 하는 값**은 전부 이걸로 접는다 —
-  투표 선택지가 두 번째 호출자다(`create_post_with_poll`). 접지 않으면 `unique`가
-  제로폭 문자·NBSP·꼬리 공백으로 **그냥 우회되어** 똑같이 생긴 값이 여럿 저장된다.
+  "보이는 텍스트의 정규형"이라, **화면에서 구분되어야 하는 값**(유일해야 하는 라벨 등)은 전부 이걸로
+  접는다. 접지 않으면 `unique`가 제로폭 문자·NBSP·꼬리 공백으로 **그냥 우회되어** 똑같이 생긴
+  값이 여럿 저장된다.
   ⚠ 클라이언트 짝(`normalizeNickname`)도 **같은 자리에서 함께** 걸어야 한다. 한쪽만 접으면
   화면이 보여준 문구와 저장값이 갈린다.
 - ⚠ CHECK 안의 함수는 **호출자 권한으로 평가**되므로 `normalize_nickname`은
@@ -616,9 +539,8 @@ end if;
 - ⚠ **자모 범위의 상한이 `ㅣ`(U+3163)인 것은 실수가 아니다.** 바로 다음 U+3164는 HANGUL
   FILLER로 화면에 아무것도 그리지 않는다 — 한 글자만 넓혀도 "보이지 않는 닉네임"이 돌아온다.
 - ⚠ **`profiles_nickname_canonical`을 지우지 않는다.** plain이 통과시키는 값은 전부 정규형이라
-  지금은 중복처럼 보이지만, `profiles_nickname_trimmed`를 지웠던 때와는 사정이 다르다 —
-  그때는 canonical이 trimmed를 **영구히** 포함했다. plain은 **정책**이라 넓어질 수 있고
-  (특수문자를 허용하기로 하는 순간), 그때 canonical이 유일한 정규형 방어선으로 돌아온다.
+  지금은 중복처럼 보이지만, plain은 **정책**이라 넓어질 수 있고(특수문자를 허용하기로 하는 순간),
+  그때 canonical이 유일한 정규형 방어선으로 돌아온다.
   뜻이 다르다: canonical = 정규형(보안 불변식) / plain = 문자 집합(정책).
 - ⚠ 클라이언트 짝은 `isPlainNickname`이고 **정규형에 적용한다.** 원본으로 판정하면 NFD 한글이
   거부되고, DB가 조용히 다듬는 꼬리 공백까지 에러가 된다.
@@ -633,14 +555,14 @@ end if;
 `profiles.avatar_path`에는 전체 URL이 아니라 `avatars` 버킷 안의 경로(`{user_id}/{uuid}.webp`)만
 넣는다. 전체 URL을 저장하면 로컬(`127.0.0.1:64321`)과 원격(`*.supabase.co`)의 호스트가 달라
 환경을 옮길 때마다 모든 행이 깨진다. URL 조립은 **`@/shared/config`의 `avatarUrl()`** 한 곳에서만
-(entities 셋이 함께 써야 해서 `shared`에 있다).
+(버킷 URL 조립의 단일 소스가 `publicStorageUrl()`이고 `avatarUrl()`은 그것을 감싼다).
 
 - ⚠ `profiles_avatar_path_own` CHECK가 **자기 폴더만** 허용한다. Storage 정책이 업로드를 막아도
   **이미 존재하는 남의 파일 경로는 참조할 수 있기** 때문에 두 겹으로 막는다.
 - ⚠ **`starts_with`로는 부족하다**(실측). `{내 uuid}/../{남의 uuid}/x.webp`가 통과하고, URL을
-  만드는 순간 브라우저 파서가 `..`를 정규화해 **남의 파일이 뜬다.** 아바타가 상세·댓글에
-  노출되므로 그대로 사칭 벡터가 된다 → 정규식으로 `{내 uuid}/{파일명}` **두 세그먼트**를 강제한다.
-  (`rls.sql` 섹션 24가 경로 탈출·하위 폴더·확장자 없음을 전부 검사한다)
+  만드는 순간 브라우저 파서가 `..`를 정규화해 **남의 파일이 뜬다.** 아바타는 작성자 신원 표시라
+  그대로 사칭 벡터가 된다 → 정규식으로 `{내 uuid}/{파일명}` **두 세그먼트**를 강제한다.
+  (`rls.sql`의 프로필 검사가 경로 탈출·하위 폴더·확장자 없음을 전부 본다)
 - **1계정 : 1프로필사진.** 교체는 `list()`로 내 폴더를 훑어 **전부 지운 뒤** 업로드한다.
   반대 순서(업로드 → DB → 옛 파일 삭제)로 두면 마지막 삭제가 실패할 때마다 고아가 쌓이고
   되돌릴 방법이 없다. ⚠ 지울 대상을 **캐시에서 받지 않는다** — 리페치가 실패하면 옛 경로에
@@ -649,55 +571,20 @@ end if;
 - ⚠ 파일명은 업로드마다 새로 만든다(uuid). 같은 이름을 덮어쓰면 공개 URL이 그대로라
   브라우저·CDN 캐시 때문에 옛 사진이 계속 보인다.
 - 버킷의 `file_size_limit`(2MiB)·`allowed_mime_types`가 **실제 방어선**이다 —
-  클라이언트 리사이즈는 UX일 뿐 우회 가능하다(RLS와 같은 구조).
-
-## 입축구 면 배경도 **경로**로 저장한다
-
-`survey_option.image_path`는 `survey-images` 버킷 안의 `{survey_id}/{파일명}`이다. 아바타와
-같은 이유(호스트가 환경마다 다르다)이고, 조립은 `publicStorageUrl()` 한 곳에서만 한다.
-
-- ⚠ **`starts_with`가 아니라 정규식으로 두 세그먼트를 강제한다.** 아바타에서 실측한 함정이
-  그대로 재현된다 — `..`가 낀 경로는 URL을 만드는 순간 브라우저 파서가 정규화해 다른
-  폴더의 파일을 가리킨다. 폴더를 `[0-9]+`로 두면 `..`가 애초에 들어오지 못한다.
-- ⚠ **`bg_color`를 대체하지 않는다.** 이미지가 뜨기 전·실패했을 때 깔릴 배경이 필요하고,
-  분할 카드 판별자도 여전히 색이다 → 이미지만 있고 색이 없는 문항은 카드로 그려지지 않는다.
-- ⚠ **쓰기는 관리자에게만 열려 있다**(`survey_images_insert/update/delete_admin`). 한동안
-  정책이 아예 없어 앱에 업로드 경로가 없었고, 어드민 화면이 생기면서 그 자리가 열렸다 —
-  `scripts/upload-survey-images.mjs`(service_role) 경로는 그대로 살아 있다.
-  ⚠ 경로 형태(`{survey_id}/{파일}`)는 여전히 `image_path`의 CHECK가 강제한다 — 정책은
-  "관리자인가"만 본다.
-  ⚠ 새 키 형식(`sb_secret_…`)은 JWT가 아니라서 **`apikey` 헤더를 함께** 보내야 한다
+  클라이언트 리사이즈는 UX일 뿐 우회 가능하다(RLS와 같은 구조). `rls.sql`이 이 설정값까지 대조한다 —
+  정책만 보면 이 값이 조용히 넓어져도 아무도 모른다.
+- ⚠ 새 키 형식(`sb_secret_…`)을 스크립트에서 쓸 때는 **`apikey` 헤더를 함께** 보낸다
   (Authorization만 주면 storage가 JWT로 파싱하려다 `Invalid Compact JWS`로 죽는다).
-- ⚠ 크기·타입의 **실제 방어선은 버킷 설정**이다(`rls.sql` 섹션 30c-2가 값까지 대조한다).
 
-## 본문 이미지는 **URL을 본문에 담는다** — 경로 규약의 의도된 예외
+### ⚠ 정책만 걷은 옛 버킷이 남아 있다 — `post-images` · `survey-images`
 
-바로 위 규칙과 반대로, 본문 이미지는 `post-images` 버킷의 **전체 공개 URL**을
-마크다운(`![](…)`)으로 `post.content`에 넣는다. 갈리는 이유는 셋이다.
+두 버킷의 스토리지 정책은 마이그레이션(`20260926000001_drop_community_survey_match.sql`)이 걷었지만
+**버킷과 파일은 남아 있다.** 호스팅 Supabase는 `storage.buckets`·`storage.objects`의 직접 DELETE를
+트리거로 막아("Use the Storage API instead") 마이그레이션에서 지우면 원격 적용이 통째로 실패한다.
 
-- **위 규칙의 주어는 컬럼이다.** `profiles.avatar_path`는 앱이 값의 형태를 온전히 소유하므로
-  경로만 담고 조립을 `avatarUrl()` 한 곳으로 모을 수 있다. `post.content`는 사용자가
-  **외부 이미지 주소를 직접 적을 수도 있는 자유 텍스트**라 그 전제가 성립하지 않는다.
-- 경로만 담으려면 `shared/ui/markdown.tsx`가 "스킴 없는 src는 우리 버킷"이라는 **사적 규약을
-  알아야 한다.** 그 파일은 `"use client"`조차 붙이지 않고 서버 렌더 여지를 남긴 범용 렌더러이고,
-  "raw HTML을 절대 렌더하지 않는다"는 안전 계약이 그 범용성 위에 서 있다.
-- **커스텀 스킴은 애초에 불가능하다.** react-markdown의 기본 `urlTransform`이 http/https/
-  mailto/tel/상대경로 외를 빈 문자열로 잘라낸다(`usableUrl`이 존재하는 이유).
-
-⚠ 대가로 **DB를 다른 프로젝트로 옮기면 본문 이미지가 깨진다.** 아바타에는 없는 위험이므로
-  버킷을 옮길 일이 생기면 `post.content`의 URL도 함께 치환해야 한다.
-
-⚠ **아바타에 있는 DB CHECK 대응물이 없다.** `profiles_avatar_path_own`이 경로 형태를 강제하는
-  자리가 본문에는 없어 **Storage 정책이 유일한 방어선**이다. 남의 폴더에 올리는 것은 막지만
-  "남의 파일 주소를 자기 본문에 적기"는 막지 못한다 — 공개 버킷이고 아바타와 달리 **작성자
-  신원 표시가 아니라서** 사칭 벡터가 되지 않는다.
-
-⚠ **고아 파일이 남을 수 있다.** 올린 뒤 본문에서 마크다운만 지우고 등록하면 그렇다. 작성을
-  취소하고 나가는 경로만 그 세션 업로드분을 정리한다(`useUploadPostImage`의 `discardUploads`).
-  정리가 필요해지면 "본문에서 참조되지 않는 경로 삭제" 배치를 붙인다.
-
-⚠ URL이 길어 `excerpt`(=`left(content, 300)`) 예산을 먹으므로, 그 생성식이 **이미지 마크다운을
-  먼저 지운다**(마이그레이션 20260817000002). 목록 카드 발췌가 통째로 비는 것을 막는 장치다.
+- 더는 올릴 수 없지만 **공개 버킷이라 이미 올라간 파일의 공개 URL은 계속 열린다.** 대시보드
+  (Storage)에서 비운 뒤 지운다.
+- 스토리지 정리를 마이그레이션에 넣지 않는다 — 버킷·객체 삭제는 Storage API(대시보드·CLI)로 한다.
 
 ## 문자 검증은 클라이언트와 DB가 **같은 문자 집합**을 써야 한다
 
@@ -709,8 +596,8 @@ end if;
 | `U+200B`(제로폭 공백) | 통과 | 통과 |
 | 이모지 121개 | **거부** — `.length`가 UTF-16 코드유닛 | 통과 — `char_length`는 코드포인트 |
 
-결과: 제목이 **완전히 비어 보이는 글**이 실제로 만들어졌고(`<title>﻿ | 온더볼</title>`),
-이모지 제목은 한도의 절반에서 막혔다. 방향이 양쪽으로 다 어긋난 셈이다.
+결과: 제목이 **완전히 비어 보이는 행**이 실제로 만들어졌고(`<title>﻿ | 온더볼</title>`),
+이모지 입력은 한도의 절반에서 막혔다. 방향이 양쪽으로 다 어긋난 셈이다.
 
 → 단일 소스를 둔다. `src/shared/lib/text.ts`의 `hasVisibleChar`·`codePointLength`와
    `public.has_visible_char`(마이그레이션 20260802000001)가 **같은 문자 집합**을 쓴다.
@@ -728,7 +615,7 @@ end if;
 | 👨🏻‍❤️‍💋‍👨🏽 | 1 | 10 |
 | `a` + 결합악센트 50개 | **1** | **51** |
 
-그래서 **사용자에게 보이는 한도는 그래핌**(`graphemeLength`)이다. 그런데 DB를 그 단위로
+그래서 **사용자에게 보이는 한도는 그래핌**이다. 그런데 DB를 그 단위로
 맞출 수는 없다 — PostgreSQL에 그래핌 분절이 아예 없고(정규식에 `\X` 없음), 손으로 근사한
 함수를 CHECK에 넣으면 **유니코드 버전에 따라 경계가 바뀌어** 실질적으로 IMMUTABLE이 아니게 된다
 (ICU 업그레이드 후 기존 행이 제약 위반 → dump/restore 실패).
@@ -747,44 +634,32 @@ end if;
 그래서 한도를 `TextLimit`(`@/shared/lib`) 하나로 묶고 판정은 **`lengthOverflow`가 단독으로**
 소유한다. `parsePostId`·`safeNextPath`와 같은 이유다 — 두 곳이 같아야 하는 규약은 함수 하나가 갖는다.
 
-- ⚠ **`graphemeLength(v) > MAX`를 직접 짜지 않는다.** 반드시 `lengthOverflow(v, LIMIT)`.
+- ⚠ **그래핌 길이를 직접 재서 비교하지 않는다.** 반드시 `lengthOverflow(v, LIMIT)`.
 - 검사 순서가 규약이다 — 그래핌을 먼저 봐야 일반 사용자에게 한도 숫자가 담긴 문구가 간다.
   코드포인트 초과 문구("너무 길어요")는 결합 문자를 쌓지 않는 한 도달할 수 없다.
 
 | 자리 | 화면(그래핌, 클라 전용) | DB(코드포인트, CHECK) | 상수 | 검증 함수 |
 |---|---:|---:|---|---|
-| 제목 | 120 | 1,200 | `TITLE_LIMIT` | `validatePost` |
-| 댓글 | 1,000 | 10,000 | `COMMENT_LIMIT` | `validateComment` |
 | 닉네임 | 20 | 200 | `NICKNAME_LIMIT` | `validateNickname` (정규형 기준 + `isPlainNickname`) |
-| 투표 질문 | 100 | 1,000 | `POLL_QUESTION_LIMIT` | `validatePoll` |
-| 투표 선택지 | 40 | 400 | `POLL_OPTION_LIMIT` | `validatePoll` |
-| 본문 | — (도입 안 함) | 20,000 | `CONTENT_MAX` (단일) | `validatePost` |
-| 입축구 제목 | 100 | 1,000 | `SURVEY_TITLE_LIMIT` | `validateSurvey` |
-| 입축구 선택지·부제 | 40 | 400 | `SURVEY_LABEL_LIMIT`·`SURVEY_SUBTITLE_LIMIT` | `validateSurvey` |
-| 공지 제목 | 120 | 1,200 | `NOTICE_TITLE_LIMIT` | `validateNotice` |
-| 공지 본문 | — (도입 안 함) | 20,000 | `NOTICE_BODY_MAX` (단일) | `validateNotice` |
-| 가리는 사유 | 20 | 200 | `MASK_REASON_LIMIT` | `validateMaskReason` |
 
 ⚠⚠ **길이는 저장하는 값으로 잰다.** 저장 직전에 값을 접는 자리(`normalizeNickname`)가 있으면
 **정규형을 재야** 화면 한도와 저장값이 갈리지 않는다. `normalizeNickname`이 ZWJ를 지우므로
 가족 이모지(👨‍👩‍👧‍👦)는 저장 시점에 4자로 분해된다 — 원본으로 재면 그래핌 20개가 한도 40을
-통과한 뒤 **80그래핌으로 부푼다**(실측). 정규형을 재는 것은 `validateNickname`·`validatePoll`·
-`validateSurvey`이고, 접지 않고 저장하는 값(공지 제목·본문)은 원본을 잰다.
+통과한 뒤 **80그래핌으로 부푼다**(실측). 접지 않고 저장하는 값은 원본을 잰다.
 
-⚠ **이 표는 "클라이언트가 쓰는 컬럼"만 담는다.** 쓰기 경로가 없는 컬럼은 DB CHECK만 둔다.
-⚠ **클라이언트 쓰기 경로가 새로 열리면 그 순간 이 표의 대상이 된다** — 입축구가 실제로 그랬다.
-한동안 문항을 마이그레이션만 넣어서 겹쳐 걸 화면 한도가 없었는데, 어드민 화면이 생기면서
-`survey.title`·`survey_option.label`·`subtitle`이 이 표로 들어왔다(공지도 같은 이유로 함께).
-⚠ 어드민 전용 화면이라고 예외가 아니다 — 한도를 안 걸면 DB의 23514가 나가고
-`toDbErrorMessage`가 "입력값이 허용 범위를 벗어났어요."로 접어 **어느 칸이 문제인지
-말하지 못한다.** 화면 한도는 그 문구를 "N자까지예요"로 만드는 장치다.
+⚠ **이 표는 "클라이언트가 쓰는 컬럼"만 담는다.** 쓰기 경로가 없는 컬럼(운영 스크립트만 쓰는
+`transfer_*`)은 DB CHECK만 둔다.
+⚠ **클라이언트 쓰기 경로가 새로 열리면 그 순간 이 표의 대상이 된다.** 운영 전용 화면이라고
+예외가 아니다 — 한도를 안 걸면 DB의 23514가 나가고 `toDbErrorMessage`가 "입력값이 허용 범위를
+벗어났어요."로 접어 **어느 칸이 문제인지 말하지 못한다.** 화면 한도는 그 문구를 "N자까지예요"로
+만드는 장치다.
 
-⚠ **검증은 features 슬라이스가 소유하고 뷰는 문구만 받는다.** 세 슬라이스가 같은 형태를
-지켜야 한다 — 한 슬라이스만 한도 상수를 배럴로 내보내고 뷰가 분기를 직접 짜면 형태가 갈린다.
+⚠ **검증은 features 슬라이스가 소유하고 뷰는 문구만 받는다**(`features/update-profile`의
+`validateNickname`). 한도 상수를 배럴로 내보내고 뷰가 분기를 직접 짜면 슬라이스마다 형태가 갈린다.
 
-⚠ **본문은 일부러 그래핌으로 바꾸지 않았다.** 한도가 넓어 이모지가 체감되지 않는데 가장 큰
-컬럼이라 abuse bound를 10배로 푸는 대가가 크고, 20,000자 그래핌 계산이 **1.5ms로
-코드포인트(0.1ms)의 14배**라 키 입력마다 돌릴 수 없다(제목 120자는 0.011ms라 무해하다).
+⚠ **아주 긴 본문형 컬럼은 그래핌을 도입하지 않을 수 있다.** 한도가 넓어 이모지가 체감되지 않는데
+abuse bound를 10배로 푸는 대가가 크고, 20,000자 그래핌 계산이 **1.5ms로 코드포인트(0.1ms)의
+14배**라 키 입력마다 돌릴 수 없다(120자는 0.011ms라 무해하다). 그때는 코드포인트 단일 값으로 둔다.
 
 ⚠ **DB 한도를 없애서 "어긋날 일을 없앤다"는 선택지는 없다.** 중간 검증층이 없어
 이 CHECK가 유일한 실제 방어선인 데다, `profiles`는 `lower(nickname)` btree 유니크 인덱스를
@@ -794,49 +669,24 @@ end if;
 (허용 문자가 한글·영문·숫자뿐이라 최악이 3바이트다 — `profiles_nickname_plain`이 4바이트
 문자를 애초에 거부한다. **문자 집합을 넓히면 이 곱셈도 함께 고친다**).
 
-⚠ 화면 한도를 클라이언트만 강제하게 됐으므로 **렌더도 방어해야 한다** — 우회 삽입된 긴 제목이
-목록 카드를 늘리지 않게 `PostCard`의 제목을 `line-clamp-2`로 자른다. `generateMetadata`는
-이미 `clamp`가 막고 있다.
+⚠ 화면 한도를 클라이언트만 강제하므로 **렌더도 방어해야 한다** — 우회 삽입된 긴 값이
+카드를 늘리지 않게 `line-clamp`·`truncate`로 자른다. `generateMetadata`는 `clamp`가 막는다.
 
 ⚠ `random_nickname()`의 계약은 여전히 **20자**다(컬럼 상한 200이 아니다). 랜덤 배정된 닉네임도
-사용자가 화면 한도 안에서 편집할 수 있어야 한다 — `rls.sql` 섹션 23의 검사를 200으로 올리지 말 것.
+사용자가 화면 한도 안에서 편집할 수 있어야 한다 — `rls.sql`의 랜덤 닉네임 길이 검사를 200으로 올리지 말 것.
 
-검증은 `rls.sql` 섹션 25(경계 ±1 + 가족 이모지 120개 제목 + btree 통과)가 맡는다.
+검증은 `rls.sql`의 길이 한도 검사(경계 ±1 + 닉네임 200자가 `lower(nickname)` btree 인덱스에도 들어가는지)가 맡는다.
 
-## SECURITY DEFINER RPC
+## SECURITY DEFINER 함수
 
-쓰기가 RLS를 넘어야 할 때만 RPC로 내린다. `security definer` 함수의 **전량은 아래 표가 전부**다 — 새로 만들면 여기에 추가한다.
+쓰기가 RLS를 넘어야 할 때만 `security definer`로 내린다. `security definer` 함수의 **전량은 아래 표가 전부**다 — 새로 만들면 여기에 추가한다.
 
 > 검증: `select proname, prosecdef from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public'`
 > — 표와 실제가 갈리면 **보안 표면 목록이 거짓이 된 것**이다.
 
 | 종류 | 함수 | 비고 |
 |---|---|---|
-| RPC(클라이언트가 직접 호출) | `toggle_post_like` · `soft_delete_post` · `increment_post_view` · `create_post_with_poll` | `increment_post_view`만 anon에 열려 있다(아래 예외 항목) |
-| 트리거 | `sync_post_like_count` · `sync_post_comment_count` · `check_comment_depth` | `post_like`·`comment` |
-| 트리거 | `check_post_report` (`post_report_guard`, `before insert on post_report`) | 자기 글 신고·중복 신고를 P0001 한국어로 거부. **호출자 권한으로 돌면 두 `exists`가 모두 0행을 보아 검사가 조용히 통과한다** — 신고자에게 `post_report` SELECT 권한이 없고 `post` 쪽도 차단 필터가 걸린 RLS를 넘어야 한다 |
 | 트리거 | **`handle_new_user`** (`on_auth_user_created`, `after insert on auth.users`) | 가입 시 `profiles` 행 생성. **호출자 권한으로 돌면 `profiles` insert 권한이 없어 가입 자체가 실패한다** |
-| 정책 헬퍼 | `post_is_alive` (`stable`) | `comment`·`post_poll_vote`의 정책과 `post_poll_results`가 공유 — 인라인 서브쿼리를 쓰지 않는 이유는 아래 참고 |
-| 정책 헬퍼 | `survey_is_open` (`stable`) | `survey_vote`의 insert·update 정책이 공유하는 **마감 판정**. SELECT와 `survey_results`에는 걸지 않는다 — 마감돼도 참여자는 자기 표와 결과를 봐야 한다. anon에는 열지 않는다(부르는 정책이 전부 `to authenticated`라 화이트리스트가 늘지 않는다) |
-| 정책 헬퍼 | `is_blocked` (`stable`) | `post`·`comment`의 SELECT 정책이 공유하는 **차단 숨김 판정**. anon에도 EXECUTE가 열려 있다(아래 화이트리스트) |
-| **집계 읽기** | `post_poll_results` (`stable`) | 쓰기가 아니라 **읽기**다. 개별 표는 RLS로 "내 행만"인데 집계는 그 경계를 넘어야 한다 — 그리고 **투표한 사람에게만** 돌려준다(결과 게이팅을 UI가 아니라 여기서 건다). ⚠ definer라 정책이 닿지 않으므로 **`post_is_alive`를 함수 안에서 직접 확인**한다 |
-| 정책 헬퍼 | `match_is_open` (`stable`) | `match_prediction`의 insert·update 정책이 공유하는 **킥오프 판정**. SELECT에는 걸지 않는다 — 마감돼도 자기 예측은 봐야 한다(`survey_is_open`과 같은 형태). anon에는 열지 않는다(부르는 정책이 전부 `to authenticated`) |
-| **집계 읽기** | `match_prediction_results` (`stable`) | ⚠ **`voided_at`을 보지 않는다** — 취소된 경기도 킥오프가 지났으면 집계가 열린다(`match_is_open`은 보는데 여기는 안 본다). 던져진 예측은 실재했으므로 분포는 사실이고, 다만 `result`가 null이라 **채점에서만 빠진다** — 의도된 비대칭이다. 승부예측판 집계인데 **게이팅 축이 다르다** — 위 둘은 "참여했는가"로 가르지만 이건 **킥오프가 지났는가**로 가른다. 마감 전 공개는 다수파 추종으로 적중률을 오염시키고, 마감 후 비공개는 이 기능의 콘텐츠를 잠그는 셈이다. 그래서 anon에도 EXECUTE가 열려 있다 |
-| **집계 읽기** | `match_leaderboard` (`stable`) | 승부예측 랭킹. 개별 예측은 RLS로 "내 행만"인데 순위는 **남의 적중 수**를 세야 해서 그 경계를 넘는다. ⚠ **돌려주는 것은 개인별 합계이고 경기별 선택은 없다** — 선택을 돌려주는 열을 더하면 `match_prediction_results`의 킥오프 게이팅을 옆문으로 우회하게 된다(`rls.sql` 34f가 반환 형태를 문자 그대로 못박는다). 다만 **경기별 적중 여부는 차분으로 추론된다**(채점 하나 전후의 두 판 비교) — 전부 킥오프 후의 사실이라 수용한 경계다. ⚠ **`result`만 믿지 않고 `kickoff_at <= now()`를 함께 본다** — "킥오프 전에는 스코어가 없다"를 DB가 강제하지 않아서, 제공자가 "종료 + 미래 날짜"를 주면 열린 경기의 적중이 순위에 잡혀 마감 전 선택이 샌다(34e). ⚠ definer라 정책이 닿지 않으므로 **`deleted_at`을 함수 안에서 직접 거른다**(무효는 `result`의 생성식이 이미 거른다). ⚠ 순위 규칙(적중 수 → 적은 예측 수 → 공동 순위)과 상한 클램프(1~100)를 이 함수가 단독으로 소유한다 — 화면은 다시 정렬하지 않는다. 호출자 본인의 행은 상한 밖이어도 끝에 붙는다(`is_me`). 비로그인·크롤러가 보는 공개 콘텐츠라 anon에 열려 있다 |
-| **집계 읽기** | `survey_results` (`stable`) | 입축구판 `post_poll_results`. 게이팅도 같다. ⚠ 삭제된 문항은 **함수 안에서 직접 거른다**(definer라 정책이 닿지 않는다 — `post_poll_results`가 `post_is_alive`를 부르는 자리와 같다). authenticated 전용이라 아래 anon 화이트리스트에는 들어가지 않는다 |
-| 정책 헬퍼 | `match_is_alive` (`stable`) | `match_lineup`·`match_lineup_player`·`match_event`·`match_stat`의 SELECT 정책이 공유하는 **부모 생존 판정**. anon에 열려 있다(크롤러가 경기 상세를 색인한다) |
-| 정책 헬퍼 | `survey_is_alive` (`stable`) | `survey_option`의 SELECT 정책이 쓰는 부모 생존 판정. anon에 열려 있다 |
-| 정책 헬퍼 | `post_is_masked` (`stable`) | `post_update_own`이 쓰는 **가림 잠금**. 이게 없으면 작성자가 가려진 자기 글의 본문을 곧바로 다시 써 넣는다 — 그리고 그 상태에서 관리자가 되돌리면 **작성자가 새로 쓴 글이 지워지고 문제 원문이 다시 게시된다**(실측). anon에는 열지 않는다(부르는 정책이 `to authenticated`) |
-| 권한 판정 | `is_admin` (`stable`) | 관리자 여부. **인자를 받지 않는다**(`auth.uid()`로 확정). anon에는 열지 않는다 — **어떤 RLS 정책도 이 함수를 부르지 않기 때문**이다 |
-| **어드민 조회** | `admin_match_list` · `admin_survey_list` · `admin_survey_option_list` · `admin_post_list` · `admin_notice_list` · `admin_survey_vote_count` (`stable`, `language sql`) | 정책이 감춘 행(삭제·예약·차단)을 어드민에게만 돌려준다. **비관리자에게는 예외가 아니라 0행**이다. ⚠ **`language sql`이어야 한다** — plpgsql은 인라인되지 않아 PostgREST가 붙인 `order/limit`이 전체를 물질화한 뒤 적용된다(결과는 정확하고 느리기만 해서 아무 검사도 못 잡는다) |
-| **어드민 쓰기** | `admin_update_match` · `admin_unlock_match` · `admin_soft_delete_match` · `admin_restore_match` · `admin_create_survey` · `admin_update_survey` · `admin_set_survey_options` · `admin_edit_survey_option` · `admin_soft_delete_survey` · `admin_restore_survey` · `admin_create_notice` · `admin_update_notice` · `admin_soft_delete_notice` · `admin_restore_notice` · `admin_strip_post_images` · `admin_mask_post` · `admin_unmask_post` · `admin_soft_delete_post` · `admin_restore_post` · `admin_edit_post_poll` | 첫 줄이 `is_admin()` 확인이고 아니면 **P0001 한국어**다. 아래 "어드민 쓰기는 전부 RPC를 지난다" 절 참고 |
-
-⚠ **RLS를 우회하는 definer는 "그 함수가 유일한 경로"일 때 가장 강하다.**
-`create_post_with_poll`이 그 예다. 처음엔 원자성만 노리고 invoker로 두고 `post_poll`·`post_poll_option`에
-"작성자면 insert 가능" 정책을 열었는데, **정책에 시점 개념이 없어** 작성자가 이미 표가 던져진
-투표에 선택지를 끼워 넣을 수 있었다(실측). 두 테이블의 정책과 grant를 걷어내고 함수를 definer로
-올리자, "생성 시 고정"과 "선택지 2~4개"를 **함수 하나가 단독으로 소유**하게 됐다 —
-정책으로 표현할 수 없는 규약은 유일 경로로 만들어야 지켜진다.
 
 ⚠ **아래는 definer로 오해하기 쉽지만 아니다.**
 권한 없이도 도는 함수를 "RLS를 우회하는 함수"로 세어두면 보안 검토가 헛돈다. 위 검증 질의에서 `prosecdef = false`로 나오는 것이 전부이고, 아래 표는 그중 이유가 헷갈리는 것만 적는다.
@@ -847,219 +697,119 @@ end if;
 | `normalize_profile_nickname` | 쓰기 직전 `new.nickname`을 다듬을 뿐이라 호출자 권한으로 충분하다 |
 | `transfer_news_freeze_collected` | 트리거지만 옛 행과 새 행을 비교해 거부할 뿐이다 → 권한 상승이 필요 없다(writer가 service_role이라 **어차피 grant가 아니라 이 트리거가** 방어다) |
 | `random_nickname` | 인자도 테이블 접근도 없는 순수 조합 생성기 |
-| `admin_set_post_content` · `admin_validate_survey_options` | definer RPC **안에서만** 불리는 내부 헬퍼 — 호출자가 이미 definer 컨텍스트라 권한 상승이 필요 없고, 직접 부를 EXECUTE도 열려 있지 않다 |
 
 ⚠ **CHECK 제약 평가 함수(`has_visible_char`·`normalize_nickname`·`is_plain_nickname`)는 이 목록의 대상이 아니다.**
 성질이 반대다 — definer로 만들 게 아니라 오히려
-**그 테이블에 쓰는 역할에 EXECUTE를 열어야** 한다(바로 아래 항목).
+**그 테이블에 쓰는 역할에 EXECUTE를 열어야** 한다(위 "CHECK 제약 안의 함수" 절).
+
+definer 함수를 새로 만들 때의 규약:
 
 - **유저 id를 인자로 받지 않는다.** `security definer`는 RLS를 우회하므로 유저를 클라이언트가 넘기면 남의 명의로 조작할 수 있다. 함수 안에서 `auth.uid()`로 확정한다 — PostgREST가 access token을 검증해 `request.jwt.claims`에 심어둔 값이라 위조가 불가능하다. `security definer`가 바꾸는 것은 "무엇을 할 수 있는가"(권한)이지 "누가 호출했는가"(세션 컨텍스트)가 아니다.
 - **`set search_path = ''` + `public.` 접두사.** 호출자가 search_path를 조작해 다른 스키마의 동명 테이블을 붙잡게 만드는 권한 상승을 막는다.
+- **definer 안에서는 정책이 닿지 않는다.** 소프트 삭제·권한 판정처럼 정책이 하던 거름을 **함수 안에서 직접** 한다.
+- **정책으로 표현할 수 없는 규약은 유일 경로로 만든다.** 정책에는 시점 개념이 없어 "생성 시 고정"·"항목 2~4개" 같은 규약을 지키지 못한다 — 그 테이블의 정책·grant를 걷고 definer 함수 하나만 쓰기 경로로 남기면 그 함수가 규약을 **단독으로 소유**한다(실측: 정책을 열어 뒀더니 이미 표가 던져진 투표에 선택지를 끼워 넣을 수 있었다).
+- **여러 행을 한 번에 바꾸는 함수는 세기 전에 잠근다.** "지우고 넣은 뒤 다시 센다"로는 막을 수 없다 — 자식 FK가 `on delete cascade`면 그 delete가 **경합으로 들어온 행까지 함께 지우고**, 재검사는 자기가 지운 증거를 찾다가 0을 본다(두 세션으로 실측). 세기 전에 `select … for update`로 잠근다 — 참조하는 insert가 `for key share`를 잡으므로 충돌해 기다리거나 23503으로 거부된다. ⚠ 이 회귀는 `rls.sql`이 잡지 못한다(두 세션이 필요한데 그 파일은 한 트랜잭션이다).
 - **`revoke execute from public, anon`.** 함수는 기본적으로 PUBLIC에 EXECUTE가 부여된다 — 그대로 두면 비로그인도 호출한다.
-  - ⚠ **anon에 EXECUTE가 열린 함수는 전부 10개**이고, 그게 `rls.sql` 섹션 17d의 화이트리스트다.
-    definer는 그중 일곱뿐이니 "definer 7개"로만 세면 안 된다.
+  - ⚠ **anon에 EXECUTE가 열린 함수는 아래 표가 전부**이고, 그게 `rls.sql` 전수 가드의 화이트리스트다.
+    definer는 그중에 없다 — 새로 열 때 definer인지를 함께 적는다.
 
     | 함수 | definer? | 왜 열려 있나 |
     |---|:---:|---|
-    | `increment_post_view` | ✅ | **유일한 비로그인 쓰기 경로**(아래) |
-    | `match_prediction_results` | ✅ | 승부예측 집계 — **게이팅 축이 "참여"가 아니라 "킥오프"** 라 마감 후에는 비로그인에게도 열어야 한다. "커뮤니티의 68%가 이렇게 봤다"가 이 기능의 콘텐츠 자체이고 크롤러도 그것을 본다. 킥오프 전에는 누구에게나 0행이다 |
-    | `match_leaderboard` | ✅ | 승부예측 랭킹 — 비로그인·크롤러가 보는 공개 콘텐츠다. 돌려주는 것은 이미 공개인 닉네임·아바타 경로와 **킥오프가 지나 채점이 끝난** 경기의 개인별 합계뿐이라 마감 전 선택이 새는 경로가 없다(스코어를 쓰는 쪽을 믿지 않고 함수가 킥오프를 직접 본다 — 34e) |
-    | `post_is_alive` | ✅ | 비로그인 select 정책이 부르는 **정책 평가 함수** — 읽기 판정만 한다 |
-    | `is_blocked` | ✅ | 〃 — `post`의 select 정책에 `to` 절이 없어 비로그인 조회도 이 함수를 지난다. **닫으면 목록·상세가 통째로 42501로 죽는다.** anon은 `auth.uid()`가 null이라 항상 false를 받아 아무것도 감춰지지 않는다 |
     | `has_visible_char` | — | **CHECK 제약 평가** — 닫으면 그 테이블의 쓰기가 전부 42501로 죽는다 |
     | `normalize_nickname` | — | 〃 (CHECK + before-write 트리거) |
-| `is_plain_nickname` | — | 〃 (`profiles_nickname_plain` CHECK) — 닫으면 가입과 닉네임 변경이 42501로 죽는다 |
-    | `match_is_alive` | ✅ | 라인업·사건·스탯의 select 정책이 부르는 **부모 생존 판정**. 그 정책들에 `to` 절이 없어 비로그인 조회도 지난다 — 닫으면 크롤러의 경기 상세가 통째로 42501로 죽는다. 입력한 id의 생존 여부만 돌려주는데 그건 `match`를 직접 조회해도 알 수 있는 사실이다 |
-    | `survey_is_alive` | ✅ | 〃 — `survey_option`의 select 정책이 부른다 |
+    | `is_plain_nickname` | — | 〃 (`profiles_nickname_plain` CHECK) — 닫으면 가입과 닉네임 변경이 42501로 죽는다 |
 
-    ⚠ **`is_admin`은 이 표에 없다.** 어떤 RLS 정책도 그 함수를 부르지 않기 때문이다 —
-    어드민 조회조차 definer RPC를 지나므로 anon에 열 이유가 없다(아래 어드민 절).
-
-  - ⚠ **쓰기 예외는 `increment_post_view` 하나뿐이다.** "anon은 어디에도 쓸 수 없다"는 전제가 여기서만 깨진다. 조회는 비로그인이 대부분이라 authenticated 전용으로 두면 숫자가 의미를 잃기 때문이다.
-  - 대가로 **`view_count`는 curl 루프로 부풀릴 수 있는 대략치**다 — 트리거가 단독 관리하는 `like_count`·`comment_count`와 **신뢰 수준이 다르다.** 이 차이는 컬럼 주석에도 적혀 있다. 정확도가 필요해지면 `(post_id, viewer_hash, viewed_on)` 로그 테이블이 필요하다.
+  - ⚠ **anon은 어디에도 쓸 수 없다.** 비로그인 쓰기 경로를 여는 순간 그 값은 curl 루프로 부풀릴 수 있는 대략치가 된다 — 열어야 한다면 컬럼 주석에 신뢰 수준을 함께 적는다.
 - **에러 코드 규약**: 우리가 의도적으로 띄우는 한국어 메시지는 **`P0001`** 로 던진다(`toDbErrorMessage`가 그대로 노출한다). `42501`은 Postgres 자신의 영어 권한 거부용으로 남겨둔다.
 
-### 어드민 쓰기는 **전부 definer RPC를 지난다** — 테이블 grant를 열지 않는다
+### 카운터가 없으면 쓰기 RPC도 없다
 
-`match`·`survey`·`survey_option`·`notice`·`post`에 어드민용 정책도 grant도 **한 줄도** 두지
-않는다. 근거가 넷이다.
-
-1. **원자성.** 정책은 문장 단위 스냅샷 판정이라 "표가 0건일 때만 선택지 변경"을 지키지 못한다 —
-   어드민이 선택지를 끼워 넣는 순간 다른 사용자의 투표가 동시에 커밋되면 둘 다 통과한다.
-   `post_poll`에서 실제로 뚫렸던 "진행 중인 투표에 선택지 끼워 넣기"와 같은 구멍이다.
-2. **행 수 불변식.** "선택지 2~4개"는 CHECK로 셀 수 없어 `rls.sql` 섹션 30의 "0행" 질의가
-   대신 지키는데, 그게 성립하는 근거는 **"입력이 우리가 쓴 마이그레이션뿐"** 이다.
-   어드민이 런타임에 지울 수 있게 되면 그 전제가 사라진다 → 여러 행을 한 번에 바꾸는
-   함수만이 이걸 다시 **구조**로 만든다.
-3. **거부 사유.** 정책 위반은 영어 42501 하나다. "표가 이미 있어 선택지 개수를 바꿀 수
-   없어요"는 P0001로만 말할 수 있다.
-4. **기존 검사가 살아남는다.** `seed.sql`이 alice를 관리자로 만들어 `rls.sql` 섹션
-   1·3·30a·31a의 `[❌차단]`이 **관리자 컨텍스트에서 돈다** — 그것들이 그대로 통과하는 것이
-   곧 "어드민 쓰기가 테이블 DML을 쓰지 않는다"의 증거다.
-   ⚠ 그 검사가 뒤집히면 **alice→bob으로 고치지 말고** 왜 테이블 권한이 열렸는지를 먼저 본다.
-
-**조회도 마찬가지로 RPC다.** SELECT 정책에 `or public.is_admin()`을 얹지 않는다:
-
-- 정책에 definer 호출을 하나 더 더하는 것은 `is_blocked`로 인기순이 **8.7ms → 151.6ms(17배)**
-  로 뛴 실측을 다시 사는 일이다.
-- 더 중요한 건 **관리자의 화면만 조용히 오염된다**는 것이다. 조회 훅에는 `deleted_at` 필터가
-  없으므로(정책에 맡기는 것이 이 프로젝트의 규약이다) 관리자가 `/matches`·`/posts`를 열면
-  삭제한 항목이 그냥 섞여 보이고, `useMyAccuracyQuery`의 `match!inner` 때문에 **관리자의
-  적중률만 다른 분모로** 계산된다. 빌드도 린트도 `rls.sql`도 잡지 못한다.
-
-⚠ **`profiles.is_admin`은 아무에게도 SELECT를 열지 않는다.** 누가 관리자인지는 계정 탈취의
-표적을 특정해 주는 값이다 → `grant select (id, nickname, created_at, avatar_path)`로 좁혔다.
-대가로 **profiles에 컬럼을 더할 때 이 목록도 함께 늘려야 하고**, 잊으면 그 컬럼만 조용히
-42501이 된다(17a는 SELECT를 보지 않는다) → `rls.sql` 33b가 목록을 전수 대조한다.
-
-### 본문 가리기 — **작성자의 수정 권한에서 그 글만 뺀다**
-
-`admin_mask_post`는 본문을 안내 문구로 바꾸고 원본을 `post_moderation`에 보관한다. 그런데
-`post_update_own`이 `author_id`만 보면 **작성자가 곧바로 다시 써 넣을 수 있어** 이 기능이
-사실상 아무 일도 하지 않는다(실측). → 정책에 `not public.post_is_masked(id)`를 더해
-**가려진 동안에는 작성자도 못 고치게** 한다. 되돌리면 다시 고칠 수 있다.
-
-⚠ **가리기는 `title`을 다루지 않는다.** 제목이 문제면 글 자체를 지우는 것이 이 화면의 계약이다.
-
-⚠ **어드민의 본문 조치는 "수정됨"을 남기지 않는다.** `post_touch_updated_at`의 WHEN 절이
-`content`를 포함해서, 그냥 두면 이미지 제거·가리기가 `updated_at`을 밀어 **작성자가 고친 적
-없는 글에 "수정됨"이 붙고 되돌려도 그 표시는 돌아오지 않는다**(`app/sitemap.ts`의
-`lastModified`도 이 컬럼을 읽는다). → 세 RPC가 `admin_set_post_content`를 거치고, 그 함수가
-**두 번째 UPDATE로 `updated_at`을 되돌린다**(트리거가 BEFORE라 같은 문장에서는 덮인다.
-그 두 번째 문장은 title·content를 건드리지 않아 WHEN 절이 발화하지 않는다).
-`match`·`survey`·`notice`의 트리거를 WHEN으로 좁힌 것과 같은 목적이다.
-
-### ⚠ 선택지 묶음 교체의 경합은 **`for update`가 닫는다** — 사후 재검사가 아니다
-
-`admin_set_survey_options`는 표가 0건일 때만 통과한다. 그런데 "지우고 넣은 뒤 다시 센다"로는
-막을 수 없다 — `survey_vote → survey_option` FK가 `on delete cascade`라 **그 delete가 경합으로
-들어온 표를 함께 지우고**, 재검사는 자기가 지운 증거를 찾다가 0을 본다(두 세션으로 실측:
-교체가 예외 없이 성공하고 사용자의 표가 사라졌다).
-
-→ 세기 **전에** `select … from survey_option … for update`로 잠근다. `survey_vote` insert가
-참조 행에 `for key share`를 잡으므로 이 잠금과 충돌한다 — 미커밋 투표가 있으면 기다렸다가
-그 표를 세게 되고, 반대로 우리가 먼저 잠그면 투표가 23503으로 거부된다(표가 조용히
-사라지는 대신 투표한 사람이 사실을 알게 된다).
-
-⚠ **이 회귀는 `rls.sql`이 잡지 못한다** — 두 세션이 필요한데 그 파일은 한 트랜잭션이다.
-섹션 33f 머리말이 그 한계를 적어 두었다.
-
-### `deleted_at` · `voided_at` · `admin_locked_at` — 셋의 뜻이 다르다
-
-| | `voided_at` | `deleted_at` | `admin_locked_at` |
-|---|---|---|---|
-| 뜻 | 경기가 실제 취소·몰수됐다(세상의 사실) | 우리 DB의 이 행이 잘못됐다(운영 판단) | 어드민이 손댔으니 동기화가 건드리지 마라 |
-| 소유자 | `sync-matches.mjs`의 `matchState()` | 어드민 | 어드민 |
-| 화면 | **보인다**("취소") | 안 보인다 | 보인다(잠금 표시) |
-| 동기화 | 매 실행이 덮어쓴다 | **보존된다**(payload에 없다) | **그 행을 통째로 건너뛴다** |
-
-🔴 **`admin_locked_at`이 없으면 어드민 수정이 조용히 원복된다.** `toRow()`가 만드는 payload에
-season·matchday·팀·kickoff_at·스코어·finished_at·voided_at이 전부 들어 있기 때문이다 —
-화면은 "저장됐어요"라 말하고 몇 시간 뒤 값이 돌아온다. `sync-matches.mjs`와
-`sync-match-detail.mjs` **둘 다** 이 컬럼을 존중해야 한다(후자는 `deleted_at`도 함께 본다 —
-service_role이라 RLS가 걸리지 않아 감춘 경기에 API 예산을 태운다).
-
-⚠ **`result` 생성식에 `deleted_at`을 넣지 않는다.** 생성식 변경은 컬럼 drop/add(전 테이블
-rewrite)를 부르는데, 행 자체가 안 보이면 채점에서 이미 빠지므로 얻는 것이 없다.
-
-### 투표에는 왜 쓰기 RPC도, 카운터 트리거도 없는가
-
-좋아요와 나란히 두면 판단 기준이 보인다.
-
-- **좋아요가 RPC인 이유는 카운터 때문이다** — "존재 확인 → 분기 → insert/delete"가 한 원자 단위여야 했다. 투표는 집계 컬럼이 없어(아래) 지킬 불변조건이 행 하나뿐이고, 그 행은 `(post_id, user_id)` 기본키가 이미 하나로 묶는다. 같은 유저의 동시 요청은 "마지막에 고른 것이 남는다"로 끝나는데 그건 이 기능의 정의 그대로다.
-- **득표수 컬럼을 두지 않는다.** `like_count`가 탈퇴 cascade 경로에서 어긋나 영구히 과대로 남았던 사고의 클래스를 통째로 없앤다 — 어긋날 값 자체가 없다. 선택지가 4개 이하라 `count(*) group by`가 사실상 공짜이고, 어차피 결과 게이팅 때문에 함수를 거쳐야 한다.
+- **존재 확인 → 분기 → insert/delete → 카운터 증감**이 한 원자 단위여야 하는 쓰기만 RPC로 내린다.
+  `SELECT → +1 → UPDATE`는 두 요청이 동시에 0을 읽어 결과가 2가 아니라 1이 되고(lost update),
+  supabase-js에는 행 잠금 옵션이 없다 → `FOR UPDATE`를 DB 함수로 내린다.
+- 분기가 없는 증감(항상 insert)은 `count = count + 1` 자체가 원자적이라 **트리거**로 충분하다.
+  ⚠ 그 트리거 함수도 **`security definer`가 필수**다. 호출자 권한으로 돌면 "본인 행만" UPDATE 정책에
+  걸려 남의 행의 카운터 UPDATE가 0행으로 조용히 실패한다.
+- **카운터가 없으면 지킬 불변조건이 행 하나뿐이고, 그 행은 복합 PK가 이미 묶는다** → RPC 없이
+  훅이 insert/delete를 직접 보낸다(`transfer_deal_watch`). 집계는 그때그때 `count(*)`로 센다 —
+  어긋날 값 자체를 두지 않는다.
 
 ⚠ **PostgREST의 upsert(`Prefer: resolution=merge-duplicates`)를 쓰지 않는다.**
-`ON CONFLICT DO UPDATE SET`에 **payload의 모든 컬럼**을 실어서 `post_id`·`user_id`에도 UPDATE
-권한을 요구한다(실측 42501). 그 권한을 열면 자기 표의 `post_id`를 살아 있는 다른 글로 옮겨
-**DELETE 정책을 두지 않은 "취소 불가"를 우회**할 수 있다 → 클라이언트가 "내 표가 있는가"로
-갈라 insert 또는 `option_id`만 바꾸는 UPDATE를 보낸다. 컬럼 grant는 `option_id` 하나뿐이다.
-
-### 왜 좋아요는 RPC이고 댓글 수는 트리거인가
-
-- **좋아요**: "존재 확인 → 분기 → insert/delete → 카운터 증감"이 한 원자 단위여야 한다. `SELECT → +1 → UPDATE`는 두 요청이 동시에 0을 읽어 결과가 2가 아니라 1이 되고(lost update), supabase-js에는 행 잠금 옵션이 없다 → `FOR UPDATE`를 DB 함수로 내린다.
-- **댓글 수**: 분기가 없다(항상 insert). `comment_count = comment_count + 1`은 그 자체로 원자적이라 잠금이 필요 없고, 어떤 경로로 들어와도 어긋나지 않는다 → 트리거.
-- ⚠ 트리거 함수도 **`security definer`가 필수**다. 호출자 권한으로 돌면 `post_update_own`("본인 글만")에 걸려 남의 글에 댓글을 달 때 UPDATE가 0행으로 조용히 실패한다.
+`ON CONFLICT DO UPDATE SET`에 **payload의 모든 컬럼**을 실어서 키 컬럼에도 UPDATE 권한을
+요구한다(실측 42501). 그 권한을 열면 자기 행의 부모 키를 다른 부모로 옮겨 **DELETE 정책을 두지
+않은 "취소 불가"를 우회**할 수 있다 → 클라이언트가 "내 행이 있는가"로 갈라 insert 또는 값 컬럼만
+바꾸는 UPDATE를 보낸다. 컬럼 grant는 바꿀 수 있는 컬럼 하나뿐이다.
 
 ## 운영진만 쓰는 데이터는 **쓰기 경로를 만들지 않는다**
 
-입축구(`survey`·`survey_option`)가 그 자리다. 사용자가 만드는 것이 아니므로
-**정책도 grant도 두지 않고**, 문항 추가는 새 마이그레이션이 한다(테이블 소유자로 실행되어
-RLS를 지나지 않는다). `post_poll`·`post_poll_option`이 `create_post_with_poll` 하나만 남기고 닫아 둔 것과
-같은 형태이고, 여기서는 그 유일 경로가 마이그레이션이라 **definer 함수조차 필요 없다.**
+사용자가 만드는 것이 아닌 데이터(`transfer_news`·`transfer_club`·`transfer_deal`·`transfer_name_ko`)는
+**쓰기 정책도 grant도 두지 않는다.** 쓰는 것은 service_role로 도는 운영 스크립트 하나뿐이다
+(사람이 미리 써 두는 데이터라면 마이그레이션이 그 유일 경로다 — 테이블 소유자로 실행되어
+RLS를 지나지 않는다).
 
-- 얻는 것: "생성 시 고정"이 정책 문구가 아니라 **구조**가 된다. 정책에는 시점 개념이 없어
-  `post_poll`에서 실제로 뚫렸던 "진행 중인 투표에 선택지 끼워 넣기"가 여기서는 성립할 수 없다.
-- 대가: **관리 화면이 없다.** 문항을 하나 올리려면 배포가 필요하다.
-  → 운영자가 런타임에 문항을 추가해야 하는 시점이 오면, 그때가 관리 화면과 권한 컬럼을
-    함께 들이는 시점이다(열거값을 lookup 테이블로 옮기는 판단과 같은 형태다).
-- **기간은 `survey.closes_at`이 갖는다**(기본값 생성 + 7일). 마감 뒤의 차단은 화면이 아니라
-  `survey_is_open` 정책이 한다 — 클라이언트 판정(`isSurveyOpen`)은 `useNowMs`가 마운트 시각에
-  고정돼 경계를 놓칠 수 있어 **안내일 뿐이다**(클라이언트 검증이 UX이지 방어가 아닌 것과 같은 층위).
-- ⚠ **표현 형태를 enum으로 두지 않았다.** 입축구를 분할 카드로 그릴지는 `survey_option.bg_color`의
-  유무가 정한다 — enum 값은 PostgreSQL에서 **지울 수 없어**(add/rename만 있다) 형태를 하나
-  늘리는 결정이 영구적이 되는데, 색은 `update ... set bg_color = null` 한 줄로 되돌아온다.
-  ⚠ 대신 "한 문항 안에서 전부 갖거나 전무"가 행 간 제약이 되어 아래와 같은 자리로 간다.
-- ⚠ **행 수 제약은 이 구조에서 CHECK로 표현할 수 없다.** 선택지 상한 4는
-  `sort_order between 1 and 4` + `unique`가 잡지만 하한 2는 잡지 못한다 →
-  `rls.sql`이 "선택지 2개 미만인 입축구가 0행"을 검사해 대신 지킨다.
-  검증 대상이 사용자 입력이 아니라 **우리가 쓴 마이그레이션**이라 성립하는 배치다.
+- 얻는 것: "앱에서 고칠 수 없다"가 정책 문구가 아니라 **구조**가 된다. 정책에는 시점 개념이 없어
+  "진행 중인 것에 항목 끼워 넣기" 같은 구멍이 생기는데, 쓰기 경로가 없으면 그것이 성립할 수 없다.
+- 대가: **관리 화면이 없다.** 운영자가 런타임에 값을 고쳐야 하는 시점이 오면, 그때가 관리 화면과
+  권한 판정을 함께 들이는 시점이다(열거값을 lookup 테이블로 옮기는 판단과 같은 형태다) —
+  그때도 쓰기는 테이블 grant가 아니라 권한을 확인하는 definer 함수를 지나게 한다.
+- ⚠ writer가 service_role이면 **grant·정책은 아무것도 막지 못한다** — 지켜야 할 불변식은 CHECK와
+  트리거가 진다(`transfer_news_freeze_collected`가 그 자리다).
+- ⚠ **행 수 제약은 CHECK로 표현할 수 없다.** "항목 최소 N개"처럼 행 간 제약이 필요하면 `rls.sql`에
+  "위반 행이 0행"인 질의를 두어 대신 지킨다 — 검증 대상이 사용자 입력이 아니라 우리가 쓴 데이터라
+  성립하는 배치다. ⚠ 그 질의는 **시드가 걸리는 것을 먼저 보이고**(1 기대) 롤백한 뒤 실제 데이터를
+  센다(0 기대) — 질의가 아무것도 세지 않게 되면 라벨만 남고 통과한다.
 
 ## 비정규화 카운터는 트리거가 단독으로 관리한다
 
-`like_count`·`comment_count`처럼 실제 행 수를 베낀 컬럼은 **관리 주체를 하나로 못박는다.**
+실제 행 수를 베낀 컬럼은 **관리 주체를 하나로 못박는다.**
 
-- 처음에 `like_count`를 `toggle_post_like` RPC가 증감했더니, 유저 탈퇴로
-  `auth.users → profiles → post_like`가 cascade 삭제되는 경로가 RPC를 거치지 않아
-  **카운터가 실제보다 큰 채 영구히 남았다**(`check >= 0` 때문에 항상 과대, 자가 교정 불가).
-- 지금은 `post_like`·`comment` 양쪽 다 `after insert or delete` 트리거가 단독 관리한다.
-  RPC는 잠금·검증·토글만 하고 카운터는 건드리지 않는다.
+- 카운터를 RPC가 증감했더니, 유저 탈퇴로 `auth.users → profiles → (자식 행)`이 cascade 삭제되는
+  경로가 RPC를 거치지 않아 **카운터가 실제보다 큰 채 영구히 남았다**(`check >= 0` 때문에 항상 과대,
+  자가 교정 불가) → `after insert or delete` 트리거가 단독 관리하고, RPC는 잠금·검증·토글만 한다.
 - 새 카운터를 만들면 **"어느 경로로 행이 생기고 사라지든 맞는가"** 를 먼저 따진다.
   cascade·직접 SQL·관리 도구까지 포함해서.
+- ⚠ **카운터는 뷰어별로 달라질 수 없다.** 정책이 뷰어마다 행을 감추면 헤딩 숫자와 실제로 보이는
+  행 수가 어긋난다 — 그 차이는 화면 문구로 갚는다("표시되지 않은 항목 N개").
 
 ## ⚠ 부모의 소프트 삭제는 자식 정책까지 함께 묶어야 한다
 
-`post`에 `deleted_at`을 넣고 `post_select_visible`로 글을 감췄지만 `comment` 정책에는
-post와의 연결이 없었다. 그래서 **삭제된 글의 댓글이 비로그인에게 그대로 공개**됐고
-(id가 연번이라 삭제된 글의 id는 목록의 구멍으로 추정된다), **삭제된 글에 댓글을 더 달 수도** 있었다.
+부모에 `deleted_at`을 넣고 SELECT 정책으로 감췄는데 자식 정책에 부모와의 연결이 없으면,
+**삭제된 부모의 자식이 비로그인에게 그대로 공개**되고(id가 연번이면 삭제된 id는 목록의 구멍으로
+추정된다), **삭제된 부모에 자식을 더 달 수도** 있다(실측).
 
-자식 테이블의 select·insert 정책에 부모 생존을 `exists`로 건다:
+자식 테이블의 select·insert 정책에 부모 생존을 건다:
 
 ```sql
-create policy "comment_select_visible" on public.comment
-  for select using (
-    exists (select 1 from public.post p
-             where p.id = comment.post_id and p.deleted_at is null)
-  );
+create policy "child_select_visible" on public.child
+  for select using ( public.parent_is_alive(child.parent_id) );
 ```
 
-같은 리소스에 대해 **좋아요와 댓글의 삭제 판정이 달라지면 안 된다** — RPC 쪽만 막고
-정책 쪽을 잊는 게 전형적인 실수다.
+같은 리소스에 대해 **자식 종류마다 삭제 판정이 달라지면 안 된다** — RPC 쪽만 막고 정책 쪽을
+잊는 게 전형적인 실수다. 판정은 아래 "서브쿼리를 인라인으로 쓰지 않는다"대로 헬퍼 함수 하나가 갖는다.
 
 ## ⚠ `on delete cascade`는 RLS를 적용받지 않는다
 
 cascade 삭제는 RI(참조 무결성) **내부 트리거**가 수행하므로 정책이 개입하지 않는다.
-`comment.parent_id`가 `on delete cascade`라서 실제로 이런 일이 생긴다:
+그래서 "본인 것만 삭제" 정책이 있어도, 내 행을 지우면 거기에 매달린 **남의 행까지 함께 사라진다** —
+정책의 간접 우회로다.
 
-> 루트 댓글 작성자가 자기 댓글을 지우면 **남이 단 답글까지 함께 사라진다.**
-> `comment_delete_own`("본인 것만")의 간접 우회로다.
-
-포럼 관례라 **수용한 트레이드오프**이지만, 그렇다면 **화면의 삭제 확인 문구가 이 사실을 고지해야 한다** —
-정책이 못 막는 것을 UI 계약으로 갚는 셈이다. `comment_count`는 자식 행마다 `after delete` 트리거가
-발화해 정확히 감소한다(확인함).
+- 지금 그 자리는 `transfer_deal_watch`다 — 재파생이 딜을 지우면 모든 사용자의 관심이 함께 사라진다.
+  딜이 없어졌으니 관심도 뜻을 잃는다는 판단으로 **수용한 트레이드오프**다.
+- 사용자가 지우는 행에서 남의 행이 함께 사라진다면 **화면의 삭제 확인 문구가 그 사실을 고지해야 한다** —
+  정책이 못 막는 것을 UI 계약으로 갚는 셈이다.
 
 새 FK에 cascade를 걸 때는 **"이 삭제가 누구의 행까지 지우는가"** 를 정책과 따로 따진다.
 
 ## 트리거는 필요한 변경에만 발화시킨다
 
-`touch_updated_at`을 `before update on post`에 조건 없이 걸었더니, 카운터를 올리는
-UPDATE(좋아요·댓글)에도 발화해 **남이 좋아요만 눌러도 내 글에 "수정됨"이 붙었다.**
-`created_at <> updated_at = 수정됨`이라는 계약을 스스로 깬 셈이다.
+`touch_updated_at`을 조건 없이 걸었더니 카운터를 올리는 UPDATE에도 발화해 **남의 동작만으로
+내 행에 "수정됨"이 붙었다**(실측). `created_at <> updated_at = 수정됨`이라는 계약을 스스로 깬 셈이다.
+"수정됨"이 특정 컬럼에 걸려 있다면 WHEN 절로 좁힌다:
 
 ```sql
-create trigger post_touch_updated_at
-  before update on public.post for each row
-  when (old.title is distinct from new.title or old.content is distinct from new.content)
+create trigger child_touch_updated_at
+  before update on public.child for each row
+  when (old.title is distinct from new.title or old.body is distinct from new.body)
   execute function public.touch_updated_at();
 ```
 
@@ -1069,76 +819,31 @@ create trigger post_touch_updated_at
 마지막으로 바뀐 시각"이면 충분하고(파생기는 값이 바뀐 행만 쓴다 — 위 딜 파생 절), 화면·사이트맵도 이 컬럼을 읽지 않는다(이적 딜의 lastModified는
 `updated_at`이 아니라 `latest_reported_at`이다 — 사유는 `nextjs.md`의 sitemap 절).
 
-## 소프트 삭제 (post)
+## 소프트 삭제
 
-`post`는 `deleted_at`을 찍는 소프트 삭제뿐이다(DELETE 정책 없음). `comment`는 hard delete다.
+⚠ **클라이언트가 `deleted_at`을 직접 UPDATE할 수 없다.** Postgres는 UPDATE의 **새 행**에도 SELECT 정책을 적용하므로, `deleted_at`을 채운 행이 SELECT 정책의 `deleted_at is null`을 통과하지 못해 거부된다(실측 확인). → 소프트 삭제는 definer RPC가 담당한다.
 
-⚠ **클라이언트가 `deleted_at`을 직접 UPDATE할 수 없다.** Postgres는 UPDATE의 **새 행**에도 SELECT 정책을 적용하므로, `deleted_at`을 채운 행이 `post_select_visible`의 `deleted_at is null`을 통과하지 못해 거부된다(실측 확인). → `soft_delete_post` RPC가 담당한다.
+정책을 `deleted_at is null or <owner> = auth.uid()`로 푸는 선택지도 있지만, 그러면 `deleted_at` 필터가 모든 조회 쿼리로 흩어져 한 곳만 빠뜨려도 삭제된 행이 샌다. **정책은 엄격하게 두고 쓰기만 RPC로 내린다.** 덕분에 조회 훅에 `.is("deleted_at", null)`을 붙일 필요가 없다.
 
-정책을 `deleted_at is null or author_id = auth.uid()`로 푸는 선택지도 있었지만, 그러면 `deleted_at` 필터가 모든 조회 쿼리로 흩어져 한 곳만 빠뜨려도 삭제된 글이 샌다. **정책은 엄격하게 두고 쓰기만 RPC로 내린다.** 덕분에 조회 훅에 `.is("deleted_at", null)`을 붙일 필요가 없다.
-
-## 차단은 **정책이 감춘다** — 조회 훅이 아니라
-
-차단한 사용자의 글·댓글을 숨기는 일은 `post_select_visible`·`comment_select_visible`가 한다.
-소프트 삭제와 같은 자리·같은 이유다 — 필터를 조회마다 반복하면 한 곳만 빠뜨려도 샌다.
-차단은 **목록·상세·댓글·`generateMetadata`의 서버 조회·수정 페이지의 존재 확인**에
-동시에 걸려 그 위험이 더 크다.
-
-정책이라 얻는 것이 둘 더 있다.
-
-- **`.limit()` 이전에 걸러진다.** 클라이언트에서 걷어내면 30건 중 차단분이 빠져 페이지가
-  쪼그라들고, 페이지네이션이 없어 그 자리를 채울 방법이 없다.
-- **서버·클라 판정이 갈리지 않는다.** 서버 조회는 쿠키 기반 클라이언트라 `auth.uid()`가 잡힌다
-  → 차단한 작성자의 글은 그 사용자에게 SSR·CSR 모두 404다. anon 키였다면 어긋났을 자리다.
-
-### ⚠ 자기차단 금지 CHECK는 취향이 아니라 정책의 전제다
-
-Postgres는 UPDATE의 **새 행**에도 SELECT 정책을 적용한다. 자기 자신을 차단할 수 있으면
-수정한 행이 `post_select_visible`을 통과하지 못해 **자기 글 수정이 통째로 막힌다**(실측: `UPDATE 0`에 내 글이 전부 사라진다).
-→ `check (blocker_id <> blocked_id)`가 이것을 없앤다. 회귀를 잡는 것은 `rls.sql` 섹션 28의
-**"자기 자신 차단"** 검사다 — CHECK가 없으면 그 insert가 성공해 러너의 ②에 걸린다.
-⚠ 같은 섹션의 "차단 중에도 내 글 수정이 된다"는 **다른 성질**(남을 차단해도 내 쓰기가 멀쩡하다)을
-지킨다. CHECK를 지워도 그 검사는 통과하므로 회귀 감시를 그쪽에 맡기지 말 것.
-
-### ⚠ 차단 조건을 넣으면 안 되는 곳
-
-| 대상 | 넣으면 |
-|---|---|
-| `post_is_alive` | `comment`·`post_poll`·`post_poll_vote`의 **쓰기** 정책과 `post_poll_results`가 공유한다 → "이 글에 댓글을 달 수 있는가"가 보는 사람마다 달라진다 |
-| `profiles_select_all` | 차단한 사람의 닉네임까지 감춰져 `/profile`의 차단 목록이 통째로 "알 수 없음"이 된다 → **해제할 대상을 알아볼 수 없다** |
-
-### ⚠ 차단이 닿지 않는 곳 — 의도된 경계
-
-| 대상 | 왜 두는가 |
-|---|---|
-| definer 함수(`toggle_post_like`·`increment_post_view`·`create_post_with_poll`·`post_poll_results`) | RLS를 우회한다. 전부 "내게 보이지 않아 도달 경로가 없는 글"에만 남고, 여기에 차단을 넣으면 뷰어 종속성이 definer 전반으로 번진다. `rls.sql` 섹션 28이 이 경계를 검사로 못박는다 |
-| `post_poll`·`post_poll_option`의 SELECT 정책 | 차단한 사람의 투표 질문·선택지가 REST로는 읽힌다. 화면 경로는 없다(그 글의 상세가 404다). 두 테이블에는 작성자 컬럼이 없어 `post`를 한 번 더 타야 하는데, **보안이 아니라 개인 취향 필터**에 그 비용을 들이지 않는다 |
-| `like_count`·`comment_count` | 트리거가 단독 관리하므로 뷰어별로 다를 수 없다(아래 항목) |
-
-| 입축구 전체 | 작성자가 없다 — 운영진 문항이라 차단할 상대 자체가 없다. `survey`·`survey_option`·`survey_vote`의 정책에 `is_blocked`를 넣을 자리가 없는 이유다 |
-| 승부예측 전체 | 〃 — 경기는 작성자가 없는 운영 데이터다. `team`·`match`·`match_prediction`도 같은 이유로 `is_blocked`를 넣을 자리가 없다 |
-
-⚠ 차단은 **보안 경계가 아니다.** 차단한 사람의 글은 여전히 공개 게시물이고, 감추는 것은
-그 사용자의 화면뿐이다. 이 표를 "구멍 목록"으로 읽지 말 것 — 어디까지가 계약인지의 선이다.
-
-### ⚠ 카운터는 뷰어별로 달라질 수 없다
-
-`comment_count`·`like_count`는 트리거가 단독 관리하므로 차단된 사용자의 행을 계속 포함한다.
-그래서 **헤딩 숫자와 실제로 보이는 댓글 수가 어긋난다.** 잘림 판정 자체는 여전히 옳지만
-(정책이 `.limit()` 이전에 거르므로 목록은 "보이는 댓글"로 채워진다), 차이는 화면 문구로 갚는다
-— 상세의 "표시되지 않은 댓글 N개"가 그 자리다.
+- **보이는가를 가르는 필터는 조회 훅이 아니라 정책에 둔다.** 정책이라 **`.limit()` 이전에 걸러지고**
+  (클라이언트에서 걷어내면 페이지가 쪼그라든다), 서버(쿠키 클라이언트)와 클라이언트의 판정이 갈리지 않는다.
+- ⚠ 같은 이유로, **새 행이 자기 SELECT 정책을 통과하지 못하게 되는 쓰기**(예: 뷰어 종속 필터가 자기 자신을
+  걸러 내는 상태)는 CHECK로 원천 차단한다 — 그 상태에서는 자기 행 UPDATE가 통째로 0행이 된다(실측).
 
 ## PostgREST 임베딩
 
-- **임베딩 경로가 둘 이상이면 FK 컬럼명으로 지정한다.** `post → profiles`는 `author_id` 직접 FK와 `post_like` 경유 many-to-many 둘이라 그냥 `profiles(nickname)`이라 쓰면 `PGRST201`로 실패한다 → `author:author_id(nickname)`.
-- `post_like(user_id)` 임베딩은 SELECT 정책이 "내 행만"이라 **결과 배열의 길이가 곧 `isLiked`** 다. 별도 필터를 잊어 남의 좋아요가 새는 사고가 구조적으로 불가능하다. 비로그인은 정책이 `to authenticated`라 빈 배열 → `false`.
-- select 컬럼 문자열은 `entities/*/api/mappers.ts`에 상수로 둔다(`POST_LIST_SELECT` 등) — 스키마가 바뀌면 한 곳만 고친다.
+- **임베딩 경로가 둘 이상이면 FK 컬럼명으로 지정한다.** `transfer_deal → transfer_club`은 출발·도착 두 FK라 그냥 `transfer_club(...)`이라 쓰면 `PGRST201`로 실패한다 → `from:transfer_club!from_club_code(...)`.
+  ⚠ 컬럼명만 쓴 `from:from_club_code(...)` 형태는 런타임엔 통해도 **생성 타입이 모호성을 풀지 못한다**(`!` 형태를 쓴다).
+- `transfer_deal_watch(user_id)` 임베딩은 SELECT 정책이 "내 행만"이라 **결과 배열의 길이가 곧 `isWatched`** 다. 별도 필터를 잊어 남의 행이 새는 사고가 구조적으로 불가능하다. 비로그인은 정책이 `to authenticated`라 빈 배열 → `false`.
+- select 컬럼 문자열은 `entities/*/api/mappers.ts`에 상수로 둔다(`DEAL_LIST_SELECT` 등) — 스키마가 바뀌면 한 곳만 고친다.
+  ⚠ **select 문자열을 `+`로 잇지 않는다.** supabase-js가 **리터럴 타입**을 파싱해 결과 형태를 만드는데, 조각을 이어 붙이면 `string`으로 넓어져 추론이 통째로 `GenericStringError`가 된다(실측) — 한 템플릿 리터럴에 `as const`로 둔다.
 - 0행이 정상인 조회는 `single()`이 아니라 **`maybeSingle()`** 을 쓴다(`single()`은 `PGRST116` 에러를 던져 "없음"과 진짜 에러가 섞인다).
+- ⚠ PostgREST의 `max_rows`(1,000)에 걸리면 결과가 **조용히 잘린다.** 전체를 세야 하는 계산(비율·합계)을 클라이언트에서 하지 말고, 해야 한다면 잘렸는지(`Content-Range` 총계)를 함께 보고 그때는 숫자를 그리지 않는다.
 
 ## 마이그레이션
 
 - 파일명은 **`YYYYMMDDHHMMSS_snake_name.sql`**.
-- 원격에 적용된 마이그레이션은 **수정하지 않고 새 파일로 추가**한다. 아직 로컬에만 있는 것은 `supabase db reset`으로 재적용되므로 그 자리에서 고치는 게 맞다(깨진 마이그레이션과 수정 마이그레이션을 함께 남길 이유가 없다).
+- 원격에 적용된 마이그레이션은 **수정하지 않고 새 파일로 추가**한다(주석이라도 고치지 않는다). 아직 로컬에만 있는 것은 `supabase db reset`으로 재적용되므로 그 자리에서 고치는 게 맞다(깨진 마이그레이션과 수정 마이그레이션을 함께 남길 이유가 없다).
 - `config.toml`의 `[auth]` 변경은 `db reset`이 아니라 **`supabase stop && supabase start`** 가 필요하다(gotrue 컨테이너 설정).
 - 로컬 스택은 643xx 포트. API 64321 / DB 64322 / Studio 64323 / **Mailpit 64324**.
 - ⚠ **CLI가 원격 프로젝트에 링크돼 있다**(`supabase/.temp/project-ref`) 그리고 `.env.local`에
@@ -1147,6 +852,9 @@ Postgres는 UPDATE의 **새 행**에도 SELECT 정책을 적용한다. 자기 �
   **`config push`**(`config.toml`의 `[auth]`를 통째로 덮는다 — Site URL이 localhost가 되고
   테스트용으로 켜 둔 `[auth.email] enable_signup`까지 함께 올라간다. `docs/oauth-setup.md` §4).
   로컬 작업에는 반드시 `db reset`(로컬)만 쓴다. `pnpm db:types`는 `--local` 고정이라 안전하다.
+- ⚠ **테이블을 지우는 마이그레이션은 되돌릴 수 없다** — 원격에 적용하기 전에 원격 DB를 백업한다.
+  지우는 순서도 규약이다: 그 테이블·함수를 참조하는 정책(스토리지 정책 포함) → 테이블(`cascade`) →
+  함수(시그니처까지 적는다 — 오버로드가 생겨도 엉뚱한 함수를 지우지 않게) → enum → 컬럼.
 
 ### RLS 정책에 서브쿼리를 인라인으로 쓰지 않는다
 
@@ -1154,41 +862,32 @@ Postgres는 UPDATE의 **새 행**에도 SELECT 정책을 적용한다. 자기 �
 RLS 술어가 security-barrier 서브쿼리 안으로 들어가 바깥의 `fk = N` 등가류가 전파되지 않고
 `fk IN (조건을 만족하는 전체)`로 비상관화된다 — 1건이 필요한데 전체를 훑는다.
 
-실측(글 5만·댓글 300): 인라인 `exists` **4.76ms** vs `stable security definer` 헬퍼 **0.61ms**.
+실측(부모 5만·자식 300): 인라인 `exists` **4.76ms** vs `stable security definer` 헬퍼 **0.61ms**.
 버퍼는 헬퍼가 더 쓰지만(912 vs 633) 해시 구축 CPU가 지배적이다. 결정적인 건 **비용의 성격**이다 —
 헬퍼는 자식 행 수(조회 limit)에 묶여 상한이 있고, 인라인은 부모 테이블 크기에 비례해 무한정 늘어난다.
 
-→ 선례: `public.post_is_alive(bigint)` (`comment`의 select·insert 정책이 공유).
+→ 부모 판정은 `stable security definer` 헬퍼 함수(`<parent>_is_alive(bigint)` 형태)로 빼고 자식 정책들이 공유한다.
+  ⚠ 그 헬퍼를 비로그인 select 정책이 부르면 **anon에도 EXECUTE를 열어야** 한다(닫으면 조회가 통째로 42501이다) —
+  위 anon 화이트리스트와 definer 표에 함께 적는다.
+⚠ 반대로 정책에 definer 호출을 **하나 더 얹는 것은 공짜가 아니다** — 행별 판정 함수 하나로 정렬 조회가
+  **8.7ms → 151.6ms(17배)** 로 뛴 실측이 있다. 권한별로 다른 행을 보여야 하면 SELECT 정책에 `or …`를
+  얹지 말고 전용 definer 조회 함수로 가른다(`language sql`로 — plpgsql은 인라인되지 않아 PostgREST가 붙인
+  `order/limit`이 전체를 물질화한 뒤 적용된다).
 
 ## 검증 자산
 
 | 파일 | 용도 |
 |---|---|
-| `supabase/tests/rls.sql` | RLS·컬럼 권한·RPC 전량 검사 (전체 rollback이라 DB에 흔적 없음). ⚠ 여기에 **마지막 섹션 번호를 적지 않는다** — 섹션을 더하는 순간 거짓이 된다 |
-| — 섹션 25는 **길이 한도**를 검사 | 제목·댓글·닉네임의 새 CHECK 경계 ±1, 가족 이모지 120개 제목(코드포인트 840)이 통과하는지, 닉네임 200자가 `lower(nickname)` btree 인덱스에도 들어가는지, 그리고 **본문은 20,000 그대로**인지. ⚠ 여기 숫자는 abuse bound다 — 화면 한도(그래핌)는 클라이언트만 강제하므로 이 검사로 증명되지 않는다 |
-| — 섹션 29는 **신고**를 검사 | 성공 경로 / 같은 글 두 번(**23505가 아니라 트리거의 P0001 한국어**) / 내 글 신고 / 남의 명의 / 비로그인 / 삭제된 글(`post_is_alive`) / **본인이 넣은 신고도 다시 읽을 수 없는지**(SELECT 정책도 권한도 없다) / `created_at` 위조 |
-| — 섹션 31은 **승부예측**을 검사 | 일정·결과를 앱에서 만들거나 스코어를 조작하거나 킥오프를 미뤄 마감을 늘리는 것이 막히는지(정책도 grant도 없다), 남의 명의·비로그인·한 사람 두 표·예측 취소(**grant 자체가 없어 42501**)·표를 다른 경기로 옮기기(취소 우회)·소유권 이전·시각 위조가 막히는지, 킥오프 후 예측·갈아타기는 막히면서 **내 예측 조회는 열려 있는지**, 취소된 경기(`voided_at`)에 예측이 막히는지. **31d가 게이팅의 축**을 검사한다 — 킥오프 전에는 **참여자 본인·미참여자·비로그인 셋 다** 0행이고 후에는 **비로그인·미참여자에게도** 열린다(입축구와 정반대다). ⚠ 이 검사를 미참여자만으로 두면 게이팅이 `survey_results`처럼 "참여했으면 보인다"로 퇴행해도 **그대로 통과한다** — 참여자 본인으로 조회하는 케이스가 이 기능의 전제를 지키는 유일한 그물이다. **31e는 채점** — 스코어가 없으면 `result`도 없고, 스코어를 정정하면 정답이 따라 움직이고, 무효 처리하면 `result`가 null이 되어 채점에서 빠지는지. **31f는 스키마 불변식** — 같은 팀끼리 붙기·한쪽 스코어·시즌 형식·라운드 상한·`external_id` 중복을 본다. ⚠ 갈아탄 흔적(`updated_at`) 검사는 **시드를 과거로 밀어야** 성립한다(`now()`가 트랜잭션 시작 시각이라 같은 트랜잭션에서는 값이 같아진다). ⚠ **팀 코드는 테스트 전용 네임스페이스(`rlstest-*`)를 쓴다** — 실제 구단 슬러그를 쓰면 동기화 스크립트가 먼저 넣어 둔 행과 `team_pkey`가 충돌해 seed가 죽고, 뒤따르는 `\gset`이 전부 비어 **40건이 연쇄로 실패한다**(실측). 사용자가 만들지 않는 데이터를 검사할 때 생기는 함정이라, 새 운영 테이블에도 같은 규칙이 붙는다 |
-| — 섹션 32는 **경기 상세**를 검사 | 앱에서 선수·라인업·사건·스탯을 만들거나 평점·점유율을 고치거나 **종료된 경기를 진행 중으로 위조**하는 것이 막히는지(정책도 grant도 없다 — `team`·`match`과 같은 취급), **비로그인이 넷 다 읽는지**(크롤러가 경기 페이지를 색인한다 — grant를 빼면 임베딩이 42501로 죽어 상세가 통째로 안 보인다), 부모 없는 선수 행(복합 FK)·`sort_order` 중복·**벤치에 피치 좌표**·좌표 한쪽만·평점 11점·포메이션 형식·`external_id` 중복·참조 중인 선수 삭제가 막히는지, 경기를 지우면 라인업·사건·스탯이 함께 cascade되는지. **32d는 사건의 형태** — 카드에 상대역·한 사람만 있는 교체·자기 자신과 교체가 막히고, **경기 중 재폴링이 같은 사건을 두 번 쌓지 않는지**(`unique`를 `nulls not distinct`로 두지 않으면 `player_id`가 비는 사건이 폴링마다 새 행이 된다). **32e가 이 파일에서 가장 조용한 회귀를 잡는다** — 제공자는 교체에서 `player`=나간 선수, `assist`=들어온 선수를 주는데(실측 9/9) 이름과 반대라, 뒤집기를 놓치면 화면의 화살표가 통째로 거꾸로 그려지고 **빌드도 타입도 값도 그럴듯해 아무도 못 잡는다**. 그래서 "들어온 선수는 그 라인업의 벤치에 있다"를 구조로 검사하고, **방향을 뒤집어 넣어 걸리는 것까지 보인다**(검사가 죽지 않았다는 증거). **32h는 선발 11명** — 행 수 제약이라 CHECK로 셀 수 없어(입축구의 "선택지 2개 미만"과 같은 자리) 이 질의가 유일한 보증이다. ⚠ 32e·32h 둘 다 **시드가 걸리는 것을 먼저 보이고**(1 기대) 롤백한 뒤 실제 데이터를 센다(0 기대) — 질의가 아무것도 세지 않게 되면 라벨만 남고 통과하는데, `run-rls.sh`는 값을 대조하지 않아 그 죽음을 알리지 못한다 |
-| — 섹션 34는 **승부예측 랭킹**을 검사 | 34a 비로그인이 시즌 순위를 보는지와 **순서·순위·합계가 규칙대로인지**(적중이 같으면 예측이 적은 쪽이 앞선다), 비로그인에게 `is_me`가 **null도 아닌** false인지. 34b 라운드 순위와 **제외 규칙을 하나씩** — 미채점·무효·삭제 경기는 맞았어도 세지 않고, 삭제·무효를 되돌리면 다시 세는지(제외가 그 판정 **때문**이라는 증거). 34c 공동 순위(1, 1, 1)와 화면 순서 고정. 34d 상한 밖의 **내 행이 끝에 붙는지**·상한 안이면 중복되지 않는지·차단한 사람도 순위에 있는지(의도된 경계)·상한 클램프. 34e 상한이 **실제로 100에서 멈추는지**(참여자 104명 — 3명으로는 위쪽 클램프를 증명할 수 없다)·공동 순위 다음이 1, 1, **3**인지(`dense_rank()`로 바뀌는 회귀)·**스코어가 들어온 예정 경기**를 세지 않는지. 34f **반환 열이 합계뿐인지**를 문자 그대로 대조한다. ⚠ 시즌을 **테스트 전용 값(`1999-00`)** 으로 둔다 — 동기화된 실제 경기가 섞이면 합계가 조용히 틀어진다(31e와 같은 함정) |
-| — 섹션 35는 **이적 소식**을 검사 | 35a 앱에서 만들기·단계 조작·**저자 바꿔치기**·삭제·비로그인 쓰기가 막히는지(정책도 grant도 없다). 35b 비로그인이 공개용 앞부분(`body_excerpt`)을 읽고 **원문 전문(`body`)은 로그인 여부와 무관하게 못 읽는지**, 앞부분이 원문의 앞 280자인지. 35c 스키마 불변식 — **저자 미상 등급이 enum에 없는지**, 인증 계정·확증된 미러 등급이 저자 없이 들어가지 않는지, 이적료 세 컬럼이 한 덩어리인지, 350m 상한, `(source_id, external_id)` 중복(동기화의 멱등성이 이 제약에 기댄다), 보이지 않는 본문, 레지스트리 형식이 아닌 소스 id. 35c에는 이적료 0·관련성 범위·등급·묶음 키 형식·http가 아닌 링크·빈 저자·키 길이·**하루 넘게 미래인 게시 시각**(커서를 잠근다)도 있다. 35d **원문 고정 트리거가 superuser에게도 걸리는지**(writer가 service_role이라 grant로는 막을 수 없다) — 원문·게시 시각 수정과 원문을 바꿔 싣는 upsert가 막히고, **재처리가 보내는 모양**(원문 그대로 + 추출 컬럼만 새 값)은 통과하는지, 그리고 **삭제는 막지 않는지**. ⚠ 소스 id를 **테스트 전용(`rss:rlstest-*`)** 으로 둔다 — 동기화된 실제 행이 섞이면 개수 검사가 조용히 틀어진다 |
-| — 섹션 36은 **이적시장 보드**를 검사 | 36a 앱에서 딜·구단을 만들거나 고치거나 지우는 것이 막히는지(정책·grant 없음), `transfer_news.deal_id`를 앱이 못 바꾸는지(추출 컬럼이라 파생기만 쓴다). 36b 비로그인이 딜·구단·피드(`deal_id` 포함, `body` 제외)를 읽는지 — **임베딩 경로까지**(딜⟵보도, 딜→구단, 딜⟵관심이 전부 42501 없이 돈다. 관심 임베딩은 anon에게 **빈 배열**로 와야 한다 — 42501이면 보드가 통째로 안 보인다). 36c 스키마 불변식 — `stage='unknown'` 거부, `from=to` 거부, 구단을 하나도 못 읽은 딜은 정상값인지(from<>to CHECK가 둘 다 null을 거부하면 안 된다), `deal_key` 형식(16자리 소문자 hex)과 중복 거부(재파생의 멱등성이 이 제약에 기댄다), 이적료 세 묶음(`fee_*`·`prev_fee`·범위·옵션이 기준값 없이 못 들어간다), 국적·생년·선수명·계약·주급 길이, `transfer_club.code`·`league` 형식, WHEN 없는 트리거로 `updated_at`이 매번 움직이는지, 파생기는 `deal_id`를 다시 쓸 수 있는지(추출 컬럼), 딜을 지우면 보도의 `deal_id`가 `null`로 돌아가는지(`on delete set null`). 36d 관심 — 남의 명의·비로그인·`created_at` 위조가 42501, 중복 담기가 23505(멱등 흡수 대상), UPDATE 정책이 없어 표를 다른 딜로 못 옮기는지, 내 관심만 보이고 목록 임베딩 길이가 `isWatched`와 같은지, 딜을 지우면 관심이 cascade로 함께 사라지는지. 36e 자유계약 — 이적료가 있는 딜을 FA로 두면 거부되고(CHECK), 이적료 없는 딜은 FA일 수 있으며, 비로그인이 그 값을 읽는지. ⚠ 시드는 테스트 전용 `deal_key`(형식 CHECK 때문에 실제 sha1 16자리를 미리 계산해 둔다)와 구단 `code`(`rlstest-*`)를 쓴다 — 실 데이터가 섞이면 개수 검사가 조용히 틀어진다(35·31과 같은 함정) |
-| — 섹션 37은 **이적 소식 한국어 요약**을 검사 | 37a 로그인 유저가 요약을 못 고치는지(쓰기 grant 없음). 37b 비로그인이 `summary_ko`를 읽고 **`summarized_at`은 못 읽는지**(운영 표시). 37c 시도 시각 없는 요약·160자 초과(전문 번역 우회 차단)·보이지 않는 요약이 거부되고, 요약 쓰기가 원문 고정 트리거에 걸리지 않으며, 무관 판정(요약 없이 시각만)이 정상값인지. ⚠ 소스 id는 테스트 전용 `rss:rlstest-c` |
-| — 섹션 38은 **이름 사전 자동 캐시**를 검사 | 로그인 유저가 표기를 못 쓰는지(쓰기 grant 없음), 비로그인이 읽는지, 모르는 종류·출처(위키데이터 id) 없는 한국어 표기·id 형식이 거부되고, 찾지 못한 이름(`name_ko` null)은 정상값인지. ⚠ 사람이 고친 표기는 여기가 아니라 JSON에 둔다 — 그래서 출처 없는 표기를 CHECK가 막는다 |
-| — 섹션 30은 **입축구**를 검사 | 로그인 유저가 문항을 만들거나(정책도 grant도 없다) 진행 중인 입축구에 선택지를 끼워 넣거나 제목·선택지를 고치거나 통째로 지우는 것이 막히는지, `sort_order` 5(상한 4)가 거부되는지, **선택지가 2개 미만인 입축구가 0행인지**(하한 2는 행 수라 CHECK로 셀 수 없어 이 검사가 유일한 보증이다), **색이 일부 선택지에만 있는 입축구가 0행인지**(같은 성격 — 한 면만 색이 없으면 분할 카드가 깨진다), 색이 `#rrggbb` 형식이고 배경·글자색이 쌍으로만 들어가는지, 남의 명의·비로그인·한 사람 두 표·다른 입축구의 선택지(복합 FK)·표를 다른 입축구로 옮기기(취소 우회)·시각 위조·참여 취소가 전부 막히는지, **미참여자에게 `survey_results`가 0행**이고 비로그인은 EXECUTE 자체가 없는지, 갈아타면 집계가 따라 움직이는지. **30d는 기간**을 검사한다 — 마감된 입축구에 투표·갈아타기가 막히는지, 그런데도 **내 표 조회와 참여자 결과는 열려 있는지**(SELECT·`survey_results`에 만료를 걸지 않은 결과), `closes_at > created_at` CHECK, 기본값이 생성 + 7일인지 |
-| — 섹션 28은 **차단**을 검사 | 남의 명의·자기차단(CHECK)·비로그인·차단 행 UPDATE·남의 차단 행 삭제(0행)가 막히는지, 차단하면 그 사람의 글과 댓글이 함께 사라지는지, **단방향인지**(상대에게는 그대로 보이고 차단당한 사실도 알 수 없다), 비로그인에게는 그대로 보이는지, **차단 중에도 내 글 수정이 되는지**(자기차단 CHECK가 사라지는 회귀를 여기서 잡는다), 해제하면 되돌아오는지, 그리고 **definer RPC는 차단을 보지 않는다**는 의도된 경계 |
-| — ⚠ `:login_anon`은 role만 바꾸고 `request.jwt.claims`를 그대로 둔다 | 앞선 `:login_alice`의 `sub`가 남아 `auth.uid()`가 계속 그 사람을 가리킨다(실제로 차단 검사가 그것 때문에 틀린 값을 냈다). **판정이 `auth.uid()`에 걸린 검사는 claims까지 비워야** 진짜 비로그인이 된다 — 정책이 `to authenticated`인 검사들은 role만으로 갈려 이 함정에 걸리지 않는다 |
-| — 섹션 27은 **투표**를 검사 | 남의 글에 투표 붙이기·질문/선택지 수정·투표 취소·표를 다른 글로 옮기기(취소 우회)·남의 명의 투표·한 사람 두 표·다른 글의 선택지로 투표(복합 FK)·삭제된 글에 투표가 전부 막히는지, **미투표자에게 `post_poll_results`가 0행**인지, 갈아타면 집계가 따라 움직이는지, 그리고 **27b** `create_post_with_poll`이 실패할 때 글도 남기지 않는지, **작성자·카운터·시각을 실을 자리가 없는지**(definer라 컬럼 권한을 우회하므로 삽입 컬럼 목록이 넓어지는 회귀를 여기서 잡는다), 선택지가 정규형으로 접혀 저장되는지 |
-| — 섹션 26은 **excerpt**를 검사 | 사진으로 시작하는 글도 발췌에 본문이 남고 URL은 빠지는지(20260817000002) |
-| — 섹션 24는 **프로필 편집**을 검사 | 본인만 수정·남의 닉네임 0행·아바타 경로가 자기 폴더인지·`created_at` 위조 차단·랜덤 닉네임 배정, 그리고 **24b 스토리지 정책**(남의 폴더에 업로드 불가)과 **24c 본문 이미지 버킷**(남의 폴더·비로그인 업로드 불가 — 여기엔 CHECK 대응물이 없어 이 정책이 유일한 방어선이다). ⚠ 24c는 **버킷 설정값도** 검사한다(`public`·`file_size_limit`·`allowed_mime_types`) — 크기·타입의 실제 방어선이 거기라, 정책만 보면 이 값이 조용히 넓어져도 아무도 모른다 |
-| — 섹션 23은 **닉네임 정규형·허용 문자**를 검사 | 제로폭·NBSP·soft hyphen을 끼운 닉네임이 정규형으로 접혀 기존 닉네임과 충돌하는지(사칭 차단), NFC로 자모 분해형이 완성형과 같아지는지(그리고 전각 `Ａ`는 **접히지 않는지** — NFKC가 아니라는 증거다). **23c가 허용 문자**다 — 공백·이모지·특수문자·한자·가나·키릴 `а`·전각 `Ａ`·HANGUL FILLER가 거부되고 한글·자모·영숫자가 통과하는지. ⚠ 그리고 **500명을 연속 가입시켜 480조합을 포화**시켜 폴백 접미사가 CHECK를 통과하는지 본다(실측 폴백 25회 발동) — 그게 `[t 기대] fallback_actually_fired`로 함께 증명된다. 그 검사가 0이 되면 포화 검사는 폴백을 전혀 보지 못한 채 통과하는 셈이다 |
-| — ⚠ **섹션 17의 네 전수 가드는 `[0행 기대]` 라벨을 달아야 한다** | 라벨이 없으면 러너의 값 대조(③)가 그 질의를 보지 않아, **행이 나와도 "✅ 통과"로 넘어간다.** 실제로 그랬다 — `is_plain_nickname`을 anon에 열었는데 17d가 그 이름을 뱉은 채 통과했다. 전수 가드가 러너에 안 잡히면 가드가 아니다 |
-| — 섹션 22는 **답글**을 검사 | 깊이 1 초과 거부·타 게시글 부모 거부·없는 부모 거부(전부 P0001), cascade가 남의 답글까지 지우는 동작, `comment_count`가 답글 포함 총합인지, 글이 소프트 삭제되면 답글도 함께 감춰지는지 |
-| — 섹션 17은 **테이블명을 하드코딩하지 않는다** | public 스키마 기본 권한이 anon/authenticated에 ALL이라, 새 마이그레이션이 `revoke`를 한 번만 잊어도 즉시 구멍이 된다. 고정 목록만 검사하면 **새 테이블은 검사 대상에 들어오지도 않는다** → RLS 미적용·anon 쓰기 권한·search_path 미고정·anon EXECUTE를 전수로 훑는다 |
-| — 섹션 18은 **INSERT 시점 위조**를 검사 | 섹션 1이 UPDATE만 보고 있어서, `grant insert` 목록이 넓어지는 회귀(카운터·타임스탬프 동봉)를 못 잡았다 |
+| `supabase/tests/rls.sql` | RLS·컬럼 권한·함수 전량 검사 (전체 rollback이라 DB에 흔적 없음). ⚠ 여기에 **섹션 번호를 적지 않는다** — 섹션을 더하고 빼는 순간 거짓이 된다. 다루는 것: 프로필 편집(본인만 수정·아바타 경로·`created_at` 위조·스토리지 정책과 버킷 설정값), 닉네임 정규형·허용 문자·랜덤 배정 포화, 길이 한도, 이적 소식·보드·관심·요약·이름 캐시, 그리고 아래 전수 가드 |
+| — **전수 가드는 테이블명을 하드코딩하지 않는다** | public 스키마 기본 권한이 anon/authenticated에 ALL이라, 새 마이그레이션이 `revoke`를 한 번만 잊어도 즉시 구멍이 된다. 고정 목록만 검사하면 **새 테이블은 검사 대상에 들어오지도 않는다** → RLS 미적용·anon 쓰기 권한·search_path 미고정·anon EXECUTE를 전수로 훑는다 |
+| — ⚠ **전수 가드는 `[0행 기대]` 라벨을 달아야 한다** | 라벨이 없으면 러너의 값 대조가 그 질의를 보지 않아, **행이 나와도 "✅ 통과"로 넘어간다.** 실제로 그랬다 — CHECK 평가 함수를 anon에 열었는데 가드가 그 이름을 뱉은 채 통과했다. 전수 가드가 러너에 안 잡히면 가드가 아니다 |
+| — **INSERT 시점 위조**도 따로 본다 | UPDATE만 보면 `grant insert` 목록이 넓어지는 회귀(카운터·타임스탬프 동봉)를 못 잡는다 |
+| — **SELECT 가능 컬럼 목록을 전수 대조한다** | `profiles`는 SELECT grant를 컬럼으로 좁혀 두었다 → 컬럼을 더할 때 grant를 잊으면 그 컬럼만 조용히 42501이 되는데, 권한 가드는 SELECT를 보지 않는다 |
+| — ⚠ `:login_anon`은 role만 바꾸고 `request.jwt.claims`를 그대로 둔다 | 앞선 `:login_alice`의 `sub`가 남아 `auth.uid()`가 계속 그 사람을 가리킨다(실제로 틀린 값을 냈다). **판정이 `auth.uid()`에 걸린 검사는 claims까지 비워야** 진짜 비로그인이 된다 — 정책이 `to authenticated`인 검사들은 role만으로 갈려 이 함정에 걸리지 않는다 |
+| — 운영 데이터 검사는 **테스트 전용 네임스페이스**를 쓴다 | 소스 id(`rss:rlstest-*`)·구단 코드(`rlstest-*`)·`deal_key`를 테스트 전용으로 둔다 — 스크립트가 먼저 넣어 둔 실제 행과 PK가 충돌하면 seed가 죽고 뒤따르는 `\gset`이 전부 비어 **연쇄로 실패**하고, 섞이면 개수 검사가 조용히 틀어진다 |
 | — 시드 INSERT는 반드시 `begin;` **아래**에 | 위에 두면 오토커밋으로 새어나가 실행할 때마다 행이 쌓인다(실제로 그랬다) |
 | — 시각 비교 검사는 시드를 과거로 밀 것 | `now()`는 **트랜잭션 시작 시각**이라 한 트랜잭션 안에서 insert의 default와 트리거의 값이 같아진다 → "수정하면 updated_at이 바뀐다"를 증명할 수 없다 |
-| — 섹션 33은 **관리자·어드민 백오피스**를 검사 | 33a 비관리자·비로그인이 어드민 RPC에 닿지 못하는지(조회는 **0행**, 쓰기는 **P0001**, anon은 EXECUTE 자체가 없음). ⚠ `:login_anon`이 claims를 비우지 않으므로 `is_admin()` 판정 검사는 **claims까지 비운다**. 33b 자가 승격 차단 + **`profiles`의 SELECT 가능 컬럼 목록 전수 대조**(컬럼을 더할 때 grant를 잊으면 그 컬럼만 조용히 42501이 되는데 17a는 SELECT를 보지 않는다). 33c 삭제하면 **관리자 자신의 일반 조회에서도 사라지는지**(이 설계의 핵심 성질 — 정책에 `or is_admin()`을 얹었다면 관리자만 다른 화면을 본다). 33d 자식(라인업·사건·스탯·선택지)이 부모의 삭제에 함께 묶이는지. 33e definer 누수(**anon에 열린 `match_prediction_results`가 삭제된 경기에 0행**). 33f 입축구 편집 규칙(표 0건일 때만 개수 변경 · 색 쌍/전무 · 정규형 중복이 **23505가 아니라 P0001**). 33g 피드(이미지만 빠지고 본문은 남는지 · 두 번 가려도 **최초 원본**이 보관되는지 · `post_moderation`을 아무도 못 읽는지 · 투표 개수 변경 거부). 33h 공지(노출 기간 밖이 anon에게 0행이고 어드민 조회에는 보이는지). 33i `updated_at` WHEN 절(삭제·복구·`live_minute`은 안 움직이고 스코어 정정은 움직인다 — ⚠ **시드를 과거로 밀 것**). 33j 수정하면 **동기화 잠금이 반드시 남는지**, 그리고 **킥오프 전 경기에 스코어를 넣거나 채점된 경기의 킥오프를 미래로 미는 것이 막히는지**(둘 다 `match_is_open`이 킥오프만 보므로 "결과가 뜬 채 예측이 열리는" 상태를 만든다 — 동기화는 만들 수 없고 어드민 경로가 생기면서 처음 도달 가능해졌다). ⚠ 33은 이번에 **실제로 뚫렸던 경로들**을 회귀로 못박는다: 한 칸 편집이 문항 전체 색 불변식을 깨는 것 · stale한 선택지 id가 다른 문항을 고치는 것 · **같은 id를 여러 번** 넣어 "정확히 일치"를 우회하는 것(내부 임시 라벨 `#id`가 사용자 화면에 남았다) · 숫자가 아닌 id · 없는 id의 조용한 삭제 성공 · **가려진 글을 작성자가 다시 쓰는 것** · 괄호가 든 URL에서 본문이 깨지는 것 · 어드민 조치가 "수정됨"을 남기는 것. ⚠ **경합만은 못 잡는다**(두 세션이 필요하다) |
-| `supabase/tests/concurrency.sh` | 좋아요 동시성 — N명 동시 클릭 후 `like_count == count(post_like)` |
-| `pnpm test:transfer`(`scripts/test-transfer-extract.mjs` → `test-transfer-compose.mjs` → `test-transfer-derive.mjs` → `test-transfer-summarize.mjs` → `test-transfer-names.mjs` → `test-transfer-sources.mjs`) | DB 없이 도는 파이프라인 회귀 — 추출(주급·옵션·선수 앵커·사전 형식) → 이적설 글 조립 → **딜 파생**(`deriveDeals`가 순수 함수라 픽스처 행 배열만으로 검증한다: 방향 투표, `collapsed`가 진전 보도보다 나중에 오면 무산으로 뒤집기, 직전 보도 이적료·통화 혼합, 한 토큰 이름 합치기·동성이인 분리, 라운드업·관련성 미달 제외). **한국어 요약**은 API를 부르지 않고 판정(무관·모순·한글 없음·길이)과 사전·메시지 조립만 검사한다 — 모델 출력은 비결정적이라 회귀 대상이 아니다 |
-| **`supabase/seed.sql`** | `db reset`이 **자동 실행**한다 — 계정(alice/bob)·글·댓글·좋아요. ⚠ 시드가 없으면 마이그레이션을 고칠 때마다 reset이 개발 데이터를 통째로 날린다. 닉네임을 명시적으로 고정하는 이유는 랜덤 배정이면 섹션 13의 유일성 검사가 부딪힐 상대를 잃어 **조용히 무의미해지기** 때문이다 |
-| **`supabase/tests/run-rls.sh`** | rls.sql을 돌리고 **양방향으로** 대조한다 — ① 기대하지 않은 ERROR ② **차단 기대인데 통과한 것**. ②를 안 보면 로그가 깨끗한 채로 검사가 죽어 있다(실제로 2건이 그랬다) |
+| — 경합은 못 잡는다 | 두 세션이 필요한 회귀(`for update` 누락 등)는 이 파일이 한 트랜잭션이라 볼 수 없다 |
+| `pnpm test:transfer`(`scripts/test-transfer-extract.mjs` → `test-transfer-derive.mjs` → `test-transfer-summarize.mjs` → `test-transfer-names.mjs` → `test-transfer-sources.mjs`) | DB 없이 도는 파이프라인 회귀 — 추출(주급·옵션·선수 앵커·사전 형식) → **딜 파생**(`deriveDeals`가 순수 함수라 픽스처 행 배열만으로 검증한다: 방향 투표, `collapsed`가 진전 보도보다 나중에 오면 무산으로 뒤집기, 직전 보도 이적료·통화 혼합, 한 토큰 이름 합치기·동성이인 분리, 라운드업·관련성 미달 제외). **한국어 요약**은 API를 부르지 않고 판정(무관·모순·한글 없음·길이)과 사전·메시지 조립만 검사한다 — 모델 출력은 비결정적이라 회귀 대상이 아니다 |
+| **`supabase/seed.sql`** | `db reset`이 **자동 실행**한다 — 개발 계정(alice/bob)과 프로필. ⚠ 시드가 없으면 마이그레이션을 고칠 때마다 reset이 개발 데이터를 통째로 날린다. 닉네임을 명시적으로 고정하는 이유는 랜덤 배정이면 유일성 검사가 부딪힐 상대를 잃어 **조용히 무의미해지기** 때문이다 |
+| **`supabase/tests/run-rls.sh`** | rls.sql을 돌리고 **양방향으로** 대조한다 — ① 기대하지 않은 ERROR ② **차단 기대인데 통과한 것** ③ 값 기대 라벨(`[0행 기대]` 등)의 실제 값. ②를 안 보면 로그가 깨끗한 채로 검사가 죽어 있다(실제로 2건이 그랬다) |

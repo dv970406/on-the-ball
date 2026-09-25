@@ -31,14 +31,14 @@ const DB_ERROR_MESSAGE: Record<string, string> = {
   // 우리가 의도적으로 띄우는 권한 에러는 P0001로 던져 메시지를 그대로 노출한다.
   "42501": "권한이 없어요.",
   // PGRST116 — single()이 기대한 1행을 못 찾음.
-  // 글·댓글·프로필 어디서든 나올 수 있으므로 대상을 특정하지 않는다.
+  // 어느 테이블에서든 나올 수 있으므로 대상을 특정하지 않는다.
   PGRST116: "대상을 찾을 수 없어요.",
   // 23514 check_violation — 클라이언트 검증과 DB 제약이 어긋났을 때(길이·공백)
   "23514": "입력값이 허용 범위를 벗어났어요.",
-  // 22P02 invalid_text_representation — enum에 없는 값(말머리 등).
+  // 22P02 invalid_text_representation — enum에 없는 값.
   // enum 컬럼을 쓰면서 생긴 코드다: text+check였다면 23514로 왔을 자리다.
   "22P02": "허용되지 않는 값이에요.",
-  // 23502 not_null_violation — 필수 컬럼 누락(말머리는 default가 없어 여기로 온다)
+  // 23502 not_null_violation — 필수 컬럼 누락
   "23502": "필수 값이 비어 있어요.",
 };
 

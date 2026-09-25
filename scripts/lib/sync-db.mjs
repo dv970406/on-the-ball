@@ -1,9 +1,9 @@
 /**
  * 동기화 스크립트가 공유하는 **쓰기 경로와 그 방어**.
  *
- * ⚠ **여기 있는 것은 전부 실측으로 얻은 방어다.** `sync-matches.mjs`가 세 라운드에 걸쳐
- *   쌓은 것을 폴러(`sync-match-detail.mjs`)가 그대로 물려받게 하려고 뺐다 — 사본을 만들면
- *   한쪽만 고쳐지고, 그 순간 폴러는 예전 스크립트가 이미 겪은 실패를 다시 겪는다.
+ * ⚠ **여기 있는 것은 전부 실측으로 얻은 방어다.** 스크립트마다 사본을 만들면 한쪽만 고쳐지고,
+ *   그 순간 다른 스크립트가 이미 겪은 실패를 다시 겪는다 — 이적 소식 수집·딜 파생·엠블럼
+ *   수집이 여기를 함께 쓴다.
  */
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
@@ -87,8 +87,8 @@ export function isSystemic(error, status) {
  *   같은 CHECK를 어긴 서로 다른 행들은 **자연스럽게 같은 메시지**를 내므로 데이터 결함
  *   5건에 걸려 **뒤의 멀쩡한 행을 전부 버렸다**(실측).
  *
- * ⚠ **배치 한 번은 SQL 한 문장이라 원자적이다.** 폴러가 라인업 20명을 한 번에 보내는 것이
- *   그 성질에 기대고 있다 — 나눠 보내면 읽는 사람에게 **선수가 6명뿐인 라인업**이 보인다.
+ * ⚠ **배치 한 번은 SQL 한 문장이라 원자적이다.** 한 묶음을 한 번에 보내면
+ *   읽는 사람이 반쯤 쓰인 상태를 보지 않는다 — 나눠 보내면 그 사이 상태가 노출된다.
  *   행 단위 폴백은 그 원자성을 포기하는 대신 전량 손실을 막는 거래다.
  */
 /**
@@ -215,13 +215,8 @@ export function isoOrNull(v) {
   return year >= 1900 && year <= 2200 ? d.toISOString() : null;
 }
 
-/** 스코어로 쓸 수 있는 값인가 — 음이 아닌 정수이고 축구에서 나올 수 있는 범위 */
-export function validScore(v) {
-  return Number.isInteger(v) && v >= 0 && v <= 999;
-}
-
 /** `--name value` 형태의 인자. ⚠ 값이 없거나 다음 플래그면 null이다 — `true`를 돌려주면
- *  `readFileSync(true)`로 죽고 `--fixture --remote`는 `"--remote"`를 파일명으로 읽는다(실측). */
+ *  `readFileSync(true)`로 죽고 `--code --remote`는 `"--remote"`를 값으로 읽는다(실측). */
 export function flag(argv, name) {
   const i = argv.indexOf(`--${name}`);
   if (i === -1) return null;

@@ -33,7 +33,7 @@ export function markSignOutIntent() {
  * 남겨 두면 나중에 일어난 세션 만료까지 "직접 로그아웃"으로 오인한다.
  *
  * ⚠ 가드는 이 값만 보고 판정하지 않는다 — **쓰지 않을 때도 읽어서 버린다.**
- *   가드는 셋(`/profile`·`/posts/new`·`/posts/[id]/edit`)이라, 남은 신호를 다음 가드가
+ *   가드는 로그인 필수 화면마다 하나씩이라, 남은 신호를 다음 가드가
  *   먹으면 비로그인 사용자가 로그인 화면 대신 목록으로 되튕긴다.
  */
 export function consumeSignOutIntent() {

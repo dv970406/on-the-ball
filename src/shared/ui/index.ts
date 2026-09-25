@@ -3,34 +3,17 @@ export { Pill } from "./pill";
 export { Button } from "./button";
 // 순수 함수라 서버 컴포넌트에서도 호출 가능 (Button과 파일이 분리된 이유는 button-class 주석 참고)
 export { buttonClassName } from "./button-class";
-export { Flag, type FlagCode } from "./flag";
-export { PlayerSilhouette } from "./player-silhouette";
-export { Shirt, type ShirtStripe } from "./shirt";
 export { Avatar } from "./avatar";
-// entities/match(TeamCrest)·entities/transfer가 공유하는 엠블럼류 메커니즘 — entities끼리는
-// import할 수 없어 여기로 승격했다(사유는 crest.tsx 주석)
+// 엠블럼류 메커니즘(이미지 + 하이드레이션 전 실패 감지 + 모노그램 폴백) — 사유는 crest.tsx 주석
 export { Crest } from "./crest";
-export { SectionHead } from "./section-head";
-export { TabHeader } from "./tab-header";
-export { NightCard } from "./night-card";
-export { LiveDot } from "./live-dot";
-export { LiveStatusPill } from "./live-status-pill";
 export { Wordmark } from "./wordmark";
-export { RatioBar, type RatioSegment } from "./ratio-bar";
-// 결과 도착 모션 — 굴러가는 숫자 / 획이 그려지는 체크(사유는 각 파일과 globals.css의 결과 모션 절)
-export { CountUp } from "./count-up";
-export { DrawnCheck } from "./drawn-check";
 export { Skeleton } from "./skeleton";
 export { EmptyState } from "./empty-state";
 export { StaleBanner } from "./stale-banner";
 export { TextField } from "./text-field";
-// 커뮤니티 화면 — 말머리 칩 / 카운터 액션 칩 / 오버레이 3종
-export { Chip } from "./chip";
-// 순수 함수라 Link 등 button이 아닌 요소에서도 같은 외형을 재사용한다 (buttonClassName과 같은 이유)
+// 칩 외형 — 이동(`<Link>`)에 입힐 수 있게 클래스 함수로만 둔다(buttonClassName과 같은 이유)
 export { chipClassName } from "./chip-class";
-export { ActionChip } from "./action-chip";
-// 순수 함수라 Link 등 button이 아닌 요소에서도 같은 외형을 재사용할 수 있다 (buttonClassName과 같은 이유)
-export { actionChipClassName } from "./action-chip-class";
+// 오버레이 2종 + 로그인 안내
 // 닫기 수단은 스크림 탭·Escape·그래버(탭·스와이프) — 별도 "닫기" 행을 두지 않는다.
 // 그래버가 `button aria-label="닫기"`를 겸하는 이유는 sheet.tsx 주석에 있다(스크린리더 탈출구).
 export { Sheet, SheetItem } from "./sheet";
@@ -39,6 +22,3 @@ export { Dialog } from "./dialog";
 export { SignInDialog } from "./sign-in-dialog";
 // 토스트의 상태(useToast·useToastStore)는 @/shared/lib에 있다 — ui는 뷰포트만 노출한다
 export { ToastViewport } from "./toast";
-export { Markdown } from "./markdown";
-// 구조화 데이터 — 서버 page가 렌더한다("use client" 없음, Markdown과 같은 성질)
-export { JsonLd, type JsonLdObject } from "./json-ld";

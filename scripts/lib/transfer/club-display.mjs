@@ -25,7 +25,7 @@ function readJson(rel) {
 function load() {
   cache ??= {
     presets: readJson("./club-presets.json"),
-    // ⚠ EPL 한국어 표기의 단일 소스 — 동기화(sync-matches)가 team.name에 입히는 그 파일이다
+    // ⚠ EPL 한국어 표기의 단일 소스(code 키)
     eplKo: readJson("../../team-names-ko.json"),
   };
   return cache;

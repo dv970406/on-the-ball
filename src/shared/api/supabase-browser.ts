@@ -3,8 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { env, isSupabaseConfigured } from "@/shared/config";
 import type { Database } from "@/types/database.types";
 
-// SupabaseClient에 Database를 붙여야 .from("post").insert({...})·
-// .rpc("toggle_post_like", {...})의 테이블명·컬럼명·인자가 컴파일 타임에 검증된다.
+// SupabaseClient에 Database를 붙여야 .from("transfer_deal_watch").insert({...})·.rpc(...)의
+// 테이블명·컬럼명·인자가 컴파일 타임에 검증된다.
 let client: SupabaseClient<Database> | null = null;
 
 /**

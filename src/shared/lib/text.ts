@@ -1,6 +1,6 @@
 /**
- * 사용자 입력 텍스트 판정 — 게시글·댓글·DB 제약이 **같은 기준**을 써야 하는 것들만 둔다.
- * (parsePostId를 proxy와 페이지가 공유하는 것과 같은 이유다 — 기준이 갈리면 한쪽만 통과한다)
+ * 사용자 입력 텍스트 판정 — 클라이언트와 DB 제약이 **같은 기준**을 써야 하는 것들만 둔다.
+ * (기준이 갈리면 한쪽만 통과한다)
  *
  * 예외가 하나 있다: `graphemeLength`는 **DB에 대응물이 없는** 표시 전용 단위다.
  * 그래서 한도는 `TextLimit`(그래핌·코드포인트 한 쌍)로 두고 `lengthOverflow`가 둘 다 본다.
@@ -207,9 +207,7 @@ export function isPlainNickname(value: string): boolean {
  * ⚠ 코드포인트 단위로 센다. `.length`(UTF-16 코드유닛)로 자르면 이모지가 반쪽으로 잘린다.
  *   위 `codePointLength`와 같은 단위라 한 쌍으로 읽힌다.
  *
- * 도메인을 전혀 모르는 순수 함수인데 한때 `entities/post/lib/plain-summary`에 살았다 —
- * 소비처가 셋이 되면서(글 상세·입축구 상세의 `generateMetadata`, `toPlainSummary`) 그 파일
- * 스스로 적어 둔 임계치("3번째 소비자가 생기면 shared로")를 넘겨 여기로 옮겼다.
+ * 도메인을 모르는 순수 함수라 서버(`generateMetadata`)와 화면이 함께 쓴다.
  */
 export function clamp(text: string, max: number): string {
   const chars = [...text.trim()];

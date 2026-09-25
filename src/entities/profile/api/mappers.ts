@@ -3,7 +3,7 @@ import type { MyProfile, ProfileRow } from "../model/types";
 /**
  * select 컬럼의 단일 소스 — 스키마가 바뀌면 여기 한 곳만 고친다.
  *
- * ⚠ `"use client"`가 없다(순수·서버 안전). `post`·`comment`의 `api/mappers.ts`와 같은 자리다.
+ * ⚠ `"use client"`가 없다(순수·서버 안전). `transfer`의 `api/mappers.ts`와 같은 자리다.
  */
 export const PROFILE_SELECT = "id, nickname, avatar_path";
 

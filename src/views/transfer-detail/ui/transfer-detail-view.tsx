@@ -153,7 +153,7 @@ export function TransferDetailView({
       {/*
         ⚠ **스크롤 영역이 여기 있어야 한다** — 루트 프레임이 `h-dvh … overflow-hidden`이라 `<main>`이
           스스로 스크롤하지 않으면 넘친 내용에 닿을 방법이 없다(경기 상세와 같은 주석).
-        ⚠ `pt-*`를 두지 않는다 — 위쪽 여백은 각 분기의 첫 요소가 진다(`views/match-detail` 주석).
+        ⚠ `pt-*`를 두지 않는다 — 위쪽 여백은 각 분기의 첫 요소가 진다.
         ⚠ 아래 `pb`는 하단 고정 바(관심 토글) 높이 + safe-area다 — 본문이 바에 가려지지 않게.
       */}
       <main className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(96px+env(safe-area-inset-bottom))]">
@@ -245,7 +245,7 @@ export function TransferDetailView({
       </main>
 
       {/*
-        하단 고정 바 — `<main>`의 형제(글 상세의 댓글 바 자리와 같은 형태). z-60은 핸드오프의 스케일
+        하단 고정 바 — `<main>`의 형제. z-60은 핸드오프의 스케일
         (서브헤더 20 < 하단바 60~70 < 오버레이 80). 이 화면의 CTA는 관심 토글 하나뿐이고 에메랄드
         (활성 시 `primary`)는 `buttonClassName`이 갖는다 — 이 슬라이스에서 새로 칠하지 않는다.
         ⚠ 딜이 그려졌을 때만 둔다 — 로딩·에러·없음 화면에 눌러도 대상이 없는 버튼을 남기지 않는다.

@@ -6,8 +6,8 @@ export const AVATAR_BUCKET = "avatars";
 /**
  * 아바타 경로 → 공개 URL.
  *
- * ⚠ **`shared`에 있는 이유**: 아바타를 쓰는 곳이 `entities/comment`·`entities/post`(상세)·
- *   `views/profile` 셋인데 **entities끼리는 import할 수 없다**(architecture.md 단방향 규칙).
+ * ⚠ **`shared`에 있는 이유**: 아바타는 여러 엔티티(작성자 표기 등)가 함께 그릴 수 있는데
+ *   **entities끼리는 import할 수 없다**(architecture.md 단방향 규칙).
  *   `OAUTH_PROVIDERS`가 `features/sign-in`에서 여기로 옮겨온 것과 똑같은 사정이다.
  *
  * ⚠ 파일명은 업로드마다 새로 만든다(uuid) — 같은 이름을 덮어쓰면 URL이 그대로라

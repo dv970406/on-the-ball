@@ -55,7 +55,7 @@ export const OG_SITE = {
  * 절대 URL을 요구하는 자리가 넷이다 — 사이트맵(sitemaps.org 규격), `robots.txt`의 `Sitemap:`,
  * `og:url`(네이버가 읽는다), 구조화 데이터의 `url`(JSON-LD는 `metadataBase`를 모른다).
  * 넷이 **같은 URL을 가리켜야** 검색엔진·공유 플랫폼이 한 주소를 대표로 본다 — 조립을 한 곳에 둔다.
- * ⚠ `ROUTES`가 주는 절대 경로(`/posts/1`)를 받으므로 `env.siteUrl`의 경로 부분은 버려진다 —
+ * ⚠ `ROUTES`가 주는 절대 경로(`/transfers/1`)를 받으므로 `env.siteUrl`의 경로 부분은 버려진다 —
  *   basePath 배포는 이 앱의 전제가 아니다(`metadataBase`도 같은 방식으로 해석한다).
  */
 export function absoluteUrl(path: string): string {

@@ -7,7 +7,7 @@
  *   키에 userId가 있으면 그 사고가 구조적으로 불가능하다.
  *
  * ⚠ `"use client"`가 없다 — 서버(generateMetadata·서버 컴포넌트)도 이 키를 쓸 수 있어야 한다.
- *   `post`·`comment`의 `api/keys.ts`와 같은 형태다.
+ *   `transfer`의 `api/keys.ts`와 같은 형태다.
  */
 export const profileKeys = {
   all: ["profile"] as const,

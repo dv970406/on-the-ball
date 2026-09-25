@@ -2,50 +2,30 @@ import { cache } from "react";
 import type { MetadataRoute } from "next";
 import { unstable_rethrow } from "next/navigation";
 import { ROUTES, absoluteUrl } from "@/shared/config";
-import {
-  POST_CATEGORIES,
-  POST_CATEGORY_SLUG,
-  type PostCategory,
-} from "@/entities/post/model/types";
 import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
 
 /**
  * 사이트맵.
  *
- * ⚠ **홈(`/`)을 넣지 않는다.** `app/page.tsx`가 `/posts`로 리다이렉트하는데, 사이트맵에 실린
+ * ⚠ **홈(`/`)을 넣지 않는다.** `app/page.tsx`가 `/transfers`로 리다이렉트하는데, 사이트맵에 실린
  *   URL이 리다이렉트면 Search Console이 "리다이렉션이 있는 페이지"로 제외 처리한다.
- *   목적지인 `/posts`가 이미 들어 있으므로 잃는 것이 없다.
+ *   목적지인 `/transfers`가 이미 들어 있으므로 잃는 것이 없다.
  *
- * ⚠ **정렬 쿼리(`?sort=`)를 넣지 않는다.** 같은 집합의 순서만 다른 중복이고, canonical이
- *   이미 정렬 없는 URL을 가리킨다 — 사이트맵은 **canonical만** 담는다.
- *
- * ⚠ 소프트 삭제·차단은 RLS가 거른다.
+ * ⚠ **정렬·리그 쿼리(`?sort=`·`?league=`)를 넣지 않는다.** 같은 집합의 순서·부분집합이라
+ *   사이트맵은 **canonical만** 담는다.
  *
  * ⚠ **쿠키를 보지 않고 항상 익명 클라이언트다.** 사이트맵은 크롤러가 읽는 문서라 누가 부르든
- *   공개분만 담아야 한다 — 쿠키 클라이언트면 로그인 사용자가 열었을 때 그 사람의 차단 숨김이
- *   섞이고, `cookies()` 때문에 라우트가 동적이 되어 **크롤마다 목록 수만큼 DB 조회**가 나간다.
- *   익명이면 fetch가 Data Cache를 타 라우트가 `ANON_REVALIDATE` 주기의 ISR이 된다(`/notices`와
- *   같은 자리). 대가로 새 글·삭제가 최대 그 주기만큼 늦게 반영된다.
+ *   공개분만 담아야 한다 — 쿠키 클라이언트면 `cookies()` 때문에 라우트가 동적이 되어
+ *   **크롤마다 목록 수만큼 DB 조회**가 나간다. 익명이면 fetch가 Data Cache를 타 라우트가
+ *   `ANON_REVALIDATE` 주기의 ISR이 된다. 대가로 새 딜이 최대 그 주기만큼 늦게 반영된다.
  */
 
 /**
  * 한 사이트맵 파일의 URL 상한은 50,000개다(sitemaps.org).
- * ⚠ 글이 이 수를 넘으면 조용히 잘리는 게 아니라 **넘긴 글이 사이트맵에서 사라진다** →
+ * ⚠ 딜이 이 수를 넘으면 조용히 잘리는 게 아니라 **넘긴 딜이 사이트맵에서 사라진다** →
  *   그때는 `generateSitemaps`로 쪼개 사이트맵 인덱스를 만든다(Next 공식 API).
  */
 const URL_LIMIT = 10_000;
-
-/** 목록 화면의 마지막 변경 시각 — 각 목록에 실리는 항목들의 최신 시각이다 */
-interface ListLastModified {
-  posts?: Date;
-  byCategory: Partial<Record<PostCategory, Date>>;
-  surveys?: Date;
-  notices?: Date;
-  /** 랭킹 — 순위가 움직이는 것은 경기가 채점될 때다 */
-  ranking?: Date;
-  /** 이적시장 보드 — 실리는 딜 중 가장 최근 보도 시각이다 */
-  transfers?: Date;
-}
 
 /** 값이 있을 때만 `lastModified`를 싣는다 */
 function withLastModified(url: string, lastModified: Date | undefined) {
@@ -53,35 +33,15 @@ function withLastModified(url: string, lastModified: Date | undefined) {
 }
 
 /**
- * 목록·말머리처럼 경로가 고정된 URL.
+ * 경로가 고정된 URL.
  *
  * ⚠ **`lastModified`를 요청 시각(`new Date()`)으로 채우지 않는다.** 사이트맵을 부를 때마다
  *   "방금 바뀌었다"가 되는데, 구글은 이 값이 실제 변경과 맞지 않으면 사이트 전체의
  *   lastmod를 무시한다 — 상세 URL들의 정확한 값까지 함께 신호를 잃는다.
  *   그래서 그 목록에 실리는 항목의 최신 시각을 쓰고, 알 수 없으면 **생략한다.**
- * ⚠ 경기 목록은 생략한다 — 창(`MATCH_LIST_LOOKBACK_MS`)이 시간에 따라 움직여 내용이
- *   행의 변경 없이도 바뀌므로 행 시각으로는 그 목록의 변경을 말할 수 없다.
- * ⚠ 랭킹은 **순위에 잡히는 경기 중 가장 최근 `finished_at`** 이다. 동기화는 제공자가 종료 시각을
- *   주지 않아 `finished_at`에 **킥오프 시각**을 쓰므로 실제 변경보다 이르게 말하는데, 늦게 말하는
- *   것(거짓 신호)보다 안전한 쪽이다. 어드민의 스코어 정정도 같은 방향이다.
- *   ⚠ 순위가 세는 경기만 본다(`result` 있음 + 킥오프 경과 — `match_leaderboard`의 판정) —
- *     스코어가 들어온 미래 킥오프 경기(제공자 오류)의 `finished_at`은 **미래 시각**이다.
  */
-function staticEntries(last: ListLastModified): MetadataRoute.Sitemap {
-  return [
-    withLastModified(absoluteUrl(ROUTES.postList), last.posts),
-    withLastModified(absoluteUrl(ROUTES.surveyList), last.surveys),
-    { url: absoluteUrl(ROUTES.matchList) },
-    withLastModified(absoluteUrl(ROUTES.matchRanking), last.ranking),
-    withLastModified(absoluteUrl(ROUTES.noticeList), last.notices),
-    withLastModified(absoluteUrl(ROUTES.transferList), last.transfers),
-    ...POST_CATEGORIES.map((category) =>
-      withLastModified(
-        absoluteUrl(ROUTES.postCategory(POST_CATEGORY_SLUG[category])),
-        last.byCategory[category],
-      ),
-    ),
-  ];
+function staticEntries(transfers: Date | undefined): MetadataRoute.Sitemap {
+  return [withLastModified(absoluteUrl(ROUTES.transferList), transfers)];
 }
 
 /** 가장 늦은 시각 — 비어 있으면 `undefined` */
@@ -94,108 +54,35 @@ function latest(dates: Date[]): Date | undefined {
  *   적어 두면 "관리해야 하는데 아무 일도 하지 않는 값"만 는다. `lastModified`는 읽는다.
  */
 const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
-  const statics = staticEntries({ byCategory: {} });
+  const statics = staticEntries(undefined);
 
   try {
     const supabase = createSupabaseAnonClient();
     if (!supabase) return statics;
 
-    const [posts, surveys, matches, notices, transfers] = await Promise.all([
-      supabase
-        .from("post")
-        // `category`는 말머리 목록의 lastModified를 가르는 데 쓴다
-        .select("id, updated_at, category")
-        .order("id", { ascending: false })
-        .limit(URL_LIMIT),
-      supabase
-        .from("survey")
-        // ⚠ `closes_at`을 lastModified로 쓰지 않는다 — 진행 중이면 미래 시각이 된다
-        .select("id, created_at")
-        .order("id", { ascending: false })
-        .limit(URL_LIMIT),
-      supabase
-        .from("match")
-        // ⚠ `kickoff_at`을 lastModified로 쓰지 않는다 — 예정 경기는 **미래 시각**이다
-        //   (입축구의 `closes_at`과 같은 함정). 결과가 들어온 시각이 실제 마지막 변경이고,
-        //   아직 없으면 그 경기는 바뀐 적이 없다.
-        .select("id, finished_at, kickoff_at, result")
-        .order("id", { ascending: false })
-        .limit(URL_LIMIT),
-      supabase
-        .from("notice")
-        // ⚠ 예약·만료·삭제는 `notice_select_live` 정책이 거른다 — 크롤러는 쿠키가 없어
-        //   공개분만 나온다(필터를 여기서 다시 짜면 정책과 갈릴 자리가 생긴다).
-        .select("id, updated_at")
-        .order("id", { ascending: false })
-        .limit(URL_LIMIT),
-      supabase
-        .from("transfer_deal")
-        // 상세도 보드도 `latest_reported_at`(최신 보도 시각)이 lastModified다 — 아래 주석 참고.
-        // ⚠ 범위 필터를 걸지 않는다 — 상세 URL은 창이 지나도 살아 있다(`/transfers/[id]`).
-        .select("id, latest_reported_at")
-        .order("id", { ascending: false })
-        .limit(URL_LIMIT),
-    ]);
+    const transfers = await supabase
+      .from("transfer_deal")
+      // 상세도 보드도 `latest_reported_at`(최신 보도 시각)이 lastModified다 — 아래 주석 참고.
+      // ⚠ 범위 필터를 걸지 않는다 — 상세 URL은 창이 지나도 살아 있다(`/transfers/[id]`).
+      .select("id, latest_reported_at")
+      .order("id", { ascending: false })
+      .limit(URL_LIMIT);
 
     // 미래 시각을 lastmod로 싣지 않기 위한 기준 — 데이터를 읽은 시각이다
     const nowMs = Date.now();
-    const postRows = posts.data ?? [];
-    const byCategory: ListLastModified["byCategory"] = {};
-    for (const category of POST_CATEGORIES) {
-      byCategory[category] = latest(
-        postRows.filter((post) => post.category === category).map((post) => new Date(post.updated_at)),
-      );
-    }
+    // ⚠ 미래 시각을 싣지 않는다 — 수집기가 10분 여유로 거르지만 CHECK 상한은 +1일이다
+    const deals = (transfers.data ?? []).filter(
+      (deal) => Date.parse(deal.latest_reported_at) <= nowMs,
+    );
 
     return [
-      ...staticEntries({
-        posts: latest(postRows.map((post) => new Date(post.updated_at))),
-        byCategory,
-        surveys: latest((surveys.data ?? []).map((survey) => new Date(survey.created_at))),
-        notices: latest((notices.data ?? []).map((notice) => new Date(notice.updated_at))),
-        ranking: latest(
-          (matches.data ?? []).flatMap((match) =>
-            match.finished_at && match.result !== null && Date.parse(match.kickoff_at) <= nowMs
-              ? [new Date(match.finished_at)]
-              : [],
-          ),
-        ),
-        // ⚠ 미래 시각을 싣지 않는다 — 수집기가 10분 여유로 거르지만 CHECK 상한은 +1일이다
-        transfers: latest(
-          (transfers.data ?? []).flatMap((deal) =>
-            Date.parse(deal.latest_reported_at) <= nowMs ? [new Date(deal.latest_reported_at)] : [],
-          ),
-        ),
-      }),
-      ...postRows.map((post) => ({
-        url: absoluteUrl(ROUTES.post(post.id)),
-        lastModified: new Date(post.updated_at),
-      })),
-      ...(surveys.data ?? []).map((survey) => ({
-        url: absoluteUrl(ROUTES.survey(survey.id)),
-        lastModified: new Date(survey.created_at),
-      })),
-      ...(matches.data ?? []).map((match) => ({
-        url: absoluteUrl(ROUTES.match(match.id)),
-        // 결과가 없으면 lastModified를 생략한다 — 없는 값을 now()로 채우면 사이트맵을 부를
-        // 때마다 "방금 바뀌었다"는 거짓 신호가 나간다
-        // ⚠ 미래 시각도 싣지 않는다 — 스코어가 들어온 미래 킥오프 경기(제공자 오류)가 그렇다
-        ...(match.finished_at && Date.parse(match.finished_at) <= nowMs
-          ? { lastModified: new Date(match.finished_at) }
-          : {}),
-      })),
-      ...(notices.data ?? []).map((notice) => ({
-        url: absoluteUrl(ROUTES.notice(notice.id)),
-        // ⚠ `opens_at`이 아니라 `updated_at`이다 — 예약 공지의 `opens_at`은 **미래 시각**이라
-        //   입축구의 `closes_at`과 같은 함정이다(정책이 감춰 여기 오지 않더라도 규약은 같다).
-        lastModified: new Date(notice.updated_at),
-      })),
+      ...staticEntries(latest(deals.map((deal) => new Date(deal.latest_reported_at)))),
       ...(transfers.data ?? []).map((deal) => ({
         url: absoluteUrl(ROUTES.transfer(deal.id)),
-        // ⚠ `updated_at`(파생 시각)이 아니라 `latest_reported_at`이다 — 파생기가 매시 upsert하면서
-        //   값이 그대로여도 `updated_at`을 밀어, 그걸 실으면 모든 상세가 매시 "방금 바뀌었다"가 된다
-        //   (요청 시각을 싣지 말라는 규약과 같은 함정). 화면이 그리는 "업데이트 N분 전"도 이 값이다.
-        // ⚠ 미래 시각은 싣지 않는다(다른 행과 같은 규약)
+        // ⚠ `updated_at`(파생 시각)이 아니라 `latest_reported_at`이다 — `updated_at`은 파생 컬럼
+        //   **아무것이나** 바뀐 시각이라(한국어 표기가 새로 붙어도 움직인다) 보도가 새로 나온
+        //   시각과 맞지 않는다. 화면이 그리는 "업데이트 N분 전"도 이 값이다.
+        // ⚠ 미래 시각은 싣지 않는다
         ...(Date.parse(deal.latest_reported_at) <= nowMs
           ? { lastModified: new Date(deal.latest_reported_at) }
           : {}),

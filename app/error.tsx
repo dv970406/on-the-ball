@@ -7,7 +7,7 @@ import { Button, EmptyState, buttonClassName } from "@/shared/ui";
 import { ROUTES } from "@/shared/config";
 
 /**
- * 루트 세그먼트 에러 바운더리 — 모든 화면(게시판·인증)의 렌더 오류를 받는다.
+ * 루트 세그먼트 에러 바운더리 — 모든 화면(이적시장·프로필·인증)의 렌더 오류를 받는다.
  * 이 바운더리가 뜨면 화면 셸까지 대체되므로 탈출 경로로 "홈으로"를 함께 둔다.
  * (루트 layout 자체의 오류는 이 파일이 아니라 global-error.tsx가 담당)
  */

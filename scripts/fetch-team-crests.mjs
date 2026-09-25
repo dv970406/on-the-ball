@@ -1,21 +1,19 @@
 /**
- * 구단 엠블럼을 내려받아 **줄여서 `public/crests/{team.code}.png`에 커밋한다.**
+ * 구단 엠블럼을 내려받아 **줄여서 `public/crests/{code}.png`에 커밋한다.**
  *
- *   node scripts/fetch-team-crests.mjs                    # API에서 (API_FOOTBALL_KEY 필요)
- *   node scripts/fetch-team-crests.mjs --fixture <파일>   # 키 없이 저장된 JSON으로
- *   node scripts/fetch-team-crests.mjs --season 2026
+ *   node scripts/fetch-team-crests.mjs --team 494         # 구단 하나(API-Football 팀 id)
+ *   node scripts/fetch-team-crests.mjs --team 33 --code man-united
  *   node scripts/fetch-team-crests.mjs --league 140       # 해외 리그 전체(라리가 140 · 분데스리가 78 ·
  *                                                         #   세리에 A 135 · 리그 1 61) — 팀 목록 JSON을 stdout에
- *   node scripts/fetch-team-crests.mjs --team 494         # 해외 구단 하나(API-Football 팀 id)
- *   node scripts/fetch-team-crests.mjs --team 541 --code real-madrid
- *   (--league·--team에 --force를 붙이면 이미 있는 파일도 다시 받는다)
+ *   (--force를 붙이면 이미 있는 파일도 다시 받는다)
  *
- * ⚠ **`--league`·`--team`은 `team` 테이블에 없는 구단용이다**(이적 소식의 해외 구단 — 표시 프리셋은
- *   `scripts/lib/transfer/club-presets.json`). 파일명은 API 이름을 `slugify`한 값이고 그 프리셋의
- *   `code`와 같아야 한다. ⚠ **파일명은 영구 계약이다** — 이적설 글 본문에 `/crests/{code}.png`가
- *   박혀 있어, 이름을 바꾸거나 지우면 이미 쓴 글의 엠블럼이 깨진다.
- * ⚠ **이미 있는 파일은 덮지 않는다**(`--force` 제외). 로컬 DB의 `team`이 일부뿐이면 코드 소유
- *   검사만으로는 커밋된 EPL 엠블럼을 지킬 수 없어서다(QA에서 재현 — `--team 66`이 aston-villa.png를 덮었다).
+ * ⚠ **파일명(code)은 구단 표시 프리셋 `scripts/lib/transfer/club-presets.json`의 `code`와 같아야 한다.**
+ *   `--league`는 API 이름을 `slugify`한 값을 쓰고, 프리셋이 그와 다른 코드를 쓰는 구단(프리미어리그는
+ *   `man-united`·`brighton-hove`처럼 옛 경기 동기화가 정한 코드다)은 `--team <id> --code <code>`로 받는다.
+ *   ⚠ **그래서 프리미어리그를 `--league`로 받지 않는다** — 슬러그가 프리셋과 갈려 같은 구단의 파일이 둘 생긴다.
+ * ⚠ **파일명을 바꾸면 프리셋의 `code`도 함께 바꾼다** — 화면(`TransferCrest`)이 `code`로 경로를 만들어,
+ *   한쪽만 바꾸면 그 구단이 모노그램으로 떨어진다.
+ * ⚠ **이미 있는 파일은 덮지 않는다**(`--force` 제외) — 승격팀만 새로 받으려고 다시 돌리는 것이 보통이다.
  *
  * ⚠ **왜 제공자 CDN을 직접 걸지 않는가.** 원본이 큰 PNG인데 화면에서
  *   그리는 크기는 24·44px이라 8배 가까이 과하다. `?width=`·`?w=` 같은 리사이즈 파라미터를
@@ -23,28 +21,20 @@
  *   20팀 기준 **1,068KB → 약 85KB(92% 감소)** 가 된다(API-Football 기준 실측).
  *
  * ⚠ **PNG다. AVIF가 아니다.** 같은 조건에서 AVIF가 조금 더 작지만(66% vs 60%) 20팀 기준
- *   14KB 차이뿐이고, 디코드에 실패하는 브라우저에서는 `TeamCrest`의 폴백이 **조용히
+ *   14KB 차이뿐이고, 디코드에 실패하는 브라우저에서는 `Crest`의 폴백이 **조용히
  *   모노그램으로** 떨어져 원인을 알 수 없다. 그 위험을 14KB에 사지 않는다.
  *   WebP는 이 그림에서 PNG보다 오히려 크다(45% 감소 — 로고는 색 수가 적어 팔레트가 이긴다).
  *
  * ⚠ **결과물은 저장소에 커밋한다.** 런타임에 늘어나지 않는다는 뜻이라, 승격팀이 생기면
  *   사람이 이 스크립트를 돌려 커밋해야 채워진다 — `scripts/team-names-ko.json`의 한국어
- *   표기와 **똑같은 운영 모델**이고, 그동안 화면은 약칭 모노그램으로 떨어진다(`TeamCrest`).
- *   그래서 아래에서 빠진 팀을 경고로 남긴다.
+ *   표기와 **똑같은 운영 모델**이고, 그동안 화면은 약칭 모노그램으로 떨어진다(`Crest`).
  *
- * ⚠ **EPL(인자 없는 기본 모드)은 팀 코드를 DB가 소유한다.** 여기서 슬러그를 다시 만들지 않는다 — `sync-matches.mjs`와
- *   규칙이 갈리는 순간 파일명이 `team.code`와 어긋나 모든 엠블럼이 404가 된다.
- *   그래서 API의 팀 id(`external_id`)로 DB 행을 찾아 그 `code`를 파일명으로 쓴다.
- *   → **`sync-matches.mjs`를 먼저 돌려야 한다.**
- *
- * ⚠ **service_role이 필요 없다.** `team`은 공개 읽기라 anon 키로 충분하다 — 이 스크립트는
- *   DB에 아무것도 쓰지 않는다(`sync-matches.mjs`·`upload-survey-images.mjs`와 다른 점).
+ * ⚠ **DB에 접근하지 않는다.** 필요한 자격증명은 API-Football 키 하나뿐이다.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { createClient } from "@supabase/supabase-js";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import sharp from "sharp";
 import { flag, loadEnv, slugify } from "./lib/sync-db.mjs";
-import { EPL_LEAGUE_ID, createApiFootball } from "./lib/api-football.mjs";
+import { createApiFootball } from "./lib/api-football.mjs";
 
 const OUT_DIR = "public/crests";
 
@@ -69,7 +59,6 @@ const PALETTE_QUALITY = 40;
 
 // ── 인자 ───────────────────────────────────────────────────────────────
 const argv = process.argv.slice(2);
-const fixturePath = flag(argv, "fixture");
 const seasonArg = flag(argv, "season");
 const teamArg = flag(argv, "team");
 const codeArg = flag(argv, "code");
@@ -81,31 +70,21 @@ const FOREIGN_LEAGUES = new Map([[140, "라리가"], [78, "분데스리가"], [1
 
 /*
  * ⚠ **모드가 섞인 인자는 거부한다.** 조용히 한쪽만 실행하면 의도와 다른 파일이 생기고 API 한도를 쓴다
- *   (`--team 541 --fixture x.json`이 fixture를 무시하고 API를 불렀다 — QA).
+ *   (`--team 541 --league 140`처럼 둘을 함께 주면 어느 쪽이 도는지 알 수 없다).
  */
 function usage(message) {
   console.error(message);
   process.exit(1);
 }
-const modes = ["--team", "--league", "--fixture"].filter((m) => argv.includes(m));
+const modes = ["--team", "--league"].filter((m) => argv.includes(m));
+if (modes.length === 0) usage("--team <id> 또는 --league <id>가 필요합니다");
 if (modes.length > 1) usage(`${modes.join(" · ")}는 함께 쓸 수 없습니다`);
 if (argv.includes("--code") && !argv.includes("--team")) usage("--code는 --team과 함께만 씁니다");
 if (argv.includes("--code") && !codeArg) usage("--code 뒤에 파일명이 필요합니다");
-if (force && modes[0] !== "--team" && modes[0] !== "--league") usage("--force는 --team·--league에만 씁니다");
 if (argv.includes("--team") && argv.includes("--season")) usage("--team은 시즌을 받지 않습니다");
 
 // ── 환경 ───────────────────────────────────────────────────────────────
-/*
- * ⚠ **service_role이 아니라 anon 키다.** `team`은 공개 읽기라 충분하고, 이 스크립트는
- *   DB에 아무것도 쓰지 않는다 — 쓰기 자격증명을 들고 다닐 이유가 없다.
- */
-const env = loadEnv(["NEXT_PUBLIC_SUPABASE_ANON_KEY", "API_FOOTBALL_KEY"]);
-const url = env.NEXT_PUBLIC_SUPABASE_URL;
-const key = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-if (!url || !key) {
-  console.error("NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY가 필요합니다");
-  process.exit(1);
-}
+const env = loadEnv(["API_FOOTBALL_KEY"]);
 
 /**
  * 원본 엠블럼 → 128px 팔레트 PNG.
@@ -136,7 +115,7 @@ const CODE_RE = /^[a-z](?:[a-z0-9]|-(?=[a-z0-9]))*$/;
 
 /**
  * stdout을 다 내보낸 뒤 끝낸다 — `process.exit`는 파이프에 남은 출력을 버린다(큰 JSON이 64KB에서 잘렸다).
- * ⚠ 반드시 `await`한다 — 기다리지 않으면 쓰기가 끝나기 전에 아래의 EPL 기본 모드가 이어서 실행된다.
+ * ⚠ 반드시 `await`한다 — 기다리지 않으면 쓰기가 끝나기 전에 아래 코드가 이어서 실행된다.
  */
 async function finish(code, out) {
   if (out !== undefined) await new Promise((resolve) => process.stdout.write(`${out}\n`, resolve));
@@ -157,13 +136,6 @@ if (argv.includes("--team")) {
   if (!t || !logo) usage(`✗ 팀 ${teamArg}의 엠블럼을 찾지 못했습니다`);
   const code = codeArg ?? slugify(t.name);
   if (!code || !CODE_RE.test(code)) usage(`✗ 파일명으로 쓸 수 없는 코드입니다: ${code}`);
-  // ⚠ 기존 팀 코드와 겹치면 그 팀의 엠블럼을 덮는다 — 같은 제공자 팀일 때만 허용한다
-  const { data: clash, error: clashErr } = await createClient(url, key)
-    .from("team").select("code, external_id").eq("code", code).maybeSingle();
-  if (clashErr) usage(`✗ team 조회 실패: ${clashErr.message}`);
-  if (clash && String(clash.external_id) !== String(t.id)) {
-    usage(`✗ ${code}는 이미 다른 팀(external_id ${clash.external_id})의 코드입니다 — --code로 다른 이름을 주세요`);
-  }
   if (existsSync(`${OUT_DIR}/${code}.png`) && !force) {
     usage(`✗ ${OUT_DIR}/${code}.png가 이미 있습니다 — 다시 받으려면 --force를 붙이세요`);
   }
@@ -198,9 +170,6 @@ if (argv.includes("--league")) {
     usage(`✗ ${e.message}`);
   }
   if (list.length === 0) usage(`✗ ${FOREIGN_LEAGUES.get(leagueId)} ${season} 시즌 팀을 찾지 못했습니다`);
-  const { data: dbTeams, error: dbErr } = await createClient(url, key).from("team").select("code, external_id");
-  if (dbErr) usage(`✗ team 조회 실패: ${dbErr.message}`);
-  const owner = new Map((dbTeams ?? []).map((t) => [t.code, String(t.external_id)]));
   mkdirSync(OUT_DIR, { recursive: true });
   const result = { league: FOREIGN_LEAGUES.get(leagueId), season, saved: [], kept: [], skipped: [] };
   const claimed = new Set(); // ⚠ 한 실행 안에서 같은 코드가 두 번 나오면 뒤의 것이 앞의 것을 조용히 덮는다
@@ -215,7 +184,6 @@ if (argv.includes("--league")) {
     if (!code || !CODE_RE.test(code)) { skip("파일명으로 쓸 수 없는 이름"); continue; }
     if (!logo) { skip("엠블럼 주소 없음"); continue; }
     if (claimed.has(code)) { skip(`${code}가 이 리그에서 이미 쓰였다`); continue; }
-    if (owner.has(code) && owner.get(code) !== String(t.id)) { skip(`${code}는 다른 팀의 코드다`); continue; }
     claimed.add(code);
     const entry = { code, apiId: t.id, name: t.name };
     if (existsSync(`${OUT_DIR}/${code}.png`) && !force) {
@@ -232,103 +200,4 @@ if (argv.includes("--league")) {
     }
   }
   await finish(bad ? 1 : 0, JSON.stringify(result));
-}
-
-// ── 수집 ───────────────────────────────────────────────────────────────
-/*
- * ⚠ **경기가 아니라 팀 엔드포인트를 쓴다.** 예전 제공자는 경기 응답의 팀에 엠블럼 URL을
- *   실어 줬지만 API-Football은 팀 목록에만 담는다 — 대신 **요청이 하나로 끝나고**
- *   경기가 아직 없는 시즌에도 받을 수 있다.
- */
-const season = Number(seasonArg ?? (new Date().getUTCMonth() >= 6
-  ? new Date().getUTCFullYear()
-  : new Date().getUTCFullYear() - 1));
-
-let apiTeams;
-if (fixturePath) {
-  const parsed = JSON.parse(readFileSync(fixturePath, "utf8"));
-  apiTeams = Array.isArray(parsed?.response) ? parsed.response.map((x) => x.team) : null;
-} else {
-  const api = createApiFootball(env.API_FOOTBALL_KEY);
-  try {
-    const body = await api.get(`/teams?league=${EPL_LEAGUE_ID}&season=${season}`);
-    apiTeams = Array.isArray(body?.response) ? body.response.map((x) => x.team) : null;
-  } catch (e) {
-    console.error(`✗ ${e.message}`);
-    process.exit(1);
-  }
-}
-
-// ⚠ `sync-matches.mjs`와 같은 방어 — `{}`나 문자열이 오면 아래가 죽는다.
-if (!apiTeams || apiTeams.length === 0) {
-  console.error("팀 배열을 찾지 못했습니다 — 응답 형태나 시즌을 확인하세요");
-  process.exit(1);
-}
-
-/** API 팀 id → 엠블럼 원본 URL */
-const crestByApiId = new Map();
-for (const t of apiTeams) {
-  if (!t?.id || crestByApiId.has(t.id)) continue;
-  const logo = httpsLogo(t.logo);
-  if (logo) crestByApiId.set(t.id, logo);
-}
-
-// ── 팀 코드 (DB가 소유한다) ────────────────────────────────────────────
-const supabase = createClient(url, key);
-const { data: teams, error } = await supabase.from("team").select("code, external_id");
-if (error) {
-  console.error(`✗ team 조회 실패: ${error.message}`);
-  process.exit(1);
-}
-if (!teams || teams.length === 0) {
-  console.error("team이 비어 있습니다 — scripts/sync-matches.mjs를 먼저 돌리세요");
-  process.exit(1);
-}
-
-// ── 변환 ───────────────────────────────────────────────────────────────
-mkdirSync(OUT_DIR, { recursive: true });
-
-const saved = [];
-const missing = []; // DB에는 있는데 API가 엠블럼을 주지 않은 팀
-const failed = [];
-let originalBytes = 0;
-let outputBytes = 0;
-
-for (const team of teams) {
-  const source = team.external_id === null ? undefined : crestByApiId.get(Number(team.external_id));
-  if (!source) {
-    missing.push(team.code);
-    continue;
-  }
-
-  try {
-    const { input, output } = await toCrestPng(source);
-    writeFileSync(`${OUT_DIR}/${team.code}.png`, output);
-    originalBytes += input.length;
-    outputBytes += output.length;
-    saved.push(team.code);
-  } catch (e) {
-    // ⚠ 한 팀의 실패가 나머지를 막지 않는다 — 부분 성공이 전량 실패보다 낫다.
-    failed.push(`${team.code} (${e instanceof Error ? e.message : String(e)})`);
-  }
-}
-
-// ── 보고 ───────────────────────────────────────────────────────────────
-const kb = (n) => `${(n / 1024).toFixed(1)}KB`;
-console.log(`✓ 엠블럼 ${saved.length}개 → ${OUT_DIR}/`);
-if (saved.length > 0) {
-  console.log(
-    `  ${kb(originalBytes)} → ${kb(outputBytes)} (${(100 - (outputBytes / originalBytes) * 100).toFixed(0)}% 감소, ${SIZE}px 팔레트 PNG)`,
-  );
-}
-
-// ⚠ **경고로 남긴다 — 실패시키지 않는다.** 승격팀이 생겨도 나머지는 갱신돼야 하고,
-//   빠진 팀은 화면에서 모노그램으로 떨어질 뿐이다(`team-names-ko.json`과 같은 규약).
-if (missing.length > 0) {
-  console.warn(`⚠ 엠블럼을 찾지 못한 팀 ${missing.length}개: ${missing.join(", ")}`);
-  console.warn("  (API 응답에 crest가 없거나 이 시즌 경기에 등장하지 않는 팀입니다)");
-}
-if (failed.length > 0) {
-  console.error(`✗ 내려받기 실패 ${failed.length}개: ${failed.join(", ")}`);
-  process.exitCode = 1; // ⚠ 크론이 초록으로 지나가면 안 된다
 }

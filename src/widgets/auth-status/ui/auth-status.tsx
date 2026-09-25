@@ -22,9 +22,9 @@ export function AuthStatus() {
 
   return (
     // 로그인 후 보던 화면으로 돌아오도록 목적지를 싣는다(`signInWithNext` — 가드·proxy와 같은 형태).
-    // ⚠ **여기는 곧바로 이동한다.** 좋아요·투표·차단·신고·글쓰기처럼 라벨이 동작을 말하는
+    // ⚠ **여기는 곧바로 이동한다.** 관심 담기처럼 라벨이 동작을 말하는
     //   컨트롤은 `SignInDialog`로 한 단계 안내를 끼지만, 라벨이 "로그인"이면 목적지가 이미
-    //   적혀 있어 되묻는 것이 방해다(같은 예외가 `CommentBar`의 로그인 버튼).
+    //   적혀 있어 되묻는 것이 방해다
     <Link
       href={signInWithNext(pathname)}
       className={buttonClassName({ variant: "secondary", size: "sm" })}

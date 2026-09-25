@@ -1,5 +1,5 @@
 /**
- * 계약 기간·만료 파싱 — 글 조립(compose)과 딜 파생(derive-deals)이 공유한다.
+ * 계약 기간·만료 파싱 — 딜 파생(derive-deals)이 쓴다.
  *
  * 구조화된 값(`parseContract`)과 두 표기(`contractLabel` — 글의 표 칸, `contractText` — 보드의
  * `contract_text`)를 함께 둔다. 표기를 각자 만들면 같은 문장에서 다른 값이 나온다.

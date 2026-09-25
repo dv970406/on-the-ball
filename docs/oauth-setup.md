@@ -176,7 +176,7 @@
 supabase stop && supabase start   # ⚠ db reset이 아니다 — gotrue 컨테이너 환경변수라 재기동이 필요하다
 ```
 
-`supabase stop`은 데이터를 도커 볼륨에 백업하고 `start`가 복원하므로 **글·계정은 사라지지 않습니다.**
+`supabase stop`은 데이터를 도커 볼륨에 백업하고 `start`가 복원하므로 **데이터·계정은 사라지지 않습니다.**
 
 ### 제대로 붙었는지 확인
 
@@ -234,7 +234,7 @@ pnpm build:prod && pnpm start:prod
 - **Redirect URLs**: `https://<배포 도메인>/**`
 
 ⚠ 앱으로 돌아오는 주소가 허용 목록에 없으면 GoTrue가 **조용히 Site URL로 되돌려** 보냅니다
-(`?next=`가 통째로 사라져 "글쓰기를 누르고 로그인했는데 목록으로 떨어지는" 증상이 됩니다).
+(`?next=`가 통째로 사라져 "딜 상세에서 로그인했는데 보드로 떨어지는" 증상이 됩니다).
 
 ---
 
@@ -253,7 +253,7 @@ pnpm build:prod && pnpm start:prod
       │                ⚠ 복귀 상태(code 유무·verifier 유무·error)는 **서버가 판정해** prop으로
       │                  내린다 — 클라이언트가 첫 렌더에서 URL을 읽으면 하이드레이션이 깨진다
       ▼
- SIGNED_IN ──▶ GuestOnly가 ?next= 또는 /posts로 이동   ← 목적지는 여기 한 곳이 정한다
+ SIGNED_IN ──▶ GuestOnly가 ?next= 또는 /transfers로 이동   ← 목적지는 여기 한 곳이 정한다
       │
       ▼
  auth.users INSERT ──▶ handle_new_user 트리거가 profiles.nickname 생성
@@ -265,7 +265,7 @@ pnpm build:prod && pnpm start:prod
 |---|---|
 | `KOE205` | 동의항목 미설정. **대부분 `account_email`이 원인**이고, 그건 비즈 앱 전환이 필요하다(1번 절) |
 | `redirect_uri_mismatch` | 콘솔의 Redirect URI가 0번 표와 다름 |
-| 로그인 후 목록으로만 감 | `additional_redirect_urls`(로컬) / Redirect URLs(원격)에 앱 주소 없음 |
+| 로그인 후 보드(`/transfers`)로만 감 | `additional_redirect_urls`(로컬) / Redirect URLs(원격)에 앱 주소 없음 |
 | 즉시 "로그인을 마치지 못했어요" | PKCE verifier가 없다 — 다른 브라우저에서 링크를 열었거나 이미 한 번 교환을 시도했다(새로고침). 서버가 쿠키로 판정해 기다리지 않는다 |
 | "로그인 중"에서 8초 뒤 에러 | verifier는 있는데 교환이 실패했다 — GoTrue 로그·프로바이더 설정 확인 |
 | 카카오·구글이 별도 계정이 됨 | 이메일이 다르거나 없어 자동 연결이 안 된 것. `/profile`의 **로그인 수단**에서 직접 연결한다 (⚠ 이미 갈린 뒤에는 연결도 실패한다) |
