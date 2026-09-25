@@ -174,7 +174,7 @@ async function derive({ dryRun: summaryOnly }) {
       }
     } else {
       const w = r.write;
-      console.log(`  저장: 구단 ${w.clubs} · 딜 ${w.deals} · 배정 ${w.linked} · 해제 ${w.unlinked} · 삭제 ${w.deleted}${w.failed ? ` · 실패 ${w.failed}` : ""}`);
+      console.log(`  저장(값이 바뀐 것만): 구단 ${w.clubs} · 딜 ${w.deals}(그대로 ${w.unchanged}) · 배정 ${w.linked} · 해제 ${w.unlinked} · 삭제 ${w.deleted}${w.failed ? ` · 실패 ${w.failed}` : ""}`);
       if (w.failed) process.exitCode = 1;
     }
   } catch (e) {

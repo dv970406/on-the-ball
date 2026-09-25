@@ -6,7 +6,7 @@
  * 픽스처 행 배열 → 파생 결과를 **정확 일치**로 본다. 규칙(계획서 §2-2)을 고치면 이걸 먼저 돌린다.
  */
 import { createNameBook } from "./lib/transfer/names-ko.mjs";
-import { boardScopeStartMs, clubRecord, dealKey, deriveDeals, derivationStartMs, normalizePlayer, windowSpan } from "./lib/transfer/derive-deals.mjs";
+import { boardScopeStartMs, clubRecord, createExtractMemo, dealKey, deriveDeals, derivationStartMs, normalizePlayer, windowSpan } from "./lib/transfer/derive-deals.mjs";
 
 const NOW = Date.parse("2026-09-25T00:00:00Z");
 const WINDOWS = [
@@ -270,7 +270,21 @@ const UNIT = [
     want: { key: "k", label: "l", opensAt: "2026-06-15T00:00:00Z", closesAt: "2026-09-01T22:00:00Z" },
   },
   { name: "derivationStartMs — 범위 시작 − 14일", got: new Date(derivationStartMs(NOW, WINDOWS)).toISOString(), want: "2026-05-18T00:00:00.000Z" },
-  { name: "clubRecord — 사전 밖 구절도 CHECK 길이 안(short_name ≤40)", got: clubRecord("A".repeat(80) + " United").short_name.length <= 40, want: true },];
+  { name: "clubRecord — 사전 밖 구절도 CHECK 길이 안(short_name ≤40)", got: clubRecord("A".repeat(80) + " United").short_name.length <= 40, want: true },  {
+    // 추출 메모는 결과를 바꾸지 않는다 — 이름을 찾은 뒤 다시 파생할 때 같은 메모를 넘기는 경로(runDerivation)까지
+    name: "추출 메모 — 두 번의 파생이 메모를 나눠 써도 메모 없는 파생과 결과가 같다",
+    got: (() => {
+      const rows = CASES.flatMap((c) => c.rows);
+      const opts = { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: DICT }) };
+      const flat = (d) => JSON.stringify({ ...d, assignments: [...d.assignments] });
+      const memo = createExtractMemo();
+      const first = deriveDeals(rows, { ...opts, memo });
+      const second = deriveDeals(rows, { ...opts, memo });
+      return flat(first) === flat(deriveDeals(rows, opts)) && flat(second) === flat(first);
+    })(),
+    want: true,
+  },
+];
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 let pass = 0;
