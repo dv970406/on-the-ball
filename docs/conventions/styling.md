@@ -17,6 +17,7 @@
   - arbitrary **value**: `border-[1.5px]`, `tracking-[-0.6px]`, `bg-[linear-gradient(...)]`
   - arbitrary **property**: `[clip-path:polygon(...)]`, `[transform:...]`, `[transition:...]`
 - ⚠ **`bg-linear-*` 그라데이션 유틸은 `in oklab` 보간이다.** 프로토타입의 sRGB `linear-gradient(...)`를 그대로 옮길 땐 `bg-[linear-gradient(...)]` arbitrary를 쓴다(중간색이 달라진다).
+- ⚠ **`[vertical-align:...]`·`[font-family:...]` arbitrary property는 생성되지 않는다(실측)** — Tailwind가 이미 그 이름의 표준 유틸(`align-*`·`font-*`)을 갖고 있으면 arbitrary property 형태를 스캐너가 인식하지 못한다. 대신 그 표준 유틸에 arbitrary **value**를 준다: `align-[-1px]`·`font-['Apple_Color_Emoji','Segoe_UI_Emoji','Noto_Color_Emoji',sans-serif]`(이적시장 상세의 국기 이모지 폰트 스택이 선례 — `views/transfer-detail/ui/transfer-detail-view.tsx`).
 - ⚠ 벤더 prefix는 자동 생성되지 않는다(browserslist 미설정 → Lightning CSS 기본 타깃). 구형 사파리 지원이 필요한 속성은 `[-webkit-clip-path:...]`처럼 병기한다.
 
 ### `style` prop이 허용되는 유일한 경우 — 런타임에 결정되는 동적 값
@@ -73,6 +74,8 @@ function cardClassName(peek: boolean) {
 `code-quality.md`의 "성급한 추상화보다 중복"을 그대로 적용한다.
 
 1. **`@theme` 토큰 추가 — 하지 않는다**(동결). 여러 슬라이스가 공유하는 디자인 결정이 새로 생겼을 때만 별도 논의.
+   선례: 이적시장 결렬 행의 회색 배경은 `bg-[#f3f3f3]`(arbitrary value)다 — 토큰에 없는 값이라 토큰을
+   늘리지 않고 인라인으로 둔다(`entities/transfer/ui/deal-row.tsx`).
 2. **슬라이스 내부 `Record<K, string>` 클래스 맵** — 판별자(tone·side·상태)가 **이미 있고** 값들이 반드시 함께 바뀔 때만. 새 추상화를 만드는 게 아니라 기존 맵의 값 타입을 바꾸는 수준이어야 한다.
 3. 그 외는 전부 **인라인 arbitrary**. 길어도 1회 사용이면 이름을 붙이지 않는다 — 바로 위 한국어 주석이 이미 의미를 설명한다.
 
@@ -112,6 +115,9 @@ function cardClassName(peek: boolean) {
     | `entities/match/ui/prediction-block.tsx` | 승부예측 **결과 띠** — 채점이 끝난 뒤 **결과 칸에만 1개**. 같은 블록의 선택지 3개에는 쓰지 않는 것과 갈리는 지점이고, 체크 아이콘이 형태를 지어 "색이 정보를 혼자 지지 않는다"도 만족한다 |
     | `entities/match/ui/match-card.tsx` | 승부예측 "적중" 배지 — **예측했고 채점까지 끝난 카드에만 1개**. 선택지(카드당 3개)에 에메랄드를 쓰지 않는 것과 갈리는 지점이고, 글자를 담아 "색이 정보를 혼자 지지 않는다"도 만족한다 |
     | `widgets/notice-banner/ui/notice-banner.tsx` · `views/notice-list` · `views/notice-detail` · `views/admin-notice-list` | `'필독'` 배지 — 공지가 닿는 네 자리에서 **같은 색이어야 한 종류로 읽힌다**. CTA가 아니라 상태 표시라 이 셈에 들어가지 않고(`match-card`의 적중 배지와 같은 자리), 글자를 담아 "색이 정보를 혼자 지지 않는다"도 만족한다. ⚠ 피드에서는 글쓰기 FAB과 한 뷰포트에 함께 뜨는데, **CTA는 여전히 FAB 하나**다 |
+    | `entities/transfer/ui/status-badge.tsx` | 이적시장 오피셜 뱃지 — CTA가 아니라 상태 표시라 이 셈에 들어가지 않고, 글자("오피셜")를 담아 "색이 정보를 혼자 지지 않는다"도 만족한다 |
+    | `entities/transfer/ui/watch-mark.tsx` | 이적시장 관심 표시 원(목록 행) — 상태 표시. 글자 대신 종 아이콘(`Bell`, `fill-current`)이 형태를 지고 `sr-only` 텍스트가 스크린리더에 같은 뜻을 준다 |
+    | `entities/transfer/ui/fee-delta.tsx` | 이적시장 이적료 상승 화살표(`text-primary-deep`) — 콘텐츠 값의 방향 표시라 CTA 셈에 들어가지 않고, `ArrowUp` 아이콘이 형태를 진다(하락은 `text-crimson`) |
     | `views/post-detail/ui/comment-section.tsx` | 댓글 수 |
     | `widgets/bottom-tab-bar/ui/bottom-tab-bar.tsx` | 활성 탭 아이콘 |
 
@@ -204,6 +210,7 @@ function cardClassName(peek: boolean) {
 | 바텀시트 **그래버**(36×4px 바) | 누르는 컨트롤이 아니라 **드래그 어포던스** — 아래로 끌면 시트가 따라 내려간다 | `shared/ui/sheet.tsx` |
 | 분할 카드의 **VS 배지** | `aria-hidden` 장식이라 컨트롤이 아니다 — 원이 아니면 성립하지 않는 형태다 | `entities/survey/ui/vs-badge.tsx` |
 | 라인업의 **선수 사진**·**등번호 배지**·**센터서클**·**사건 배지**(득점·교체) | 누르는 컨트롤이 아니라 피치와 선수를 그리는 표시 요소다 — 전부 원이 아니면 성립하지 않는다(사진은 `Avatar`와 같은 얼굴 원이다) | `entities/match/ui/lineup-pitch.tsx` · `player-badges.tsx` · `player-photo.tsx` |
+| 이적시장 **상태 뱃지**·**관심 표시 원**·**결렬 X 원**·**보도 타임라인 점** | 누르는 컨트롤이 아니라 상태·경로·시간순을 그리는 표시 요소다 | `entities/transfer/ui/status-badge.tsx` · `watch-mark.tsx` · `club-route.tsx` · `views/transfer-detail/ui/report-timeline.tsx` |
 
 ⚠ 위의 알약 예외 표와 이 "대상이 아닌 것" 표는 **`pnpm check:conventions`가 대조한다** — 목록에 없는 `rounded-full`이 생기면 검사가 실패한다. 그림자·`backdrop-blur` 예외도 같다.
 ⚠ 다만 검사가 대조하는 것은 **파일 경로**이고 행 수가 아니다. 여기에 "세 목록"·"4곳" 같은 **개수를 적지 않는다** — 표에 행을 더하면 그 개수가 곧바로 거짓이 된다.

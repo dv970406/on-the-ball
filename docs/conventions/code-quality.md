@@ -65,6 +65,7 @@ per-call 콜백이 **상위 레이어의 결정**(이동 목적지, 입력창 �
   - `requireBrowserSupabase` — 10곳 넘게 반복되던 null 가드를 한 번에 한국어 에러로(중복 3회 이상 + 형태가 진짜 같음).
   - `PostForm` — 작성·수정이 같은 필드·같은 검증을 쓰므로 한 곳에 둔다.
   - 낙관적 업데이트 `onMutate → onError → onSettled` — 같은 규약을 모든 낙관적 쓰기 훅이 공유(예측 가능성).
+  - `Crest`(`@/shared/ui`) — 도메인을 모르는 순수 메커니즘(이미지 + 하이드레이션 전 실패 감지 + 모노그램 폴백)을 `entities/match`(`TeamCrest`)와 `entities/transfer`(`TransferCrest`)가 함께 쓴다. 소비처가 둘뿐이라 "중복 3회 이상" 기준에는 못 미치지만, entities끼리 import할 수 없는 것이 FSD의 구조적 제약이라 그 레이어 안에서는 공유가 애초에 불가능하다 — `avatarUrl`·`OAUTH_PROVIDERS`가 `shared`에 있는 것과 같은 사정이라 "성급한 추상화"가 아니라 "공유해야만 하는 메커니즘" 쪽으로 판단한다.
 - **나쁜 예(하지 말 것):**
   - 10개 뮤테이션 훅을 하나의 factory로 묶기 — 무효화 키·Promise 반환·낙관적 업데이트 여부가 제각각 정당한데 묶으면 "책임 하나씩"·"중복 > 성급한 추상화" 위배.
   - `toAuthErrorMessage`와 `toDbErrorMessage`를 억지 공용 헬퍼로 묶기 — 에러 타입도 코드 체계도 다르다. 3번째 사용처가 생기면 그때.

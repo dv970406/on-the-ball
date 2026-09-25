@@ -196,7 +196,7 @@
 - `LineupPitch`·`StatComparison`의 **`animate`** — 라인업이 GK→FW 줄 단위로, 스탯 막대가 가운데서 바깥으로 자란다. ⚠ 판정은 뷰가 한다(`useEntranceMotion() || 탭을 골랐는가`) — 패널이 `hidden`에서 벗어나는 순간 브라우저가 애니메이션을 새로 시작하므로 탭을 오갈 때마다 재생된다. ⚠ 마커는 표준 `-translate-*` 센터링이라 애니메이션을 **안쪽 래퍼**에 건다(styling.md).
   ⚠ `MATCH_PICKS`·`MATCH_PICK_LABEL`·`Team`·`PredictionAccuracy`·`LineupPlayer`·`PlayerMarks`·`StatRow`·`playerPhotoUrl`은 **배럴에 없다** — 슬라이스 밖 소비자가 0이라 올리지 않았다(`entities/survey`가 `SurveyOption`·`SplitCount`를 뺀 것과 같은 이유). `check:conventions`는 상대 경로 소비를 현역으로 세어 **이 유형을 잡지 못하므로** 손으로 지킨다.
 - ⚠ **`Team.name`은 한국어다**(DB에 그렇게 저장된다 — 사유는 `api-and-db.md`). 화면에서 옮기지 말 것. ⚠ `name`(정식)과 `shortName`(약칭)의 쓰임이 다르다 — **상세 제목만 정식명이고 목록 카드와 예측 버튼은 약칭**이다. 좁은 폭에 좌우로 두 팀을 놓는 자리에서 정식명은 잘리는데 **잘린 팀 이름은 고를 수가 없다.** 상세가 정식명을 감당하는 것은 엠블럼을 이름 **위**에 얹어 가로 폭을 이름에 전부 내주기 때문이다. 표기 추가는 `scripts/team-names-ko.json`.
-- **`TeamCrest`** — 구단 엠블럼 + 폴백. **엠블럼은 DB에 없다** — `public/crests/{team.code}.png`를 `team.code`에서 유도한다(사유는 `api-and-db.md`). ⚠ **직접 `<img>`로 그리지 말 것** — 폴백이 두 갈래인데 둘 다 필요하다: 팀 코드가 비었을 때와, **파일이 없어 404일 때**(승격팀이 생기면 반드시 겪는다). ⚠ `onError`만으로는 부족하다 — SSR HTML의 `<img>`는 **하이드레이션 전에** 실패할 수 있고 그러면 이벤트가 지나가 버린다(마운트 시 `complete && naturalWidth === 0`을 함께 확인하는 이유). ⚠ `Avatar`로 대신하지 말 것 — `rounded-full` + `object-cover`라 방패 모양 엠블럼의 모서리가 잘린다. ⚠ 자산을 새로 뽑을 때는 `scripts/fetch-team-crests.mjs`를 쓴다 — 크기·포맷·품질의 근거가 거기 있고, 손으로 만든 파일은 그 판단과 갈린다.
+- **`TeamCrest`** — 구단 엠블럼 + 폴백. **엠블럼은 DB에 없다** — `public/crests/{team.code}.png`를 `team.code`에서 유도한다(사유는 `api-and-db.md`). ⚠ **메커니즘 자체는 `@/shared/ui`의 `Crest`가 갖는다**(이미지 + 하이드레이션 전 실패 감지 + 모노그램 폴백) — `entities/transfer`의 `TransferCrest`도 같은 메커니즘을 쓰는데 entities끼리 import할 수 없어 `shared`로 승격했다(`avatarUrl`과 같은 사정). `TeamCrest`에 남은 것은 `team.code`로 경로를 조립하는 **도메인 지식뿐**이다 — 호출부·렌더 결과는 그대로다. ⚠ **직접 `<img>`로 그리지 말 것** — 폴백이 두 갈래인데 둘 다 필요하다: 팀 코드가 비었을 때와, **파일이 없어 404일 때**(승격팀이 생기면 반드시 겪는다). ⚠ `onError`만으로는 부족하다 — SSR HTML의 `<img>`는 **하이드레이션 전에** 실패할 수 있고 그러면 이벤트가 지나가 버린다(마운트 시 `complete && naturalWidth === 0`을 함께 확인하는 이유). ⚠ `Avatar`로 대신하지 말 것 — `rounded-full` + `object-cover`라 방패 모양 엠블럼의 모서리가 잘린다. ⚠ 자산을 새로 뽑을 때는 `scripts/fetch-team-crests.mjs`를 쓴다 — 크기·포맷·품질의 근거가 거기 있고, 손으로 만든 파일은 그 판단과 갈린다.
 - **`PlayerPhoto`** — 선수 얼굴 + 폴백. 주소를 `player.external_id`에서 유도한다(`lib/player-photo` — 컬럼을 두지 않는 것은 `TeamCrest`와 같은 판단이다). ⚠ **`TeamCrest`와 갈리는 지점이 둘이다.** ① `next/image`를 쓴다 — 엠블럼은 우리가 이미 128px로 줄여 커밋한 자산이라 파이프라인이 줄 이득이 없지만, 사진은 제공자 원본(150px·평균 28KB)이 그대로 와서 한 경기 40장이 **1.07MB**였다. 그 CDN은 리사이즈 파라미터를 **전부 403으로 거부**하고 포맷 협상도 하지 않아(실측) 우리가 줄이는 수밖에 없다(`next.config.ts`의 `remotePatterns`에 호스트를 등재해야 동작한다). ② 폴백이 **실루엣**이다 — 호출부가 등번호를 이미 따로 그리므로 폴백에도 번호를 넣으면 두 번 찍힌다. ⚠ `onError`만으로 부족한 것은 `TeamCrest`와 같다(하이드레이션 전 실패 — `next/image`도 `forwardRef`로 ref를 넘겨 주어 같은 판정이 선다). ⚠ **권리 확인이 남아 있고, 그 통제는 플래그가 진다** — `env.showPlayerPhotos`(`NEXT_PUBLIC_SHOW_PLAYER_PHOTOS`)가 **기본 꺼짐**이라 값이 없는 환경은 자동으로 실루엣으로 그린다. 판정은 `playerPhotoUrl`이 단독으로 갖는다(호출부가 각자 기억하는 방어는 방어가 아니다) — 새 호출부를 만들 때 플래그를 다시 볼 필요가 없다는 뜻이다. 제공자가 이 자산의 권리자가 아니라는 사실과 켤 때의 판단은 `api-and-db.md`.
 - **`buildPlayerMarks(events)`** — 사건 → 선수별 표시(득점·자책골·카드·교체). ⚠ **`kind === "goal"`이 곧 득점이 아니다** — 실축 페널티가 같은 타입으로 오고 **VAR로 취소된 페널티에는 선수 없는 골 이벤트가 딸려 온다**(실측). ⚠ 카드는 **단조 승격만** 한다 — `else if`로 두면 `Red` 뒤에 온 `Yellow`가 퇴장을 경고로 **강등시킨다**. ⚠ `detail`이 null이어도 카드는 남긴다(동기화가 실제로 null을 쓴다) — "카드가 있었다"가 "무슨 카드였나"보다 먼저다.
 - **`buildStatRows(stats)` / `barPercent`** — 스탯 표 조립. ⚠ **호출부가 이 함수로 "그릴 게 있는가"를 판정한다** — 원본 행 수로 세면 표시 목록에 없는 키만 저장된 경기에서 표는 비고 출처 문구만 남는다. ⚠ `barPercent`는 **음수를 0으로 접는다** — `width: "-50%"`를 CSS가 거부해 `auto`가 되고 블록이라 막대가 **가득 찬다**(제공자의 `goals_prevented`는 실제로 음수가 된다).
@@ -222,6 +222,34 @@
 - ⚠ **비로그인에게도 선택지를 연결한다** — 눌러야 로그인 안내가 뜬다. 안내(`SignInDialog`)는 **뷰가 소유한다**(`onSignInRequired`로 올린다).
 - ⚠ **집계 캐시를 건드리지 않는다 — 투표·입축구와 갈리는 지점이다.** 저쪽은 참여하는 순간 결과가 열려 낙관적으로 막대를 밀어야 하지만, 여기는 **마감 시점과 공개 시점이 같은 킥오프**라 예측할 수 있는 동안 분포가 반드시 닫혀 있다 — 밀 막대가 애초에 없다. 같은 이유로 적중률 캐시도 건드리지 않는다(채점은 킥오프 뒤다).
 - ⚠ RPC도 upsert도 쓰지 않는다 — 사유는 `cast-poll-vote`와 같다(upsert는 `match_id` UPDATE 권한을 요구해 "취소 불가"를 뚫는다).
+
+## `@/entities/transfer`
+- `useTransferDealListQuery(userId, scopeStartIso, enabled, initialData)` / `useTransferDealQuery(dealId, userId, enabled, initialData)` / `useTransferReportsQuery(dealId, enabled, initialData)` — 보드 목록(범위 안 전부) · 딜 단건 · 상세 보도 타임라인.
+  ⚠ **목록·상세는 `userId`로 스코프된다**(관심 임베딩이 "내 행만"이라 응답 자체가 "나"에 종속된다 — `matchKeys`·`surveyKeys`와 같은 이유). **타임라인은 스코프되지 않는다**("나"에 종속된 값이 없다).
+  ⚠ **리그·정렬은 쿼리 키에 넣지 않는다** — 서버가 범위 안 딜 **전체**(≤`TRANSFER_DEAL_LIMIT`)를 내리고 뷰(`sortDeals`·`groupDeals`·`dealInLeague`)가 같은 데이터로 계산한다. 필터를 키에 넣으면 `initialData`가 캐시에 닿지 못하는 사고가 난다(`nextjs.md`의 실측 사고와 같은 함정).
+- `transferKeys` — 쿼리 키. `list`는 `userId`·`scopeStartIso`(범위 시작 ISO, **분 단위로 내린 값**)를 함께 받는다.
+- `TRANSFER_DEAL_LIMIT` — 목록 상한(`api/mappers.ts` — SSR과 공유해야 해서 `"use client"`가 아닌 파일에 있다. `POST_LIST_LIMIT`과 같은 자리).
+- **`pickRecentRumors(deals, nowMs)`** — "최근 3일 소식" 캐러셀 대상(믿을 만한 출처 · 3일 이내). 믿을 만한 출처는 🎖️ 매체와 🌕·🌖 기자다(`isTopCredibility` — 화면 뱃지와 같은 등급이라 표시와 채택 기준이 갈리지 않는다). ⚠ **최신 보도의 출처로 판정한다** — 목록 select의 최신 보도 임베딩(`limit 1`)만 보므로, 최신 보도의 등급이 낮으면 그 앞의 믿을 만한 보도가 있어도 그 딜은 빠진다(딜마다 보도 전체를 싣는 비용을 들이지 않기로 한 트레이드오프). 결렬 딜도 포함한다. ⚠ `nowMs`를 인자로 받는다(`isHotPost`와 같은 이유) — 서버 시각이 있으면 그 값을 넘긴다.
+- **`FeeValue`** — 이적료 칸의 값. 금액이면 `€95M`(mono), 자유계약이 **확인된** 딜이면 `FA(자유 계약)`, 아니면 `미공개`(흐리게). ⚠ **빈 이적료를 FA로 추정하지 않는다** — 판정은 `feeLabel`이 단독으로 갖고 근거는 파생기의 `is_free_agent`다(`api-and-db.md`). 이적료 칸을 새로 그릴 때 `formatFee(...) ?? "—"`를 직접 짜지 말 것.
+- **`formatFee({amount, currency})`** — 이적료 표기(`€95M`). **`formatFeeRange(deal)`**은 그 딜의 보도 이적료 최소–최대(`€58–95M`, 같으면 한 값). ⚠ handoff의 `min(prev,fee)–(fee+add)` 공식을 쓰지 않는다 — 하락 딜에서 `€58–58M`로 퇴화한다. **`feeDelta(deal)`**은 직전 보도 대비 변동폭(`{direction, text}` | `null`) — 통화 변환은 하지 않는다(파생기가 `prevFeeAmount`에 같은 통화 값만 넣는다).
+- **`reporterName(report)`** — 보도 주체의 한국어 표기(기자는 전체 이름 "벤 제이콥스", 매체는 매체명 "BBC"). 캐러셀·목록·타임라인이 **이것 하나**를 쓴다 — 소스 등록용 영어 라벨을 화면에 따로 그리면 같은 기자가 화면마다 "Fabrizio Romano"·"파브리지오 로마노"로 갈린다. ⚠ **단일 소스는 `scripts/lib/transfer/reporters.json`**이다(이적설 글 조립 `compose.mjs`와 같은 파일을 읽는다 — 갈리면 같은 보도가 글에서는 "파브리지오 로마노", 화면에서는 "fabrizioromano"가 된다). 우선순위는 `bylines → sources → journalists → attributed_to 원문 → source_id`로 compose와 같아야 한다.
+- **`TRANSFER_LEAGUES`** — 리그 시트의 노출 순서(5대 리그). `TransferLeague` 유니온과 `as const satisfies` + 망라성 가드로 서로 대조한다(`POST_CATEGORIES`와 같은 형태) — DB `transfer_club.league`가 enum이 아니라 `text + check`라 생성 타입에서 못 뽑아 손으로 적었기 때문이다.
+- **`dealInLeague(deal, league)` / `parseTransferLeague(value)` / `parseTransferSort(value)`** — 리그 필터(출발 **또는** 도착 일치, `null`은 전체) · URL `?league=`·`?sort=` 해석. ⚠ **모르는 리그는 `null`(전체로 폴백), 모르는 정렬은 `latest`로 폴백** — 파라미터 오염이 404를 양산하면 안 된다(`nextjs.md`의 정렬·말머리 갈림과 같은 판단, 리그는 path가 아니라 query라 애초에 색인 착지점이 아니다).
+- **`groupDeals(deals)` / `sortDeals(deals, sort)`** — 정렬 → 구간 분류. `sortDeals`가 **먼저**다(안정 정렬 — 같은 값끼리는 서버가 준 순서를 유지한다). `groupDeals`는 **빈 구간을 뺀다**(구간 점프 칩은 `GROUP_ORDER`·`GROUP_LABEL`을 직접 돌아 빈 구간도 0건으로 그린다).
+- `GROUP_LABEL` / `GROUP_ORDER` — 보드 구간(오피셜·합의 완료·진행 중·루머·결렬)의 라벨·고정 순서.
+- **`CredibilityBadge`** — 출처 공신력: 🎖️(오피셜에 육박하는 매체에만) 또는 🌑~🌕(그 밖의 매체와 기자 — 5단계). 등급의 단일 소스는 `scripts/lib/transfer/reporters.json`의 `credibility`다 — 매체는 **소스 id**로(같은 "BBC" 표기를 BBC Sport와 BBC 이적 가십이 함께 쓴다), 기자는 보도 주체 표기로 매긴다. 등재되지 않은 출처는 그리지 않는다. ⚠ 🎖은 **U+FE0F를 붙여야** Windows에서 컬러로 그려진다(기본 표시가 글자다). ⚠ 이모지는 `aria-hidden`이고 뜻은 `sr-only` 글자가 진다 — 스크린리더는 이모지를 모양 이름("보름달")으로 읽는다. DB의 `tier`(1·2)는 수집기의 귀속 판정용이라 화면에 쓰지 않는다.
+- `DealRow` / `DealMiniCard` / `RumorCard` / `StatusBadge` / `FeeDelta` / `TransferCrest` — 목록 행 · 미니 카드 · 캐러셀 카드 · 상태 뱃지 · 변동폭 · 구단 엠블럼(`Crest`의 얇은 래퍼, `TeamCrest`와 같은 형태).
+- ⚠ **한국어로는 "이적시장"·"딜"로 부른다.** URL(`/transfers`)·테이블(`transfer_deal`)·식별자(`transfer`)는 그대로 두고 화면·주석의 한국어만 통일한다(입축구·승부예측과 같은 규약).
+- ⚠ **`TransferClub`·`STAGE_GROUP`·`STAGE_STATUS`·`STATUS_LABEL`·`isDeadStage`·`ClubRoute`·`WatchMark`는 배럴에 없다** — 슬라이스 밖 소비자가 0이라 올리지 않았다(`entities/match`가 `Team`·`playerPhotoUrl`을 뺀 것과 같은 이유). `check:conventions`는 상대 경로 소비를 현역으로 세어 이 유형을 잡지 못하므로 손으로 지킨다.
+- 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/keys`·`api/list-query`·`lib/league`·`lib/stage`를 직접 import.
+
+## `@/features/watch-transfer`
+- `WatchToggle({ dealId, watched, variant, onSignInRequired })` — 상세 하단의 관심 토글 하나(`block` 변형). 조회는 `@/entities/transfer`다(`cast-survey-vote`와 같은 분업).
+- ⚠ **훅(`useToggleTransferWatch`)은 배럴에 없다** — 토글은 상세 하나뿐이라 슬라이스 밖 호출부가 0이다(목록 행의 관심 표시는 표시일 뿐 토글이 아니다 — `WatchMark`는 `entities/transfer` 내부에서만 쓰인다).
+- ⚠ 세션 `status`를 **3분기**한다(`loading`을 비로그인과 같이 다루면 콜드 로드 직후 로그인 사용자가 안내를 본다).
+- ⚠ **비로그인에게도 버튼을 그대로 연결한다** — 눌러야 로그인 안내가 뜬다. 안내는 **뷰가 소유한다**(`onSignInRequired` 콜백).
+- ⚠ **가드가 없다** — 낙관적 업데이트의 목적이 즉시 반응이고(좋아요와 같은 판단), 연타해도 행은 복합 PK 하나뿐이다. `disabled`도 두지 않는다.
+- ⚠ RPC가 없다 — 카운터가 없어 지킬 불변조건이 `(user_id, deal_id)` 기본키 하나뿐이다(`block-user`와 같은 형태).
 
 ## `@/entities/notice`
 - `useNoticeListQuery(initialData)` / `useNoticeQuery(id, initialData)` / `useBannerNoticeQuery(initialData)` / `useAdminNoticeListQuery(deleted)` / `useAdminNoticeQuery(id)` / `noticeKeys` / `Notice` · `NoticeListItem` · `NoticeType` / `NOTICE_TYPES` / `noticeVisibility(notice, nowMs)`.
@@ -275,6 +303,8 @@
 - `ROUTES` — 경로 헬퍼. **경로 문자열 하드코딩 금지**(`"/posts"` ❌ → `ROUTES.postList`).
   ⚠ 랭킹은 **`ROUTES.matchRanking`**(`/matches/ranking`)이다 — 정적 세그먼트라 `/matches/[id]`보다 먼저 맞는다. 진입점은 경기 목록 머리의 적중률 줄이다(비로그인에게도 그려진다 — 크롤러가 이 앵커로 랭킹을 발견한다).
   ⚠ 승부예측은 `/predictions`가 아니라 **`/matches`** 다 — 나중에 선수 평점·매치 스레드가 붙으면 전부 경기를 부모로 삼는데, 그때 `/predictions/[id]`는 거짓말이 된다. 탭 라벨은 "승부예측"이고 **표시 문구와 경로는 다른 계약**이다.
+  ⚠ 이적시장은 **`ROUTES.transferList`**(`/transfers`) · `ROUTES.transfer(id)`(`/transfers/[id]`)다. 상세에는 탭바가 없다 — `activeTabHref`가 목록 경로만 센다(`postCategory`와 같은 판단).
+- **`openTransferWindow(nowMs)` / `trackedTransferWindow(nowMs)` / `boardScopeStartMs(nowMs)`**(`transfer-window.ts`) — 이적 창 일정. 창의 기간은 리그별 일정을 합친 것이다(개장 = 가장 먼저 여는 리그, 마감 = 가장 늦게 닫는 리그). `openTransferWindow`는 **지금 열려 있는 창**(없으면 `null`) — 헤더의 "마감까지" 카운트다운은 이 값이 있을 때만 그리고 마감에 닿으면 스스로 사라진다. `trackedTransferWindow`는 보드가 추적하는 창(개장한 가장 최근 창 — 창 사이에는 방금 닫힌 창)으로 헤더의 창 이름이 쓰고, `boardScopeStartMs`는 그 창의 개장 시각(보드에 실을 딜의 하한)이다. ⚠ **단일 소스는 `scripts/lib/transfer/windows.json`**이다 — 딜 파생 스크립트(Node)가 이 TS를 import할 수 없어 JSON이 원본이고, 이 파일은 그 JSON을 그대로 읽는다. **시즌마다 사람이 갱신한다** — 엠블럼(`public/crests`)·`team-names-ko.json`과 같은 운영 모델이라 런타임에 늘지 않는다.
 - **`isTabBarRoute(pathname)` / `activeTabHref(pathname)`** — 하단 탭바를 그리는 화면인지와 그때 활성인 탭. **정확 일치 배열로 되돌리지 말 것** — 말머리 목록(`/posts/category/…`)이 생기면서 값이 유한하지 않게 됐고, 빠뜨리면 그 화면에서 **탭바가 사라지고 토스트가 탭바 자리로 내려간다.** 탭바(`widgets`)와 토스트(`shared/ui`)가 이 둘만 본다.
 - `signInWithNext(pathname)` / `withNext(path, next)` — 복귀 경로를 붙인 URL. 이 형태를 만드는 곳이 가드·`SignInDialog`·`AuthStatus`로 여럿이라 여기로 모았다. ⚠ 액션 컨트롤에서 이걸로 **직접 이동하지 않는다** — `SignInDialog`가 안내를 끼고 그 안에서 부른다(예외는 라벨이 "로그인"인 컨트롤).
 - **`safeNextPath(next, origin)`** — `?next=` 값을 앱 내부 경로로만 통과시킨다. **직접 문자열 검사를 짜지 말 것** — `startsWith("/") && !startsWith("//")`로는 `/\evil.com`도 `/..//evil.com`도 못 막는다(둘 다 실제로 뚫렸다).
@@ -294,7 +324,7 @@
 ## `@/shared/ui`
 **현역(게시판 v2가 실제로 쓰는 것)** — 새로 만들기 전 여기부터 확인:
 `Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·`Markdown`·
-`Chip`·`chipClassName`·`ActionChip`·`actionChipClassName`·`Dialog`·`SignInDialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`·`RatioBar`·`StaleBanner`·`LiveDot`·`CountUp`·`DrawnCheck`·`JsonLd`
+`Chip`·`chipClassName`·`ActionChip`·`actionChipClassName`·`Dialog`·`SignInDialog`·`Sheet`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`·`RatioBar`·`StaleBanner`·`LiveDot`·`CountUp`·`DrawnCheck`·`JsonLd`·`Crest`
 
 **현재 미사용** — **"검증된 현역"으로 오인하지 말 것**:
 `TabHeader`·`Flag`·`Shirt`·`SectionHead`·`LiveStatusPill`·`NightCard`·`PlayerSilhouette`
@@ -310,6 +340,7 @@
     ⚠ 판정은 **제목 문자열로만** 한다 — 주소 형태(`/crests/…`)로 가르면 이 범용 렌더러가 우리 자산의 경로 규약을 알게 된다.
     ⚠ 바로 옆에 이름이 있으면 대체 텍스트를 비운다(스크린리더가 두 번 읽는다).
 - **`JsonLd`** — 구조화 데이터 `<script type="application/ld+json">`. `"use client"` **없음** — 서버 page가 렌더한다. 직렬화만 하고(`<` 이스케이프 포함) 모양은 뷰 슬라이스의 `lib/json-ld.ts`가 조립한다(`nextjs.md`의 구조화 데이터 절). 서버에서는 `@/shared/ui/json-ld` 직접 경로. ⚠ `next/script`로 바꾸지 말 것 — 데이터지 코드가 아니다.
+- **`Crest`** — 엠블럼류 이미지 + 하이드레이션 전 실패 감지 + 모노그램 폴백의 **공통 메커니즘**. `entities/match`의 `TeamCrest`와 `entities/transfer`의 `TransferCrest`가 이걸 감싼다(도메인 지식은 호출부가 `src`·`label`로 넘긴다). entities끼리 import할 수 없어 여기로 승격했다(`avatarUrl`과 같은 사정 — `code-quality.md`의 공용화 판단 선례). `"use client"` — 실패 감지가 `useEffect` + `onError`를 함께 쓴다. `next/image`가 아니라 `<img>`다(`avatar.tsx`·`markdown.tsx`와 같은 판단 — 자산이 이미 목표 크기라 최적화 파이프라인이 줄 이득이 없다).
 - **`CountUp`** — 굴러가며 도착하는 숫자(퍼센트·참여자 수·적중률). 등장 모션 판정(`useEntranceMotion`)을 **안에서** 하므로 하이드레이션 값은 즉시 최종값이고 클라이언트에서 늦게 마운트된 값만 0에서 올라온다. `format`은 **정수**를 받는다(`formatCount` 등 — 보간 중의 실수는 안에서 반올림한다). ⚠ `tabular-nums`는 호출부가 준다.
 - **`DrawnCheck`** — 획이 그려지는 체크("내가 고른 것"). ⚠ `animate`의 판정은 **호출부**가 한다 — "방금 골랐다"는 `aria-pressed`를 바꾸는 쪽만 알고, 이미 고른 채로 이동해 온 화면에서 다시 그려지면 거짓 신호다(`useState(mine)`으로 마운트 시점 값을 고정해 비교하는 것이 선례 — `split-card`·`prediction-block`). `"use client"` 없음.
 - **`RatioBar`** — 비율 막대. `enterDelayMs`를 주면 마운트 순간 0에서 자란다(순차 리빌은 호출부가 `i * 60`으로). 등장 판정을 안에서 하는 `"use client"` 컴포넌트다 — 판정을 호출부에 맡기면 부모의 마운트 시점이 기준이 되어 첫 투표의 리빌이 빠진다.
@@ -337,6 +368,7 @@
 - `BottomTabBar` — 하단 탭바. **`backdrop-blur`가 허용된 유일한 요소**다(`styling.md`).
   - ⚠ **로그인해야 열리는 탭을 추가하면 `signInAction` 문구를 함께 적는다.** 그 값이 있는 탭만 비로그인의 이동을 가로채 `SignInDialog`를 띄운다 — 앵커는 그대로 두고 `preventDefault`만 한다. 빠뜨리면 그 탭은 안내 없이 이동했다가 `AuthRequired`에 막혀 로그인 화면으로 떨궈진다.
   - ⚠ 그 다이얼로그는 `<nav>`의 **형제**여야 한다. 탭바가 `absolute`라 자기 안의 `Dialog`에게 컨테이닝 블록이 되어, 안에 두면 알약 한가운데에 뜬다.
+  - 탭 목록은 커뮤니티·입축구·승부예측·**이적시장**·프로필 순이다(`ROUTES.transferList`, 아이콘 `ArrowLeftRight`). 보드에 로그인이 필요한 액션이 없어(관심 토글은 상세에만) `signInAction`을 붙이지 않는다.
 - `SubHeader` — 상세·작성·수정 화면 상단(뒤로가기 + 공유).
 - `TabScrollArea` — 목록 스크롤 영역(`<main>` 제공 + 스크롤 복원).
 - `AuthShell` — 인증 화면의 공통 껍데기.
