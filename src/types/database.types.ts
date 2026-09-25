@@ -801,6 +801,189 @@ export type Database = {
         }
         Relationships: []
       }
+      transfer_club: {
+        Row: {
+          canonical: string
+          code: string
+          league: string | null
+          name: string
+          short_name: string
+          updated_at: string
+        }
+        Insert: {
+          canonical: string
+          code: string
+          league?: string | null
+          name: string
+          short_name: string
+          updated_at?: string
+        }
+        Update: {
+          canonical?: string
+          code?: string
+          league?: string | null
+          name?: string
+          short_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      transfer_deal: {
+        Row: {
+          add_on_amount: number | null
+          birth_year: number | null
+          contract_text: string | null
+          deal_key: string
+          fee_amount: number | null
+          fee_currency: string | null
+          fee_high_amount: number | null
+          fee_low_amount: number | null
+          fee_text: string | null
+          first_reported_at: string
+          from_club_code: string | null
+          id: number
+          is_free_agent: boolean
+          latest_reported_at: string
+          nationality: string | null
+          player: string
+          player_ko: string | null
+          position: string | null
+          prev_fee_amount: number | null
+          report_count: number
+          stage: Database["public"]["Enums"]["transfer_stage"]
+          to_club_code: string | null
+          updated_at: string
+          wage_text: string | null
+        }
+        Insert: {
+          add_on_amount?: number | null
+          birth_year?: number | null
+          contract_text?: string | null
+          deal_key: string
+          fee_amount?: number | null
+          fee_currency?: string | null
+          fee_high_amount?: number | null
+          fee_low_amount?: number | null
+          fee_text?: string | null
+          first_reported_at: string
+          from_club_code?: string | null
+          id?: never
+          is_free_agent?: boolean
+          latest_reported_at: string
+          nationality?: string | null
+          player: string
+          player_ko?: string | null
+          position?: string | null
+          prev_fee_amount?: number | null
+          report_count: number
+          stage: Database["public"]["Enums"]["transfer_stage"]
+          to_club_code?: string | null
+          updated_at?: string
+          wage_text?: string | null
+        }
+        Update: {
+          add_on_amount?: number | null
+          birth_year?: number | null
+          contract_text?: string | null
+          deal_key?: string
+          fee_amount?: number | null
+          fee_currency?: string | null
+          fee_high_amount?: number | null
+          fee_low_amount?: number | null
+          fee_text?: string | null
+          first_reported_at?: string
+          from_club_code?: string | null
+          id?: never
+          is_free_agent?: boolean
+          latest_reported_at?: string
+          nationality?: string | null
+          player?: string
+          player_ko?: string | null
+          position?: string | null
+          prev_fee_amount?: number | null
+          report_count?: number
+          stage?: Database["public"]["Enums"]["transfer_stage"]
+          to_club_code?: string | null
+          updated_at?: string
+          wage_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transfer_deal_from_club_code_fkey"
+            columns: ["from_club_code"]
+            isOneToOne: false
+            referencedRelation: "transfer_club"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "transfer_deal_to_club_code_fkey"
+            columns: ["to_club_code"]
+            isOneToOne: false
+            referencedRelation: "transfer_club"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      transfer_deal_watch: {
+        Row: {
+          created_at: string
+          deal_id: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deal_id: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          deal_id?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transfer_deal_watch_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "transfer_deal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfer_deal_watch_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transfer_name_ko: {
+        Row: {
+          checked_at: string
+          key: string
+          kind: string
+          name_en: string
+          name_ko: string | null
+          wikidata_id: string | null
+        }
+        Insert: {
+          checked_at?: string
+          key: string
+          kind: string
+          name_en: string
+          name_ko?: string | null
+          wikidata_id?: string | null
+        }
+        Update: {
+          checked_at?: string
+          key?: string
+          kind?: string
+          name_en?: string
+          name_ko?: string | null
+          wikidata_id?: string | null
+        }
+        Relationships: []
+      }
       transfer_news: {
         Row: {
           attributed_to: string | null
@@ -810,6 +993,7 @@ export type Database = {
           body_excerpt: string | null
           clubs: string[]
           cluster_key: string | null
+          deal_id: number | null
           external_id: string
           fee_amount: number | null
           fee_currency: string | null
@@ -822,6 +1006,8 @@ export type Database = {
           relevance: number
           source_id: string
           stage: Database["public"]["Enums"]["transfer_stage"]
+          summarized_at: string | null
+          summary_ko: string | null
           tier: number
           url: string | null
         }
@@ -833,6 +1019,7 @@ export type Database = {
           body_excerpt?: string | null
           clubs?: string[]
           cluster_key?: string | null
+          deal_id?: number | null
           external_id: string
           fee_amount?: number | null
           fee_currency?: string | null
@@ -845,6 +1032,8 @@ export type Database = {
           relevance: number
           source_id: string
           stage: Database["public"]["Enums"]["transfer_stage"]
+          summarized_at?: string | null
+          summary_ko?: string | null
           tier: number
           url?: string | null
         }
@@ -856,6 +1045,7 @@ export type Database = {
           body_excerpt?: string | null
           clubs?: string[]
           cluster_key?: string | null
+          deal_id?: number | null
           external_id?: string
           fee_amount?: number | null
           fee_currency?: string | null
@@ -868,10 +1058,20 @@ export type Database = {
           relevance?: number
           source_id?: string
           stage?: Database["public"]["Enums"]["transfer_stage"]
+          summarized_at?: string | null
+          summary_ko?: string | null
           tier?: number
           url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "transfer_news_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "transfer_deal"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_block: {
         Row: {

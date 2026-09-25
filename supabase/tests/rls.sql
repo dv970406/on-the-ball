@@ -416,7 +416,7 @@ reset role;
 \echo '   ⚠ DELETE는 컬럼 단위 권한이 아니라 has_any_column_privilege가 거부한다'
 \echo '     (unrecognized privilege type) → 그쪽만 has_table_privilege로 본다.'
 \echo '   ⚠ authenticated의 INSERT/UPDATE는 여기서 세지 않는다 — 정상 기능이 그걸로 돈다.'
-\echo '     대신 **DELETE와 TRUNCATE**를 본다(comment·user_block만 정당한 DELETE 대상이다).'
+\echo '     대신 **DELETE와 TRUNCATE**를 본다(comment·user_block·transfer_deal_watch만 정당한 DELETE 대상이다).'
 \echo '[0행 기대] RLS가 꺼졌거나 anon에 쓰기 권한이 남은 테이블'
 select c.relname,
        c.relrowsecurity                                          as rls_on,
@@ -435,10 +435,10 @@ select c.relname,
         or has_table_privilege('anon', c.oid, 'DELETE')
         or has_table_privilege('anon', c.oid, 'TRUNCATE')
         or has_table_privilege('authenticated', c.oid, 'TRUNCATE')
-        -- comment만 정당하다(자기 댓글 삭제). user_block은 DELETE 정책이 있지만
-        -- grant도 테이블 단위라 여기 걸리므로 함께 예외로 둔다.
+        -- comment만 정당하다(자기 댓글 삭제). user_block·transfer_deal_watch는 DELETE 정책이
+        -- 있지만 grant도 테이블 단위라 여기 걸리므로 함께 예외로 둔다.
         or (has_table_privilege('authenticated', c.oid, 'DELETE')
-            and c.relname not in ('comment', 'user_block')));
+            and c.relname not in ('comment', 'user_block', 'transfer_deal_watch')));
 
 \echo '-- 17b. RLS는 켜졌는데 정책이 하나도 없는 테이블 (전면 차단이 의도인지 확인 필요)'
 \echo '[0행 기대] 정책이 없는 RLS 테이블'
@@ -3636,6 +3636,514 @@ select not exists (select 1 from public.transfer_news where id = :tn1);
 rollback to s;
 
 rollback to s35;
+
+\echo ''
+\echo '=== 36. 이적시장 — 파생 딜 · 구단 · 관심 (20260925000001) ==='
+\echo '  설계 요약: 딜(transfer_deal)·구단(transfer_club)은 transfer_news에서 파생한 운영 데이터라'
+\echo '  유일한 writer가 service_role 파생 스크립트이고 앱에는 쓰기 경로가 없다(team·match와 같은 취급).'
+\echo '  사용자가 쓰는 것은 관심(transfer_deal_watch)의 자기 행뿐이다(post_like·user_block과 같은 형태).'
+\echo '  ⚠ 시드는 테스트 전용 값이다 — 구단 code는 rlstest-*, deal_key는 sha1(''rlstest-player-*'')의'
+\echo '    앞 16자리를 미리 적어 둔 것(형식 CHECK 때문에 임의 문자열을 쓸 수 없다), 소스 id는 rss:rlstest-b.'
+\echo '    파생기가 넣은 실제 행이 섞이면 개수 검사가 조용히 틀어진다(섹션 35·34와 같은 함정).'
+savepoint s36;
+
+insert into public.transfer_club (code, canonical, name, short_name, league)
+values ('rlstest-a', 'RLS Test A', '테스트 A', 'TSA', '프리미어리그'),
+       ('rlstest-b', 'RLS Test B', '테스트 B', 'TSB', null);
+
+-- ⚠ updated_at을 과거로 밀어 둔다 — now()가 트랜잭션 시작 시각이라, 기본값으로 시드하면
+--   "파생하면 updated_at이 움직인다"를 이 트랜잭션 안에서 증명할 수 없다(섹션 2와 같은 사유).
+insert into public.transfer_deal
+  (deal_key, player, from_club_code, to_club_code, stage,
+   fee_text, fee_amount, fee_currency, prev_fee_amount, fee_low_amount, fee_high_amount, add_on_amount,
+   first_reported_at, latest_reported_at, report_count, updated_at)
+values ('29cbd7bb142420b0', 'Rlstest Player A', 'rlstest-a', 'rlstest-b', 'talks',
+        '€50m', 50, 'EUR', 45, 45, 50, 5,
+        now() - interval '3 days', now() - interval '1 hour', 2, now() - interval '1 hour')
+returning id as td1 \gset
+
+-- 구단도 이적료도 못 읽은 루머 — 둘 다 null인 딜이 정상값이라는 것을 시드 자체가 증명한다
+insert into public.transfer_deal
+  (deal_key, player, stage, first_reported_at, latest_reported_at, report_count)
+values ('630f2338c2fe7f34', 'Rlstest Player B', 'rumour', now() - interval '1 day', now() - interval '1 day', 1)
+returning id as td2 \gset
+
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, tier, stage, relevance, deal_id)
+values ('rss:rlstest-b', 'x1', 'Rlstest Player A in talks with RLS Test B', now() - interval '1 hour', 'outlet', 1, 'talks', 0.8, :td1)
+returning id as tn36 \gset
+
+-- bob의 관심 — "내 행만 보인다"의 상대역 (superuser로 넣는다)
+insert into public.transfer_deal_watch (user_id, deal_id) values (:'bob', :td1);
+
+\echo ''
+\echo '-- 36a. 앱에는 쓰기 경로가 없다 (정책도 grant도 없다) --'
+
+savepoint s; :login_alice
+\echo '[❌차단] 딜을 직접 만든다'
+insert into public.transfer_deal (deal_key, player, stage, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Fake Deal', 'here_we_go', now(), now(), 1);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 단계 조작 — 협상을 HERE WE GO로 올린다'
+update public.transfer_deal set stage = 'here_we_go' where id = :td1;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 딜을 지운다'
+delete from public.transfer_deal where id = :td1;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 구단을 직접 만든다'
+insert into public.transfer_club (code, canonical, name, short_name) values ('rlstest-c', 'RLS Test C', '테스트 C', 'TSC');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 구단 표기를 고친다'
+update public.transfer_club set name = '가짜' where code = 'rlstest-a';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 구단을 지운다'
+delete from public.transfer_club where code = 'rlstest-b';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 보도가 속한 딜을 앱이 바꾼다 — deal_id는 파생기만 쓴다'
+update public.transfer_news set deal_id = :td2 where id = :tn36;
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[❌차단] 비로그인이 딜을 만든다'
+insert into public.transfer_deal (deal_key, player, stage, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Anon Deal', 'rumour', now(), now(), 1);
+rollback to s;
+
+\echo ''
+\echo '-- 36b. 읽기는 비로그인에게도 열린다 — 임베딩 경로까지 (크롤러가 보드를 색인한다) --'
+-- ⚠ :login_anon은 claims를 비우지 않는다(섹션 28 주석). 여기 검사는 role만으로 갈리지만
+--   "비로그인"을 말하는 검사라 claims까지 비워 진짜 비로그인으로 만든다.
+
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[2 / 2 기대] 비로그인이 딜과 구단을 읽는다'
+select (select count(*) from public.transfer_deal where deal_key in ('29cbd7bb142420b0', '630f2338c2fe7f34')) as deals,
+       (select count(*) from public.transfer_club where code like 'rlstest-%')                                  as clubs;
+rollback to s;
+
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[t 기대] 비로그인이 피드를 읽는다 — deal_id를 포함하되 body는 뺀 컬럼 나열(별표 select는 쓸 수 없다)'
+select deal_id = :td1
+  from (select id, source_id, external_id, url, provenance_url, author_handle, body_excerpt,
+               published_at, fetched_at, attribution, attributed_to, tier, stage, players, clubs,
+               fee_text, fee_amount, fee_currency, cluster_key, relevance, deal_id
+          from public.transfer_news where id = :tn36) n;
+rollback to s;
+
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[❌차단] 원문 전문(body)은 deal_id가 생긴 뒤에도 공개 키로 읽을 수 없다'
+select body from public.transfer_news where id = :tn36;
+rollback to s;
+
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[t 기대] 딜 ⟵ 보도 임베딩(transfer_news!deal_id)이 42501 없이 돈다 — 상세의 보도 타임라인'
+select count(n.id) = 1
+  from public.transfer_deal d
+  left join public.transfer_news n on n.deal_id = d.id
+ where d.id = :td1;
+rollback to s;
+
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '    ⚠ grant가 있어야 임베딩이 돌고, 정책(to authenticated)이 행을 막는다 — bob이 담았어도'
+\echo '      비로그인에게는 빈 배열(= isWatched false)이다. 이 조회가 42501이면 보드가 통째로 죽는다.'
+\echo '[0 기대] 딜 ⟵ 관심 임베딩(transfer_deal_watch(user_id))이 비로그인에게 42501 없이 빈 배열로 돈다'
+select count(w.user_id)
+  from public.transfer_deal d
+  left join public.transfer_deal_watch w on w.deal_id = d.id
+ where d.id = :td1;
+rollback to s;
+
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[t 기대] 딜 → 출발·행선지 구단 임베딩(transfer_club!from_club_code · !to_club_code)'
+select f.short_name = 'TSA' and t.short_name = 'TSB'
+  from public.transfer_deal d
+  join public.transfer_club f on f.code = d.from_club_code
+  join public.transfer_club t on t.code = d.to_club_code
+ where d.id = :td1;
+rollback to s;
+
+\echo ''
+\echo '-- 36c. 스키마 불변식 (writer가 service_role이라 CHECK가 유일한 방어다) --'
+
+savepoint s;
+\echo '[❌차단] stage = unknown — 이적과 무관한 게시물은 딜이 될 수 없다'
+insert into public.transfer_deal (deal_key, player, stage, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Unknown Stage', 'unknown', now(), now(), 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 출발과 행선지가 같은 딜'
+insert into public.transfer_deal (deal_key, player, from_club_code, to_club_code, stage, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Same Club', 'rlstest-a', 'rlstest-a', 'talks', now(), now(), 1);
+rollback to s;
+
+savepoint s;
+insert into public.transfer_deal (deal_key, player, stage, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'No Clubs', 'rumour', now(), now(), 1);
+\echo '[t 기대] 구단을 하나도 못 읽은 딜은 정상이다 — from<>to CHECK가 둘 다 null을 거부하면 안 된다'
+select exists (select 1 from public.transfer_deal where deal_key = '61f61e3fdb8eed92' and from_club_code is null and to_club_code is null);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 한쪽만 읽힌 딜의 나머지가 모르는 구단 — FK'
+insert into public.transfer_deal (deal_key, player, to_club_code, stage, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Unknown Club', 'rlstest-nope', 'talks', now(), now(), 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] deal_key 형식 — 16자리 소문자 hex가 아니다'
+insert into public.transfer_deal (deal_key, player, stage, first_reported_at, latest_reported_at, report_count)
+values ('NOT-A-HASH', 'Bad Key', 'rumour', now(), now(), 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] deal_key 형식 — 대문자 hex'
+insert into public.transfer_deal (deal_key, player, stage, first_reported_at, latest_reported_at, report_count)
+values ('61F61E3FDB8EED92', 'Upper Key', 'rumour', now(), now(), 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] deal_key 중복 — 재파생의 멱등성이 이 제약에 기댄다(upsert on conflict (deal_key))'
+insert into public.transfer_deal (deal_key, player, stage, first_reported_at, latest_reported_at, report_count)
+values ('29cbd7bb142420b0', 'Duplicate', 'rumour', now(), now(), 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 이적료가 금액 없이 통화만 — 셋은 한 덩어리다'
+insert into public.transfer_deal (deal_key, player, stage, fee_currency, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Currency Only', 'offer', 'EUR', now(), now(), 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 이적료 없이 직전 보도 이적료만 — 기준값 없는 차이는 그릴 수 없다'
+insert into public.transfer_deal (deal_key, player, stage, prev_fee_amount, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Prev Only', 'offer', 40, now(), now(), 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 이적료 없이 옵션만'
+insert into public.transfer_deal (deal_key, player, stage, add_on_amount, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Add-on Only', 'offer', 5, now(), now(), 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 보도 범위의 한쪽만(low 없이 high) — 둘은 한 쌍이다'
+insert into public.transfer_deal (deal_key, player, stage, fee_text, fee_amount, fee_currency, fee_high_amount, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Half Range', 'offer', '€50m', 50, 'EUR', 60, now(), now(), 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 보도 범위가 뒤집혔다(low > high)'
+insert into public.transfer_deal (deal_key, player, stage, fee_text, fee_amount, fee_currency, fee_low_amount, fee_high_amount, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Inverted Range', 'offer', '€50m', 50, 'EUR', 60, 40, now(), now(), 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 단일 이적료로 불가능한 액수(350m 초과)'
+insert into public.transfer_deal (deal_key, player, stage, fee_text, fee_amount, fee_currency, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Club Sale', 'offer', '£449m', 449, 'GBP', now(), now(), 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 국적 형식 — ISO 3자리 대문자가 아니다'
+insert into public.transfer_deal (deal_key, player, nationality, stage, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Bad Nationality', 'br', 'rumour', now(), now(), 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 생년 범위 밖(1949)'
+insert into public.transfer_deal (deal_key, player, birth_year, stage, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Too Old', 1949, 'rumour', now(), now(), 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 보이지 않는 선수명(제로폭 공백만)'
+insert into public.transfer_deal (deal_key, player, stage, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', U&'\200B', 'rumour', now(), now(), 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 선수명 121자'
+insert into public.transfer_deal (deal_key, player, stage, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', repeat('a', 121), 'rumour', now(), now(), 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 계약 표기 21자'
+insert into public.transfer_deal (deal_key, player, contract_text, stage, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Long Contract', repeat('9', 21), 'rumour', now(), now(), 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 주급 표기 21자'
+insert into public.transfer_deal (deal_key, player, wage_text, stage, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Long Wage', repeat('9', 21), 'rumour', now(), now(), 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 보도 수 0 — 보도 없는 딜은 파생기가 지운다'
+insert into public.transfer_deal (deal_key, player, stage, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'No Reports', 'rumour', now(), now(), 0);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 첫 보도가 마지막 보도보다 나중'
+insert into public.transfer_deal (deal_key, player, stage, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Time Travel', 'rumour', now(), now() - interval '1 day', 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 구단 code 형식 — 소문자·숫자·하이픈만(엠블럼 파일명이다)'
+insert into public.transfer_club (code, canonical, name, short_name) values ('Rlstest_C', 'RLS Test C', '테스트 C', 'TSC');
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 구단 league 값 밖(5대 리그 이름이 아니다)'
+insert into public.transfer_club (code, canonical, name, short_name, league) values ('rlstest-c', 'RLS Test C', '테스트 C', 'TSC', '분데스');
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 구단 정규 영문명 중복 — 파생기가 canonical로 code를 찾는다'
+insert into public.transfer_club (code, canonical, name, short_name) values ('rlstest-c', 'RLS Test A', '테스트 C', 'TSC');
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 참조 중인 구단 삭제 — 딜의 출발·행선지가 조용히 비면 안 된다(FK, cascade 아님)'
+delete from public.transfer_club where code = 'rlstest-a';
+rollback to s;
+
+savepoint s;
+update public.transfer_deal set stage = 'offer' where id = :td1;
+\echo '[t 기대] 재파생으로 다시 쓰면 updated_at이 움직인다 — WHEN 절 없는 트리거'
+select updated_at > now() - interval '30 minutes' from public.transfer_deal where id = :td1;
+rollback to s;
+
+savepoint s;
+update public.transfer_news set deal_id = :td2 where id = :tn36;
+\echo '[t 기대] 파생기는 deal_id를 다시 쓸 수 있다 — 추출 컬럼이라 원문 고정 트리거에 걸리지 않는다'
+select deal_id = :td2 from public.transfer_news where id = :tn36;
+rollback to s;
+
+savepoint s;
+delete from public.transfer_deal where id = :td1;
+\echo '[t 기대] 딜을 지우면 보도의 deal_id는 null로 돌아가고 보도는 남는다 (on delete set null)'
+select exists (select 1 from public.transfer_news where id = :tn36 and deal_id is null);
+rollback to s;
+
+\echo ''
+\echo '-- 36d. 관심 — 자기 행만 (post_like·user_block과 같은 형태) --'
+
+savepoint s; :login_alice
+\echo '[❌차단] 남(bob) 명의로 관심을 담는다'
+insert into public.transfer_deal_watch (user_id, deal_id) values (:'bob', :td2);
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[❌차단] 비로그인 관심'
+insert into public.transfer_deal_watch (user_id, deal_id) values (:'alice', :td1);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] created_at을 실어 시각 위조 — insert grant 목록 밖이다'
+insert into public.transfer_deal_watch (user_id, deal_id, created_at) values (:'alice', :td1, now() - interval '1 year');
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_deal_watch (user_id, deal_id) values (:'alice', :td1);
+\echo '[❌차단] 같은 딜을 두 번 담는다 — 복합 PK(23505, 훅이 멱등으로 흡수한다)'
+insert into public.transfer_deal_watch (user_id, deal_id) values (:'alice', :td1);
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_deal_watch (user_id, deal_id) values (:'alice', :td1);
+\echo '[❌차단] 관심 행 UPDATE(다른 딜로 옮기기) — 정책도 컬럼 권한도 없다(빼기는 delete)'
+update public.transfer_deal_watch set deal_id = :td2 where user_id = :'alice';
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_deal_watch (user_id, deal_id) values (:'alice', :td1);
+\echo '[1 / 0 기대] 내 관심은 보이고 남(bob)의 관심은 0행이다'
+select (select count(*) from public.transfer_deal_watch where user_id = :'alice') as mine,
+       (select count(*) from public.transfer_deal_watch where user_id = :'bob')   as others;
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_deal_watch (user_id, deal_id) values (:'alice', :td1);
+\echo '[1 / 0 기대] 목록 임베딩 — 담은 딜은 배열 길이 1, 안 담은 딜은 0 (bob의 관심은 세지 않는다)'
+select (select count(w.user_id) from public.transfer_deal d left join public.transfer_deal_watch w on w.deal_id = d.id where d.id = :td1) as watched,
+       (select count(w.user_id) from public.transfer_deal d left join public.transfer_deal_watch w on w.deal_id = d.id where d.id = :td2) as not_watched;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '    ⚠ DELETE의 using 절은 필터로 동작한다 — 권한이 없으면 에러가 아니라 0행이다.'
+\echo '[DELETE 0 기대] 남(bob)의 관심은 지워지지 않는다'
+delete from public.transfer_deal_watch where user_id = :'bob';
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_deal_watch (user_id, deal_id) values (:'alice', :td1);
+\echo '[DELETE 1 기대] 내 관심은 뺀다'
+delete from public.transfer_deal_watch where user_id = :'alice' and deal_id = :td1;
+rollback to s;
+
+savepoint s;
+\echo '    (superuser — 파생기가 report_count 0인 딜을 지우는 경로다)'
+delete from public.transfer_deal where id = :td1;
+\echo '[0 기대] 딜을 지우면 그 딜의 관심이 함께 사라진다 (cascade)'
+select count(*) from public.transfer_deal_watch where deal_id = :td1;
+rollback to s;
+
+\echo ''
+\echo '-- 36e. 자유계약 표시 (20260925000003) — 이적료가 확인된 딜은 FA가 아니다 --'
+savepoint s;
+\echo '[❌차단] 이적료가 있는 딜을 자유계약으로 — 화면이 금액과 FA 중 무엇을 그릴지 갈린다'
+update public.transfer_deal set is_free_agent = true where id = :td1;
+rollback to s;
+
+savepoint s;
+\echo '[t 기대] 이적료가 없는 딜은 자유계약일 수 있다'
+update public.transfer_deal set is_free_agent = true where id = :td2;
+select is_free_agent from public.transfer_deal where id = :td2;
+rollback to s;
+
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[t 기대] 비로그인이 자유계약 여부를 읽는다(테이블 단위 grant가 새 컬럼도 덮는다)'
+select count(*) = 1 from public.transfer_deal where id = :td2 and is_free_agent = false;
+rollback to s;
+
+rollback to s36;
+
+\echo ''
+\echo '=== 37. 이적 소식 한국어 요약 (20260925000002) ==='
+\echo '  설계 요약: summary_ko는 요약 단계(LLM, service_role)만 쓰는 추출 컬럼이다. 비로그인도 읽고,'
+\echo '  시도 표시(summarized_at)는 열지 않는다. 원문 전문의 우회 재배포를 막는 길이 상한이 있다.'
+savepoint s37;
+
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, attributed_to, tier, stage, relevance)
+values ('rss:rlstest-c', 'x1', 'Liverpool agree deal for Barcola', now() - interval '1 hour', 'outlet', null, 1, 'agreement', 0.8)
+returning id as ts1 \gset
+
+\echo ''
+\echo '-- 37a. 앱은 요약을 쓸 수 없다 --'
+savepoint s; :login_alice
+\echo '[❌차단] 로그인 유저가 요약을 고친다 — update grant가 없다'
+update public.transfer_news set summary_ko = '가짜 요약' where id = :ts1;
+rollback to s;
+
+\echo ''
+\echo '-- 37b. 읽기 --'
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[t 기대] 비로그인이 요약을 읽는다(아직 없으면 null)'
+select count(*) = 1 from public.transfer_news where id = :ts1 and summary_ko is null;
+rollback to s;
+
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[❌차단] 비로그인이 시도 표시(summarized_at)를 읽는다 — 운영 표시라 열지 않는다'
+select summarized_at from public.transfer_news where id = :ts1;
+rollback to s;
+
+\echo ''
+\echo '-- 37c. 스키마 불변식 (writer가 service_role이라 CHECK가 유일한 방어다) --'
+savepoint s;
+\echo '[❌차단] 시도 시각 없는 요약'
+update public.transfer_news set summary_ko = '아스날이 영입에 합의했다.' where id = :ts1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 160자 초과 — 요약이 아니라 전문 번역이 들어오는 것을 막는다'
+update public.transfer_news set summary_ko = repeat('가', 161), summarized_at = now() where id = :ts1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 보이지 않는 요약(제로폭 공백)'
+update public.transfer_news set summary_ko = E'​', summarized_at = now() where id = :ts1;
+rollback to s;
+
+savepoint s;
+\echo '[t 기대] 요약을 쓴다 — 원문 고정 트리거(수집 컬럼)에 걸리지 않는다'
+update public.transfer_news set summary_ko = repeat('가', 160), summarized_at = now() where id = :ts1;
+select char_length(summary_ko) = 160 from public.transfer_news where id = :ts1;
+rollback to s;
+
+savepoint s;
+\echo '[t 기대] 무관 판정 — 요약 없이 시도 시각만 남는다'
+update public.transfer_news set summarized_at = now() where id = :ts1;
+select summary_ko is null and summarized_at is not null from public.transfer_news where id = :ts1;
+rollback to s;
+
+rollback to s37;
+
+\echo ''
+\echo '=== 38. 이름 사전 자동 캐시 (20260925000004) ==='
+\echo '  설계 요약: 선수·구단 한국어 표기의 위키데이터 캐시. writer는 service_role 파생 스크립트뿐이고'
+\echo '  읽기는 공개다. 찾지 못한 이름도 행으로 남는다(name_ko null).'
+savepoint s38;
+
+insert into public.transfer_name_ko (kind, key, name_en, name_ko, wikidata_id)
+values ('player', 'rlstest player', 'Rlstest Player', '알엘에스테스트', 'Q1');
+
+savepoint s; :login_alice
+\echo '[❌차단] 로그인 유저가 표기를 쓴다 — 쓰기 grant가 없다'
+insert into public.transfer_name_ko (kind, key, name_en) values ('club', 'rlstest club', 'Rlstest Club');
+rollback to s;
+
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[t 기대] 비로그인이 읽는다'
+select count(*) = 1 from public.transfer_name_ko where key = 'rlstest player';
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 모르는 종류'
+insert into public.transfer_name_ko (kind, key, name_en) values ('coach', 'x', 'X');
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 출처 없는 한국어 표기 — 사람이 고친 값은 JSON에 둔다(여기는 위키데이터 캐시다)'
+insert into public.transfer_name_ko (kind, key, name_en, name_ko) values ('club', 'rlstest club', 'Rlstest Club', '알엘에스');
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 위키데이터 id 형식'
+insert into public.transfer_name_ko (kind, key, name_en, name_ko, wikidata_id) values ('club', 'rlstest club', 'Rlstest Club', '알엘에스', 'X1');
+rollback to s;
+
+savepoint s;
+\echo '[t 기대] 찾지 못한 이름도 행으로 남는다(매시간 다시 찾지 않게)'
+insert into public.transfer_name_ko (kind, key, name_en) values ('club', 'rlstest club', 'Rlstest Club');
+select name_ko is null and wikidata_id is null from public.transfer_name_ko where key = 'rlstest club';
+rollback to s;
+
+rollback to s38;
 
 rollback;
 \echo ''
