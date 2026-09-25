@@ -134,7 +134,11 @@ function telegramPage(channel, before) {
 }
 
 /** @returns {{ msgs: object[], badDates: number }} */
-function parseTelegram(html) {
+/**
+ * ⚠ **글자만 읽는다 — 사진·영상은 읽지 않는다.** 메시지 본문 영역(`.tgme_widget_message_text`)만 고르므로
+ *   사진 영역(`.tgme_widget_message_photo_wrap` 등)은 애초에 선택되지 않는다. 테스트가 이 성질을 고정한다.
+ */
+export function parseTelegram(html) {
   const $ = cheerio.load(html);
   const out = [];
   let badDates = 0;
@@ -290,13 +294,13 @@ function safeCodePoint(n) {
 }
 
 /**
- * HTML 태그와 엔티티를 걷어낸 평문.
+ * HTML 태그와 엔티티를 걷어낸 평문. `<img>`도 여기서 사라진다 — RSS 설명에 붙은 사진을 읽지 않는다.
  *
  * ⚠ **엔티티를 먼저 풀고 태그를 지운다.** Google News·Guardian의 description은 HTML이
  *   `&lt;a href=…&gt;`로 **인코딩되어** 온다 — 태그를 먼저 지우면 걸리는 것이 없고, 디코딩이
  *   그 뒤에 `<a href=…>`를 되살려 본문에 마크업이 그대로 남는다(크롤러가 그 상태로 저장했다).
  */
-function stripHtml(s) {
+export function stripHtml(s) {
   return decodeEntities(s).replace(HTML_TAG, " ").replace(/\s+/g, " ").trim();
 }
 
@@ -351,6 +355,25 @@ function entryLink(e) {
   return null;
 }
 
+/**
+ * 기사 byline — `<dc:creator>`, RSS `<author>`("메일 (이름)" 또는 이름), Atom `<author><name>`. 없으면 `null`.
+ * 지역지(Reach plc — Manchester Evening News·Liverpool Echo·football.london·Chronicle 등)는 기사마다
+ * 기자 이름을 매체가 직접 붙여 내보낸다 — 그 기자의 글로 **귀속할 근거**가 된다(`reporters.json`의 `bylines`).
+ * ⚠ 메일 주소만 있고 이름이 없으면 버린다 — 주소는 이름이 아니다.
+ */
+export function bylineOf(e) {
+  const a = e.author;
+  const raw =
+    textOf(e["dc:creator"]) ||
+    (a && typeof a === "object" && !("#text" in a) ? textOf(a.name) : textOf(a));
+  if (!raw) return null;
+  const s = stripHtml(raw);
+  const paren = s.match(/\(([^()]+)\)\s*$/); // "football.london@trinitymirror.com (Alasdair Gold)"
+  const name = (paren ? paren[1] : s).trim();
+  if (!name || name.includes("@")) return null;
+  return clampCp(name, 200);
+}
+
 async function fetchRss(def, since) {
   const warnings = [];
   const body = await getText(def.config.url, `rss ${def.id}`);
@@ -389,8 +412,9 @@ async function fetchRss(def, since) {
       // guid가 URL이든 임의 문자열이든 길이가 들쭉날쭉해 해시로 고정한다
       externalId: createHash("sha1").update(guid).digest("hex").slice(0, 20),
       url: link,
-      // Google News는 <source>에 원 매체명이 온다("The Times &amp; The Sunday Times"처럼 인코딩돼서)
-      authorHandle: stripHtml(textOf(e.source)) || null,
+      // Google News는 <source>에 원 매체명이 온다("The Times &amp; The Sunday Times"처럼 인코딩돼서).
+      // 그 밖의 매체는 기사 byline(기자 이름)이 온다 — 없으면 매체 단위 귀속으로 남는다
+      authorHandle: stripHtml(textOf(e.source)) || bylineOf(e) || null,
       text,
       publishedAt: published.toISOString(),
       provenanceUrl: link,

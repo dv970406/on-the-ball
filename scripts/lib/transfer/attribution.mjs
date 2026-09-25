@@ -17,7 +17,8 @@ import { createHash } from "node:crypto";
 export function resolveAttribution(def, item) {
   switch (def.kind) {
     case "bluesky":
-      // 레지스트리에 인증 발급자가 기록돼 있으면 본인 계정 직접 게시로 본다
+      // 레지스트리에 **본인 확인 기록**이 있어야 본인 계정 직접 게시로 본다 — 인증 배지(`issuerHandle`)이거나,
+      // 배지가 없으면 사람이 확인한 근거(`method` — 링크한 기사의 기자란 이름 · 본인 도메인 핸들 등)다
       if (!def.verification || !item.authorHandle) return null;
       return {
         attribution: def.defaultAttribution === "outlet" ? "outlet" : "verified_author",
