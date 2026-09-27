@@ -147,7 +147,7 @@ reset role;
 \echo '   ⚠ DELETE는 컬럼 단위 권한이 아니라 has_any_column_privilege가 거부한다'
 \echo '     (unrecognized privilege type) → 그쪽만 has_table_privilege로 본다.'
 \echo '   ⚠ authenticated의 INSERT/UPDATE는 여기서 세지 않는다 — 정상 기능이 그걸로 돈다.'
-\echo '     대신 **DELETE와 TRUNCATE**를 본다(transfer_deal_watch만 정당한 DELETE 대상이다).'
+\echo '     대신 **DELETE와 TRUNCATE**를 본다(관심·댓글·댓글 표만 정당한 DELETE 대상이다).'
 \echo '[0행 기대] RLS가 꺼졌거나 anon에 쓰기 권한이 남은 테이블'
 select c.relname,
        c.relrowsecurity                                          as rls_on,
@@ -166,10 +166,13 @@ select c.relname,
         or has_table_privilege('anon', c.oid, 'DELETE')
         or has_table_privilege('anon', c.oid, 'TRUNCATE')
         or has_table_privilege('authenticated', c.oid, 'TRUNCATE')
-        -- transfer_deal_watch만 정당하다(관심 빼기 — 자기 행만 지우는 DELETE 정책이 있다).
+        -- 아래 셋만 정당하다 — 전부 자기 행만 지우는 DELETE 정책이 있다.
+        --   transfer_deal_watch(관심 빼기) · transfer_deal_comment(내 댓글 삭제) ·
+        --   transfer_deal_comment_vote(표 거두기)
         -- 새 테이블에 DELETE를 열면 여기 이름을 더하고 사유를 적는다.
         or (has_table_privilege('authenticated', c.oid, 'DELETE')
-            and c.relname not in ('transfer_deal_watch')));
+            and c.relname not in ('transfer_deal_watch', 'transfer_deal_comment',
+                                  'transfer_deal_comment_vote')));
 
 \echo '-- 17b. RLS는 켜졌는데 정책이 하나도 없는 테이블 (전면 차단이 의도인지 확인 필요)'
 \echo '[0행 기대] 정책이 없는 RLS 테이블'
@@ -1237,6 +1240,322 @@ select name_ko is null and wikidata_id is null from public.transfer_name_ko wher
 rollback to s;
 
 rollback to s38;
+
+\echo ''
+\echo '=== 39. 이적 딜 댓글 · 좋아요/싫어요 (20260927000001) ==='
+\echo '  설계 요약: 읽기 공개 · 쓰기/삭제 본인만 · 수정 없음. 답글 깊이 1은 트리거가 P0001로 말한다.'
+\echo '  표는 (user_id, comment_id) 행 하나이고 합계는 definer 트리거가 단독 관리한다.'
+\echo '  딜 FK는 restrict다 — 파생기가 댓글 달린 딜을 지우지 못하게 구조로 막는다.'
+\echo '  ⚠ 딜 시드는 테스트 전용 deal_key(sha1(''rlstest-player-d/e'')의 앞 16자리)를 쓴다(섹션 36과 같은 이유).'
+savepoint s39;
+
+insert into public.transfer_deal (deal_key, player, stage, first_reported_at, latest_reported_at, report_count)
+values ('3f889b10af07bd9a', 'Rlstest Player D', 'talks', now() - interval '1 day', now() - interval '1 hour', 1)
+returning id as tdc1 \gset
+insert into public.transfer_deal (deal_key, player, stage, first_reported_at, latest_reported_at, report_count)
+values ('4360f429624315b7', 'Rlstest Player E', 'rumour', now() - interval '1 day', now() - interval '1 hour', 1)
+returning id as tdc2 \gset
+
+-- bob의 루트 댓글 — 남의 행 역할(superuser로 넣는다)
+insert into public.transfer_deal_comment (deal_id, user_id, content)
+values (:tdc1, :'bob', 'bob 루트')
+returning id as bc \gset
+
+\echo ''
+\echo '-- 39a. 댓글 쓰기 · 삭제 --'
+
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[❌차단] 비로그인 댓글'
+insert into public.transfer_deal_comment (deal_id, user_id, content) values (:tdc1, :'alice', 'x');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 남(bob) 명의로 댓글'
+insert into public.transfer_deal_comment (deal_id, user_id, content) values (:tdc1, :'bob', '사칭');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 좋아요 수를 실어 위조 — insert grant 목록 밖이다'
+insert into public.transfer_deal_comment (deal_id, user_id, content, up_count) values (:tdc1, :'alice', 'x', 999);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] created_at을 실어 시각 위조 — insert grant 목록 밖이다'
+insert into public.transfer_deal_comment (deal_id, user_id, content, created_at) values (:tdc1, :'alice', 'x', now() - interval '1 year');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 싫어요 수를 실어 위조 — insert grant 목록 밖이다'
+insert into public.transfer_deal_comment (deal_id, user_id, content, down_count) values (:tdc1, :'alice', 'x', 999);
+rollback to s;
+
+\echo '    ⚠ 위 위조 검사는 컬럼 하나씩만 본다 — grant 목록이 넓어지는 회귀는 아래 전수 대조가 잡는다.'
+\echo '[t 기대] authenticated의 쓰기 가능 컬럼이 설계와 정확히 같다(댓글 insert · 표 insert/update)'
+select
+  (select string_agg(column_name, ',' order by column_name) from information_schema.columns
+    where table_schema = 'public' and table_name = 'transfer_deal_comment'
+      and has_column_privilege('authenticated', 'public.transfer_deal_comment', column_name, 'INSERT'))
+    = 'content,deal_id,parent_id,user_id'
+  and not exists (select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'transfer_deal_comment'
+      and has_column_privilege('authenticated', 'public.transfer_deal_comment', column_name, 'UPDATE'))
+  and (select string_agg(column_name, ',' order by column_name) from information_schema.columns
+    where table_schema = 'public' and table_name = 'transfer_deal_comment_vote'
+      and has_column_privilege('authenticated', 'public.transfer_deal_comment_vote', column_name, 'INSERT'))
+    = 'comment_id,user_id,value'
+  and (select string_agg(column_name, ',' order by column_name) from information_schema.columns
+    where table_schema = 'public' and table_name = 'transfer_deal_comment_vote'
+      and has_column_privilege('authenticated', 'public.transfer_deal_comment_vote', column_name, 'UPDATE'))
+    = 'value';
+
+savepoint s; :login_alice
+\echo '[❌차단] 보이지 않는 글자(제로폭 공백)만 있는 댓글'
+insert into public.transfer_deal_comment (deal_id, user_id, content) values (:tdc1, :'alice', U&'\200B\FEFF');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 3,001코드포인트 — abuse bound(화면 한도 300그래핌의 10배)'
+insert into public.transfer_deal_comment (deal_id, user_id, content) values (:tdc1, :'alice', repeat('가', 3001));
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_deal_comment (deal_id, user_id, content) values (:tdc1, :'alice', repeat('가', 3000));
+\echo '[t 기대] 3,000코드포인트는 들어간다(경계)'
+select exists (select 1 from public.transfer_deal_comment where user_id = :'alice' and char_length(content) = 3000);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 없는 딜에 댓글 — FK(23503)'
+insert into public.transfer_deal_comment (deal_id, user_id, content) values (0, :'alice', 'x');
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_deal_comment (deal_id, user_id, content) values (:tdc1, :'alice', '원문') returning id as ac \gset
+\echo '[❌차단] 본문 수정 — UPDATE 정책도 grant도 없다'
+update public.transfer_deal_comment set content = '고침' where id = :ac;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 좋아요 수를 직접 조작 — 카운터는 트리거만 쓴다'
+update public.transfer_deal_comment set up_count = 999 where id = :bc;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '    ⚠ DELETE의 using 절은 필터로 동작한다 — 권한이 없으면 에러가 아니라 0행이다.'
+delete from public.transfer_deal_comment where id = :bc;
+\echo '[t 기대] 남(bob)의 댓글은 지워지지 않는다'
+select exists (select 1 from public.transfer_deal_comment where id = :bc);
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_deal_comment (deal_id, user_id, content) values (:tdc1, :'alice', '지울 댓글') returning id as ac \gset
+delete from public.transfer_deal_comment where id = :ac;
+\echo '[f 기대] 내 댓글은 지운다'
+select exists (select 1 from public.transfer_deal_comment where id = :ac);
+rollback to s;
+
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[t 기대] 비로그인이 댓글·작성자·표 수를 읽는다(SSR·크롤러)'
+select count(*) = 1
+  from public.transfer_deal_comment c
+  join public.profiles p on p.id = c.user_id
+ where c.id = :bc and p.nickname = 'bob' and c.up_count = 0 and c.down_count = 0;
+rollback to s;
+
+\echo ''
+\echo '-- 39b. 답글 — 깊이 1 --'
+
+savepoint s; :login_alice
+insert into public.transfer_deal_comment (deal_id, user_id, content, parent_id) values (:tdc1, :'alice', '답글', :bc) returning id as ar \gset
+\echo '[t 기대] 남의 루트에 답글은 달린다'
+select exists (select 1 from public.transfer_deal_comment where id = :ar and parent_id = :bc);
+\echo '[❌차단] 답글에 답글 — 트리거(P0001)'
+insert into public.transfer_deal_comment (deal_id, user_id, content, parent_id) values (:tdc1, :'alice', '답답글', :ar);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 다른 딜의 댓글에 답글 — 트리거(P0001)'
+insert into public.transfer_deal_comment (deal_id, user_id, content, parent_id) values (:tdc2, :'alice', '엇갈림', :bc);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 없는 댓글에 답글 — 트리거(P0001)'
+insert into public.transfer_deal_comment (deal_id, user_id, content, parent_id) values (:tdc1, :'alice', '허공', 0);
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_deal_comment (deal_id, user_id, content, parent_id) values (:tdc1, :'alice', '답글', :bc) returning id as ar \gset
+select set_config('rls.reply', :'ar', true), set_config('rls.deal', :'tdc1', true);
+\echo '    ⚠ 러너는 "차단됐는가"만 보고 **어떤 코드로** 차단됐는지는 보지 않는다 — 깊이 거부가 42501·23514로'
+\echo '      바뀌면 화면이 한국어 사유 대신 뭉뚱그린 문구를 낸다. 코드를 DB 안에서 대조한다.'
+\echo '[P0001 확인] 답글에 답글의 거부 코드가 P0001이다(아니면 ERROR)'
+do $$
+begin
+  begin
+    insert into public.transfer_deal_comment (deal_id, user_id, content, parent_id)
+    values (current_setting('rls.deal')::bigint, (select auth.uid()), '답답글', current_setting('rls.reply')::bigint);
+  exception when others then
+    if sqlstate <> 'P0001' then
+      raise exception '깊이 거부 코드가 P0001이 아니다: %', sqlstate;
+    end if;
+    return;
+  end;
+  raise exception '답글에 답글이 차단되지 않았다';
+end $$;
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_deal_comment (deal_id, user_id, content, parent_id) values (:tdc1, :'alice', 'alice 답글', :bc);
+:login_bob
+delete from public.transfer_deal_comment where id = :bc;
+\echo '[0 기대] 루트를 지우면 남(alice)이 단 답글도 함께 사라진다 (cascade — 화면이 확인 문구로 알린다)'
+select count(*) from public.transfer_deal_comment where parent_id = :bc;
+rollback to s;
+
+\echo ''
+\echo '-- 39c. 좋아요 · 싫어요 --'
+
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[❌차단] 비로그인 투표'
+insert into public.transfer_deal_comment_vote (user_id, comment_id, value) values (:'alice', :bc, 1);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 남(bob) 명의로 투표'
+insert into public.transfer_deal_comment_vote (user_id, comment_id, value) values (:'bob', :bc, 1);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 표 값 2 — 1 또는 -1만'
+insert into public.transfer_deal_comment_vote (user_id, comment_id, value) values (:'alice', :bc, 2);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 표 값 0 — 표 없음은 행이 없는 것이다'
+insert into public.transfer_deal_comment_vote (user_id, comment_id, value) values (:'alice', :bc, 0);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] created_at을 실어 시각 위조 — insert grant 목록 밖이다'
+insert into public.transfer_deal_comment_vote (user_id, comment_id, value, created_at) values (:'alice', :bc, 1, now() - interval '1 year');
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_deal_comment_vote (user_id, comment_id, value) values (:'alice', :bc, 1);
+\echo '[1 / 0 기대] 좋아요 → 트리거가 up_count를 올린다(남의 댓글인데도 — definer)'
+select up_count, down_count from public.transfer_deal_comment where id = :bc;
+\echo '[❌차단] 같은 댓글에 두 번 투표 — 복합 PK(23505)'
+insert into public.transfer_deal_comment_vote (user_id, comment_id, value) values (:'alice', :bc, -1);
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_deal_comment_vote (user_id, comment_id, value) values (:'alice', :bc, 1);
+update public.transfer_deal_comment_vote set value = -1 where user_id = :'alice' and comment_id = :bc;
+\echo '[0 / 1 기대] 좋아요 → 싫어요 전환은 한 쪽을 빼고 다른 쪽을 더한다'
+select up_count, down_count from public.transfer_deal_comment where id = :bc;
+update public.transfer_deal_comment_vote set value = -1 where user_id = :'alice' and comment_id = :bc;
+\echo '[0 / 1 기대] 같은 값으로 다시 UPDATE해도 알짜 0이다'
+select up_count, down_count from public.transfer_deal_comment where id = :bc;
+delete from public.transfer_deal_comment_vote where user_id = :'alice' and comment_id = :bc;
+\echo '[0 / 0 기대] 표를 거두면 원래대로'
+select up_count, down_count from public.transfer_deal_comment where id = :bc;
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_deal_comment (deal_id, user_id, content) values (:tdc1, :'alice', '옮길 곳') returning id as ac \gset
+insert into public.transfer_deal_comment_vote (user_id, comment_id, value) values (:'alice', :bc, 1);
+\echo '[❌차단] 표를 다른 댓글로 옮긴다 — comment_id는 update grant 밖이다'
+update public.transfer_deal_comment_vote set comment_id = :ac where user_id = :'alice' and comment_id = :bc;
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_deal_comment_vote (user_id, comment_id, value) values (:'alice', :bc, 1);
+\echo '[❌차단] 표를 남(bob) 명의로 넘긴다 — user_id는 update grant 밖이다'
+update public.transfer_deal_comment_vote set user_id = :'bob' where user_id = :'alice' and comment_id = :bc;
+rollback to s;
+
+savepoint s;
+-- bob의 좋아요(superuser로) — "내 표만 보인다"의 상대역
+insert into public.transfer_deal_comment_vote (user_id, comment_id, value) values (:'bob', :bc, 1);
+:login_alice
+\echo '[0 기대] 남(bob)의 표는 보이지 않는다'
+select count(*) from public.transfer_deal_comment_vote where user_id = :'bob';
+update public.transfer_deal_comment_vote set value = -1 where user_id = :'bob';
+delete from public.transfer_deal_comment_vote where user_id = :'bob';
+reset role;
+\echo '[1 / 1 / 0 기대] 남(bob)의 표는 바꿀 수도 거둘 수도 없다(0행) — 표 · 좋아요 · 싫어요'
+select (select value from public.transfer_deal_comment_vote where user_id = :'bob' and comment_id = :bc),
+       up_count, down_count
+  from public.transfer_deal_comment where id = :bc;
+rollback to s;
+
+savepoint s;
+insert into public.transfer_deal_comment_vote (user_id, comment_id, value) values (:'bob', :bc, -1);
+:login_alice
+insert into public.transfer_deal_comment_vote (user_id, comment_id, value) values (:'alice', :bc, 1);
+\echo '[1 / 1 / 1 기대] 목록 임베딩 — 내 표(1)만 보이고 합계는 둘 다 센다 · 내 표 · 좋아요 · 싫어요'
+select (select v.value from public.transfer_deal_comment_vote v where v.comment_id = c.id),
+       c.up_count, c.down_count
+  from public.transfer_deal_comment c where c.id = :bc;
+rollback to s;
+
+savepoint s;
+insert into public.transfer_deal_comment_vote (user_id, comment_id, value) values (:'bob', :bc, 1);
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[0 기대] 비로그인에게 표 임베딩이 42501 없이 빈 배열로 돈다(grant가 통로, 정책이 거름)'
+select count(v.value)
+  from public.transfer_deal_comment c
+  left join public.transfer_deal_comment_vote v on v.comment_id = c.id
+ where c.id = :bc;
+rollback to s;
+
+savepoint s;
+\echo '    (superuser — 탈퇴 cascade는 RPC도 정책도 거치지 않는다. 트리거만 숫자를 맞춘다)'
+insert into public.transfer_deal_comment (deal_id, user_id, content) values (:tdc1, :'alice', 'alice 루트') returning id as ac \gset
+insert into public.transfer_deal_comment_vote (user_id, comment_id, value) values (:'bob', :ac, 1), (:'alice', :ac, -1);
+delete from auth.users where id = :'bob';
+\echo '[0 / 1 기대] bob이 탈퇴하면 그 표가 합계에서 빠진다'
+select up_count, down_count from public.transfer_deal_comment where id = :ac;
+rollback to s;
+
+savepoint s;
+insert into public.transfer_deal_comment (deal_id, user_id, content) values (:tdc1, :'alice', 'a') returning id as ac \gset
+insert into public.transfer_deal_comment_vote (user_id, comment_id, value) values (:'alice', :bc, 1), (:'bob', :bc, -1), (:'bob', :ac, 1);
+delete from public.transfer_deal_comment_vote where user_id = :'bob' and comment_id = :bc;
+update public.transfer_deal_comment_vote set value = -1 where user_id = :'alice' and comment_id = :bc;
+\echo '[0행 기대] 표 합계가 실제 표 행 수와 어긋난 댓글'
+select c.id, c.up_count, c.down_count, v.up, v.dn
+  from public.transfer_deal_comment c
+  left join (select comment_id,
+                    count(*) filter (where value =  1) as up,
+                    count(*) filter (where value = -1) as dn
+               from public.transfer_deal_comment_vote group by 1) v on v.comment_id = c.id
+ where c.up_count <> coalesce(v.up, 0) or c.down_count <> coalesce(v.dn, 0);
+rollback to s;
+
+\echo ''
+\echo '-- 39d. 딜 삭제 — 댓글이 달린 딜은 지워지지 않는다 --'
+
+savepoint s;
+\echo '    (superuser — 파생기가 보도가 끊긴 딜을 지우는 경로다)'
+\echo '[❌차단] 댓글이 달린 딜을 지운다 — FK restrict(23503). 파생기는 애초에 이 딜을 고르지 않는다'
+delete from public.transfer_deal where id = :tdc1;
+rollback to s;
+
+savepoint s;
+delete from public.transfer_deal where id = :tdc2;
+\echo '[f 기대] 댓글이 없는 딜은 그대로 지워진다'
+select exists (select 1 from public.transfer_deal where id = :tdc2);
+rollback to s;
+
+rollback to s39;
 
 rollback;
 \echo ''

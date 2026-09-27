@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import {
   StatusBadge,
@@ -10,11 +10,15 @@ import {
 } from "@/entities/transfer";
 import { WatchToggle } from "@/features/watch-transfer";
 import { ROUTES } from "@/shared/config";
-import { cn, formatRelativeTime, useNowMs } from "@/shared/lib";
-import { EmptyState, Icon, SignInDialog, Skeleton, StaleBanner } from "@/shared/ui";
+import type { CommentList } from "@/entities/comment";
+import { cn, formatCount, formatRelativeTime, useNowMs } from "@/shared/lib";
+import { Dialog, EmptyState, Icon, SignInDialog, Skeleton, StaleBanner } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
 import { flagEmoji } from "../lib/flag";
+import { useCommentDeletion } from "../model/use-comment-deletion";
 import { useTransferDetail } from "../model/use-transfer-detail";
+import { CommentSection } from "./comment-section";
+import { DetailTabs, detailPanelId, detailTabId, type DetailTabKey } from "./detail-tabs";
 import { FeeCard } from "./fee-card";
 import { ReportTimeline } from "./report-timeline";
 
@@ -29,9 +33,14 @@ interface TransferDetailViewProps {
   /** 서버가 미리 조회한 보도 타임라인(최신순) */
   initialReports?: TransferReport[];
   /**
+   * 서버가 미리 조회한 댓글. ⚠ 키가 userId로 스코프된다(내 표 임베딩) — `initialUserId`와 한 쌍이다.
+   *   `undefined`면 클라이언트가 조회한다.
+   */
+  initialComments?: CommentList;
+  /**
    * 서버가 본 로그인 사용자.
    * ⚠ **이게 없으면 프리페치가 무의미해진다** — `transferKeys.detail`이 userId로 스코프돼 있어
-   *   복원 전 `undefined` 키로 찾으면 서버가 채운 캐시에 닿지 못한다(`MatchDetailView`와 같은 함정).
+   *   복원 전 `undefined` 키로 찾으면 서버가 채운 캐시에 닿지 못한다(`transferKeys.list`도 같다).
    */
   initialUserId?: string;
   /**
@@ -117,30 +126,62 @@ function InfoLine({ deal }: { deal: TransferDeal }) {
 }
 
 /**
- * 이적 상세 — 선수 · 경로 · 이적료 · 보도 타임라인 + 관심 토글.
+ * 이적 상세 — 선수 · 경로 · 이적료 · `댓글 | 보도 타임라인` 탭 + 관심 토글.
  *
- * 하단 탭바를 렌더하지 않는다(글·경기 상세와 같은 서브헤더 화면이다). 공유는 `SubHeader`가 갖는다.
+ * 하단 탭바를 렌더하지 않는다(서브헤더 화면이다). 공유는 `SubHeader`가 갖는다.
  * 확률 카드·알림 CTA·원화 환산은 두지 않는다(계획서 §0·§0-1).
+ *
+ * ⚠ **두 탭 패널을 모두 렌더하고 `hidden`으로만 가린다** — 색인 대상 화면이라 비활성 탭을 조건부
+ *   렌더로 빼면 크롤러가 그 패널을 보지 못한다(`nextjs.md` "탭으로 갈라도 HTML에는 전부 남긴다").
+ *   가린 패널에는 `flex`·`grid` 같은 display 유틸을 얹지 않는다(UA의 `[hidden]`을 이긴다).
+ * ⚠ 오버레이(로그인 안내·삭제 확인)는 **프레임 직속 자리에 한 벌씩**이다 — `Dialog`가 `absolute`라
+ *   스크롤 영역(`<main>`) 안에 두면 스크롤한 만큼 화면 밖에 뜬다.
  */
 export function TransferDetailView({
   dealId,
   initialDeal,
   initialReports,
+  initialComments,
   initialUserId,
   serverNowMs,
 }: TransferDetailViewProps) {
   // 조회·대기 판정은 `model/use-transfer-detail`이 소유한다
-  const { deal, reports, reportsError, isLoading, error, refetch } = useTransferDetail({
+  const {
+    deal: { data: deal, isLoading, error },
+    reports,
+    comments,
+    session,
+    refetch,
+  } = useTransferDetail({
     dealId,
     initialDeal,
     initialReports,
+    initialComments,
     initialUserId,
+    serverNowMs,
   });
+  /** 댓글 탭 패널 — 삭제 확정·답글 대상 소실 뒤 포커스를 받는 자리(프로그램으로만) */
+  const commentsPanelRef = useRef<HTMLDivElement>(null);
   /**
-   * 비로그인이 관심 토글을 눌렀을 때의 안내 — **뷰가 소유한다**(`Dialog`가 `absolute`라
-   * 하단 바 안에 두면 그 바를 기준으로 뜬다 — `SignInDialog` 주석).
+   * 삭제 흐름(확인 다이얼로그·답글 수 재확인·대상 소실·포커스)과 **화면에 그릴 목록**(지운 댓글을 뺀 것)은
+   * 훅이 갖는다. 탭 건수·댓글 섹션이 모두 `deletion.visibleList`를 본다(같은 값에서 만든다).
    */
-  const [askSignIn, setAskSignIn] = useState(false);
+  const deletion = useCommentDeletion({
+    dealId,
+    list: comments.list,
+    isPlaceholder: comments.isPlaceholder,
+    userId: session.userId,
+    refetch: comments.refetch,
+    focusFallbackRef: commentsPanelRef,
+  });
+  const commentList = deletion.visibleList;
+  /**
+   * 비로그인이 누른 동작(`~하려면`) — 관심 토글·댓글 입력·답글·표가 **문구만 다른 한 벌**을 쓴다.
+   * `null`이면 닫혀 있다. 뷰가 소유한다(`Dialog`가 `absolute`라 — `SignInDialog` 주석).
+   */
+  const [signInAction, setSignInAction] = useState<string | null>(null);
+  /** 댓글이 기본 선택이다(handoff §5-7) */
+  const [tab, setTab] = useState<DetailTabKey>("comments");
   // ⚠ **서버 시각이 우선이다** — `useNowMs()`는 세션당 한 번 고정된다(`data-and-state.md`).
   //   ⚠ `??`는 단축평가라 훅을 뒤에 두면 조건부 호출이 된다 → 먼저 무조건 부른다.
   const clientNowMs = useNowMs();
@@ -159,7 +200,7 @@ export function TransferDetailView({
       <main className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(96px+env(safe-area-inset-bottom))]">
         {isLoading && (
           <div aria-hidden className="pt-4">
-            {/* 골격은 실제 화면과 같다 — 뱃지 줄 · 이름 · 정보줄 · 경로 카드 · 이적료 카드 · 타임라인 */}
+            {/* 골격은 실제 화면과 같다 — 뱃지 줄 · 이름 · 정보줄 · 경로 카드 · 이적료 카드 · 탭 · 입력칸 */}
             <div className="flex items-center justify-between">
               <Skeleton className="h-5 w-14" />
               <Skeleton className="h-3 w-24" />
@@ -168,8 +209,8 @@ export function TransferDetailView({
             <Skeleton className="mt-2 h-3 w-4/5" />
             <Skeleton className="mt-3 h-[88px] w-full rounded-lg" />
             <Skeleton className="mt-3 h-[196px] w-full rounded-lg" />
-            <Skeleton className="mt-[22px] h-4 w-24" />
-            <Skeleton className="mt-3 h-16 w-full" />
+            <Skeleton className="mt-7 h-11 w-48" />
+            <Skeleton className="mt-3.5 h-11 w-full rounded-md" />
           </div>
         )}
 
@@ -234,12 +275,65 @@ export function TransferDetailView({
 
             <FeeCard deal={deal} />
 
-            <ReportTimeline
-              reports={reports}
-              error={reportsError}
-              onRetry={() => refetch()}
-              nowMs={nowMs}
+            <DetailTabs
+              selected={tab}
+              onSelect={setTab}
+              tabs={[
+                {
+                  key: "comments",
+                  label: "댓글",
+                  // 댓글 + 답글 합계(handoff). 상한에 잘렸으면 `+`를 붙인다 — 받은 것만 센 숫자다
+                  count: commentList
+                    ? `${formatCount(commentList.comments.length)}${commentList.truncated ? "+" : ""}`
+                    : null,
+                },
+                {
+                  key: "reports",
+                  label: "보도 타임라인",
+                  count: reports.list ? formatCount(reports.list.length) : null,
+                },
+              ]}
             />
+
+            <div
+              ref={commentsPanelRef}
+              role="tabpanel"
+              id={detailPanelId("comments")}
+              aria-labelledby={detailTabId("comments")}
+              hidden={tab !== "comments"}
+              // 삭제 확정·답글 대상 소실 뒤 포커스를 받는 자리다(프로그램으로만 — Tab 순서에는 넣지 않는다)
+              tabIndex={-1}
+              className="outline-none"
+            >
+              <CommentSection
+                dealId={dealId}
+                list={commentList}
+                isPlaceholder={comments.isPlaceholder}
+                error={comments.error}
+                onRetry={() => comments.refetch()}
+                status={session.status}
+                userId={session.userId}
+                nowMs={nowMs}
+                onSignInRequired={setSignInAction}
+                deletion={deletion.item}
+                confirmedDeletes={deletion.confirmedIds}
+                focusFallbackRef={commentsPanelRef}
+              />
+            </div>
+
+            <div
+              role="tabpanel"
+              id={detailPanelId("reports")}
+              aria-labelledby={detailTabId("reports")}
+              hidden={tab !== "reports"}
+            >
+              <ReportTimeline
+                reports={reports.list}
+                error={reports.error}
+                onRetry={() => refetch()}
+                nowMs={nowMs}
+              />
+            </div>
           </article>
         )}
       </main>
@@ -255,7 +349,7 @@ export function TransferDetailView({
           <WatchToggle
             dealId={deal.id}
             watched={deal.isWatched}
-            onSignInRequired={() => setAskSignIn(true)}
+            onSignInRequired={() => setSignInAction("관심 목록에 담으려면")}
           />
         </footer>
       )}
@@ -265,10 +359,33 @@ export function TransferDetailView({
         프레임이 된다(`SignInDialog` 주석). 로그인 뒤 이 상세로 돌아온다.
       */}
       <SignInDialog
-        open={askSignIn}
-        onClose={() => setAskSignIn(false)}
-        action="관심 목록에 담으려면"
-        next={ROUTES.transfer(dealId)}
+        open={signInAction !== null}
+        onClose={() => setSignInAction(null)}
+        action={signInAction ?? ""}
+        // `next`를 주지 않는다 — 기본값(지금 화면)이라 문구가 "이 화면으로 돌아와요"가 된다.
+        // 주면 "이어서 진행할 수 있어요"가 나오는데, 로그인하고 돌아와도 누른 동작은 이어지지 않는다
+      />
+
+      {/*
+        댓글 삭제 확인 — 늘 묻는다(`use-comment-deletion` 주석). 답글이 달린 루트는 **남의 답글까지**
+        함께 사라진다는 것을 알린다 — cascade는 RLS가 막지 못하는 경로라 화면이 계약으로 갚는다.
+      */}
+      <Dialog
+        open={deletion.dialog.open}
+        onCancel={deletion.dialog.cancel}
+        onConfirm={deletion.dialog.confirm}
+        title="이 댓글을 삭제할까요?"
+        description={
+          deletion.dialog.checking
+            ? "달린 답글을 확인하고 있어요."
+            : deletion.dialog.replyCount > 0
+              ? `답글 ${formatCount(deletion.dialog.replyCount)}개도 함께 삭제돼요. 되돌릴 수 없어요.`
+              : "삭제한 댓글은 되돌릴 수 없어요."
+        }
+        confirmDisabled={deletion.dialog.checking}
+        cancelLabel="취소"
+        confirmLabel="삭제"
+        confirmTone="danger"
       />
     </>
   );

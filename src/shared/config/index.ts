@@ -1,7 +1,7 @@
 export { env, isSupabaseConfigured } from "./env";
 export {
   ROUTES,
-  isTabBarRoute,
+  hasBottomBar,
   activeTabHref,
   signInWithNext,
   withNext,

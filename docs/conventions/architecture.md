@@ -11,8 +11,9 @@
   sign-in / profile / transfer-board / transfer-detail
 - `widgets` — app-bar / bottom-tab-bar / sub-header / tab-scroll-area / auth-shell / auth-status
 - `features` — 사용자 액션 1개 = 슬라이스 1개
-  sign-in(소셜 OAuth) / sign-out / link-identity / update-profile / watch-transfer
-- `entities` — session / profile / transfer
+  sign-in(소셜 OAuth) / sign-out / link-identity / update-profile / watch-transfer /
+  write-comment / delete-comment / vote-comment
+- `entities` — session / profile / transfer / comment
   (도메인 타입·쿼리 훅·도메인 UI)
 - `shared` — ui / api / lib / config
 
@@ -26,7 +27,7 @@ shared ← entities ← features ← widgets ← views
 
 - 하위 레이어는 상위를 import하지 않는다.
 - **동일 레이어 간 import 금지** (예: `views` → `views`, `entities` → `entities`).
-- 상위가 하위 여러 슬라이스를 참조하는 것은 정상(예: `transfer-detail` view가 transfer·session 엔티티와 `watch-transfer` feature를 사용).
+- 상위가 하위 여러 슬라이스를 참조하는 것은 정상(예: `transfer-detail` view가 transfer·comment·session 엔티티와 `watch-transfer`·댓글 feature들을 사용).
 
 ## Public API & 배럴(index.ts)
 
@@ -61,6 +62,7 @@ shared ← entities ← features ← widgets ← views
   - ⚠ **`"use client"`를 붙이지 않은 `shared/ui` 컴포넌트도 서버 소비자다.** 배럴을 거치면 서버 렌더 여지를 잃는다 — `empty-state`·`avatar`·`pill`·`skeleton`과 클래스 함수들(`button-class`·`chip-class`)이 `@/shared/lib/cn` 직접 경로를 쓰는 이유다(사유는 `empty-state.tsx` 주석에).
 - `@/entities/profile` — `"use client"` 쿼리 훅 포함. **서버는 `model/types`·`api/mappers`·`api/keys`를 직접 import**(이 세 접미사는 모든 엔티티에 공통으로 열려 있다).
 - `@/entities/transfer` — `"use client"` 쿼리 훅·UI 포함. **서버는 `model/types`·`api/mappers`·`api/keys`·`api/list-query`·`lib/league`·`lib/stage`를 직접 import** — `app/transfers/page.tsx`가 리그·정렬 파싱(`lib/league`)을, `app/transfers/[id]/page.tsx`가 상태 뱃지 라벨(`lib/stage`)을 og description에 쓴다.
+- `@/entities/comment` — `"use client"` 쿼리 훅 포함. **서버는 `model/types`·`api/mappers`·`api/list-query`를 직접 import** — `app/transfers/[id]/page.tsx`가 댓글을 클라이언트 훅과 같은 조립(`buildCommentListQuery`)·자르기(`buildCommentList`)로 프리페치한다.
 - `@/entities/session` — 배럴이 zustand 스토어·Provider·가드를 재export(전부 클라이언트). 순수 함수 `toAuthErrorMessage`는 `lib/auth-error-message`에, 쿼리 키는 `api/keys`에 따로 있다.
 - `@/features/sign-in` — 배럴이 `"use client"` 훅(`useOAuthSignIn`)을 포함한다. **서버가 쓰는 순수 함수 `hasPkceVerifier`는 `@/features/sign-in/lib/pkce-verifier` 직접 경로**로 가져간다(`app/(auth)/sign-in/page.tsx`가 선례). features 레이어에도 같은 예외가 성립한다는 뜻이다 — 배럴이 클라이언트 훅을 담고 있으면 서버 소비자는 직접 경로를 쓴다.
 - 선례: `app/transfers/[id]/page.tsx`는 **`"use client"`를 담은 배럴을 하나도 거치지 않는다.** 서버 안전 모듈은 전부 직접 경로로 가져오고, 배럴을 쓰는 곳은 순수 상수만 담은 `@/shared/config`와 서버가 **렌더**하는 뷰(`@/views/transfer-detail`)뿐이다(렌더는 합법 — 아래 절 참고).

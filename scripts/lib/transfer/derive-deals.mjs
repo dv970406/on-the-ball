@@ -471,12 +471,24 @@ async function readAll(supabase, table, columns, key, build = (q) => q) {
  *   참조 보도를 **최대 1건만** 임베딩해 보고(`transfer_news_deal_published_idx`를 탄다) 빈 딜만 고른다.
  * ⚠ 임베딩은 `limit 1`이라 결과가 잘려도 판정이 틀리지 않는다 — 1건이라도 오면 "참조됨", 0건이면 정말 0건이다.
  * ⚠ 보도 행을 사람이 지워 생긴 빈 딜도 여기서 잡힌다(이번 실행에 배정이 바뀐 딜만 보면 그 경로를 놓친다).
+ * ⚠ **댓글이 달린 딜은 지우지 않는다**(`kept`로 따로 돌려준다). 댓글 FK가 `on delete restrict`라 지우려 하면
+ *   23503으로 실패하고, 그렇게 두면 매시간 같은 실패가 종료 코드 1로 남는다. 보도가 끊긴 딜이 보드에 남는 것은
+ *   사용자가 쓴 글을 잃는 것보다 싸다고 판단했다(`api-and-db.md` "삭제 규칙"). 댓글도 같은 방식으로 1건만 본다.
+ * @returns {{ orphans: object[], kept: object[] }}
  */
 async function findOrphanDeals(supabase, keep) {
-  const deals = await readAll(supabase, DEALS, "id, deal_key, player, refs:transfer_news!deal_id(id)", "id", (q) =>
-    q.limit(1, { referencedTable: "refs" }),
+  const deals = await readAll(
+    supabase,
+    DEALS,
+    "id, deal_key, player, refs:transfer_news!deal_id(id), comments:transfer_deal_comment!deal_id(id)",
+    "id",
+    (q) => q.limit(1, { referencedTable: "refs" }).limit(1, { referencedTable: "comments" }),
   );
-  return deals.filter((d) => !keep.has(d.deal_key) && d.refs.length === 0);
+  const empty = deals.filter((d) => !keep.has(d.deal_key) && d.refs.length === 0);
+  return {
+    orphans: empty.filter((d) => d.comments.length === 0),
+    kept: empty.filter((d) => d.comments.length > 0),
+  };
 }
 
 /**
@@ -554,9 +566,13 @@ export async function writeDeals(supabase, derived, rows, opts = {}) {
     stats.unlinked += ids.length;
   }
 
-  // 어떤 보도 행도 가리키지 않는 딜만 지운다(관심은 cascade)
-  for (const d of await findOrphanDeals(supabase, savedKeys)) {
+  // 어떤 보도 행도 가리키지 않는 딜만 지운다(관심은 cascade, 댓글이 달린 딜은 남긴다 — findOrphanDeals 주석)
+  const { orphans, kept } = await findOrphanDeals(supabase, savedKeys);
+  for (const d of kept) log.warn(`⚠ 보도가 끊겼지만 댓글이 있어 남긴 딜: ${d.player} (${d.deal_key})`);
+  for (const d of orphans) {
     const { error: delErr } = await supabase.from(DEALS).delete().eq("id", d.id);
+    // 판정과 삭제 사이에 댓글이 달렸다(댓글 FK restrict) — 실패가 아니라 "남긴 딜"이다
+    if (delErr?.code === "23503" && `${delErr.message} ${delErr.details ?? ""}`.includes("transfer_deal_comment")) { log.warn(`⚠ 삭제하려던 사이 댓글이 달려 남긴 딜: ${d.player} (${d.deal_key})`); continue; }
     if (delErr) { stats.failed++; log.error(`✗ 딜 삭제 실패(${d.player}): ${delErr.message}`); continue; }
     stats.deleted++;
     log.warn(`⚠ 보도 행이 하나도 남지 않은 딜을 지웠다: ${d.player} (${d.deal_key})`);

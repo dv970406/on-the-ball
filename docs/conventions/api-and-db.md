@@ -70,6 +70,10 @@ transfer_deal · transfer_deal_watch   ← watch는 deal에 딸린다
 값의 목록이 정해진 컬럼(이적 단계 `transfer_stage` 같은)은 `create type ... as enum`으로 만든다.
 `text + check`도, 코드 테이블 + FK도 아니다. 바로 위 절이 말한 **생성 타입**을 그대로 얻기 때문이다.
 
+⚠ **값이 곧 산술에 쓰이는 부호(좋아요 `1` · 싫어요 `-1`)는 enum이 아니라 `smallint + check`다**
+(`transfer_deal_comment_vote.value`). 합계 트리거와 클라이언트의 낙관적 계산이 그 값을 그대로 더하고 빼므로,
+enum이면 양쪽에 라벨 → 부호 변환이 한 벌씩 생긴다. 라벨이 붙는 값이 아니라 수치다.
+
 - 생성 파일이 **유니온 타입과 런타임 배열을 둘 다** 내려준다
   (`Database["public"]["Enums"]["transfer_stage"]` · `Constants.public.Enums.transfer_stage`).
   FK로 두면 그 자리가 `number`가 되어 도메인이 통째로 사라진다.
@@ -315,6 +319,9 @@ writer는 `scripts/lib/transfer/derive-deals.mjs`(`scripts/sync-transfer-news.mj
   ⚠ 빈 딜은 **딜마다 세지 않고** 딜 목록을 페이지로 읽으며 참조 보도를 1건만 임베딩해 찾는다 —
   범위 밖 옛 창의 딜은 옛 보도가 계속 가리켜 지워지지 않고 창마다 쌓이므로, 한 건씩 세면
   실행당 딜 수만큼 왕복이 붙는다.
+  ⚠ **댓글이 달린 딜은 보도가 끊겨도 지우지 않는다**(`findOrphanDeals`가 따로 걸러 경고만 남긴다).
+  사용자가 쓴 글이 재파생 한 번에 사라지는 것보다 보도가 끊긴 딜이 보드에 남는 편이 싸다고 판단했다 —
+  댓글 FK가 `on delete restrict`라 이 약속을 구조가 지킨다(지우려 하면 23503으로 실패한다).
 - **쓰기는 값이 바뀐 것만**: 구단·딜은 저장된 값과 파생 값을 컬럼마다 대조해(`writeDeals`의
   `sameRow`) 다른 행만 upsert한다. 전량을 매시 쓰면 값이 그대로인 행까지 트리거·인덱스가
   갱신되고, 한 행만 실패해도 `upsertRows`가 전량을 한 건씩 다시 보낸다.
@@ -361,6 +368,28 @@ writer는 `scripts/lib/transfer/derive-deals.mjs`(`scripts/sync-transfer-news.mj
   빼면 목록 select의 관심 임베딩이 42501로 죽어 비로그인에게 보드가 통째로 안 보인다 —
   anon은 정책에서 걸려 항상 빈 배열(= `isWatched` false)을 받을 뿐이다.
 - 딜이 지워지면(`report_count`가 0이 된 재파생) 관심도 함께 사라진다(`on delete cascade`).
+
+### `transfer_deal_comment` — 딜 댓글 · 좋아요/싫어요
+
+딜에 딸린 사용자 글이다. 읽기 공개(비로그인·크롤러 포함) ·
+쓰기/삭제 본인만 · **수정 경로 없음**(UPDATE 정책도 grant도 없다).
+
+- **딜 FK는 `on delete restrict`다(관심의 cascade가 아니다).** 딜은 파생 스크립트가 다시 만들고 지우는
+  데이터라 cascade면 재파생 한 번에 사용자 글이 사라진다 → 파생기가 댓글 달린 딜을 삭제 대상에서 뺀다(위 딜 파생 절).
+- **답글은 깊이 1** — `transfer_deal_comment_check_depth`(BEFORE INSERT)가 부모가 답글이거나·다른 딜이거나·없으면
+  P0001로 사유를 말한다. 정책이 아니라 트리거인 이유는 아래 "그래서 검증 로직을 정책이 아니라 트리거에 두는 경우" 절.
+  ⚠ 이 트리거는 **invoker**이고 첫 줄 명의 검사를 **두지 않는다**(아래 "트리거는 정책이 통과시킬 행에 대해서만
+  말한다"의 예외) — 말하는 값(부모의 딜·깊이)이 전부 공개 SELECT로 읽히는 값이라 오라클이 될 것이 없고, 명의
+  검사를 두면 `auth.uid()`가 비는 service_role 경로에서 깊이 검사가 꺼진다.
+- **루트를 지우면 남의 답글까지 cascade로 사라진다** — 화면의 삭제 확인이 "답글 N개도 함께 삭제돼요"로 알린다.
+- **표는 `transfer_deal_comment_vote(user_id, comment_id, value ±1)` 한 행**이다. 복합 PK가 "1인 1표"를 쥐고, 바꾸기는
+  `value` UPDATE(grant가 그 컬럼 하나뿐 — 표를 다른 댓글·사람으로 옮길 수 없다), 거두기는 delete다. upsert는 쓰지 않는다.
+- **합계(`up_count`·`down_count`)는 definer 트리거(`sync_transfer_deal_comment_vote_count`)가 단독 관리한다** — 표가
+  남의 댓글에 붙으므로 호출자 권한으론 UPDATE할 수 없고, 탈퇴 cascade도 숫자를 맞춰야 한다(아래 "비정규화 카운터" 절).
+  RPC가 없는 이유는 분기(insert/update/delete)를 클라이언트가 해도 불변조건이 PK·트리거에 있어 어긋날 값이 없어서다.
+- 목록 select의 `transfer_deal_comment_vote(value)` 임베딩이 곧 **내 표**다(관심과 같은 트릭 — 정책이 "내 행만").
+  ⚠ 그래서 anon에도 `(user_id, comment_id, value)` SELECT를 연다(임베딩의 통로).
+- 작성자 표기는 `profiles` 임베딩이다 → 닉네임·아바타를 바꾸는 훅이 댓글 캐시도 무효화한다.
 
 ### ⚠ enum 값은 **지울 수 없다**
 
@@ -460,6 +489,9 @@ end if;
 ⚠ 이 회귀는 라벨만으로는 안 잡힌다 — `run-rls.sh`는 "차단 기대인데 통과했는가"만 보고
 **어떤 코드로 차단됐는지는 보지 않는다.** `rls.sql`에서 sqlstate를 직접 찍어 대조한다.
 
+⚠ **예외: 트리거가 말하는 값이 전부 공개 SELECT로 읽히는 값이면 명의 검사를 두지 않는다**(댓글 깊이 트리거).
+감춘 것이 없으면 오라클도 없고, 명의 검사는 `auth.uid()`가 비는 service_role·마이그레이션 경로에서 검사를 통째로 끈다.
+
 #### ⚠ 같은 23505라도 "설명"과 "흡수"로 갈린다
 
 판정 기준은 **재시도가 목표 상태에 이미 도달했는가**다.
@@ -467,6 +499,7 @@ end if;
 | 자리 | 처리 | 왜 |
 |---|---|---|
 | 관심 담기(`transfer_deal_watch`) | 훅이 23505를 **성공으로 흡수** | 이미 담은 딜을 또 담으면 목표 상태 그대로다 — 멱등이 맞다 |
+| 댓글 표 던지기(`transfer_deal_comment_vote`) | 훅이 23505를 받으면 **`value` UPDATE로 이어 간다** | 다른 탭이 이미 표를 던졌다 — 목표 표로 맞추면 된다(흡수의 변형: 행은 있으니 값만 수렴시킨다) |
 | "접수했어요"류 쓰기 | 트리거가 **P0001로 설명** | 같은 접수를 두 번 "접수했어요"라고 말하면 거짓말이다 |
 
 ⚠ 트리거는 BEFORE라 **동시 요청 두 건이 둘 다 통과하는 창**이 남는다. 그 창은 복합 PK가 막고(23505), 훅이 그 코드를 같은 한국어 문구로 접는다. **트리거는 "설명", 제약은 "보장"**이라 둘 다 필요하다.
@@ -641,6 +674,7 @@ end if;
 | 자리 | 화면(그래핌, 클라 전용) | DB(코드포인트, CHECK) | 상수 | 검증 함수 |
 |---|---:|---:|---|---|
 | 닉네임 | 20 | 200 | `NICKNAME_LIMIT` | `validateNickname` (정규형 기준 + `isPlainNickname`) |
+| 딜 댓글 | 300 | 3,000 | `COMMENT_LIMIT` | `validateComment` (`hasVisibleChar` + `lengthOverflow`, 앞뒤 공백을 걷은 **저장값**을 잰다) |
 
 ⚠⚠ **길이는 저장하는 값으로 잰다.** 저장 직전에 값을 접는 자리(`normalizeNickname`)가 있으면
 **정규형을 재야** 화면 한도와 저장값이 갈리지 않는다. `normalizeNickname`이 ZWJ를 지우므로
@@ -687,6 +721,7 @@ abuse bound를 10배로 푸는 대가가 크고, 20,000자 그래핌 계산이 *
 | 종류 | 함수 | 비고 |
 |---|---|---|
 | 트리거 | **`handle_new_user`** (`on_auth_user_created`, `after insert on auth.users`) | 가입 시 `profiles` 행 생성. **호출자 권한으로 돌면 `profiles` insert 권한이 없어 가입 자체가 실패한다** |
+| 트리거 | **`sync_transfer_deal_comment_vote_count`** (`after insert or update or delete on transfer_deal_comment_vote`) | 댓글 좋아요·싫어요 합계. 댓글에 UPDATE 정책도 grant도 없어 **호출자 권한으로 돌면 남의 댓글 합계가 0행으로 조용히 안 바뀐다** |
 
 ⚠ **아래는 definer로 오해하기 쉽지만 아니다.**
 권한 없이도 도는 함수를 "RLS를 우회하는 함수"로 세어두면 보안 검토가 헛돈다. 위 검증 질의에서 `prosecdef = false`로 나오는 것이 전부이고, 아래 표는 그중 이유가 헷갈리는 것만 적는다.
@@ -697,6 +732,7 @@ abuse bound를 10배로 푸는 대가가 크고, 20,000자 그래핌 계산이 *
 | `normalize_profile_nickname` | 쓰기 직전 `new.nickname`을 다듬을 뿐이라 호출자 권한으로 충분하다 |
 | `transfer_news_freeze_collected` | 트리거지만 옛 행과 새 행을 비교해 거부할 뿐이다 → 권한 상승이 필요 없다(writer가 service_role이라 **어차피 grant가 아니라 이 트리거가** 방어다) |
 | `random_nickname` | 인자도 테이블 접근도 없는 순수 조합 생성기 |
+| `transfer_deal_comment_check_depth` | 트리거지만 부모 댓글을 **읽기만** 하고, 댓글은 전부 공개 SELECT라 RLS를 넘을 이유가 없다 |
 
 ⚠ **CHECK 제약 평가 함수(`has_visible_char`·`normalize_nickname`·`is_plain_nickname`)는 이 목록의 대상이 아니다.**
 성질이 반대다 — definer로 만들 게 아니라 오히려
@@ -733,6 +769,9 @@ definer 함수를 새로 만들 때의 규약:
 - **카운터가 없으면 지킬 불변조건이 행 하나뿐이고, 그 행은 복합 PK가 이미 묶는다** → RPC 없이
   훅이 insert/delete를 직접 보낸다(`transfer_deal_watch`). 집계는 그때그때 `count(*)`로 센다 —
   어긋날 값 자체를 두지 않는다.
+- **카운터가 있어도 트리거가 단독으로 관리하면 RPC가 필요 없다** — 분기(insert/update/delete)를 클라이언트가
+  골라도 합계는 행이 실제로 바뀐 만큼만 트리거가 움직이므로 어긋날 수 없다(`transfer_deal_comment_vote`).
+  RPC가 필요한 것은 **카운터를 함수가 직접 증감할 때**다(`SELECT → +1 → UPDATE`의 lost update).
 
 ⚠ **PostgREST의 upsert(`Prefer: resolution=merge-duplicates`)를 쓰지 않는다.**
 `ON CONFLICT DO UPDATE SET`에 **payload의 모든 컬럼**을 실어서 키 컬럼에도 UPDATE 권한을
@@ -793,8 +832,15 @@ cascade 삭제는 RI(참조 무결성) **내부 트리거**가 수행하므로 �
 그래서 "본인 것만 삭제" 정책이 있어도, 내 행을 지우면 거기에 매달린 **남의 행까지 함께 사라진다** —
 정책의 간접 우회로다.
 
-- 지금 그 자리는 `transfer_deal_watch`다 — 재파생이 딜을 지우면 모든 사용자의 관심이 함께 사라진다.
+- `transfer_deal_watch` — 재파생이 딜을 지우면 모든 사용자의 관심이 함께 사라진다.
   딜이 없어졌으니 관심도 뜻을 잃는다는 판단으로 **수용한 트레이드오프**다.
+  ⚠ 같은 딜에 매달린 **댓글은 반대로 `restrict`다** — 사용자가 쓴 글은 뜻을 잃지 않는다(위 댓글 절).
+- `transfer_deal_comment.parent_id` — 루트를 지우면 남이 단 답글까지 사라진다 → 삭제 확인 문구가 알린다.
+- `transfer_deal_comment_vote.comment_id` — 댓글을 지우면 거기 던진 남의 표도 사라진다. 표는 그 댓글에 대한
+  것이라 댓글과 함께 뜻을 잃는다 — **수용한 트레이드오프**다(합계를 담은 행 자체가 사라지므로 어긋날 숫자도 없다).
+- `transfer_deal_comment.user_id`·`transfer_deal_comment_vote.user_id`(→ `profiles`) — 탈퇴하면 그 사람의 댓글
+  (과 거기 달린 남의 답글)·표가 사라진다. 탈퇴한 사람의 글을 남기려면 작성자 표기를 대체할 방법이 먼저 있어야
+  하므로 지금은 **수용한다**. 표가 사라질 때 남의 댓글 합계는 트리거가 맞춘다(cascade도 행 삭제라 트리거가 돈다).
 - 사용자가 지우는 행에서 남의 행이 함께 사라진다면 **화면의 삭제 확인 문구가 그 사실을 고지해야 한다** —
   정책이 못 막는 것을 UI 계약으로 갚는 셈이다.
 
@@ -878,7 +924,7 @@ RLS 술어가 security-barrier 서브쿼리 안으로 들어가 바깥의 `fk = 
 
 | 파일 | 용도 |
 |---|---|
-| `supabase/tests/rls.sql` | RLS·컬럼 권한·함수 전량 검사 (전체 rollback이라 DB에 흔적 없음). ⚠ 여기에 **섹션 번호를 적지 않는다** — 섹션을 더하고 빼는 순간 거짓이 된다. 다루는 것: 프로필 편집(본인만 수정·아바타 경로·`created_at` 위조·스토리지 정책과 버킷 설정값), 닉네임 정규형·허용 문자·랜덤 배정 포화, 길이 한도, 이적 소식·보드·관심·요약·이름 캐시, 그리고 아래 전수 가드 |
+| `supabase/tests/rls.sql` | RLS·컬럼 권한·함수 전량 검사 (전체 rollback이라 DB에 흔적 없음). ⚠ 여기에 **섹션 번호를 적지 않는다** — 섹션을 더하고 빼는 순간 거짓이 된다. 다루는 것: 프로필 편집(본인만 수정·아바타 경로·`created_at` 위조·스토리지 정책과 버킷 설정값), 닉네임 정규형·허용 문자·랜덤 배정 포화, 길이 한도, 이적 소식·보드·관심·요약·이름 캐시, 딜 댓글·답글 깊이·표 합계, 그리고 아래 전수 가드 |
 | — **전수 가드는 테이블명을 하드코딩하지 않는다** | public 스키마 기본 권한이 anon/authenticated에 ALL이라, 새 마이그레이션이 `revoke`를 한 번만 잊어도 즉시 구멍이 된다. 고정 목록만 검사하면 **새 테이블은 검사 대상에 들어오지도 않는다** → RLS 미적용·anon 쓰기 권한·search_path 미고정·anon EXECUTE를 전수로 훑는다 |
 | — ⚠ **전수 가드는 `[0행 기대]` 라벨을 달아야 한다** | 라벨이 없으면 러너의 값 대조가 그 질의를 보지 않아, **행이 나와도 "✅ 통과"로 넘어간다.** 실제로 그랬다 — CHECK 평가 함수를 anon에 열었는데 가드가 그 이름을 뱉은 채 통과했다. 전수 가드가 러너에 안 잡히면 가드가 아니다 |
 | — **INSERT 시점 위조**도 따로 본다 | UPDATE만 보면 `grant insert` 목록이 넓어지는 회귀(카운터·타임스탬프 동봉)를 못 잡는다 |

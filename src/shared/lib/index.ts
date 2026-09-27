@@ -2,6 +2,8 @@ export { cn } from "./cn";
 export { useScrollRestore } from "./use-scroll-restore";
 export { formatCount, formatRelativeTime } from "./format";
 export { useNowMs } from "./use-now";
+// 서버 시각 → 기기 시계 기준(쿼리의 initialDataUpdatedAt 등 기기 시계와 빼는 자리) — 사유는 그 파일 주석
+export { serverToClientTime } from "./server-clock";
 export { useFocusTrap } from "./use-focus-trap";
 export { useToast, useToastStore } from "./toast-store";
 export { parsePostId } from "./post-id";
@@ -15,6 +17,8 @@ export {
 } from "./text";
 export { useNextParam } from "./use-next-param";
 export { useDuplicateGuard } from "./use-duplicate-guard";
+// 목록의 **항목별** 가드 — 댓글 삭제처럼 뮤테이션 하나를 여러 항목이 나눠 쓸 때(사유는 그 파일 주석)
+export { useItemGuard } from "./use-item-guard";
 // ⚠ 쿼리 키 조각이라 **서버 안전**하다 — 서버 프리페치가 키를 만들 일이 생기면
 //   배럴이 아니라 "@/shared/lib/query-scope" 직접 경로로.
 export { userScope } from "./query-scope";

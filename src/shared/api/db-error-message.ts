@@ -48,6 +48,12 @@ export function toDbErrorMessage(error: unknown): string {
   // P0001은 우리가 RPC 안에서 raise exception으로 던진 것이라 message가 이미 한국어다
   if (error.code === "P0001" && error.message) return error.message;
 
+  // ⚠ 작성자 FK(`…_user_id_fkey`)가 23503이면 **내 계정(profiles 행)이 없어진 것**이다 — 일반 23503 문구
+  //   ("대상을 찾을 수 없어요")로 두면 사용자가 "쓰려던 글이 지워졌다"로 오해한다(QA 실측: 탈퇴 처리된 계정).
+  if (error.code === "23503" && error.message?.includes("_user_id_fkey")) {
+    return "계정 정보를 찾을 수 없어요. 다시 로그인해 주세요.";
+  }
+
   if (error.code && DB_ERROR_MESSAGE[error.code]) return DB_ERROR_MESSAGE[error.code];
 
   return "요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.";

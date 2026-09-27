@@ -101,6 +101,8 @@ function cardClassName(peek: boolean) {
     | `entities/transfer/ui/watch-mark.tsx` | 이적시장 관심 표시 원(목록 행) — 상태 표시. 글자 대신 종 아이콘(`Bell`, `fill-current`)이 형태를 지고 `sr-only` 텍스트가 스크린리더에 같은 뜻을 준다 |
     | `entities/transfer/ui/fee-delta.tsx` | 이적시장 이적료 상승 화살표(`text-primary-deep`) — 콘텐츠 값의 방향 표시라 CTA 셈에 들어가지 않고, `ArrowUp` 아이콘이 형태를 진다(하락은 `text-crimson`) |
     | `widgets/bottom-tab-bar/ui/bottom-tab-bar.tsx` | 활성 탭 아이콘 |
+    | `entities/comment/ui/comment-item.tsx` | 댓글의 `나` 뱃지(`Pill variant="green"`) — 상태 표시라 CTA 셈 밖이고, 글자("나")가 뜻을 진다 |
+    | `features/vote-comment/ui/comment-vote-buttons.tsx` | 댓글 좋아요 활성(`text-primary-deep`) — 상태 표시. 누른 쪽 아이콘을 채워(`fill-current`) 형태로도 구분하고 `aria-pressed`가 같은 뜻을 준다 |
 
     (검사는 **주석을 걷어낸 소스**를 훑는다 — 주석에 적힌 `bg-primary`는 세지 않는다.)
 
@@ -111,8 +113,16 @@ function cardClassName(peek: boolean) {
     WCAG의 비텍스트 최소 3:1에 못 미친다 — 이 색에 **글자나 형태 없는 표시를 싣지 않는다.**
     관심 표시 원이 성립하는 것은 종 아이콘의 채우기(`fill-current`)가 형태를 함께 지기 때문이고,
     오피셜 뱃지는 글자가 뜻을 진다.
+  - ⚠ **한 화면에 CTA가 둘이면 나중 것을 잉크로 둔다.** 이적 상세의 댓글 `등록` 버튼이 그 자리다 — 그 화면의
+    에메랄드 CTA는 하단 관심 토글이다.
+  - ⚠ **목록 항목마다 되풀이되는 에메랄드는 "내 것"처럼 드문 항목에만 붙인다.** 댓글의 `나` 뱃지는 내가 쓴
+    댓글에만 뜨므로 목록 전체를 칠하지 않는다 — 모든 항목에 붙는 표시라면 에메랄드가 항목 수만큼 늘어나
+    위 "간접으로 새는 자리" 사고가 된다.
 - 에메랄드(`bg-primary`) 위 텍스트는 항상 `text-on-primary`(#171717) — **흰색 금지**.
 - 버튼은 **6px 라운드**(`rounded-sm`) — pill 버튼 금지. **예외는 아래 표에 못박아 두었다.**
+  - ⚠ **버튼을 품은 입력칸은 버튼이 아니라 서피스다** — 댓글 입력칸(`등록` 버튼을 안에 품는다)은 8px(`rounded-md`)이고,
+    비로그인에게 같은 모양으로 보여 주는 트리거(`CommentSignInField` — 누르면 로그인 안내)도 입력칸의 치수를
+    그대로 쓴다(`COMMENT_FIELD_BOX` 공유). 입력칸처럼 보이는 것이 다른 라운드로 그려지면 다른 컨트롤로 읽힌다.
 - 그림자 대신 **1px 헤어라인**이 카드 구조를 담당, resting 상태는 flat. **예외는 "떠 있는 레이어"뿐이다(아래).**
 - 배경 그라데이션·블러·글래스모피즘 금지(하단 탭바만 예외적으로 blur).
 - 애니메이션 이징 `ease-otb`(cubic-bezier(0.2,0,0,1)), 150–350ms. 바운스·스프링 금지.

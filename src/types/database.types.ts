@@ -153,6 +153,97 @@ export type Database = {
           },
         ]
       }
+      transfer_deal_comment: {
+        Row: {
+          content: string
+          created_at: string
+          deal_id: number
+          down_count: number
+          id: number
+          parent_id: number | null
+          up_count: number
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          deal_id: number
+          down_count?: number
+          id?: never
+          parent_id?: number | null
+          up_count?: number
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          deal_id?: number
+          down_count?: number
+          id?: never
+          parent_id?: number | null
+          up_count?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transfer_deal_comment_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "transfer_deal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfer_deal_comment_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "transfer_deal_comment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfer_deal_comment_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transfer_deal_comment_vote: {
+        Row: {
+          comment_id: number
+          created_at: string
+          user_id: string
+          value: number
+        }
+        Insert: {
+          comment_id: number
+          created_at?: string
+          user_id: string
+          value: number
+        }
+        Update: {
+          comment_id?: number
+          created_at?: string
+          user_id?: string
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transfer_deal_comment_vote_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "transfer_deal_comment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfer_deal_comment_vote_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transfer_deal_watch: {
         Row: {
           created_at: string

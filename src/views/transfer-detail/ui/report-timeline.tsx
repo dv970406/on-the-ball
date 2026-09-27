@@ -20,41 +20,31 @@ interface ReportTimelineProps {
 }
 
 /**
- * 보도 타임라인(handoff §5-7) — 최신순, 항목마다 Tier · 보도 주체 · 매체 · 시간 / 요지 / 원문 보기.
+ * 보도 타임라인 탭의 내용(handoff §5-7) — 최신순, 항목마다 Tier · 보도 주체 · 매체 · 시간 / 요지 / 원문 보기.
  *
  * - 요지는 한국어 요약(없으면 영문 발췌 — 매퍼가 고른다)이고 두 줄에서 자른다. 없으면 그 행을 생략한다.
  * - 원문 주소는 `originalUrl`(원저자 주소 우선 — 매퍼가 정한다). 없으면 링크를 그리지 않는다.
  *   ⚠ `target=_blank`에는 `rel="noopener noreferrer"`가 필수다(탭 납치).
  * - 좌측 7px 점은 컨트롤이 아니라 **레일의 표시 요소**라 `rounded-full`이 알약 규칙의 대상이 아니다
- *   (`styling.md` "대상이 아닌 것" — `live-dot`과 같은 자리). 첫 항목(최신)만 잉크다.
+ *   (`styling.md` "대상이 아닌 것"). 첫 항목(최신)만 잉크다.
  *
- * ⚠ 헤더의 `N REPORTS`는 **받은 목록의 길이**다. `deal.reportCount`로 쓰면 목록이 아직 없을 때
- *   숫자만 먼저 떠서 "5건이라는데 아무것도 없다"가 된다 — 목록과 숫자를 같은 값에서 만든다.
+ * ⚠ **제목 줄(`보도 타임라인 · N REPORTS`)이 없다** — 탭이 제목과 건수를 대신한다(handoff 두 번째 판).
+ *   패널의 접근성 이름도 탭이 준다(`aria-labelledby` — 뷰가 패널을 감싼다).
  */
 export function ReportTimeline({ reports, error, onRetry, nowMs }: ReportTimelineProps) {
   return (
-    <section aria-labelledby="transfer-reports-heading" className="mt-[22px]">
-      <div className="mb-1 flex items-baseline justify-between">
-        <h2 id="transfer-reports-heading" className="text-[15px] font-medium text-ink">
-          보도 타임라인
-        </h2>
-        {reports !== undefined && (
-          <span className="font-mono text-[10px] uppercase tracking-[0.5px] tabular-nums text-ink-mute-2">
-            {reports.length} REPORTS
-          </span>
-        )}
-      </div>
-
+    // ⚠ 첫 항목 위에는 선이 없다 — 탭 바의 아래 선이 그 자리를 맡는다(두 줄이 겹쳐 굵어 보인다)
+    <>
       {reports === undefined && error === null && (
         // 골격은 실제 항목(1행 메타 + 요지 두 줄)과 같은 높이다
-        <div aria-hidden className="border-t border-hairline-cool py-3">
+        <div aria-hidden className="py-3">
           <Skeleton className="h-4 w-40" />
           <Skeleton className="mt-2 h-[42px] w-full" />
         </div>
       )}
 
       {reports === undefined && error !== null && (
-        <p className="border-t border-hairline-cool py-3 text-[12px] text-ink-mute">
+        <p className="py-3 text-[12px] text-ink-mute">
           보도를 불러오지 못했어요.{" "}
           <button type="button" onClick={onRetry} className="underline underline-offset-2">
             다시 시도
@@ -63,7 +53,7 @@ export function ReportTimeline({ reports, error, onRetry, nowMs }: ReportTimelin
       )}
 
       {reports !== undefined && reports.length === 0 && (
-        <p className="border-t border-hairline-cool py-3 text-[12px] text-ink-mute">
+        <p className="py-3 text-[12px] text-ink-mute">
           아직 연결된 보도가 없어요.
         </p>
       )}
@@ -74,7 +64,7 @@ export function ReportTimeline({ reports, error, onRetry, nowMs }: ReportTimelin
             return (
               <li
                 key={report.id}
-                className="grid grid-cols-[14px_1fr] gap-2.5 border-t border-hairline-cool py-3"
+                className="grid grid-cols-[14px_1fr] gap-2.5 border-t border-hairline-cool py-3 first:border-t-0"
               >
                 <span className="flex justify-center pt-[5px]" aria-hidden>
                   <span
@@ -124,6 +114,6 @@ export function ReportTimeline({ reports, error, onRetry, nowMs }: ReportTimelin
           })}
         </ol>
       )}
-    </section>
+    </>
   );
 }

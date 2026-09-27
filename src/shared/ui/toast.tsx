@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { cn, useToastStore } from "@/shared/lib";
-import { isTabBarRoute } from "@/shared/config";
+import { hasBottomBar } from "@/shared/config";
 
 /** 자동 소멸까지 — 프로토타입과 동일 */
 const TOAST_DURATION_MS = 1800;
@@ -15,11 +15,11 @@ const TOAST_DURATION_MS = 1800;
  *   렌더되므로 absolute의 기준은 초기 컨테이닝 블록(뷰포트)이다. 프레임이
  *   `mx-auto h-dvh`라 좌표가 결과적으로 일치한다 — 프레임 정렬을 바꾸면 여기도 봐야 한다.
  *
- * ⚠ 탭바가 있는 화면에서는 토스트를 그 위로 올려야 가리지 않는다(112px / 40px).
+ * ⚠ 하단 고정 바(탭바·딜 상세의 관심 토글 바)가 있는 화면에서는 토스트를 그 위로 올려야 가리지 않는다(112px / 40px).
  *   전에는 목록 화면이 전역 스토어에 present를 올리는 방식이었는데, 경로로 판정하는 편이
  *   shared가 "탭바"라는 상위 도메인 개념을 모르게 되고 boolean 스토어가 화면 둘에서 서로
  *   덮어쓰는 문제도 없다.
- * ⚠ **판정은 `isTabBarRoute`가 단독으로 소유한다.** 여기서 목록 경로 하나와
+ * ⚠ **판정은 `hasBottomBar`가 단독으로 소유한다.** 여기서 목록 경로 하나와
  *   직접 비교하던 시절, 프로필에도 탭바가 생기면서 **토스트가 탭바를 덮었다** — 두 곳이 같아야
  *   하는 규약은 상수 하나가 갖는다.
  */
@@ -27,7 +27,7 @@ export function ToastViewport() {
   const message = useToastStore((s) => s.message);
   const seq = useToastStore((s) => s.seq);
   const dismiss = useToastStore((s) => s.dismiss);
-  const aboveTabBar = isTabBarRoute(usePathname());
+  const aboveBottomBar = hasBottomBar(usePathname());
 
   useEffect(() => {
     if (!message) return;
@@ -53,7 +53,7 @@ export function ToastViewport() {
         // ⚠ translate 표준 유틸이 아니라 arbitrary property다 — 같은 요소에 animation이 있으면
         //   `translate` 개별 프로퍼티가 `transform`과 합성되어 조용히 어긋난다(styling.md).
         "[transform:translateX(-50%)]",
-        aboveTabBar ? "bottom-[112px]" : "bottom-10",
+        aboveBottomBar ? "bottom-[112px]" : "bottom-10",
       )}
     >
       {/* 애니메이션은 안쪽 말풍선이 갖는다 — 바깥 리전은 계속 살아 있어야 한다 */}

@@ -10,6 +10,7 @@ import {
   useToast,
   type TextLimit,
 } from "@/shared/lib";
+import { commentKeys } from "@/entities/comment";
 import { profileKeys } from "@/entities/profile";
 
 /**
@@ -100,9 +101,17 @@ export function useUpdateNickname(userId: string | undefined) {
      * isPending을 유지해 저장 직후 재클릭으로 중복 요청이 나가는 것을 막는다
      * (data-and-state.md의 표 참고).
      *
-     * ⚠ 닉네임을 싣는 캐시가 새로 생기면(작성자 표기 등) 여기 함께 무효화한다.
+     * ⚠ 닉네임을 싣는 캐시가 새로 생기면(작성자 표기 등) 여기 함께 무효화한다 — 지금은 댓글의
+     *   작성자 임베딩(`COMMENT_SELECT`의 `author`)이 그 자리다.
      */
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: profileKeys.all }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: profileKeys.all }),
+        // ⚠ 무효화만 한다(지우지 않는다) — 지우면 뒤로가기가 되살린 **옛 서버 페이로드**가 빈 캐시에
+        //   신선한 데이터로 앉아 옛 작성자 표기가 새로고침 전까지 남았다(QA 실측). stale로 남겨 두면
+        //   돌아온 순간 다시 받는다(그 왕복 동안의 옛 표기는 남는다).
+        queryClient.invalidateQueries({ queryKey: commentKeys.all }),
+      ]),
     // 실패를 앱의 유일한 알림 채널로 — 필드 아래 문구는 조건부 평문이라 낭독되지 않는다
     onError: (error) => toast(error.message),
   });

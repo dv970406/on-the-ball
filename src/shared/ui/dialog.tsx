@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { cn, useFocusTrap } from "@/shared/lib";
 
 /**
@@ -22,6 +22,9 @@ const CONFIRM_TONE = {
 
 type ConfirmTone = keyof typeof CONFIRM_TONE;
 
+/** 열린 직후 스크림 클릭을 무시하는 창 — 더블탭 간격(보통 300ms 안)을 덮는다 */
+const SCRIM_GUARD_MS = 350;
+
 interface DialogProps {
   open: boolean;
   /** 취소 — 스크림 클릭·Escape가 모두 이걸 부른다 */
@@ -33,6 +36,11 @@ interface DialogProps {
   confirmLabel: string;
   /** 확인 버튼의 성격. 기본은 잉크 블랙 */
   confirmTone?: ConfirmTone;
+  /**
+   * 확인을 잠시 막는다 — 문구가 아직 확정되지 않았을 때(댓글 삭제가 답글 수를 다시 세는 동안).
+   * ⚠ 취소는 막지 않는다 — 기다리는 동안에도 빠져나갈 수 있어야 한다.
+   */
+  confirmDisabled?: boolean;
   /**
    * 기본은 `alertdialog` — 되돌릴 수 없는 확인(삭제·차단·작성 이탈)이 이 컴포넌트의 원래 자리다.
    *
@@ -61,12 +69,18 @@ export function Dialog({
   cancelLabel,
   confirmLabel,
   confirmTone = "ink",
+  confirmDisabled,
   role = "alertdialog",
 }: DialogProps) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const descId = useId();
   useFocusTrap(ref, open, onCancel);
+  /** 열린 시각 — 여는 클릭의 두 번째 탭이 스크림에 떨어져 곧바로 닫히는 것을 막는다(아래 스크림 주석) */
+  const openedAtRef = useRef(0);
+  useEffect(() => {
+    if (open) openedAtRef.current = performance.now();
+  }, [open]);
 
   if (!open) return null;
 
@@ -74,7 +88,15 @@ export function Dialog({
     <>
       <div
         className="absolute inset-0 z-80 bg-ink/50 motion-safe:animate-[cm-fade_0.2s_cubic-bezier(0.2,0,0,1)_both]"
-        onClick={onCancel}
+        // ⚠ 열리자마자 들어온 스크림 클릭은 취소로 보지 않는다 — 여는 버튼을 더블탭하면 두 번째 탭이
+        //   막 뜬 스크림에 떨어져 다이얼로그가 열리자마자 닫혔다(QA 실측). Escape·취소 버튼은 그대로다.
+        onClick={() => {
+          if (performance.now() - openedAtRef.current < SCRIM_GUARD_MS) return;
+          onCancel();
+        }}
+        // ⚠ 스크림을 눌러도 포커스를 옮기지 않는다 — 막힌 클릭(위 가드)이 포커스만 `<body>`로 빼 모달 밖에
+        //   두었다(QA 실측). 닫히는 클릭이면 포커스 복귀는 여는 쪽이 맡는다.
+        onMouseDown={(e) => e.preventDefault()}
         aria-hidden
       />
       <div
@@ -130,9 +152,10 @@ export function Dialog({
           <button
             type="button"
             onClick={onConfirm}
+            disabled={confirmDisabled}
             className={cn(
               "h-11 flex-1 rounded-sm border text-[15px] font-medium",
-              "transition-colors duration-150 ease-otb",
+              "transition-colors duration-150 ease-otb disabled:opacity-40",
               CONFIRM_TONE[confirmTone],
             )}
           >

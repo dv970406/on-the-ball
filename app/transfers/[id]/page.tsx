@@ -13,6 +13,9 @@ import { buildDealQuery, buildReportsQuery } from "@/entities/transfer/api/list-
 import { buildDeal, buildReport } from "@/entities/transfer/api/mappers";
 import { STAGE_STATUS, STATUS_LABEL } from "@/entities/transfer/lib/stage";
 import type { TransferDeal, TransferReport } from "@/entities/transfer/model/types";
+import { buildCommentListQuery } from "@/entities/comment/api/list-query";
+import { buildCommentList } from "@/entities/comment/api/mappers";
+import type { CommentList } from "@/entities/comment/model/types";
 import { TransferDetailView } from "@/views/transfer-detail";
 
 const FALLBACK_METADATA: Metadata = { title: "이적 상세" };
@@ -33,6 +36,11 @@ type DealHead =
        *   그대로 내보내고 타임라인만 클라이언트 조회로 미룬다(`nextjs.md`).
        */
       reports: TransferReport[] | undefined;
+      /**
+       * 댓글 — 타임라인과 같은 곁다리다. 실패하면 `undefined`(클라이언트가 조회한다), 없으면 빈 목록.
+       * ⚠ 키가 userId로 스코프된다(내 표 임베딩이 "내 행만") — 아래 `userId`와 한 쌍이다.
+       */
+      comments: CommentList | undefined;
       /** ⚠ 쿼리 키가 userId로 스코프된다 — 그 값도 함께 내려야 캐시에 닿는다 */
       userId: string | undefined;
       /**
@@ -62,12 +70,18 @@ const fetchDealHead = cache(async (dealId: number): Promise<DealHead> => {
     // 서로의 결과를 쓰는 조회가 없다 → **전부 병렬로** 보낸다. 직렬이면 왕복이 쌓인다.
     // ⚠ 조립은 `buildDealQuery`·`buildReportsQuery`가 단독으로 소유한다 — 클라이언트 훅과 같은
     //   select·정렬이어야 하이드레이션 직후 타임라인이 재배열되지 않는다.
-    const [{ data: auth }, { data, error }, { data: reportRows, error: reportsError }] =
-      await Promise.all([
-        supabase.auth.getUser(),
-        buildDealQuery(supabase, dealId),
-        buildReportsQuery(supabase, dealId),
-      ]);
+    const [
+      { data: auth },
+      { data, error },
+      { data: reportRows, error: reportsError },
+      { data: commentRows, error: commentsError },
+    ] = await Promise.all([
+      supabase.auth.getUser(),
+      buildDealQuery(supabase, dealId),
+      buildReportsQuery(supabase, dealId),
+      // ⚠ 조립·자르기·뒤집기는 클라이언트 훅과 같은 함수다 — 갈리면 하이드레이션 직후 목록이 흔들린다
+      buildCommentListQuery(supabase, dealId),
+    ]);
 
     if (error) return { state: "unknown" };
     if (!data) return { state: "missing" };
@@ -75,11 +89,13 @@ const fetchDealHead = cache(async (dealId: number): Promise<DealHead> => {
     // ⚠ 곁다리 조회가 실패해도 **본문은 그대로 내보낸다** — 타임라인만 접는다(`undefined`).
     //   `[]`로 접으면 "보도가 없다"는 다른 뜻이 되어 화면이 거짓말한다.
     const reports = reportsError ? undefined : (reportRows ?? []).map(buildReport);
+    const comments = commentsError ? undefined : buildCommentList(commentRows ?? []);
 
     return {
       state: "found",
       deal: buildDeal(data),
       reports,
+      comments,
       userId: auth.user?.id,
       nowMs,
     };
@@ -162,6 +178,7 @@ export default async function Page(props: PageProps<"/transfers/[id]">) {
       dealId={dealId}
       initialDeal={head.state === "found" ? head.deal : undefined}
       initialReports={head.state === "found" ? head.reports : undefined}
+      initialComments={head.state === "found" ? head.comments : undefined}
       initialUserId={head.state === "found" ? head.userId : undefined}
       serverNowMs={head.state === "found" ? head.nowMs : undefined}
     />

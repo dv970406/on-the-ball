@@ -38,6 +38,8 @@ const DEEP_IMPORT_ALLOWED = new Set([
   // 쿼리 키 조각 — `api/keys.ts`는 서버 소비자라 "use client"를 담은 배럴을 거칠 수 없다
   "@/shared/lib/query-scope",
   "@/entities/transfer/api/list-query",
+  // 댓글 조립 — 상세 SSR이 클라이언트 훅과 같은 select·정렬·상한으로 댓글을 프리페치한다
+  "@/entities/comment/api/list-query",
   // 리그 필터·정렬 파싱 — SSR 페이지가 `?league=`·`?sort=`를 클라이언트 훅과 같은 판정으로 읽는다
   "@/entities/transfer/lib/league",
   // 단계 → 상태 뱃지 톤·라벨 — 상세 SSR이 화면과 같은 매핑으로 상태 문구를 그린다
@@ -123,11 +125,15 @@ const STYLE_ALLOWED = {
   "Pill variant={": [],
   // 에메랄드 확인 버튼 — `bg-primary` 리터럴이 아니라 위 대조에 걸리지 않던 자리
   'confirmTone="primary"': ["src/shared/ui/sign-in-dialog.tsx"],
-  'variant="green"': [],
+  'variant="green"': [
+    "src/entities/comment/ui/comment-item.tsx", // 댓글의 `나` 뱃지 — 글자를 담은 상태 표시
+  ],
   "text-primary": [
     "src/widgets/bottom-tab-bar/ui/bottom-tab-bar.tsx", // 활성 탭 아이콘
     // 이적료 상승 화살표 — 리터럴은 `text-primary-deep`이고 부분 문자열로 이 대조에 걸린다
     "src/entities/transfer/ui/fee-delta.tsx",
+    // 댓글 좋아요 활성(`text-primary-deep`) — 누른 쪽 아이콘을 채워 형태로도 구분한다
+    "src/features/vote-comment/ui/comment-vote-buttons.tsx",
   ],
 };
 

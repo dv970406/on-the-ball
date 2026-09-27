@@ -19,15 +19,17 @@ export const ROUTES = {
 } as const;
 
 /**
- * **하단 탭바를 렌더하는 화면인가.** 탭바(`widgets/bottom-tab-bar`)와 토스트(`shared/ui/toast`)가
- * 이 판정을 함께 본다.
+ * **화면 아래에 고정 바가 있는가** — 하단 탭바(목록 화면) 또는 딜 상세의 관심 토글 바.
+ * 토스트(`shared/ui/toast`)가 이 판정으로 바 위로 올라간다.
  *
- * ⚠ 두 곳이 갈리면 조용히 어긋난다 — 토스트가 경로 하나만 보고 위치를 올리면, 다른 탭 화면에서
- *   **토스트가 탭바를 덮는다.**
+ * ⚠ 탭바 판정(`activeTabHref`)과 갈리면 조용히 어긋난다 — 토스트가 경로 하나만 보고 위치를 올리면,
+ *   다른 탭 화면에서 **토스트가 탭바를 덮는다.** 그래서 탭바 쪽은 `activeTabHref`를 그대로 쓴다.
+ * ⚠ 딜 상세(`/transfers/[id]`)는 탭바가 없지만 관심 토글 바가 같은 자리에 있다 — 빠뜨리면 댓글
+ *   등록·삭제 토스트가 **그 화면의 CTA 한가운데를 덮는다**(QA 실측).
  * ⚠ `shared`에 있는 이유는 `OAUTH_PROVIDERS`와 같다 — `shared/ui`가 `widgets`를 import할 수 없다.
  */
-export function isTabBarRoute(pathname: string): boolean {
-  return activeTabHref(pathname) !== null;
+export function hasBottomBar(pathname: string): boolean {
+  return activeTabHref(pathname) !== null || pathname.startsWith(`${ROUTES.transferList}/`);
 }
 
 /**

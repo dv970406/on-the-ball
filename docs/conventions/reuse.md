@@ -31,7 +31,7 @@
 - **`userScope(userId)`** — 쿼리 키의 사용자 스코프 조각(`undefined` → `"guest"`). ⚠ `"guest"` 리터럴을 호출부가 각자 적지 말 것 — 갈리면 **캐시 키가 조용히 어긋나** 빌드도 린트도 못 잡고 화면만 스켈레톤이 되거나 남의 데이터가 남는다. `transferKeys`가 쓴다. ⚠ `userId: string`인 키(`identityKeys`·`profileKeys`)에는 쓰지 않는다. `api/keys.ts`는 서버 소비자라 **직접 경로**로 가져온다.
 - **`useNextParam`** — 현재 URL의 `?next=`. `useSearchParams` 대신 쓴다(그걸 쓰면 화면 프리렌더가 CSR로 떨어진다).
   - ⚠ **읽은 값을 렌더에 쓰는 화면**용이다(로그인 화면의 `redirectTo` 조립). 값이 필요한 시점이 **effect 안뿐**이라면 이걸 쓰지 말고 거기서 직접 읽는다 — 이 훅은 `useSyncExternalStore`로 렌더 중에 읽으므로 렌더타임 의존이 새로 생긴다. 라우트 가드(`use-auth-redirect`)가 그 경우이고, 사유는 그 훅 주석에 있다.
-- **`useDuplicateGuard(mutation)`** — 렌더를 기다리지 않는 중복 실행 가드. `{ isLocked, lock }`을 돌려준다. **`ref` + 해제 effect를 직접 짜지 말 것** — `disabled={isPending}`가 왜 부족한지(같은 tick의 두 번째 클릭)가 이 훅의 주석에 모여 있다. 소비자는 `useOAuthSignIn`·`useLinkIdentity`·`useUnlinkIdentity`다.
+- **`useDuplicateGuard(mutation)`** — 렌더를 기다리지 않는 중복 실행 가드. `{ isLocked, lock }`을 돌려준다. **`ref` + 해제 effect를 직접 짜지 말 것** — `disabled={isPending}`가 왜 부족한지(같은 tick의 두 번째 클릭)가 이 훅의 주석에 모여 있다. 소비자는 `useOAuthSignIn`·`useLinkIdentity`·`useUnlinkIdentity`·댓글 입력칸(`views/transfer-detail/model/use-comment-composer`)이다.
   - ⚠ **`isPending`(boolean)이 아니라 뮤테이션을 통째로 넘긴다.** 해제가 `status`+`submittedAt`에 걸려 있어서다 — boolean은 "아직 시작 전"과 "이미 끝남"을 구분하지 못해, 마이크로태스크만으로 끝나는 실패(동기 `throw`)에서 deps가 `false → false`가 되어 **자물쇠가 영영 풀리지 않았다.**
   - ⚠ **`isPending`을 prop으로 받는 컴포넌트에 두지 말 것.** 부모가 리렌더될 때까지 낡은 값을 읽으므로 같은 무증상 잠금이 된다 → 뮤테이션을 조립하는 쪽에 둔다.
   - ⚠ 확인과 잠금이 **나뉜 이유가 규약이다** — 사이에 끼는 검증이 실패하면 잠그지 않고 빠져나가야 한다. 잠그면 뮤테이션이 시작되지 않아 `isPending`이 돌지 않고, 그 자물쇠는 영영 풀리지 않는다.
@@ -41,6 +41,8 @@
   - ⚠ **그래서 서버 시각이 있으면 그쪽이 우선이다** — `serverNowMs ?? useNowMs()`. 순서를 뒤집으면 낡은 클라 시계가 갓 받은 서버 시각을 이겨 **마감된 것이 진행 중으로 보인다**(`data-and-state.md`에 실측).
   - ⚠ **서버 프리페치가 없는 화면**에서는 세션 고정 시계가 유일한 기준이 되어 **방금 만든 것이 과거 시계로 판정된다.** 그런 화면에서 시각 판정이 필요하면 TanStack Query의 `dataUpdatedAt`(그 데이터를 받은 순간)을 기준으로 쓴다 — 무효화가 곧 리페치라 판정이 함께 따라온다.
   렌더 중 `Date.now()`를 부르지 않기 위한 훅이다. **시간에 따라 달라지는 표시는 이걸로 판정한다** — `null`인 첫 렌더에서는 그 표시를 그리지 않으면 서버·클라 출력이 같아진다.
+- **`useItemGuard<K>()`** — 목록의 **항목별** 중복 실행 가드(`run(id, task)` · `isBusy(id)`). 뮤테이션 하나를 여러 항목이 나눠 쓰는 자리(댓글 삭제)용이다. ⚠ `ref` + `state` + `.finally()`를 호출부마다 다시 짜지 말 것 — 사유는 그 파일 주석과 `data-and-state.md`. ⚠ "항목 수 자체가 불변조건"인 목록(로그인 수단 해제)에는 쓰지 않는다.
+- **`serverToClientTime(serverMs)`** — 서버 시각을 **이 기기 시계** 기준으로 옮긴다(잰 오차의 최솟값을 쓴다 — 지연은 늘 양수라 최솟값이 참 오차에 가깝다). TanStack `initialDataUpdatedAt`처럼 기기 시계와 빼서 신선도를 재는 자리에 쓴다 — 서버 시각을 그대로 넣으면 기기 시계 오차만큼 방금 그린 SSR이 stale이 되거나 옛 페이로드가 신선해진다. ⚠ **화면에 그리는 값에는 쓰지 않는다** — 잰 오차가 기기마다 달라 서버 HTML과 갈린다. 신선도처럼 그려지지 않는 값에만 쓰고, 부르는 자리는 옵션 함수(`initialDataUpdatedAt: () => …` — Query가 만들어질 때 한 번)다.
 - `useScrollRestore` — 목록 스크롤 위치 저장/복원
 - `useFocusTrap` — 오버레이(`Dialog`·`Sheet`) 안에 포커스를 가둔다. ⚠ 초기 포커스는 **`preventScroll: true`** 로 준다 — 화면 밖에서 올라오는 시트에 그냥 `focus()`하면 브라우저가 `overflow-hidden`인 430px 프레임을 스크롤시켜 **되돌릴 수 없게** 화면이 밀린다(실측)
 - `useToast` / `useToastStore` — 토스트 발행. **표시 영역(`ToastViewport`)은 `@/shared/ui`에 있고 루트에 하나만 둔다** — 상태와 UI가 레이어를 달리한다
@@ -59,7 +61,8 @@
 ## `@/shared/api`
 - `requireBrowserSupabase` — 브라우저 supabase 클라이언트(`SupabaseClient<Database>`, 없으면 한국어 에러 throw). **쿼리·뮤테이션 훅은 이걸 쓴다** — null 가드를 각자 반복하지 않는다.
 - `getBrowserSupabase` — null을 그대로 받아 분기해야 할 때만.
-- `toDbErrorMessage` — PostgREST/RPC 에러 → 한국어. `P0001`(우리가 띄운 메시지)은 그대로 통과시킨다.
+- `toDbErrorMessage` — PostgREST/RPC 에러 → 한국어. `P0001`(우리가 띄운 메시지)은 그대로 통과시킨다. 작성자 FK(`…_user_id_fkey`) 위반 23503은 "계정 정보를 찾을 수 없어요"로 접는다(탈퇴·삭제된 계정의 세션이 남은 채 쓴 경우).
+- **`toWriteErrorMessage(supabase, error)`** — 로그인이 필요한 쓰기의 에러 → 한국어. 42501이면 세션을 확인해 세션이 없을 때 "로그인이 풀렸어요"로 바꾸고, 나머지는 `toDbErrorMessage`와 같다. 로그인 필수 쓰기 훅은 이것을 쓴다(`data-and-state.md`).
 - ⚠ `createSupabaseServerClient`는 배럴에 없다 — `@/shared/api/supabase-server`를 직접 import(`next/headers` 의존).
 - **`createSupabaseAnonClient` / `ANON_REVALIDATE`** (`@/shared/api/supabase-anon` 직접 경로) — 쿠키를 읽지 않는 서버 클라이언트. fetch가 Next Data Cache를 타므로 **응답이 모든 익명 요청에 동일한 조회에만** 쓴다. 새로 만들지 말 것 — 수명 상수가 TanStack `staleTime`과 한 값으로 묶여 있다(`nextjs.md`). ⚠ 캐시 히트가 DB를 없애는 것이지 **왕복이 0이 되는 것은 아니다** — in-flight 중복 제거가 없어 캐시가 빈 순간의 동시 요청은 전부 통과한다.
 - **`hasSessionCookie()`** (같은 자리, `supabase-server`) — 이 요청에 세션이 있는지를 **네트워크 없이** 판정. 위 두 클라이언트를 고르는 데만 쓴다. ⚠ `getUser()`로 바꾸지 말 것(로그인 사용자에게 GoTrue 왕복이 하나 더 붙는다). ⚠ 판정을 **좁히지 말 것** — 넓게 잡혀 있어야 헛짚어도 평소 경로로 갈 뿐이고, 좁히면 로그인 사용자가 관심 표시가 빠진 익명 목록을 받는다.
@@ -114,6 +117,23 @@
 - ⚠ **`TransferClub`·`STAGE_GROUP`·`STAGE_STATUS`·`STATUS_LABEL`·`isDeadStage`·`feeDelta`·`ClubRoute`·`WatchMark`는 배럴에 없다** — 슬라이스 밖 소비자가 0이라 올리지 않았다. `check:conventions`는 상대 경로 소비를 현역으로 세어 이 유형을 잡지 못하므로 손으로 지킨다.
 - 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/keys`·`api/list-query`·`lib/league`·`lib/stage`를 직접 import.
 
+## `@/entities/comment`
+- `useCommentListQuery({ dealId, userId, enabled, initialData, initialDataUpdatedAt, placeholderData })` / `commentKeys` — 딜의 댓글(최신 `COMMENT_LIST_LIMIT`건, 화면에는 오래된 순). ⚠ **userId로 스코프된다**(내 표 `my_vote` 임베딩이 "내 행만"). 쓰기 뒤 무효화는 사용자 무관 prefix `commentKeys.deal(dealId)`로 잡고, 표의 낙관적 갱신은 **내 키**(`commentKeys.list(dealId, userId)`)만 고친다. ⚠ `initialDataUpdatedAt`에 서버가 읽은 시각을 넣는다 — 빼면 뒤로가기가 되살린 옛 서버 페이로드가 신선한 것으로 앉는다. 서버가 **다른 사용자**로 그린 목록은 `initialData`가 아니라 내 표를 지운 `placeholderData`로 넘긴다(`withoutMyVotes`).
+- **`buildCommentListQuery` / `buildCommentList`**(`api/list-query.ts`·`api/mappers.ts` — 서버 안전) — 조립(최신순 + 상한+1건)과 자르기·뒤집기의 단일 소스. 훅과 상세 SSR이 **같은 함수**를 부른다. ⚠ 한 건 더 받아 `truncated`를 **정확히** 판정한다 — 상한과 같은 수로 "잘렸다"고 하면 정확히 상한만큼인 딜에서 거짓말이다.
+- **`buildCommentThreads(comments)`** — 평면 목록 → 깊이 1 스레드. ⚠ 부모가 잘려 나간 답글은 **버리지 않고 루트로 승격**한다.
+- **`sortThreads(threads, sort)`** — 루트만 정렬(인기순 = 좋아요−싫어요, 동점은 최신 · 최신순). 답글은 작성순 그대로. ⚠ 인기순 점수에서 **이번에 누른 변화분**(`myVote − fetchedVote`)을 뺀다 — 누르는 순간 그 댓글이 손가락 밑에서 튀지 않게. 받아 올 때 이미 있던 내 표는 점수에 남는다(다시 열었을 때 순서가 바뀌지 않게). 정렬은 쿼리 키에 넣지 않는다.
+- `CommentItem` — 댓글 한 개(`article`). 표·답글·삭제 줄(`actions`)과 답글 목록(`children`)은 **뷰가 조립해 넘긴다**(쓰기는 features다). `"use client"`가 없다.
+- `COMMENT_LIST_LIMIT` — 목록 상한(서버 안전한 `api/mappers.ts`). 화면이 잘림을 안내한다.
+- **`applyVote(list, commentId, next)`** — 목록에 목표 표를 입히는 계산(멱등). 표의 낙관적 갱신과 목록 조회(`applyPendingVotes` — 아직 끝나지 않은 표와 **그 조회가 시작된 뒤 커밋된 표**(`recordSettledVote`)를 덮는다)가 **같은 함수**를 쓴다. 표 뮤테이션 키는 `commentKeys.voteMutation(dealId)`.
+- **`refreshCommentLists(queryClient, dealId)`** — 쓰기(작성·삭제) 뒤 목록을 다시 받을 때까지 기다린다(성공 토스트는 그 뒤 — 토스트와 목록 변경이 같은 순간). ⚠ 기다림에 **상한**(3초)이 있다 — 쓰기는 성공했는데 목록 조회가 계속 실패하면 재시도가 끝날 때까지 버튼 잠금·성공 토스트가 묶인다. ⚠ 이 리페치를 **되돌리며 취소**(`cancelQueries`)하는 호출부를 두지 않는다 — 취소되면 await가 받지도 않은 채 끝나 "등록했어요" 뒤 1초 넘게 새 댓글이 없다(실측). 겹친 리페치가 `cancelRefetch`로 새로 시작되는 것은 괜찮다(먼저 건 await가 새 조회에 얹힌다).
+- 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/list-query`를 직접 import.
+
+## `@/features/write-comment` · `delete-comment` · `vote-comment`
+- `useWriteComment(dealId)` / `validateComment` / `isReplyTargetMissing(error)` — 댓글·답글 작성과 검증(`hasVisibleChar` → `lengthOverflow`, 한도 `COMMENT_LIMIT` — 값은 `api-and-db.md`의 길이 한도 표). ⚠ 무효화 Promise를 반환해 리페치까지 `isPending`을 유지한다. `isReplyTargetMissing`은 실패 사유가 "답글 대상이 지워졌다"(트리거의 P0001 문구)인지 판정한다 — 답글 칸이 같은 안내를 겹쳐 내지 않는 데만 쓰고, 문구는 마이그레이션과 글자 하나까지 같아야 한다. ⚠ **가드는 여기 없다** — 실패 시 입력창·답글 대상을 되돌리는 것은 화면의 상태라 `views/transfer-detail/model/use-comment-composer`가 조립한다.
+- `useDeleteComment(dealId)` — 본인 댓글 hard delete. 0행이면 "이미 삭제된 댓글이에요."(실패해도 다시 받아 유령 행을 걷는다). 확인 다이얼로그·항목별 가드는 뷰 model(`use-comment-deletion`)이 갖는다. ⚠ 확인 문구의 답글 수는 **누르는 순간 목록을 다시 받아** 최신 캐시로 세고, 받는 동안에는 확인 버튼을 막는다(`Dialog`의 `confirmDisabled`) — 받기 전 문구로 확정하면 알리지 않은 남의 답글이 cascade로 지워진다.
+- `CommentVoteButtons({ dealId, comment, onSignInRequired })` — 좋아요·싫어요. ⚠ 훅(`useVoteComment`)은 배럴에 없다(버튼이 유일한 호출부). 낙관적 갱신 + 같은 딜의 표를 `scope`로 직렬화 + "목표 표로 수렴"하는 요청 + 실패·0행만 줄 끝에서 한 번 재동기화(그때는 진행 중인 조회가 있어도 새로 받는다 — 표 때문에 조회를 취소하지는 않는다)(`data-and-state.md` 낙관적 업데이트 절). 가드도 `disabled`도 없다.
+- ⚠ 세 슬라이스 모두 비로그인 안내를 직접 띄우지 않는다 — `onSignInRequired`로 올리고 **뷰가 `SignInDialog` 한 벌**을 문구만 바꿔 쓴다.
+
 ## `@/features/watch-transfer`
 - `WatchToggle({ dealId, watched, variant, onSignInRequired })` — 상세 하단의 관심 토글 하나(`block` 변형). 조회는 `@/entities/transfer`다.
 - ⚠ **훅(`useToggleTransferWatch`)은 배럴에 없다** — 토글은 상세 하나뿐이라 슬라이스 밖 호출부가 0이다(목록 행의 관심 표시는 표시일 뿐 토글이 아니다 — `WatchMark`는 `entities/transfer` 내부에서만 쓰인다).
@@ -133,7 +153,7 @@
   ⚠ 이적시장은 **`ROUTES.transferList`**(`/transfers`) · `ROUTES.transfer(id)`(`/transfers/[id]`)다. 상세에는 탭바가 없다 — `activeTabHref`가 목록 경로만 센다.
   ⚠ `ROUTES.home`(`/`)은 화면이 아니라 이적시장으로의 리다이렉트다(`app/page.tsx`) — 링크 목적지로 쓰지 말고 실제 화면 경로를 쓴다.
 - **`openTransferWindow(nowMs)` / `trackedTransferWindow(nowMs)` / `boardScopeStartMs(nowMs)`**(`transfer-window.ts`) — 이적 창 일정. 창의 기간은 리그별 일정을 합친 것이다(개장 = 가장 먼저 여는 리그, 마감 = 가장 늦게 닫는 리그). `openTransferWindow`는 **지금 열려 있는 창**(없으면 `null`) — 헤더의 "마감까지" 카운트다운은 이 값이 있을 때만 그리고 마감에 닿으면 스스로 사라진다. `trackedTransferWindow`는 보드가 추적하는 창(개장한 가장 최근 창 — 창 사이에는 방금 닫힌 창)으로 헤더의 창 이름이 쓰고, `boardScopeStartMs`는 그 창의 개장 시각(보드에 실을 딜의 하한)이다. ⚠ **단일 소스는 `scripts/lib/transfer/windows.json`** 이다 — 딜 파생 스크립트(Node)가 이 TS를 import할 수 없어 JSON이 원본이고, 이 파일은 그 JSON을 그대로 읽는다. **시즌마다 사람이 갱신한다** — 엠블럼(`public/crests`)·`team-names-ko.json`과 같은 운영 모델이라 런타임에 늘지 않는다.
-- **`isTabBarRoute(pathname)` / `activeTabHref(pathname)`** — 하단 탭바를 그리는 화면인지와 그때 활성인 탭. 탭바(`widgets`)와 토스트(`shared/ui`)가 이 둘만 본다. ⚠ 새 목록 경로가 생기면 여기부터 고친다 — 빠뜨리면 그 화면에서 **탭바가 사라지고 토스트가 탭바 자리로 내려간다.** 값이 유한하지 않은 경로(`/…/category/[slug]` 같은)가 생기면 정확 일치 배열이 아니라 접두 판정으로 둔다.
+- **`hasBottomBar(pathname)` / `activeTabHref(pathname)`** — 화면 아래에 고정 바(탭바 또는 딜 상세의 관심 토글 바)가 있는지와 활성인 탭. 탭바(`widgets`)는 `activeTabHref`를, 토스트(`shared/ui`)는 `hasBottomBar`를 본다. ⚠ 하단 고정 바를 새로 두는 화면이 생기면 `hasBottomBar`에 더한다 — 빠뜨리면 토스트가 그 바의 CTA를 덮는다. ⚠ 새 목록 경로가 생기면 여기부터 고친다 — 빠뜨리면 그 화면에서 **탭바가 사라지고 토스트가 탭바 자리로 내려간다.** 값이 유한하지 않은 경로(`/…/category/[slug]` 같은)가 생기면 정확 일치 배열이 아니라 접두 판정으로 둔다.
 - `signInWithNext(pathname)` / `withNext(path, next)` — 복귀 경로를 붙인 URL. 이 형태를 만드는 곳이 가드·`SignInDialog`·`AuthStatus`로 여럿이라 여기로 모았다. ⚠ 액션 컨트롤에서 이걸로 **직접 이동하지 않는다** — `SignInDialog`가 안내를 끼고 그 안에서 부른다(예외는 라벨이 "로그인"인 컨트롤).
 - **`safeNextPath(next, origin)`** — `?next=` 값을 앱 내부 경로로만 통과시킨다. **직접 문자열 검사를 짜지 말 것** — `startsWith("/") && !startsWith("//")`로는 `/\evil.com`도 `/..//evil.com`도 못 막는다(둘 다 실제로 뚫렸다).
 - **`OAUTH_PROVIDERS` / `OAUTH_PROVIDER_LABEL`** — 지원 소셜 프로바이더의 단일 소스. `supabase/config.toml`의 `[auth.external.*]`와 갈리면 안 된다. ⚠ `shared`에 있는 이유는 로그인(`features/sign-in`)과 계정 연결(`features/link-identity`)이 같은 목록을 써야 하는데 features끼리는 import할 수 없어서다.

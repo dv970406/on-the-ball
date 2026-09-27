@@ -24,7 +24,9 @@ interface AvatarProps {
  */
 export function Avatar({ label, src, size = 28, className, style, children }: AvatarProps) {
   return (
+    // ⚠ 장식이다 — 이름은 늘 옆에 글자로 있다. 가리지 않으면 이니셜이 이름 앞에서 한 번 더 읽힌다
     <span
+      aria-hidden
       className={cn(
         "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-hairline-cool bg-canvas-soft text-xs font-medium text-ink",
         className,
