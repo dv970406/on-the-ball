@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { detectClubs, isClubName } from "./clubs.mjs";
 
 /**
@@ -222,16 +223,33 @@ function detectFee(text) {
  * 그래서 그 수식어들을 선택적으로 건너뛴다.
  */
 
+/**
+ * 영문 헤드라인은 단어마다 대문자로 쓴다("Chelsea Agree Deal To Sign …") — 앵커 단어는 첫 글자의 대소문자를
+ * 가리지 않는다. 이름 쪽(`NAME`)은 대문자 시작을 그대로 요구하므로 플래그 `i`를 쓰지 않고 앵커만 푼다.
+ * ⚠ 타이틀 케이스를 받는 순간 "Star Striker"·"Brazilian Wonderkid"도 이름처럼 생긴다 — 그 몫은
+ *   아래 `cleanCandidate`(수식어 걷기·수식 명사 판정)가 진다.
+ */
+const ci = (word) => word.replace(/^(\p{L})/u, (c) => `[${c.toLowerCase()}${c.toUpperCase()}]`);
+const alt = (words) => `(?:${words.map((w) => w.split(" ").map(ci).join("\\s+")).join("|")})`;
+
+const POSITIONS = ["centre-forward", "centre-back", "center-back", "full-back", "wing-back", "left-back", "right-back", "winger", "striker", "midfielder", "defender", "goalkeeper", "forward", "attacker", "playmaker", "keeper"];
+
 /** 이름 앞에 끼어드는 수식어: "the 23yo Spanish winger" 같은 덩어리 */
-const ROLE_PREFIX =
-  "(?:the\\s+)?(?:\\d{1,2}yo\\s+)?(?:[a-z]+\\s+)?(?:winger|striker|midfielder|defender|goalkeeper|forward|attacker|centre-back|center-back|full-back|wing-back|left-back|right-back|centre-forward|playmaker|keeper)?\\s*";
+const ROLE_PREFIX = `(?:${ci("the")}\\s+)?(?:\\d{1,2}yo\\s+)?(?:[a-z]+\\s+)?(?:${alt(POSITIONS)}\\s+)?`;
 
 /**
- * 사람 이름 덩어리: 대문자로 시작하는 토큰 2~4개.
+ * 사람 이름 덩어리 — 대문자로 시작하는 토큰 1~4개, 사이에 소문자 조사(van·de·dos…)를 둘까지 허용한다.
+ * ⚠ 첫 글자는 `\p{Lu}`다 — `[A-Z]`로 두면 Ángel Di María·Mesut Özil·Martin Ødegaard처럼 악센트 대문자로
+ *   시작하는 토큰에서 이름이 통째로 빠졌다(유명 선수 999명 시뮬레이션에서 약 5%).
+ * ⚠ 소문자 조사가 없으면 Virgil van Dijk·Frenkie de Jong이 "Virgil"·"Frenkie"에서 끊긴다.
  * ⚠ 하이픈에 **비분리 하이픈(U+2011)** 도 넣는다 — BBC가 "Gibbs‑White"를 그 글자로 쓴다. 없으면 이름이
  *   "Morgan Gibbs"에서 잘려 사전(`players-ko.json`) 키와 어긋난다(실제 수집 행).
+ * ⚠ 한 토큰짜리도 잡지만 **사람 사전에 있을 때만 받는다**(`cleanCandidate`) — "Joao"·"Pedro"처럼 흔한 이름
+ *   한 토큰으로는 누구인지 특정할 수 없다.
  */
-const NAME = "([A-Z][\\p{L}'’‑-]+(?: [A-Z][\\p{L}'’‑-]+){1,3})";
+const TOKEN = "\\p{Lu}[\\p{L}\\p{M}'’‑-]+";
+const PARTICLE = "(?:van|von|der|den|de|da|das|do|dos|di|del|della|dei|la|le|ter|ten|bin|ben|el|al|y)";
+const NAME = `(${TOKEN}(?:\\s+(?:${PARTICLE}\\s+){0,2}${TOKEN}){0,3})`;
 
 /**
  * `<name> to …` 문형은 뒤에 **사전에 있는 구단**이 와야 선수 앵커다. 없는 이름을 "to X" 하나로 인정하면
@@ -243,37 +261,257 @@ function knownClubAfter(text, from) {
 
 const PLAYER_ANCHORS = [
   // sign / signing of / re-sign
-  new RegExp(`\\b(?:re-)?sign(?:ing)?\\s+(?:of\\s+)?${ROLE_PREFIX}${NAME}`, "gu"),
-  // move|bid|offer|deal|proposal|approach|talks ... for <name>
-  new RegExp(`\\b(?:move|bid|offer|deal|proposal|approach|talks|interest)\\b[^.!?]{0,40}?\\bfor\\s+${ROLE_PREFIX}${NAME}`, "gu"),
-  // transfer of <name>
-  new RegExp(`\\btransfer\\s+of\\s+${ROLE_PREFIX}${NAME}`, "gu"),
+  new RegExp(`\\b(?:${ci("re")}-)?${ci("sign")}(?:ing)?\\s+(?:${ci("of")}\\s+)?${ROLE_PREFIX}${NAME}`, "gud"),
+  // move|bid|offer|deal|… for <name>
+  new RegExp(`\\b${alt(["move", "bid", "offer", "deal", "proposal", "approach", "talks", "interest", "agreement"])}\\b[^.!?]{0,40}?\\b${ci("for")}\\s+${ROLE_PREFIX}${NAME}`, "gud"),
+  // transfer of / loan of <name>
+  new RegExp(`\\b${alt(["transfer", "loan"])}\\s+${ci("of")}\\s+${ROLE_PREFIX}${NAME}`, "gud"),
+  // (personal) terms / agreement / contract with <name> — "Barcelona agree personal terms with X"
+  new RegExp(`\\b${alt(["terms", "agreement", "contract", "talks"])}\\s+${ci("with")}\\s+${ROLE_PREFIX}${NAME}`, "gud"),
   // "<Club> <position> <name>" — "Everton forward Iliman Ndiaye" 처럼 구단명이 끼는 어순
-  new RegExp(
-    `\\b[A-Z][\\p{L}]+\\s+(?:winger|striker|midfielder|defender|goalkeeper|forward|attacker|centre-back|full-back|wing-back|centre-forward|keeper)\\s+${NAME}`,
-    "gu"
-  ),
-  // <name> completes move / joins / agrees / arrives ...  (이름이 동사 앞에 오는 어순)
-  new RegExp(`${NAME}\\s+(?:completes?|joins?|is joining|has joined|agrees?|signs?|will join|set to join|arrives?|lands?)\\b`, "gu"),
+  new RegExp(`\\b\\p{Lu}\\p{L}+\\s+${alt(POSITIONS)}\\s+${NAME}`, "gud"),
+  // <name> completes move / joins / agrees / arrives / undergoes medical … (이름이 동사 앞에 오는 어순)
+  { nameFirst: true, re: new RegExp(
+    `${NAME}\\s+${alt(["completes", "complete", "is joining", "has joined", "joins", "join", "agrees", "agree", "signs", "sign", "will join", "set to join", "arrives", "arrive", "lands", "land", "is undergoing", "undergoes", "to undergo", "has passed", "passes"])}\\b`,
+    "gud",
+  ) },
   // <구단> target <name> / <구단>'s (top) target <name> — "Spurs target Morgan Gibbs-White"
-  new RegExp(`\\b[A-Z][\\p{L}]+(?:['’]s)?\\s+(?:top\\s+|main\\s+|priority\\s+)?target\\s+${ROLE_PREFIX}${NAME}`, "gu"),
+  new RegExp(`\\b\\p{Lu}\\p{L}+(?:['’]s)?\\s+(?:${alt(["top", "main", "priority"])}\\s+)?${ci("target")}\\s+${ROLE_PREFIX}${NAME}`, "gud"),
   // <name>'s move / signing / transfer — 소유격이 이적을 말할 때("for Marc Guiu's signing")
-  new RegExp(`${NAME}['’]s\\s+(?:signing|move|transfer|arrival|switch)\\b`, "gu"),
+  { nameFirst: true, re: new RegExp(`${NAME}['’]s\\s+${alt(["signing", "move", "transfer", "arrival", "switch"])}\\b`, "gud") },
   // <name> to <구단> — "David Alaba to Udinese, here we go". ⚠ 뒤 구단이 사전에 있을 때만
-  { re: new RegExp(`${NAME}\\s+to\\s+(?=[A-Z#])`, "gu"), requireClubAfter: true },
+  { nameFirst: true, re: new RegExp(`${NAME}\\s+${ci("to")}\\s+(?=[\\p{Lu}#])`, "gud"), requireClubAfter: true },
 ];
 
-/** 이름 뒤에 붙어 오는 잡음 단어들 — 잘라낸다 */
+/**
+ * 이름 뒤에 붙어 오는 잡음 단어들 — **둘째 토큰부터** 잘라낸다(첫 토큰이면 "Will Hughes"가 통째로 사라진다).
+ * 타이틀 케이스 헤드라인의 동사("… Agree Deal", "… Completes Move")도 여기서 끊는다.
+ */
 const TRAILING_NOISE =
-  /\b(From|To|For|And|The|Is|Has|Will|After|On|In|At|With|Deal|Move|Fee|Permanent|Loan|Contract|Terms|Medical|Talks|Bid|Offer)\b.*$/;
+  /\s+(?:From|To|For|And|The|Is|Has|Will|After|On|In|At|With|As|Amid|Ahead|Despite|Over|Before|Following|Until|While|Deal|Move|Fee|Permanent|Loan|Contract|Terms|Medical|Talks|Bid|Offer|Here|Done|Agreed|Confirmed|Official|Update|Exclusive|Live|Agrees?|Completes?|Completed|Joins?|Joined|Signs?|Signed|Seals?|Nears?|Closes?|Arrives?|Undergoes|Submits?|Makes?|Opens?|Reach(?:es)?|Eyes?|Wants?|Targets?|Set|Race|Plot|Plots|Lodge|Lodges|Launch|Launches|Rejects?|Accepts?|By)\b.*$/u;
 
 /**
- * 선수명이 아닌 게 확실한 토큰 — 속보 표식·대회명·매체명·요일·국적 형용사.
+ * 선수가 아닌데 대문자로 쓰이는 낱말 — 이름 앞머리에서 걷어 내고, 이것만으로 된 후보는 버린다.
+ * ⚠ 타이틀 케이스 헤드라인과 "sign South American star"(실제 수집 행)가 이 목록의 존재 이유다 —
+ *   국적·지역 형용사와 역할어는 대문자 두 토큰이라 이름처럼 생겼다. 소문자로 비교한다.
+ */
+const DEMONYMS = new Set(
+  ("brazilian argentine argentinian uruguayan colombian chilean peruvian ecuadorian paraguayan venezuelan bolivian mexican american canadian " +
+    "english scottish welsh irish british french spanish portuguese italian german dutch belgian swiss austrian danish swedish norwegian finnish " +
+    "icelandic polish czech slovak hungarian croatian serbian slovenian bosnian montenegrin albanian kosovan macedonian greek turkish romanian " +
+    "bulgarian ukrainian russian georgian armenian moroccan algerian tunisian egyptian nigerian ghanaian ivorian senegalese cameroonian malian " +
+    "guinean congolese gabonese zambian japanese korean chinese australian saudi iranian qatari jamaican " +
+    "south north east west central eastern western northern southern latin african european asian american scandinavian balkan nordic iberian caribbean " +
+    "brazilian-born french-born dutch-born spanish-born").split(" "),
+);
+/** 역할·수식 명사 — 이름 **바로 뒤**에 오면 그 덩어리는 이름이 아니라 수식어다("World Cup winner", "Red Bull Salzburg winger") */
+const ROLE_NOUNS = new Set(
+  ("star stars striker winger midfielder defender goalkeeper keeper forward attacker playmaker centre-back center-back full-back wing-back " +
+    "left-back right-back centre-forward wonderkid talent youngster teenager prodigy sensation ace hotshot captain international legend veteran " +
+    "winner winners scorer target signing gem starlet duo trio boss coach manager director chairman owner").split(" "),
+);
+/**
+ * 구단 이름의 꼬리 — 사전에 없는 하부 리그 구단("Wycombe Wanderers")도 이 꼬리로 알아본다.
+ * 후보 끝이 이 낱말이면 그 앞 토큰과 함께 구단명이다("striker Ings Wycombe Wanderers sign" — 운영 데이터 대조).
+ */
+const CLUB_SUFFIX = new Set("wanderers rovers albion hotspur athletic united city town county wednesday argyle orient rangers celtic academical".split(" "));
+/** 전치사·관사·바이라인 — 이름이 될 수 없어 한 토큰이 남을 때까지 앞머리에서 걷는다("From Yokohama") */
+const NEVER_NAME = new Set("the a an and or but from to for at in on of with as amid after by via over into onto per".split(" "));
+/** 타이틀 케이스 헤드라인이 이름 앞에 흘리는 낱말 — 앞머리에서 걷는다 */
+const LEADING_NOISE = new Set(
+  ("the a an and or but we go here it is breaking exclusive official confirmed done deal update report reports understand star stars teenage young " +
+    "former new top record free mystery summer january second third first club loan veteran talented rising highly-rated experienced young").split(" "),
+);
+/** 대회·매체처럼 사람 이름 자리에 오는 고유명사 조각 — 이것만으로 된 후보는 사람이 아니다 */
+const NON_NAME_WORDS = new Set(
+  ("world cup league premier champions europa conference copa america nations euro serie liga ligue bundesliga eredivisie primeira saudi pro " +
+    "championship premiership olympic olympics under-21 u21 u23 golden boy ballon sky sports news daily mail sun mirror guardian athletic bbc " +
+    "marca relevo le parisien bild kicker gazzetta dello sport club statement announcement transfer window deadline day medical tests personal terms " +
+    "release clause stadium park arena ground live agent agents times york yahoo espn talksport " +
+    // 구단 약칭·2군 표기 — "FC Bayern"·"Milan Futuro"를 사람으로 읽지 않게
+    "fc ac sc cf afc sv fk sk vfl vfb rb psv futuro castilla primavera women reserves academy youth u19 next gen pm minister prime").split(" "),
+);
+
+/**
+ * 선수명이 아닌 게 확실한 덩어리 — 속보 표식·대회명·매체명·요일.
  * ⚠ "sign South American star"가 선수 "South American"이 됐다(실제 수집 행) — 대륙·국적 형용사는
- *   대문자 두 토큰이라 이름처럼 생겼다. 앵커를 넓힐수록 이 목록이 정밀도를 지킨다.
+ *   대문자 두 토큰이라 이름처럼 생겼다. 개별 낱말은 위 집합들이 맡고, 여기는 통째로 봐야 하는 표현만 둔다.
  */
 const NOT_A_PERSON =
-  /^(?:Breaking|Exclusive|Excl|Understand|Here We Go|Official|Done Deal|Transfer Deadline(?: Day)?|Deadline Day|Transfer Window|Premier League|Champions League|Europa League|Serie A|La Liga|Ligue(?: 1)?|Bundesliga|Sky Sports|BBC Sport|The Athletic|Google News|Football Italia|Yahoo Sports|South American|North American|Latin American|Central American|(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)['’]s?(?: \p{L}+)?)$/iu;
+  /^(?:Breaking|Exclusive|Excl|Understand|Here We Go|Official|Done Deal|Transfer Deadline(?: Day)?|Deadline Day|Transfer Window|Premier League|Champions League|Europa League|Serie A|La Liga|Ligue(?: 1)?|Bundesliga|Sky Sports|BBC Sport|The Athletic|Google News|Football Italia|Yahoo Sports|(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)['’]s?(?: \p{L}+)?)$/iu;
+
+/**
+ * 선수가 아닌 사람(감독·단장·구단주·에이전트)을 가리키는 문맥 — 실명이라 이름 모양만으로는 가를 수 없다.
+ * ⚠ "Liverpool target Pep Guardiola to replace the sacked boss", "X joins Chelsea as sporting director"가
+ *   딜이 됐다(시뮬레이션). 문장 전체가 아니라 **이름에 붙은** 역할만 본다 — "Arsenal manager Mikel Arteta
+ *   confirmed the signing of Kai Havertz"에서 하버츠까지 버리면 안 된다.
+ */
+// ⚠ "agent"는 "free agent"(자유계약 선수)를 빼야 한다 — "joins Udinese … as free agent"에서 알라바를 버렸다(운영 데이터 대조)
+const ROLE_WORD = "(?:head coach|manager|coach|boss|sporting director|technical director|director of football|director|chairman|president|owner|co-owner|chief executive|ceo|executive|(?<!free\\s)agent|journalist|reporter|pundit|presenter|assistant|prime minister|minister|pm)";
+// 이름 바로 앞의 역할어·임명 동사·바이라인("By: Oliver Fisher")
+const ROLE_BEFORE = new RegExp(`(?:\\b${ROLE_WORD}|\\b(?:appoint(?:s|ed)?|hire(?:s|d)?|sack(?:s|ed)?|named)|\\bby:?)\\s+$`, "iu");
+const ROLE_AFTER_RES = [
+  new RegExp(`^[^.!?]{0,80}?\\bas\\s+(?:[\\p{L}'’-]+\\s+){0,3}?${ROLE_WORD}\\b`, "iu"),
+  new RegExp(`^[^.!?]{0,80}?\\b(?:manager|managerial|head coach|coaching|sporting director|director of football)\\s+(?:role|job|position|post|vacancy)\\b`, "iu"),
+  new RegExp(`^[^.!?]{0,60}?\\bto replace\\b[^.!?]{0,40}?\\b(?:boss|manager|head coach|coach|director)\\b`, "iu"),
+];
+/**
+ * 이름 뒤 역할 문맥 — ⚠ 그 사이에 **다른 사람 이름**(구단이 아닌 대문자 두 토큰)이 끼면 그 역할은 그 사람의 것이다.
+ *   "Vinicius Jr to Arsenal truth emerges after Mikel Arteta secrecy as assistant coach speaks out"에서
+ *   비니시우스를 버렸다(운영 데이터 대조).
+ */
+function roleAfter(after) {
+  for (const re of ROLE_AFTER_RES) {
+    const m = re.exec(after);
+    if (!m) continue;
+    const people = [...m[0].matchAll(/\p{Lu}[\p{L}'’-]+\s+\p{Lu}[\p{L}'’-]+/gu)].filter((x) => !isOnlyClubs(x[0]));
+    if (people.length === 0) return true;
+  }
+  return false;
+}
+
+/** 한 토큰 이름(Neymar·Rodri)은 사람 사전에 있을 때만 받는다 — 사전의 정규형 키 */
+let mononyms;
+function isKnownMononym(name) {
+  if (!mononyms) {
+    let dict = {};
+    try {
+      dict = JSON.parse(readFileSync(new URL("./players-ko.json", import.meta.url), "utf8"));
+    } catch {
+      dict = {};
+    }
+    mononyms = new Set(Object.keys(dict).filter((k) => !k.startsWith("_") && !k.includes(" ")));
+  }
+  return mononyms.has(foldName(name));
+}
+/** 사람 이름 토큰이 될 수 없는 낱말인가 — 어휘 집합 또는 구단 표기 */
+const isVocab = (t) => {
+  const l = t.toLowerCase();
+  return NEVER_NAME.has(l) || LEADING_NOISE.has(l) || DEMONYMS.has(l) || ROLE_NOUNS.has(l) || POSITIONS.includes(l) || NON_NAME_WORDS.has(l) || isClubName(t);
+};
+const foldName = (s) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim();
+const isCapital = (t) => /^\p{Lu}/u.test(t);
+
+/**
+ * 토큰마다 구단 표기(별칭)에 덮이는가 — 1~4토큰 n-gram을 `isClubName`으로 본다.
+ * ⚠ `detectClubs`는 정규명("Manchester United")을 돌려줘 원문 표기("Man United")를 지울 수 없다 —
+ *   "Yahoo Sports Man United complete deal"이 사람이 됐다(운영 데이터 대조).
+ */
+function clubCoverage(tokens) {
+  const covered = tokens.map(() => false);
+  for (let n = Math.min(4, tokens.length); n >= 1; n--) {
+    for (let i = 0; i + n <= tokens.length; i++) {
+      if (covered.slice(i, i + n).some(Boolean)) continue;
+      if (isClubName(tokens.slice(i, i + n).join(" "))) for (let k = i; k < i + n; k++) covered[k] = true;
+    }
+  }
+  return covered;
+}
+
+/** 구단 표기와 어휘(구단 약칭·2군·매체)를 빼면 대문자 토큰이 남지 않는가 — 남지 않으면 구단명이다(Red Bull Salzburg) */
+function isOnlyClubs(name) {
+  const tokens = name.split(/\s+/);
+  const covered = clubCoverage(tokens);
+  return tokens.every((t, i) => covered[i] || !isCapital(t) || NON_NAME_WORDS.has(t.toLowerCase()));
+}
+
+/**
+ * 앵커가 잡은 덩어리 → 선수명(아니면 null).
+ * @param {string} raw 앵커의 NAME 그룹
+ * @param {string} text 원문
+ * @param {number} start NAME 그룹의 시작 위치
+ * @param {boolean} nameFirst 이름이 키워드 바로 앞에 와야 하는 앵커인가
+ */
+function cleanCandidate(raw, text, start, nameFirst = false) {
+  let name = raw.replace(TRAILING_NOISE, "").trim();
+  /*
+   * ⚠ 이름이 앞에 오는 앵커는 왼쪽 경계를 모른다 — 대문자 덩어리가 왼쪽으로 더 이어지면
+   *   ("The New York Times Mikel Arteta agrees") 정규식은 그 꼬리 넉 토큰을 이름으로 잡는다(운영 데이터 대조).
+   *   덩어리 안의 마지막 어휘(구단·역할어·매체) 뒤에서 자르고, 자를 자리가 없으면 경계를 알 수 없어 버린다.
+   */
+  const runContinuesLeft = nameFirst && /\p{Lu}[\p{L}\p{M}'’‑-]*\s+$/u.test(text.slice(Math.max(0, start - 40), start));
+  // ⚠ 이름이 키워드(동사·'s·to) **바로 앞**이어야 하는 앵커에서 사이의 낱말을 걷어야 했다면, 그 덩어리는 동사의
+  //   주어가 아니다 — "Medical At Old Trafford As Chelsea Agree Deal"이 "Old Trafford"가 됐다(시뮬레이션).
+  if (nameFirst && name !== raw.trim()) return null;
+  let tokens = name.split(/\s+/);
+  // 앞머리의 헤드라인 낱말·국적 형용사·역할어·구단명을 걷는다("Brazilian Wonderkid X", "Chelsea Star X")
+  for (;;) {
+    const t = tokens[0]?.toLowerCase();
+    // 소유격 접두("Bournemouth's Alex Scott", "Everton's Jarrad Branthwaite")는 소속이다 — 걷는다
+    if (tokens.length > 1 && /['’]s$/u.test(tokens[0])) {
+      tokens = tokens.slice(1);
+      continue;
+    }
+    if (tokens.length > 1 && NEVER_NAME.has(t)) {
+      tokens = tokens.slice(1);
+      continue;
+    }
+    // 역할어는 이름이 될 수 없어 한 토큰이 남을 때까지 걷는다("Brazilian Wonderkid Endrick" → "Endrick")
+    if (tokens.length > 1 && (ROLE_NOUNS.has(t) || POSITIONS.includes(t))) {
+      tokens = tokens.slice(1);
+      continue;
+    }
+    // ⚠ 국적 형용사·헤드라인 낱말은 **두 토큰 이상 남을 때만** 걷는다 — 이름과 철자가 같다
+    //   (Germán Pezzella를 악센트 없이 쓴 "German Pezzella"에서 이름이 사라졌다 — 시뮬레이션)
+    if (tokens.length > 2 && (LEADING_NOISE.has(t) || DEMONYMS.has(t) || NON_NAME_WORDS.has(t))) {
+      tokens = tokens.slice(1);
+      continue;
+    }
+    // 구단명 접두 — 걷고도 대문자 토큰이 둘 이상 남을 때만(Milan Škriniar의 "Milan"은 이름이다)
+    const k = [3, 2, 1].find((n) => tokens.length - n >= 2 && isClubName(tokens.slice(0, n).join(" ")));
+    if (k) {
+      tokens = tokens.slice(k);
+      continue;
+    }
+    break;
+  }
+  // 끝에 붙은 구단 표기는 이름이 아니다("striker Ings Wycombe Wanderers sign" → "Ings")
+  if (tokens.length > 2 && CLUB_SUFFIX.has(tokens.at(-1).toLowerCase())) tokens = tokens.slice(0, -2);
+  {
+    const covered = clubCoverage(tokens);
+    while (tokens.length > 1 && covered.at(-1)) {
+      tokens = tokens.slice(0, -1);
+      covered.pop();
+    }
+  }
+  if (runContinuesLeft) {
+    const cut = tokens.findLastIndex((t, i) => i < tokens.length - 1 && isVocab(t));
+    if (cut < 0) return null;
+    tokens = tokens.slice(cut + 1);
+  }
+  // 조사로 시작·끝나면 이름이 아니다
+  while (tokens.length && !isCapital(tokens.at(-1))) tokens.pop();
+  if (!tokens.length || !isCapital(tokens[0])) return null;
+  // 끝이 역할어면 그 덩어리 전체가 수식어다("Aston Villa Star", "Serie A Defender")
+  if (ROLE_NOUNS.has(tokens.at(-1).toLowerCase()) || POSITIONS.includes(tokens.at(-1).toLowerCase())) return null;
+  name = tokens.join(" ");
+
+  // ⚠ 소유격은 사람을 가리키지 않는다 — "signing for Mikel Arteta's side"(감독의 팀)가 선수로 잡혔다.
+  //   가운데 소유격("Lewis Hall's Fresh")도 이름의 경계를 알 수 없어 버린다(정밀도를 택한다)
+  if (tokens.some((t) => /['’]s$/u.test(t))) return null;
+  if (name.length > 40) return null;
+  if (NOT_A_PERSON.test(name)) return null;
+  // 대문자 토큰이 전부 어휘(국적·역할어·대회·매체)면 사람이 아니다 — 조사(van·de)는 세지 않는다
+  const capitals = tokens.filter(isCapital).map((t) => t.toLowerCase());
+  if (capitals.every((t) => DEMONYMS.has(t) || ROLE_NOUNS.has(t) || LEADING_NOISE.has(t) || NON_NAME_WORDS.has(t))) return null;
+  if (isClubName(name) || isOnlyClubs(name)) return null;
+
+  // 원문에서의 위치 — 앞뒤 문맥 판정용
+  const at = text.indexOf(name, start);
+  const pos = at >= 0 ? at : start;
+  const after = text.slice(pos + name.length);
+  // 이름 바로 뒤가 역할 명사면 수식어다("World Cup star", "Eastern European striker")
+  const next = after.match(/^\s+([\p{L}-]+)/u)?.[1]?.toLowerCase();
+  if (next && ROLE_NOUNS.has(next)) return null;
+  if (next && POSITIONS.includes(next)) return null;
+  // 감독·단장·구단주 문맥
+  if (ROLE_BEFORE.test(text.slice(Math.max(0, pos - 40), pos))) return null;
+  if (roleAfter(after)) return null;
+
+  // 한 토큰 이름은 사람 사전에 있을 때만 — 흔한 이름 하나로 선수를 특정하지 않는다
+  if (tokens.filter(isCapital).length < 2 && !isKnownMononym(name)) return null;
+  return name;
+}
 
 function detectPlayers(text, clubs) {
   const found = new Set();
@@ -283,21 +521,24 @@ function detectPlayers(text, clubs) {
     let m;
     while ((m = re.exec(text))) {
       if (anchor.requireClubAfter && !knownClubAfter(text, m.index + m[0].length)) continue;
-      const name = m[1].replace(TRAILING_NOISE, "").trim();
-      // ⚠ 소유격은 사람을 가리키지 않는다 — "signing for Mikel Arteta's side"(감독의 팀)가 선수로 잡혔다
-      if (/['’]s$/u.test(name)) continue;
-      // 단어 하나짜리는 구단·국가명일 확률이 높아 버린다
-      if (name.split(/\s+/).length < 2) continue;
-      if (name.length > 40) continue;
-      if (NOT_A_PERSON.test(name)) continue;
-      if (isClubName(name)) continue;
-      if (clubs.some((c) => name.includes(c) || c.includes(name))) continue;
-      // 토큰 하나라도 구단 별칭이면 사람이 아니다 — 새 앵커(to·target) 뒤에는 구단명이 자주 온다
-      if (detectClubs(name).length > 0) continue;
+      // ⚠ 대문자로 쓴 키워드는 **헤드라인(타이틀 케이스)일 때만** 앵커다 — 다음 낱말도 대문자여야 한다.
+      //   본문의 "row with Javier Tebas Sign up now!"(뉴스레터 버튼)가 "Javier Tebas signs"가 됐다(운영 데이터 대조)
+      if (anchor.nameFirst) {
+        const kw = m[0].slice(m.indices[1][1] - m.index).trim();
+        if (/^\p{Lu}/u.test(kw) && !/^['’]/u.test(kw)) {
+          const next = text.slice(m.index + m[0].length).match(/^\s*([\p{L}\p{N}]\S*)/u)?.[1];
+          if (next && !/^[\p{Lu}\p{N}£€$]/u.test(next)) continue;
+        }
+      }
+      const name = cleanCandidate(m[1], text, m.indices[1][0], anchor.nameFirst === true);
+      if (!name) continue;
+      // 본문에서 잡힌 구단과 같은 표기면 사람이 아니다
+      if (clubs.some((c) => c === name || c.includes(name))) continue;
       found.add(name);
     }
   }
-  return [...found];
+  // 같은 사람이 짧게·길게 두 번 잡히면 긴 쪽만 남긴다("Morgan Gibbs" ⊂ "Morgan Gibbs-White")
+  return [...found].filter((n) => ![...found].some((o) => o !== n && o.startsWith(n)));
 }
 
 /** 이적 관련성 점수. 낮으면 경기 리뷰·부상 소식 등 비이적 콘텐츠다. */

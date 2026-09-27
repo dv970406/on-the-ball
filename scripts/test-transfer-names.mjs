@@ -4,7 +4,7 @@
  *   node scripts/test-transfer-names.mjs
  */
 import { RECHECK_MS, createNameBook, missingNames, shortClubName } from "./lib/transfer/names-ko.mjs";
-import { koLabel, pickEntity } from "./lib/transfer/wikidata.mjs";
+import { koLabel, lookupKo, normalizeName, pickEntity, toHits } from "./lib/transfer/wikidata.mjs";
 
 let pass = 0;
 let fail = 0;
@@ -25,11 +25,51 @@ const ENT = {
   Q5: { labels: {}, claims: { P106: [claim("Q937857")] } }, // 한국어 레이블 없음
   Q6: { labels: { ko: { value: "페데리코 키에사" } }, claims: { P106: [claim("Q33999")] } }, // 동명이인(배우)
 };
-check("구단 — 검색 첫 결과가 도시여도 축구 클럽 항목을 고른다", eq(pickEntity(["Q1", "Q2"], ENT, "club"), { wikidataId: "Q2", nameKo: "왓퍼드 FC" }));
-check("선수 — 직업이 축구 선수가 아닌 동명이인은 건너뛴다", eq(pickEntity(["Q6", "Q3"], ENT, "player"), { wikidataId: "Q3", nameKo: "페데리코 키에사" }));
-check("한글이 없는 한국어 레이블은 없는 것으로 본다(영문 복사본)", eq(pickEntity(["Q4"], ENT, "player"), { wikidataId: "Q4", nameKo: null }));
-check("한국어 레이블이 없으면 항목만 남는다", eq(pickEntity(["Q5"], ENT, "player"), { wikidataId: "Q5", nameKo: null }));
-check("종류가 맞는 항목이 없으면 둘 다 null", eq(pickEntity(["Q1"], ENT, "club"), { wikidataId: null, nameKo: null }));
+const hit = (id, ...texts) => ({ id, texts });
+check("구단 — 검색 첫 결과가 도시여도 축구 클럽 항목을 고른다", eq(pickEntity([hit("Q1", "Watford"), hit("Q2", "Watford F.C.")], ENT, "club", "Watford"), { wikidataId: "Q2", nameKo: "왓퍼드 FC" }));
+check("선수 — 직업이 축구 선수가 아닌 동명이인은 건너뛴다", eq(pickEntity([hit("Q6", "Federico Chiesa"), hit("Q3", "Federico Chiesa")], ENT, "player", "Federico Chiesa"), { wikidataId: "Q3", nameKo: "페데리코 키에사" }));
+check("한글이 없는 한국어 레이블은 없는 것으로 본다(영문 복사본)", eq(pickEntity([hit("Q4", "Federico Chiesa")], ENT, "player", "Federico Chiesa"), { wikidataId: "Q4", nameKo: null }));
+check("한국어 레이블이 없으면 항목만 남는다", eq(pickEntity([hit("Q5", "Federico Chiesa")], ENT, "player", "Federico Chiesa"), { wikidataId: "Q5", nameKo: null }));
+check("종류가 맞는 항목이 없으면 둘 다 null", eq(pickEntity([hit("Q1", "Watford")], ENT, "club", "Watford"), { wikidataId: null, nameKo: null }));
+
+// 운영 사고: "Joao Pedro"가 별칭 앞부분만 맞는 주앙 칸셀루로 풀렸다 — 검색 응답을 그대로 옮긴 픽스처
+const JP = {
+  Q109982356: { labels: {}, claims: {} }, // 박물관 인물(축구 선수 아님)
+  Q6298063: { labels: { ko: { value: "주앙 칸셀루" } }, claims: { P106: [claim("Q937857")] } },
+  Q64005114: { labels: { ko: { value: "주앙 페드루" } }, claims: { P106: [claim("Q937857")] } },
+  Q96384789: { labels: {}, claims: { P106: [claim("Q937857")] } }, // 동명의 다른 선수(한국어 레이블 없음)
+};
+const JP_HITS = toHits([
+  { id: "Q109982356", label: "Joao Pedro", match: { type: "label", text: "Joao Pedro" } },
+  { id: "Q6298063", label: "João Cancelo", match: { type: "alias", text: "Joao Pedro Cavaco Cancelo" } },
+  { id: "Q64005114", label: "João Pedro", match: { type: "label", text: "João Pedro" } },
+  { id: "Q96384789", label: "João Pedro", match: { type: "label", text: "João Pedro" } },
+]);
+check("선수 — 별칭 앞부분만 맞는 다른 선수(칸셀루)를 고르지 않는다", eq(pickEntity(JP_HITS, JP, "player", "Joao Pedro"), { wikidataId: "Q64005114", nameKo: "주앙 페드루" }));
+check("선수 — 이름이 통째로 같은 후보가 없으면 고르지 않는다", eq(pickEntity([hit("Q6298063", "João Cancelo", "Joao Pedro Cavaco Cancelo")], JP, "player", "Joao Pedro"), { wikidataId: null, nameKo: null }));
+check("선수 — 별칭이 통째로 같으면 받는다", eq(pickEntity([hit("Q6298063", "João Cancelo", "Joao Cancelo")], JP, "player", "Joao Cancelo"), { wikidataId: "Q6298063", nameKo: "주앙 칸셀루" }));
+check(
+  "선수 — 같은 이름의 선수가 서로 다른 한국어 표기로 여럿이면 고르지 않는다(틀린 칸보다 빈 칸)",
+  eq(pickEntity([hit("Q6298063", "Joao Pedro"), hit("Q64005114", "João Pedro")], JP, "player", "Joao Pedro"), { wikidataId: null, nameKo: null }),
+);
+// 동명이인 중 압도적으로 유명한 한 명(브루누 페르난드스)은 고르고, 비슷하면 비운다
+const links = (n) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`w${i}`, {}]));
+const BF = {
+  Q1: { labels: { ko: { value: "브루누 페르난드스" } }, sitelinks: links(60), claims: { P106: [claim("Q937857")] } },
+  Q2: { labels: { ko: { value: "브루누 주앙 난딩가 보르즈스 페르난드스" } }, sitelinks: links(8), claims: { P106: [claim("Q937857")] } },
+  Q3: { labels: { ko: { value: "다른 페르난드스" } }, sitelinks: links(40), claims: { P106: [claim("Q937857")] } },
+};
+check("선수 — 동명이인 중 언어판 수가 2배 이상인 한 명은 고른다", eq(pickEntity([hit("Q2", "Bruno Fernandes"), hit("Q1", "Bruno Fernandes")], BF, "player", "Bruno Fernandes"), { wikidataId: "Q1", nameKo: "브루누 페르난드스" }));
+check("선수 — 동명이인의 유명도가 비슷하면 비운다", eq(pickEntity([hit("Q1", "Bruno Fernandes"), hit("Q3", "Bruno Fernandes")], BF, "player", "Bruno Fernandes"), { wikidataId: null, nameKo: null }));
+{
+  let calls = 0;
+  const r = await lookupKo("Joao", "player", async () => {
+    calls += 1;
+    throw new Error("불리면 안 된다");
+  });
+  check("선수 — 이름 한 토큰(Joao)은 위키데이터를 부르지도 않는다", eq(r, { wikidataId: null, nameKo: null }) && calls === 0);
+}
+check("normalizeName — 악센트·대소문자·기호를 접는다", normalizeName("João  Pedro-") === normalizeName("joao pedro"));
 check("koLabel — 한글이 있어야 한다", koLabel(ENT.Q3) === "페데리코 키에사" && koLabel(ENT.Q4) === null);
 
 // ── 구단 약칭 ──────────────────────────────────────────────────────────

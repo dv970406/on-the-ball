@@ -34,20 +34,70 @@ export function koLabel(entity) {
   return typeof v === "string" && /[가-힣]/.test(v) ? v.trim() : null;
 }
 
+/** 동명이인 중 "압도적으로 유명한 한 명"의 기준 — 위키백과 언어판 수 */
+const DOMINANT_MIN = 10;
+const DOMINANT_RATIO = 2;
+const sitelinkCount = (entity) => Object.keys(entity?.sitelinks ?? {}).length;
+
+/** 이름 비교용 정규형 — 악센트·대소문자·기호 차이를 접는다("João Pedro" = "Joao Pedro") */
+export function normalizeName(v) {
+  return String(v)
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
 /**
- * 검색 순서대로 후보를 보며 **종류가 맞는 첫 항목**을 고른다(순수 함수 — 테스트가 네트워크 없이 돈다).
- * @param {string[]} ids 검색 결과 순서의 항목 id
+ * 검색 결과에서 **종류가 맞는 항목**을 고른다(순수 함수 — 테스트가 네트워크 없이 돈다).
+ *
+ * ⚠ **선수는 이름이 통째로 같은 후보만 받는다**(레이블이나 별칭 하나가 검색어와 정규형으로 같아야 한다).
+ *   위키데이터 검색은 별칭의 **앞부분**만 맞아도 결과에 올린다 — "Joao Pedro"를 찾았더니 별칭
+ *   "Joao Pedro Cavaco Cancelo"를 가진 주앙 칸셀루가 첫 축구 선수로 잡혀, 다른 선수가 칸셀루로
+ *   그려졌다(운영 실측). 직업 확인만으로는 "축구 선수끼리의 혼동"을 막지 못한다.
+ * ⚠ **같은 이름의 축구 선수가 서로 다른 한국어 표기로 여럿이면, 압도적으로 유명한 한 명일 때만 고른다** —
+ *   위키백과 언어판 수(sitelinks)가 2위의 2배 이상이고 10개 이상일 때다. 전부 비우면 브루누 페르난드스·
+ *   베르나르두 실바·코나테 같은 간판 선수가 영문으로 남았다(유명 선수 999명 시뮬레이션에서 22명).
+ *   이적 보도에 오르는 선수는 대개 그 이름의 가장 유명한 사람이다. 비슷하면 여전히 비운다 —
+ *   틀린 표기보다 빈 칸(영문)이 낫고, 필요하면 사람이 `players-ko.json`으로 채운다.
+ * ⚠ 구단은 이름 일치를 요구하지 않는다 — 사전의 정규명("Watford")과 항목 레이블("Watford F.C.")이
+ *   원래 다르고, 분류(축구 클럽)가 동명이인을 거른다.
+ * @param {{ id: string, texts: string[] }[]} hits 검색 결과 순서의 후보(`texts`는 레이블·일치한 별칭)
  * @param {Record<string, object>} entities wbgetentities 응답의 `entities`
  * @param {"player" | "club"} kind
+ * @param {string} name 찾은 이름
  * @returns {{ wikidataId: string | null, nameKo: string | null }}
  */
-export function pickEntity(ids, entities, kind) {
-  for (const id of ids) {
-    const e = entities[id];
-    const ok = kind === "player" ? claimIds(e, "P106").includes(FOOTBALLER) : claimIds(e, "P31").includes(FOOTBALL_CLUB);
-    if (ok) return { wikidataId: id, nameKo: koLabel(e) };
+export function pickEntity(hits, entities, kind, name) {
+  const none = { wikidataId: null, nameKo: null };
+  if (kind === "club") {
+    const hit = hits.find((h) => claimIds(entities[h.id], "P31").includes(FOOTBALL_CLUB));
+    return hit ? { wikidataId: hit.id, nameKo: koLabel(entities[hit.id]) } : none;
   }
-  return { wikidataId: null, nameKo: null };
+  const wanted = normalizeName(name);
+  const exact = hits.filter(
+    (h) =>
+      claimIds(entities[h.id], "P106").includes(FOOTBALLER) &&
+      h.texts.some((t) => normalizeName(t) === wanted),
+  );
+  if (!exact.length) return none;
+  const labels = new Set(exact.map((h) => koLabel(entities[h.id])).filter((v) => v !== null));
+  if (labels.size > 1) {
+    const ranked = exact.map((h) => ({ h, n: sitelinkCount(entities[h.id]) })).sort((a, b) => b.n - a.n);
+    const [top, second] = ranked;
+    const dominant = top.n >= DOMINANT_MIN && top.n >= second.n * DOMINANT_RATIO && koLabel(entities[top.h.id]) !== null;
+    return dominant ? { wikidataId: top.h.id, nameKo: koLabel(entities[top.h.id]) } : none;
+  }
+  const chosen = labels.size === 1 ? exact.find((h) => koLabel(entities[h.id]) !== null) : exact[0];
+  return { wikidataId: chosen.id, nameKo: koLabel(entities[chosen.id]) };
+}
+
+/** wbsearchentities 결과 → 후보(레이블과, 별칭으로 걸렸으면 그 별칭) */
+export function toHits(search) {
+  return (search ?? [])
+    .filter((s) => typeof s?.id === "string")
+    .map((s) => ({ id: s.id, texts: [s.label, s.match?.text].filter((t) => typeof t === "string") }));
 }
 
 async function getJson(params, fetchImpl) {
@@ -62,9 +112,12 @@ async function getJson(params, fetchImpl) {
  * 네트워크·HTTP 오류는 던진다 — 호출부가 그 이름을 캐시하지 않고 다음 실행에 다시 찾는다.
  */
 export async function lookupKo(name, kind, fetchImpl = fetch) {
+  // ⚠ 선수는 이름 한 토큰("Joao"·"Fabio")으로 찾지 않는다 — 흔한 이름 하나로는 누구인지 특정할 수 없다
+  //   (시뮬레이션: 옛 규칙은 이름 첫 토큰만으로 671개 중 232개를 누군가로 특정했다). 한 토큰 선수(Neymar)는 사람 사전이 맡는다.
+  if (kind === "player" && normalizeName(name).split(" ").length < 2) return { wikidataId: null, nameKo: null };
   const search = await getJson({ action: "wbsearchentities", search: name, language: "en", uselang: "en", type: "item", limit: String(CANDIDATES) }, fetchImpl);
-  const ids = (search.search ?? []).map((s) => s.id).filter(Boolean);
-  if (!ids.length) return { wikidataId: null, nameKo: null };
-  const got = await getJson({ action: "wbgetentities", ids: ids.join("|"), props: "labels|claims", languages: "ko" }, fetchImpl);
-  return pickEntity(ids, got.entities ?? {}, kind);
+  const hits = toHits(search.search);
+  if (!hits.length) return { wikidataId: null, nameKo: null };
+  const got = await getJson({ action: "wbgetentities", ids: hits.map((h) => h.id).join("|"), props: "labels|claims|sitelinks", languages: "ko" }, fetchImpl);
+  return pickEntity(hits, got.entities ?? {}, kind, name);
 }

@@ -137,6 +137,53 @@ const PLAYER_CASES = [
   { players: [], text: "The Athletic to Liverpool: sources say no." },
   { players: [], text: "Wednesday's gossip to Tottenham Hotspur." },
   { players: [], text: "Yahoo Sports's move to Chelsea." },
+  // ── 유명 선수 999명 시뮬레이션·운영 데이터 대조에서 나온 사례 ──
+  // 악센트 대문자로 시작하는 토큰([A-Z]로는 통째로 빠졌다)
+  { players: ["Ángel Di María"], text: "Juventus complete the signing of Ángel Di María from Benfica." },
+  { players: ["Martin Ødegaard"], text: "Arsenal have submitted an opening bid for Martin Ødegaard." },
+  // 소문자 조사(van·de·dos)
+  { players: ["Virgil van Dijk"], text: "Virgil van Dijk joins Real Madrid on a five-year deal." },
+  { players: ["Giovani dos Santos"], text: "Chelsea are in advanced talks to sign Giovani dos Santos." },
+  // 악센트 없이 쓴 이름이 국적 형용사와 같은 철자다(German Pezzella)
+  { players: ["German Pezzella"], text: "Chelsea complete the signing of German Pezzella from Arsenal." },
+  // 이름에 구단명 토큰이 있다(Milan)
+  { players: ["Milan Škriniar"], text: "Paris Saint-Germain agree personal terms with Milan Škriniar." },
+  // 타이틀 케이스 헤드라인
+  { players: ["Kylian Mbappé"], text: "Real Madrid Agree £50m Deal To Sign Kylian Mbappé" },
+  { players: ["Kylian Mbappé"], text: "Kylian Mbappé Completes Move To Real Madrid" },
+  { players: ["Jadon Sancho"], text: "Man United Winger Jadon Sancho Completes Move To Chelsea" },
+  // 새 문형: terms with · medical
+  { players: ["Dani Olmo"], text: "Barcelona have agreed personal terms with Dani Olmo." },
+  { players: ["Dani Olmo"], text: "Dani Olmo is undergoing a medical at Barcelona ahead of his £40m move." },
+  // 소유격 소속("Bournemouth's Alex Scott")은 걷는다
+  { players: ["Alex Scott"], text: "Chelsea target Bournemouth's Alex Scott." },
+  // "as free agent"는 역할(에이전트)이 아니다
+  { players: ["David Alaba"], text: "David Alaba joins Udinese on one year deal after leaving Real Madrid as free agent." },
+  // 뒤의 역할어가 다른 사람(아르테타)의 것이다
+  { players: ["Vinicius Jr"], text: "Vinicius Jr to Arsenal truth emerges after Mikel Arteta secrecy as assistant coach speaks out" },
+  // 오탐 — 수식어("… star/striker/winner")
+  { players: [], text: "Liverpool reach agreement to sign Eastern European striker for £40m." },
+  { players: [], text: "Tottenham complete signing of World Cup winner." },
+  { players: [], text: "Chelsea Agree Deal To Sign Star Striker" },
+  { players: [], text: "Arsenal Agree Deal To Sign Free Agent" },
+  { players: [], text: "Juventus Agree Deal To Sign North American Midfielder" },
+  // 오탐 — 선수가 아닌 사람(감독·단장·구단주·정치인·바이라인)
+  { players: [], text: "Real Madrid target Jürgen Klopp to replace the sacked boss." },
+  { players: [], text: "Richard Hughes joins Bayern Munich as sporting director." },
+  { players: [], text: "Mikel Arteta agrees new contract to extend stay as Arsenal manager" },
+  { players: [], text: "Canadian PM Mark Carney arrives at Hill Dickinson Stadium for tonight's game" },
+  { players: [], text: "SempreMilan Podcast By: Oliver Fisher Join Oli, Anthony and Bdair as they rant" },
+  // 오탐 — 한 토큰(흔한 이름)은 사람 사전에 없으면 특정하지 않는다
+  { players: [], text: "Chelsea complete signing of Joao from Benfica." },
+  // 오탐 — 타이틀 케이스 덩어리의 경계를 알 수 없다 / 장소 / 본문의 대문자 버튼 문구
+  { players: [], text: "Medical At Old Trafford As Chelsea Agree Deal" },
+  { players: [], text: "Madrid, Mourinho and the fight for neutrality in row with Javier Tebas Sign up now! Sign up now?" },
+  // 오탐 — 구단 표기(사전 밖 하부 리그 구단·2군·약칭 포함)
+  { players: [], text: "Man United complete deal for prospect from Liverpool - Yahoo Sports Man United complete deal for prospect" },
+  // 헤드라인·본문이 붙은 원문 — 앞 덩어리("Ings Wycombe Wanderers")는 버리고 본문의 선수를 잡는다
+  { players: ["Danny Ings"], text: "Wycombe sign ex-England striker Ings Wycombe Wanderers sign former Burnley striker Danny Ings." },
+  { players: [], text: "Official: Tommaso Mancioppi extends contract with Milan Futuro By: Oliver Fisher" },
+  { players: [], text: "Harry Kane confirms new deal talks with FC Bayern are advancing." },
 ];
 let playerPass = 0;
 for (const c of PLAYER_CASES) {
