@@ -32,7 +32,11 @@ export { groupDeals, sortDeals } from "./lib/sort";
 // ⚠ 캐러셀 판정(T1 · 3일 이내)의 단일 소스 — 서버 프리페치와 뷰가 같은 함수를 부른다
 export { pickRecentRumors } from "./lib/rumors";
 // ⚠ URL 파라미터 해석과 리그 필터 — 서버 page와 시트가 같은 판정을 써야 한다
-export { dealInLeague, parseTransferLeague, parseTransferSort } from "./lib/league";
+export { dealHasClub, dealInLeague, parseTransferClub, parseTransferLeague, parseTransferSort } from "./lib/league";
+// ⚠ 루머 구간의 접기 — 식은 루머·열기 상위 판정을 뷰가 다시 짜지 않는다
+export { splitHotRumors } from "./lib/rumor-heat";
+// ⚠ 진행 중 구간의 소구간(합의 임박·협상 중) — 뱃지 톤과 같은 갈림
+export { splitProgress } from "./lib/stage";
 // ⚠ 이적료 표기·범위 — 상세의 이적료 카드가 쓴다(목록 UI는 같은 슬라이스라 상대 경로)
 export { formatFee, formatFeeRange } from "./lib/fee";
 // ⚠ 경로 두 칸의 문구(FA·미확인·미정·외 N)의 단일 소스 — 상세 경로 카드와 목록 UI가 같은 말을 한다

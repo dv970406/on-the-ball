@@ -9,7 +9,7 @@ import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
 import { buildDealListQuery } from "@/entities/transfer/api/list-query";
 import { buildDealListItem } from "@/entities/transfer/api/mappers";
 // URL 파라미터 해석 — 시트·정렬 링크가 만드는 값과 같은 판정이어야 한다
-import { parseTransferLeague, parseTransferSort } from "@/entities/transfer/lib/league";
+import { parseTransferClub, parseTransferLeague, parseTransferSort } from "@/entities/transfer/lib/league";
 import type { TransferDealListItem } from "@/entities/transfer/model/types";
 import { TransferBoardView } from "@/views/transfer-board";
 
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   // ⚠ 색인 대상 목록이라 description을 채운다 — 비우면 루트의 사이트 소개 한 줄이 이 화면의
   //   검색 결과 설명이 된다.
   description: DESCRIPTION,
-  // ⚠ **canonical에서 리그·정렬 쿼리를 항상 떨어뜨린다.** 같은 집합의 부분·순서만 다른 중복이라
+  // ⚠ **canonical에서 리그·정렬·구단 쿼리를 항상 떨어뜨린다.** 같은 집합의 부분·순서만 다른 중복이라
   //   색인 대상이 아니다(글 목록의 정렬과 같은 처리). `noindex`를 함께 걸지 않는다.
   alternates: { canonical: ROUTES.transferList },
   // ⚠ openGraph를 채우는 순간 루트 이미지 상속이 사라지므로 `images`를 함께 명시한다.
@@ -110,10 +110,11 @@ const fetchTransferBoard = cache(async (): Promise<TransferBoard> => {
 export default async function Page(props: PageProps<"/transfers">) {
   // ⚠ `useSearchParams`(클라이언트 훅)가 아니라 **서버 컴포넌트의 prop**이다 —
   //   훅을 쓰면 프리렌더가 CSR로 떨어진다(nextjs.md에서 금지).
-  const { league: rawLeague, sort: rawSort } = await props.searchParams;
-  // 모르는 리그·정렬은 전체·최신으로 폴백한다 — 파라미터 오염이 404를 양산하면 안 된다
+  const { league: rawLeague, sort: rawSort, club: rawClub } = await props.searchParams;
+  // 모르는 리그·정렬·구단은 전체·최신으로 폴백한다 — 파라미터 오염이 404를 양산하면 안 된다
   const league = parseTransferLeague(typeof rawLeague === "string" ? rawLeague : undefined);
   const sort = parseTransferSort(typeof rawSort === "string" ? rawSort : undefined);
+  const club = parseTransferClub(typeof rawClub === "string" ? rawClub : undefined);
 
   const { deals, userId, nowMs, scopeStartIso } = await fetchTransferBoard();
   return (
@@ -124,6 +125,7 @@ export default async function Page(props: PageProps<"/transfers">) {
       scopeStartIso={scopeStartIso}
       league={league}
       sort={sort}
+      club={club}
     />
   );
 }

@@ -8,7 +8,7 @@ import type { TransferDeal } from "../model/types";
 import { TransferCrest } from "./transfer-crest";
 
 interface ClubRouteProps {
-  deal: Pick<TransferDeal, "fromClub" | "toClub" | "isFreeAgent" | "suitorCount" | "stage">;
+  deal: Pick<TransferDeal, "fromClub" | "toClub" | "isFreeAgent" | "suitorCodes" | "stage">;
   /** 엠블럼 px */
   size: number;
   className?: string;

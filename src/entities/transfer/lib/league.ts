@@ -32,3 +32,23 @@ export function dealInLeague(
   if (league === null) return true;
   return deal.fromClub?.league === league || deal.toClub?.league === league;
 }
+
+/** 구단 코드의 형식 — `transfer_club.code`(엠블럼 파일명과 같은 slug) */
+const CLUB_CODE = /^[a-z0-9-]{1,60}$/u;
+
+/**
+ * URL `?club=` → 구단 코드. 형식이 아니면 `null`(= 전체). 실제로 보드에 있는 구단인지는 뷰가 딜 목록으로 대조한다 —
+ * 없는 코드는 빈 보드가 아니라 전체로 폴백한다(공유 링크의 구단이 창을 지나 사라졌을 때).
+ */
+export function parseTransferClub(value: string | undefined): string | null {
+  return value !== undefined && CLUB_CODE.test(value) ? value : null;
+}
+
+/** 구단 필터 — 출발·행선지·관심 구단(`suitorCodes`) 어느 자리에든 그 구단이 있으면 포함. `null`은 전체 */
+export function dealHasClub(
+  deal: Pick<TransferDeal, "fromClub" | "toClub" | "suitorCodes">,
+  club: string | null,
+): boolean {
+  if (club === null) return true;
+  return deal.fromClub?.code === club || deal.toClub?.code === club || deal.suitorCodes.includes(club);
+}

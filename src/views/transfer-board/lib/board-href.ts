@@ -12,10 +12,12 @@ import { ROUTES } from "@/shared/config";
  *   (`parsePostId`·`safeNextPath`와 같은 이유로 함수 하나가 갖는다).
  * ⚠ 리그명은 한글이라 `encodeURIComponent`로 싣는다 — 공백이 든 `세리에 A`도 `%20`으로 간다.
  *   해석은 `parseTransferLeague`(서버 page)가 하고, 모르는 값은 전체로 폴백한다.
+ * ⚠ 구단(`?club=`)은 구단 코드(slug)다 — 해석은 `parseTransferClub`, 보드에 없는 구단은 뷰가 전체로 폴백한다.
  */
-export function boardHref(league: TransferLeague | null, sort: TransferSort): string {
+export function boardHref(league: TransferLeague | null, sort: TransferSort, club: string | null = null): string {
   const params: string[] = [];
   if (league !== null) params.push(`league=${encodeURIComponent(league)}`);
   if (sort !== "latest") params.push(`sort=${sort}`);
+  if (club !== null) params.push(`club=${encodeURIComponent(club)}`);
   return params.length === 0 ? ROUTES.transferList : `${ROUTES.transferList}?${params.join("&")}`;
 }

@@ -19,6 +19,8 @@ const SORT_LABEL: Record<TransferSort, string> = { latest: "최신", fee: "이�
 interface BoardToolsProps {
   league: TransferLeague | null;
   sort: TransferSort;
+  /** 구단 필터 — 정렬 링크가 이 값을 유지한다(정렬을 바꿨는데 구단이 풀리면 안 된다) */
+  club: string | null;
   onOpenLeague: () => void;
 }
 
@@ -27,11 +29,11 @@ interface BoardToolsProps {
  *
  * ⚠ 정렬은 **`<Link>`**다 — 같은 집합의 순서만 다른 중복이라 색인 대상은 아니지만, 상태를
  *   URL이 소유하므로 이동이다(`PostListView`의 정렬 행과 같은 형태). 선택 표시는
- *   `aria-current="page"`(링크의 상태 표현)이고, 리그 파라미터는 `boardHref`가 유지한다.
+ *   `aria-current="page"`(링크의 상태 표현)이고, 리그·구단 파라미터는 `boardHref`가 유지한다.
  * ⚠ 리그 버튼은 그냥 `button`이다 — `aria-haspopup`을 붙이지 않는다(과한 ARIA는 없느니만 못하다).
  * ⚠ 아래 구분선 없음(handoff).
  */
-export function BoardTools({ league, sort, onOpenLeague }: BoardToolsProps) {
+export function BoardTools({ league, sort, club, onOpenLeague }: BoardToolsProps) {
   return (
     <div className="flex items-center gap-1.5 px-5 pb-2.5 pt-0.5">
       <button
@@ -47,7 +49,7 @@ export function BoardTools({ league, sort, onOpenLeague }: BoardToolsProps) {
         {SORTS.map((item) => (
           <Link
             key={item}
-            href={boardHref(league, item)}
+            href={boardHref(league, item, club)}
             aria-current={sort === item ? "page" : undefined}
             className={cn(
               "py-1.5 text-[12px] transition-colors duration-150 ease-otb",

@@ -1,4 +1,4 @@
-import type { TransferGroupKey, TransferStage, TransferStatus } from "../model/types";
+import type { TransferDeal, TransferGroupKey, TransferStage, TransferStatus } from "../model/types";
 
 /**
  * 단계 → 보드 구간. `Record`라 enum에 값이 늘면 누락이 컴파일 에러로 드러난다.
@@ -77,4 +77,22 @@ export const STATUS_LABEL: Record<TransferStatus, string> = {
  */
 export function isDeadStage(stage: TransferStage): boolean {
   return STAGE_GROUP[stage] === "dead";
+}
+
+/** 진행 중 구간의 소구간 — 뱃지 톤과 같은 갈림(합의 임박 · 협상 중). 라벨은 `STATUS_LABEL`을 그대로 쓴다 */
+export type ProgressSubgroupKey = Extract<TransferStatus, "imminent" | "talks">;
+export const PROGRESS_SUBGROUPS = ["imminent", "talks"] as const satisfies readonly ProgressSubgroupKey[];
+
+/**
+ * 진행 중 구간을 합의 임박(메디컬·개인 조건·합의) / 협상 중(제안·협상)으로 가른다 — 입력 순서는 그대로다.
+ * 빈 소구간은 뺀다. 한 소구간뿐이면 호출부가 소제목을 생략한다(뱃지가 이미 같은 말을 한다).
+ */
+export function splitProgress<T extends Pick<TransferDeal, "stage">>(
+  deals: readonly T[],
+): { key: ProgressSubgroupKey; label: string; deals: T[] }[] {
+  return PROGRESS_SUBGROUPS.map((key) => ({
+    key,
+    label: STATUS_LABEL[key],
+    deals: deals.filter((d) => STAGE_STATUS[d.stage] === key),
+  })).filter((g) => g.deals.length > 0);
 }

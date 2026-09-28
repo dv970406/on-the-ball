@@ -20,6 +20,7 @@ import { useTransferBoard } from "../model/use-transfer-board";
 import { BoardHeader } from "./board-header";
 import { BoardSections } from "./board-sections";
 import { BoardTools } from "./board-tools";
+import { ClubChips } from "./club-chips";
 import { GroupChips } from "./group-chips";
 import { LeagueSheet } from "./league-sheet";
 import { RumorCarousel } from "./rumor-carousel";
@@ -42,13 +43,15 @@ interface TransferBoardViewProps {
   /** `null` = 전체 리그. **URL이 소유한다** — 로컬 state가 아니다 */
   league: TransferLeague | null;
   sort: TransferSort;
+  /** `null` = 전체 구단. 구단 코드(`?club=`) — 보드에 없는 구단은 모델이 전체로 폴백한다 */
+  club: string | null;
 }
 
 /**
  * 이적시장 보드(handoff 4장 · 계획서 §3-6).
  *
  * 위→아래: 앱바 · 최근 3일 소식 캐러셀 · 이적시장 헤더(창 · 추적 건수 · 마감 카운트다운) ·
- * 구간 점프 칩 · 도구줄 · 구간들.
+ * 구간 점프 칩 · 도구줄 · 구단 필터 칩 · 구간들(긴 구간은 접혀 있다 — `BoardSections`).
  *
  * ⚠ `SignInDialog`를 두지 않는다 — 보드에는 로그인이 필요한 액션이 없다(관심 토글은 상세에만).
  * ⚠ 이 슬라이스는 에메랄드·`rounded-full`·`shadow-`를 새로 쓰지 않는다 — 엔티티 컴포넌트가
@@ -61,6 +64,7 @@ export function TransferBoardView({
   scopeStartIso,
   league,
   sort,
+  club: requestedClub,
 }: TransferBoardViewProps) {
   const router = useRouter();
 
@@ -71,12 +75,13 @@ export function TransferBoardView({
   const nowMs = serverNowMs ?? clientNowMs;
 
   // 조회·대기 판정·파생(캐러셀·구간·건수)은 `model/use-transfer-board`가 소유한다
-  const { deals, rumors, groups, counts } = useTransferBoard({
+  const { deals, rumors, groups, counts, clubOptions, club } = useTransferBoard({
     initialDeals,
     initialUserId,
     scopeStartIso,
     league,
     sort,
+    club: requestedClub,
     nowMs,
   });
 
@@ -88,10 +93,10 @@ export function TransferBoardView({
     jump,
   } = useGroupJump(groups.map((group) => group.key));
 
-  /** 리그는 URL이 소유한다 — `replace`라 뒤로가기 스택에 리그 변경이 쌓이지 않는다 */
+  /** 리그는 URL이 소유한다 — `replace`라 뒤로가기 스택에 리그 변경이 쌓이지 않는다. 리그를 바꾸면 구단 필터는 푼다(다른 리그의 구단이다) */
   const handleLeagueSelect = (next: TransferLeague | null) => {
     setLeagueSheetOpen(false);
-    if (next !== league) router.replace(boardHref(next, sort), { scroll: false });
+    if (next !== league) router.replace(boardHref(next, sort, null), { scroll: false });
   };
 
   const allDeals = deals.data;
@@ -147,12 +152,13 @@ export function TransferBoardView({
             {/* 구간 섹션들을 담으므로 점프 훅의 ref가 여기 붙는다 */}
             <div ref={panelRef}>
               <GroupChips counts={counts} active={activeGroup} onJump={jump} />
-              <BoardTools league={league} sort={sort} onOpenLeague={() => setLeagueSheetOpen(true)} />
+              <BoardTools league={league} sort={sort} club={club} onOpenLeague={() => setLeagueSheetOpen(true)} />
+              <ClubChips options={clubOptions} club={club} league={league} sort={sort} />
 
               {groups.length === 0 ? (
                 <EmptyState title="조건에 맞는 이적 건이 없어요" />
               ) : (
-                <BoardSections groups={groups} nowMs={nowMs} />
+                <BoardSections groups={groups} nowMs={nowMs} sort={sort} />
               )}
 
               {/*

@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useSessionStore } from "@/entities/session";
 import {
+  dealHasClub,
   dealInLeague,
   groupDeals,
   pickRecentRumors,
@@ -21,8 +22,17 @@ interface UseTransferBoardArgs {
   scopeStartIso: string;
   league: TransferLeague | null;
   sort: TransferSort;
+  /** 구단 필터(코드) — URL이 소유한다. 보드에 없는 구단이면 전체로 폴백한다 */
+  club: string | null;
   /** `serverNowMs ?? useNowMs()` — 순서는 뷰가 지킨다. `null`이면 캐러셀 판정을 미룬다 */
   nowMs: number | null;
+}
+
+/** 구단 필터 칩 하나 — 그 구단이 출발·행선지로 걸린 딜 수 순 */
+export interface ClubOption {
+  code: string;
+  label: string;
+  count: number;
 }
 
 /** 캐러셀 한 장 — `pickRecentRumors`가 `latestReport !== null`을 보장하므로 여기서 좁혀 둔다 */
@@ -40,7 +50,7 @@ export type GroupCounts = Record<TransferGroupKey, number>;
 /**
  * 이적 보드의 **조회·대기 판정과 파생 계산**을 소유한다.
  *
- * ⚠ 리그·정렬은 **여기서** 계산한다 — 쿼리 키에 넣지 않는다. 서버가 범위 안 딜 전체를 내리고
+ * ⚠ 리그·정렬·구단은 **여기서** 계산한다 — 쿼리 키에 넣지 않는다. 서버가 범위 안 딜 전체를 내리고
  *   뷰가 같은 데이터로 필터·정렬한다(사유는 `transferKeys` 주석 — 필터 객체가 키와 어긋나면
  *   `initialData`가 캐시에 닿지 못한다).
  * ⚠ 캐러셀은 리그 필터 **밖**이다 — "무엇이 새로 왔는가"라 필터를 타지 않는다(계획서 §0-1).
@@ -51,6 +61,7 @@ export function useTransferBoard({
   scopeStartIso,
   league,
   sort,
+  club,
   nowMs,
 }: UseTransferBoardArgs) {
   const sessionStatus = useSessionStore((s) => s.status);
@@ -76,10 +87,31 @@ export function useTransferBoard({
     );
   }, [deals, nowMs]);
 
-  // 정렬 → 리그 필터 → 분류. 순서가 규약이다(`groupDeals`는 입력 순서를 그대로 둔다)
+  /*
+   * 구단 칩 — 리그 필터 안의 딜에서 출발·행선지 구단을 세어 많은 순(관심 구단만인 자리는 이름이 없어 칩이 되지 않지만
+   * 필터에는 걸린다 — `dealHasClub`). URL의 구단이 여기 없으면 전체로 폴백한다(창이 지나 사라진 구단의 공유 링크).
+   */
+  const clubOptions = useMemo<ClubOption[]>(() => {
+    const seen = new Map<string, ClubOption>();
+    for (const deal of (deals ?? []).filter((d) => dealInLeague(d, league))) {
+      for (const c of [deal.fromClub, deal.toClub]) {
+        if (c === null) continue;
+        const prev = seen.get(c.code);
+        if (prev) prev.count += 1;
+        else seen.set(c.code, { code: c.code, label: c.shortName, count: 1 });
+      }
+    }
+    return [...seen.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "ko"));
+  }, [deals, league]);
+  const effectiveClub = club !== null && clubOptions.some((o) => o.code === club) ? club : null;
+
+  // 정렬 → 리그 필터 → 구단 필터 → 분류. 순서가 규약이다(`groupDeals`는 입력 순서를 그대로 둔다)
   const groups = useMemo<BoardGroup[]>(
-    () => groupDeals(sortDeals(deals ?? [], sort).filter((deal) => dealInLeague(deal, league))),
-    [deals, sort, league],
+    () =>
+      groupDeals(
+        sortDeals(deals ?? [], sort).filter((deal) => dealInLeague(deal, league) && dealHasClub(deal, effectiveClub)),
+      ),
+    [deals, sort, league, effectiveClub],
   );
 
   const counts = useMemo<GroupCounts>(() => {
@@ -101,5 +133,8 @@ export function useTransferBoard({
     rumors,
     groups,
     counts,
+    clubOptions,
+    /** URL의 구단 중 보드에 실제로 있는 것 — 칩·링크가 이 값을 선택 상태로 쓴다 */
+    club: effectiveClub,
   };
 }

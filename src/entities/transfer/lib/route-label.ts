@@ -11,11 +11,11 @@ import type { TransferDeal } from "../model/types";
  * `full`이면 정식명(상세 경로 카드), 아니면 약칭이다.
  */
 export function routeLabels(
-  deal: Pick<TransferDeal, "fromClub" | "toClub" | "isFreeAgent" | "suitorCount">,
+  deal: Pick<TransferDeal, "fromClub" | "toClub" | "isFreeAgent" | "suitorCodes">,
   { full = false }: { full?: boolean } = {},
 ): { from: string; to: string } {
   const name = (club: NonNullable<TransferDeal["fromClub"]>) => (full ? club.name : club.shortName);
   const from = deal.fromClub ? name(deal.fromClub) : deal.isFreeAgent ? "FA" : "미확인";
-  const to = deal.toClub ? (deal.suitorCount > 0 ? `${name(deal.toClub)} 외 ${deal.suitorCount}` : name(deal.toClub)) : "미정";
+  const to = deal.toClub ? (deal.suitorCodes.length > 0 ? `${name(deal.toClub)} 외 ${deal.suitorCodes.length}` : name(deal.toClub)) : "미정";
   return { from, to };
 }

@@ -20,10 +20,15 @@ interface DealRowProps {
    * `null`이면 상대시각 대신 절대시각이 그려진다(`formatRelativeTime` 계약).
    */
   nowMs: number | null;
+  /**
+   * 접힌 행 — HTML에는 남기고 화면에서만 가린다("더 보기" 전의 루머·긴 구간의 뒷장). 색인 화면의 본문 SSR·
+   * 스크롤 복원을 지키려면 행을 빼는 것이 아니라 가려야 한다(`nextjs.md`의 탭 규약과 같다).
+   */
+  hidden?: boolean;
 }
 
 /**
- * 목록 행(진행 중 · 루머 · 결렬) — handoff §4-8. 링크로 감싼 리스트 행이라 `li` + `Link`다
+ * 목록 행(진행 중 · 루머 · 결렬·부인) — handoff §4-8. 링크로 감싼 리스트 행이라 `li` + `Link`다
  * 
  *
  * 레이아웃: grid `minmax(0,1fr) auto` — 좌: 이름·경로 / 우: 이적료·변동폭 / 3행(meta)은 전폭.
@@ -37,13 +42,14 @@ interface DealRowProps {
  * ⚠ 이 행의 에메랄드는 `WatchMark`(관심)뿐이다 — 관심 딜에만 뜬다.
  * ⚠ 렌더 중에 시계를 읽지 않는다 — 상대시각은 `nowMs`를 받아 계산한다.
  */
-export function DealRow({ deal, nowMs }: DealRowProps) {
+export function DealRow({ deal, nowMs, hidden }: DealRowProps) {
   const dead = isDeadStage(deal.stage);
   const name = deal.playerKo ?? deal.player;
   const report = deal.latestReport;
 
   return (
     <li
+      hidden={hidden === true ? true : undefined}
       className={cn(
         "relative mx-2 rounded-md",
         "[&+&]:before:absolute [&+&]:before:inset-x-3 [&+&]:before:top-0 [&+&]:before:h-px [&+&]:before:bg-hairline-cool [&+&]:before:content-['']",

@@ -22,7 +22,7 @@ import { TRANSFER_LEAGUES } from "../model/types";
  * 클라이언트에서 계산한다 — 필터를 쿼리 키에 넣으면 `initialData`가 키와 어긋나는 사고가 생긴다.
  * 한 창의 딜이 이 값을 넘으면 그때 서버 필터로 옮긴다(화면이 잘림을 안내한다).
  */
-export const TRANSFER_DEAL_LIMIT = 100;
+export const TRANSFER_DEAL_LIMIT = 200;
 /** "최근 3일 소식" 캐러셀의 창 */
 export const RUMOR_CAROUSEL_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -180,7 +180,7 @@ export function buildDeal(row: DealSelectRow): TransferDeal {
     latestReportedAt: row.latest_reported_at,
     reportCount: row.report_count,
     isFreeAgent: row.is_free_agent,
-    suitorCount: row.suitor_codes.length,
+    suitorCodes: row.suitor_codes,
     // 정책이 "내 행만"이라 임베딩 결과에 남의 관심이 섞일 수 없다
     isWatched: (row.transfer_deal_watch?.length ?? 0) > 0,
   };
