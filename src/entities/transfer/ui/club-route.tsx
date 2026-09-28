@@ -2,13 +2,14 @@ import { ArrowRight, Slash, X } from "lucide-react";
 // ⚠ 배럴이 아니라 직접 경로다 — `"use client"`가 없어 서버 렌더 여지를 남긴다(`pill.tsx`와 같은 이유)
 import { cn } from "@/shared/lib/cn";
 import { Icon } from "@/shared/ui";
-import { routeLabels } from "../lib/route-label";
+import { destinationClubs, routeLabels } from "../lib/route-label";
 import { isDeadStage } from "../lib/stage";
 import type { TransferDeal } from "../model/types";
+import { CrestStack } from "./crest-stack";
 import { TransferCrest } from "./transfer-crest";
 
 interface ClubRouteProps {
-  deal: Pick<TransferDeal, "fromClub" | "toClub" | "isFreeAgent" | "suitorCodes" | "stage">;
+  deal: Pick<TransferDeal, "fromClub" | "toClub" | "isFreeAgent" | "suitors" | "stage">;
   /** 엠블럼 px */
   size: number;
   className?: string;
@@ -19,6 +20,8 @@ interface ClubRouteProps {
  * ⚠ **약칭이다**(정식명은 상세 경로 카드만) — 좁은 폭에 두 구단을 놓는 자리에서 정식명은 잘리고,
  *   잘린 구단 이름은 어느 구단인지 알 수 없다(`Team.shortName`과 같은 판단).
  * ⚠ 빈 칸의 문구는 `routeLabels`가 정한다 — 자유계약의 출발은 `FA`, 아직 정해지지 않은 행선지는 `미정`.
+ * ⚠ 행선지 자리에 구단이 여럿이면(여러 구단이 노리는 루머) 엠블럼을 겹쳐 그리고(`CrestStack`) 이름은 **두 줄까지** 흘려 전부 적는다 —
+ *   한 줄 `truncate`면 뒷 구단이 잘려 "리버풀 외 N"과 다를 게 없다.
  * ⚠ 죽은 딜은 화살표 대신 원을 그린다 — 결렬은 X, 부인은 빗금(`/`). 원(`rounded-full`)은 컨트롤이 아니라 표시 요소 —
  *   `styling.md` "대상이 아닌 것". 크림슨 채움이지만 행 전체가 `grayscale`이라 회색으로 보인다(색이 아니라 형태가 뜻을 진다).
  */
@@ -26,10 +29,13 @@ export function ClubRoute({ deal, size, className }: ClubRouteProps) {
   const label = routeLabels(deal);
   const dead = isDeadStage(deal.stage);
   const denied = deal.stage === "denied";
+  const destinations = destinationClubs(deal);
+  const stacked = destinations.length > 1;
   return (
     <span
       className={cn(
-        "flex min-w-0 items-center gap-[5px] whitespace-nowrap text-[12px] text-ink-mute",
+        "flex min-w-0 items-center gap-[5px] text-[12px] text-ink-mute",
+        stacked ? "items-start" : "whitespace-nowrap",
         className,
       )}
     >
@@ -57,8 +63,12 @@ export function ClubRoute({ deal, size, className }: ClubRouteProps) {
             : "font-medium text-ink",
         )}
       >
-        <TransferCrest club={deal.toClub} size={size} className={dead ? "opacity-50" : undefined} />
-        <span className="truncate">{label.to}</span>
+        {stacked ? (
+          <CrestStack clubs={destinations} size={size} className={dead ? "opacity-50" : undefined} />
+        ) : (
+          <TransferCrest club={destinations[0] ?? null} size={size} className={dead ? "opacity-50" : undefined} />
+        )}
+        <span className={stacked ? "line-clamp-2 whitespace-normal" : "truncate"}>{label.to}</span>
       </span>
     </span>
   );

@@ -6,11 +6,12 @@ import { ROUTES } from "@/shared/config";
 import { formatRelativeTime } from "@/shared/lib";
 import { Icon } from "@/shared/ui";
 import { reporterName } from "../lib/reporter";
-import { routeLabels } from "../lib/route-label";
+import { destinationClubs, routeLabels } from "../lib/route-label";
 import type { TransferDealListItem, TransferReport } from "../model/types";
 import { StatusBadge } from "./status-badge";
 import { FeeValue } from "./fee-value";
 import { CredibilityBadge } from "./credibility-badge";
+import { CrestStack } from "./crest-stack";
 import { TransferCrest } from "./transfer-crest";
 
 
@@ -34,6 +35,7 @@ interface RumorCardProps {
 export function RumorCard({ deal, report, nowMs }: RumorCardProps) {
   const name = deal.playerKo ?? deal.player;
   const route = routeLabels(deal);
+  const destinations = destinationClubs(deal);
 
   return (
     <li className="w-[300px] shrink-0 snap-start">
@@ -64,9 +66,14 @@ export function RumorCard({ deal, report, nowMs }: RumorCardProps) {
             <Icon as={ArrowRight} size={18} />
             <span className="sr-only">에서</span>
           </span>
-          <span className="flex flex-col items-center gap-[7px] whitespace-nowrap text-[12px] font-medium text-ink">
-            <TransferCrest club={deal.toClub} size={40} />
-            <span className="max-w-full truncate px-1">
+          <span className="flex flex-col items-center gap-[7px] text-[12px] font-medium text-ink">
+            {destinations.length > 1 ? (
+              <CrestStack clubs={destinations} size={40} />
+            ) : (
+              <TransferCrest club={destinations[0] ?? null} size={40} />
+            )}
+            {/* 관심 구단이 여럿이면 이름을 두 줄까지 흘려 전부 적는다(`ClubRoute`와 같은 판단) */}
+            <span className={destinations.length > 1 ? "line-clamp-2 px-1 text-center" : "max-w-full truncate whitespace-nowrap px-1"}>
               {route.to}
             </span>
           </span>

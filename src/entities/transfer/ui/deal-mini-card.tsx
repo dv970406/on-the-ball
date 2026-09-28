@@ -40,7 +40,7 @@ export function DealMiniCard({ deal, nowMs }: DealMiniCardProps) {
         <div className="flex items-center gap-1.5">
           <TransferCrest club={deal.fromClub} size={28} />
           <Icon as={ArrowRight} size={14} className="shrink-0 text-ink-faint" />
-          <TransferCrest club={deal.toClub} size={28} />
+          <TransferCrest club={deal.toClub ?? deal.suitors[0] ?? null} size={28} />
           <time
             dateTime={deal.latestReportedAt}
             className="ml-auto whitespace-nowrap font-mono text-[10px] tabular-nums text-ink-mute"

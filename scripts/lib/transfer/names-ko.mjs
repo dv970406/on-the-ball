@@ -125,14 +125,14 @@ export async function cacheLlmNames(supabase, entries, book) {
 
 /**
  * 파생된 딜에서 **지금 찾아야 할 이름** — 딜의 선수와 출발·행선지 구단 중 사전에 없는 것.
- * @param {{ player: string, playerKey: string, fromCanonical: string | null, toCanonical: string | null }[]} deals
+ * @param {{ player: string, playerKey: string, fromCanonical: string | null, toCanonical: string | null, suitorCanonicals?: string[] }[]} deals
  * @returns {{ kind: "player" | "club", key: string, name: string }[]}
  */
 export function missingNames(deals, book, nowMs) {
   const out = new Map();
   for (const d of deals) {
     if (book.needsLookup("player", d.playerKey, nowMs)) out.set(`player:${d.playerKey}`, { kind: "player", key: d.playerKey, name: d.player });
-    for (const c of [d.fromCanonical, d.toCanonical]) {
+    for (const c of [d.fromCanonical, d.toCanonical, ...(d.suitorCanonicals ?? [])]) {
       if (c && book.needsLookup("club", c, nowMs)) out.set(`club:${c}`, { kind: "club", key: c, name: c });
     }
   }

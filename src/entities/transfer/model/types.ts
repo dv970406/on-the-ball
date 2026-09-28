@@ -115,8 +115,11 @@ export interface TransferDeal {
   /** 출발·행선지 — 빈 칸의 문구(`FA`·`미확인`·`미정`·`외 N`)는 `lib/route-label.ts`가 단독으로 정한다 */
   fromClub: TransferClub | null;
   toClub: TransferClub | null;
-  /** 행선지 밖의 관심 구단 코드 — "행선지 외 N"과 구단 필터(`dealHasClub`)가 본다 */
-  suitorCodes: TransferDealRow["suitor_codes"];
+  /**
+   * 행선지 밖의 관심 구단(언급 순, `transfer_deal_suitor`) — 여러 구단이 노리는 루머에서 화면이 전부 엠블럼·이름으로 그린다.
+   * `toClub`이 있으면 확실한 행선지 하나 + 그 밖의 관심 구단, 없으면 관심 구단들뿐인 루머(행선지 미정)다.
+   */
+  suitors: TransferClub[];
   stage: TransferStage;
   /** 최신 보도의 이적료 — 단위는 **백만**(`€95M`의 95). 셋은 함께 있거나 함께 없다(DB CHECK) */
   feeAmount: TransferDealRow["fee_amount"];

@@ -146,7 +146,7 @@ const names = createNameBook({ players: { "david alaba": { ko: "다비드 알라
   const sys = buildSystem({ "pre-contract": "사전 계약" });
   check("지시문 — 재계약·인터뷰·감독 인사·회고·입단 테스트는 이동이 아니라고 적는다", ["재계약", "인터뷰", "감독", "돌아보는", "입단 테스트"].every((w) => sys.includes(w)));
   check('지시문 — 관용구 "in agreement with"을 경고한다', sys.includes("in agreement with"));
-  check("지시문 — 구단은 원문 표기 그대로, 관심 구단이 여럿이면 첫 구단이 to, 요약은 이동일 때만", sys.includes("글자 그대로 옮긴다") && sys.includes("첫 번째로 언급된") && sys.includes("move가 true일 때만"));
+  check("지시문 — 구단은 원문 표기 그대로, 관심만 보인 구단이 여럿이면 to는 null이고 전부 suitors, 요약은 이동일 때만", sys.includes("글자 그대로 옮긴다") && sys.includes("to는 null이고 그 구단들을 전부 suitors") && sys.includes("move가 true일 때만"));
   check("지시문 — 선수가 비면 원문에서 읽고, 특정하지 못하면 false", sys.includes("<선수>가 비어 있으면") && sys.includes("특정할 수 없으면 null"));
   check("지시문 — 용어 사전이 실린다", sys.includes("<용어>\npre-contract → 사전 계약\n</용어>"));
   check("지시문 — 같은 용어면 같은 지시문", sys === buildSystem({ "pre-contract": "사전 계약" }));

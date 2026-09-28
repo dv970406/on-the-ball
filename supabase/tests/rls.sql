@@ -1132,17 +1132,36 @@ select count(*) = 1 from public.transfer_deal where id = :td2 and is_free_agent 
 rollback to s;
 
 \echo ''
-\echo '-- 36f. 관심 구단 (20260928000003) — 행선지 밖 구단 코드 배열, 공개 --'
+\echo '-- 36f. 관심 구단 (20260928000005) — 딜의 자식 행, 읽기 공개 · 쓰기 없음 --'
+insert into public.transfer_deal_suitor (deal_id, club_code, position) values (:td2, 'rlstest-a', 0);
+
 savepoint s;
 select set_config('request.jwt.claims', '{}', true);
 :login_anon
-\echo '[t 기대] 비로그인이 관심 구단을 읽는다(기본값은 빈 배열)'
-select suitor_codes = '{}' from public.transfer_deal where id = :td2;
+\echo '[t 기대] 비로그인이 관심 구단을 읽는다(구단 행 임베딩의 통로)'
+select count(*) = 1 from public.transfer_deal_suitor where deal_id = :td2 and club_code = 'rlstest-a';
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 로그인 유저가 관심 구단을 만든다 — 쓰기 정책도 grant도 없다'
+insert into public.transfer_deal_suitor (deal_id, club_code, position) values (:td2, 'rlstest-b', 1);
 rollback to s;
 
 savepoint s;
-\echo '[❌차단] 관심 구단 11개'
-update public.transfer_deal set suitor_codes = array['a','b','c','d','e','f','g','h','i','j','k'] where id = :td2;
+\echo '[❌차단] 순서가 10 이상 — 관심 구단은 10개까지다'
+insert into public.transfer_deal_suitor (deal_id, club_code, position) values (:td2, 'rlstest-b', 10);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 없는 구단 코드'
+insert into public.transfer_deal_suitor (deal_id, club_code, position) values (:td2, 'rlstest-none', 1);
+rollback to s;
+
+savepoint s;
+\echo '    (superuser — 파생기가 보도가 끊긴 딜을 지우는 경로다)'
+delete from public.transfer_deal where id = :td2;
+\echo '[0 기대] 딜을 지우면 관심 구단이 함께 사라진다 (cascade)'
+select count(*) from public.transfer_deal_suitor where deal_id = :td2;
 rollback to s;
 
 rollback to s36;

@@ -80,7 +80,6 @@ export type Database = {
           prev_fee_amount: number | null
           report_count: number
           stage: Database["public"]["Enums"]["transfer_stage"]
-          suitor_codes: string[]
           to_club_code: string | null
           updated_at: string
           wage_text: string | null
@@ -107,7 +106,6 @@ export type Database = {
           prev_fee_amount?: number | null
           report_count: number
           stage: Database["public"]["Enums"]["transfer_stage"]
-          suitor_codes?: string[]
           to_club_code?: string | null
           updated_at?: string
           wage_text?: string | null
@@ -134,7 +132,6 @@ export type Database = {
           prev_fee_amount?: number | null
           report_count?: number
           stage?: Database["public"]["Enums"]["transfer_stage"]
-          suitor_codes?: string[]
           to_club_code?: string | null
           updated_at?: string
           wage_text?: string | null
@@ -243,6 +240,39 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transfer_deal_suitor: {
+        Row: {
+          club_code: string
+          deal_id: number
+          position: number
+        }
+        Insert: {
+          club_code: string
+          deal_id: number
+          position: number
+        }
+        Update: {
+          club_code?: string
+          deal_id?: number
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transfer_deal_suitor_club_code_fkey"
+            columns: ["club_code"]
+            isOneToOne: false
+            referencedRelation: "transfer_club"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "transfer_deal_suitor_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "transfer_deal"
             referencedColumns: ["id"]
           },
         ]

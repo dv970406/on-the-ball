@@ -482,6 +482,8 @@ export function deriveDeals(rows, opts) {
       skip("5대 리그 밖");
       continue;
     }
+    // 행선지 밖의 관심 구단(정규명, 표 순) — 이름 조회 대상이고 관문·자식 행의 근거다
+    const suitorCanonicals = [...suitorVotes.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c).filter((c) => c !== dir.from && c !== dir.to);
     const stage = resolveStage(items);
     const { fee, prev, low, high } = resolveFee(items);
     const addOn = fee ? firstOf(items.flatMap((it) => it.storySentences), (ex) => (ex.addOnAmount != null && ex.addOnCurrency === fee.currency ? ex.addOnAmount : null), memo) : null;
@@ -494,7 +496,7 @@ export function deriveDeals(rows, opts) {
 
     const playerKo = names.playerKo(key);
     const info = names.playerInfo(key);
-    nameNeeds.push({ player, playerKey: key, fromCanonical: fromClub ? dir.from : null, toCanonical: toClub ? dir.to : null });
+    nameNeeds.push({ player, playerKey: key, fromCanonical: fromClub ? dir.from : null, toCanonical: toClub ? dir.to : null, suitorCanonicals });
     /*
      * 확인된 선수 관문 — 추출은 규칙이라 처음 보는 문형에서 틀린다("South American star", 감독 이름). 이름 조회는 이 뒤에
      * 돈다(`nameNeeds`에는 넣는다) — 찾으면 같은 실행에서 다시 파생해 곧바로 열린다. 못 찾은 선수는 경고로 남긴다
@@ -522,24 +524,24 @@ export function deriveDeals(rows, opts) {
         continue;
       }
     }
+    // 관심 구단의 구단 행 — 출발·행선지와 겹치는 코드는 뺀다. 화면이 전부 엠블럼·이름으로 그린다(`transfer_deal_suitor`)
+    const suitorClubs = suitorCanonicals
+      .map((c) => clubRecord(c, names))
+      .filter((c, i, arr) => c && c.code !== fromClub?.code && c.code !== toClub?.code && arr.findIndex((x) => x?.code === c.code) === i)
+      .slice(0, 10);
     /*
-     * 방향 관문(2차) — 출발·행선지 중 하나는 읽혀야 하고, 그중 하나는 5대 리그 구단이어야 한다. 어느 팀에서 어느 팀으로
-     * 가는지 모르는 이적설은 보드에 싣지 않는다(LLM이 원문에서 읽어 채우므로 여기까지 비는 것은 구단이 없는 글이다).
+     * 방향 관문(2차) — 출발·행선지·관심 구단 중 하나는 읽혀야 하고, 그중 하나는 5대 리그 구단이어야 한다. 어느 팀과도 엮이지 않은
+     * 이적설은 보드에 싣지 않는다(LLM이 원문에서 읽어 채우므로 여기까지 비는 것은 구단이 없는 글이다). 관심 구단만 있는 루머
+     * (행선지 미정, 여러 구단이 노린다)는 정상이다.
      */
-    if (!fromClub && !toClub) {
+    if (!fromClub && !toClub && !suitorClubs.length) {
       skip("구단 미확인");
       continue;
     }
-    if (!isTopLeague(dir.from) && !isTopLeague(dir.to)) {
+    if (![dir.from, dir.to, ...suitorCanonicals].some(isTopLeague)) {
       skip("5대 리그 밖");
       continue;
     }
-    // 행선지 밖의 관심 구단 — 표가 많은 순, 출발·행선지는 뺀다. 화면이 "행선지 외 N"을 그린다
-    const suitorClubs = [...suitorVotes.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([c]) => (c !== dir.from && c !== dir.to ? clubRecord(c, names) : null))
-      .filter((c) => c && c.code !== fromClub?.code && c.code !== toClub?.code)
-      .slice(0, 10);
     // 구단 행은 관문을 지난 딜의 것만 쓴다
     for (const c of [fromClub, toClub, ...suitorClubs]) if (c) clubs.set(c.code, c);
     if (!playerKo) missingKo.push(player);
@@ -554,7 +556,6 @@ export function deriveDeals(rows, opts) {
       nationality: info?.nationality ?? null,
       from_club_code: fromClub?.code ?? null,
       to_club_code: toClub?.code ?? null,
-      suitor_codes: [...new Set(suitorClubs.map((c) => c.code))],
       stage,
       fee_amount: fee?.amount ?? null,
       fee_currency: fee?.currency ?? null,
@@ -572,6 +573,8 @@ export function deriveDeals(rows, opts) {
       latest_reported_at: new Date(Math.max(...times)).toISOString(),
       report_count: items.length,
       rowIds: items.map((it) => it.row.id),
+      // 관심 구단 코드(표 순) — `transfer_deal` 컬럼이 아니라 자식 행(`transfer_deal_suitor`)으로 쓴다
+      suitorCodes: suitorClubs.map((c) => c.code),
     });
     for (const it of items) assignments.set(it.row.id, dealKey(key));
   }
@@ -605,6 +608,7 @@ export function summarize(derived) {
 const NEWS = "transfer_news";
 const DEALS = "transfer_deal";
 const CLUBS = "transfer_club";
+const SUITORS = "transfer_deal_suitor";
 const CHUNK = 100;
 
 /**
@@ -642,14 +646,13 @@ const chunks = (arr) => Array.from({ length: Math.ceil(arr.length / CHUNK) }, (_
 
 /** 파생이 쓰는 딜 컬럼 — 바뀌었는지 대조할 대상(`id`·`updated_at` 제외) */
 const DEAL_COLUMNS = [
-  "deal_key", "player", "player_ko", "position", "birth_year", "nationality", "from_club_code", "to_club_code", "suitor_codes", "stage",
+  "deal_key", "player", "player_ko", "position", "birth_year", "nationality", "from_club_code", "to_club_code", "stage",
   "fee_amount", "fee_currency", "fee_text", "prev_fee_amount", "fee_low_amount", "fee_high_amount", "add_on_amount",
   "contract_text", "wage_text", "is_free_agent", "first_reported_at", "latest_reported_at", "report_count",
 ];
 const CLUB_COLUMNS = ["code", "canonical", "name", "short_name", "league"];
 const TIME_COLUMNS = new Set(["first_reported_at", "latest_reported_at"]);
 const NUMERIC_COLUMNS = new Set(["fee_amount", "prev_fee_amount", "fee_low_amount", "fee_high_amount", "add_on_amount"]);
-const ARRAY_COLUMNS = new Set(["suitor_codes"]);
 const PAGE = 500;
 
 /**
@@ -667,7 +670,6 @@ function sameValue(column, stored, next) {
   if (a === null || b === null) return a === b;
   if (TIME_COLUMNS.has(column)) return Date.parse(a) === Date.parse(b);
   if (NUMERIC_COLUMNS.has(column)) return Number(a) === Number(b);
-  if (ARRAY_COLUMNS.has(column)) return JSON.stringify(a) === JSON.stringify(b);
   return a === b;
 }
 const sameRow = (columns, stored, next) => columns.every((c) => sameValue(c, stored[c], next[c]));
@@ -726,7 +728,7 @@ async function findOrphanDeals(supabase, keep) {
 export async function writeDeals(supabase, derived, rows, opts = {}) {
   const log = opts.log ?? console;
   const now = new Date().toISOString();
-  const stats = { clubs: 0, deals: 0, unchanged: 0, linked: 0, unlinked: 0, deleted: 0, failed: 0 };
+  const stats = { clubs: 0, deals: 0, unchanged: 0, suitors: 0, linked: 0, unlinked: 0, deleted: 0, failed: 0 };
 
   const storedClubs = new Map();
   for (const codes of chunks(derived.clubs.map((c) => c.code))) {
@@ -747,7 +749,7 @@ export async function writeDeals(supabase, derived, rows, opts = {}) {
     if (error) throw new Error(`딜 조회 실패: ${error.message}`);
     for (const d of data) stored.set(d.deal_key, d);
   }
-  const dealRows = derived.deals.map(({ rowIds: _rowIds, ...d }) => d);
+  const dealRows = derived.deals.map(({ rowIds: _rowIds, suitorCodes: _suitorCodes, ...d }) => d);
   const changedDeals = dealRows.filter((d) => !stored.has(d.deal_key) || !sameRow(DEAL_COLUMNS, stored.get(d.deal_key), d));
   const dealUp = await upsertRows(supabase, DEALS, changedDeals.map((d) => ({ ...d, updated_at: now })), { onConflict: "deal_key" }, { log });
   stats.deals = dealUp.saved.length;
@@ -766,6 +768,29 @@ export async function writeDeals(supabase, derived, rows, opts = {}) {
     const { data, error } = await supabase.from(DEALS).select("id, deal_key").in("deal_key", keys);
     if (error) throw new Error(`딜 id 조회 실패: ${error.message}`);
     for (const d of data) idByKey.set(d.deal_key, d.id);
+  }
+
+  // 관심 구단(자식 행) — 딜마다 저장된 집합과 대조해 바뀐 딜만 지우고 다시 넣는다(표 순 position)
+  const dealIds = [...idByKey.values()];
+  const storedSuitors = new Map();
+  for (const ids of chunks(dealIds)) {
+    const { data, error } = await supabase.from(SUITORS).select("deal_id, club_code, position").in("deal_id", ids);
+    if (error) throw new Error(`관심 구단 조회 실패: ${error.message}`);
+    for (const r of data) (storedSuitors.get(r.deal_id) ?? storedSuitors.set(r.deal_id, []).get(r.deal_id)).push(r);
+  }
+  for (const deal of derived.deals) {
+    const id = idByKey.get(deal.deal_key);
+    if (id == null) continue;
+    const want = deal.suitorCodes.map((club_code, position) => ({ deal_id: id, club_code, position }));
+    const have = (storedSuitors.get(id) ?? []).sort((a, b) => a.position - b.position);
+    if (JSON.stringify(have.map((r) => [r.club_code, r.position])) === JSON.stringify(want.map((r) => [r.club_code, r.position]))) continue;
+    const { error: delErr } = await supabase.from(SUITORS).delete().eq("deal_id", id);
+    if (delErr) { stats.failed++; log.error(`✗ 관심 구단 정리 실패(${deal.player}): ${delErr.message}`); continue; }
+    if (want.length) {
+      const { error: insErr } = await supabase.from(SUITORS).insert(want);
+      if (insErr) { stats.failed++; log.error(`✗ 관심 구단 저장 실패(${deal.player}): ${insErr.message}`); continue; }
+    }
+    stats.suitors += 1;
   }
 
   // 보도 행 → 딜. 이미 같은 값이면 건너뛴다(쓰기를 아낀다)

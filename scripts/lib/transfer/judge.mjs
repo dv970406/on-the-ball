@@ -160,7 +160,7 @@ export function buildSystem(terms = loadGlossary().terms) {
 
 [stage] 보도가 말하는 이동 단계 하나. rumour(관심·주시·연결) · talks(협상·접촉·논의) · offer(제안·입찰 제출) · agreement(구단 간 합의) · personal_terms(개인 조건 합의) · medical(메디컬 진행) · here_we_go(확정, 공식 발표 전) · official(공식 발표·완료) · collapsed(진행 중이던 협상·제안·합의가 깨짐·제안 거절) · denied(관심·연결 루머를 구단·선수·기자가 부인, 매각 거부, 이적 생각 없음). move가 false면 null.
 
-[from / to / suitors] 원문에 적힌 구단명을 글자 그대로 옮긴다(번역·줄임·정규화하지 않는다). from은 <선수>의 현재 소속 구단(자유계약이면 직전 소속), to는 가려는 구단 또는 간 구단이다. 관심 구단이 여럿이면 to는 **첫 번째로 언급된** 구단이고 나머지는 suitors에 적는다(최대 ${SUITORS_MAX}). 원문에 없으면 null·[].
+[from / to / suitors] 원문에 적힌 구단명을 글자 그대로 옮긴다(번역·줄임·정규화하지 않는다). from은 <선수>의 현재 소속 구단(자유계약이면 직전 소속). to는 선수가 **실제로 가려는·간 구단**(협상·제안·합의·완료의 상대, 또는 관심을 보인 구단이 하나뿐일 때 그 구단)이다. 관심만 보인 구단이 여럿이면 to는 null이고 그 구단들을 전부 suitors에 언급 순으로 적는다(최대 ${SUITORS_MAX}) — 그중 하나를 골라 to에 넣지 않는다. to가 있으면서 다른 관심 구단도 있으면 그것들은 suitors다. 원문에 없으면 null·[].
 
 [evidence] move 판단의 근거가 된 원문 구절 하나를 글자 그대로 옮긴다(25단어 이내). false이고 마땅한 구절이 없으면 "".
 

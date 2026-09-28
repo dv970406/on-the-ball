@@ -46,9 +46,9 @@ export function parseTransferClub(value: string | undefined): string | null {
 
 /** 구단 필터 — 출발·행선지·관심 구단(`suitorCodes`) 어느 자리에든 그 구단이 있으면 포함. `null`은 전체 */
 export function dealHasClub(
-  deal: Pick<TransferDeal, "fromClub" | "toClub" | "suitorCodes">,
+  deal: Pick<TransferDeal, "fromClub" | "toClub" | "suitors">,
   club: string | null,
 ): boolean {
   if (club === null) return true;
-  return deal.fromClub?.code === club || deal.toClub?.code === club || deal.suitorCodes.includes(club);
+  return deal.fromClub?.code === club || deal.toClub?.code === club || deal.suitors.some((c) => c.code === club);
 }

@@ -28,7 +28,7 @@ export const RUMOR_CAROUSEL_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
 const CLUB_COLUMNS = "code, name, short_name, league";
 const DEAL_COLUMNS =
-  "id, player, player_ko, position, birth_year, nationality, stage, fee_amount, fee_currency, fee_text, prev_fee_amount, fee_low_amount, fee_high_amount, add_on_amount, contract_text, wage_text, first_reported_at, latest_reported_at, report_count, is_free_agent, suitor_codes";
+  "id, player, player_ko, position, birth_year, nationality, stage, fee_amount, fee_currency, fee_text, prev_fee_amount, fee_low_amount, fee_high_amount, add_on_amount, contract_text, wage_text, first_reported_at, latest_reported_at, report_count, is_free_agent";
 /**
  * ⚠ **`body`가 없다.** anon·authenticated에는 `body`를 뺀 컬럼만 grant돼 있어 `select=*`도
  *   `body`도 42501이다(`api-and-db.md` 이적 소식 절) — 그래서 컬럼을 나열한다.
@@ -43,6 +43,7 @@ const REPORT_COLUMNS =
  *   출발·도착 둘이라 그냥 `transfer_club(...)`은 PGRST201이다.
  * ⚠ `transfer_deal_watch(user_id)` 임베딩은 SELECT 정책이 "내 행만"이라 **배열 길이가 곧
  *   "내가 관심 등록했는가"** 다. 목록에도 실려야 행이 관심 표시를 그릴 수 있다.
+ * ⚠ `suitors:transfer_deal_suitor(...)`는 딜의 관심 구단 자식 행이다 — 화면이 전부 그리므로 코드가 아니라 구단 행을 임베딩한다.
  * ⚠ `latest:transfer_news!deal_id(...)`는 **최신 1건만** 받는다 — 정렬·상한은 select 문자열이
  *   아니라 `list-query.ts`가 `.order(…, { referencedTable })`·`.limit(1, { referencedTable })`로
  *   건다(임베딩 정렬은 select 안에 적을 수 없다).
@@ -50,14 +51,14 @@ const REPORT_COLUMNS =
  *   `GenericStringError`가 된다(실측). 한 템플릿 리터럴로 둔다.
  */
 export const DEAL_LIST_SELECT =
-  `${DEAL_COLUMNS}, from:transfer_club!from_club_code(${CLUB_COLUMNS}), to:transfer_club!to_club_code(${CLUB_COLUMNS}), transfer_deal_watch(user_id), latest:transfer_news!deal_id(${REPORT_COLUMNS})` as const;
+  `${DEAL_COLUMNS}, from:transfer_club!from_club_code(${CLUB_COLUMNS}), to:transfer_club!to_club_code(${CLUB_COLUMNS}), suitors:transfer_deal_suitor(position, club:transfer_club(${CLUB_COLUMNS})), transfer_deal_watch(user_id), latest:transfer_news!deal_id(${REPORT_COLUMNS})` as const;
 
 /**
  * 상세 select — 최신 보도 임베딩이 **없다.** 상세는 타임라인 전체를 따로 받으므로
  * (`REPORT_SELECT`) 같은 행을 두 번 받을 이유가 없다.
  */
 export const DEAL_DETAIL_SELECT =
-  `${DEAL_COLUMNS}, from:transfer_club!from_club_code(${CLUB_COLUMNS}), to:transfer_club!to_club_code(${CLUB_COLUMNS}), transfer_deal_watch(user_id)` as const;
+  `${DEAL_COLUMNS}, from:transfer_club!from_club_code(${CLUB_COLUMNS}), to:transfer_club!to_club_code(${CLUB_COLUMNS}), suitors:transfer_deal_suitor(position, club:transfer_club(${CLUB_COLUMNS})), transfer_deal_watch(user_id)` as const;
 
 /** 상세의 보도 타임라인 — 딜에 묶인 보도 전부(정렬은 `list-query.ts`) */
 export const REPORT_SELECT = `${REPORT_COLUMNS}` as const;
@@ -149,9 +150,10 @@ export interface DealSelectRow {
   latest_reported_at: TransferDealRow["latest_reported_at"];
   report_count: TransferDealRow["report_count"];
   is_free_agent: TransferDealRow["is_free_agent"];
-  suitor_codes: TransferDealRow["suitor_codes"];
   from: ClubSelectRow | null;
   to: ClubSelectRow | null;
+  /** 관심 구단(자식 행) — 임베딩 순서는 보장되지 않아 `position`으로 매퍼가 정렬한다 */
+  suitors: { position: number; club: ClubSelectRow | null }[] | null;
   /** SELECT 정책이 "내 행만"이라 길이가 0 또는 1이다 */
   transfer_deal_watch: Pick<TransferDealWatchRow, "user_id">[] | null;
 }
@@ -180,7 +182,7 @@ export function buildDeal(row: DealSelectRow): TransferDeal {
     latestReportedAt: row.latest_reported_at,
     reportCount: row.report_count,
     isFreeAgent: row.is_free_agent,
-    suitorCodes: row.suitor_codes,
+    suitors: [...(row.suitors ?? [])].sort((a, b) => a.position - b.position).flatMap((s) => buildClub(s.club) ?? []),
     // 정책이 "내 행만"이라 임베딩 결과에 남의 관심이 섞일 수 없다
     isWatched: (row.transfer_deal_watch?.length ?? 0) > 0,
   };

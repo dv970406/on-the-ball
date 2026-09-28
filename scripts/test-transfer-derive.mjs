@@ -407,6 +407,7 @@ const VERDICT = {
   // 규칙이 그 선수의 단계를 못 읽은 문장은 LLM 단계를 쓴다
   llmStage: judged([row("Chelsea have been told the price for John Doe by Benfica, with Jane Roe also mentioned.", { stage: "offer", players: ["John Doe", "Jane Roe"], verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_to: "Chelsea", verdict_stage: "talks" })]),
   // 관심 구단이 여럿 — 행선지 밖 구단이 suitor_codes로 모인다
+  suitorsOnly: judged([row("Arsenal and Brighton are monitoring Sturm Graz midfielder John Doe.", { stage: "rumour", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", summary_ko: "요약", verdict_from: "Sturm Graz", verdict_to: null, verdict_suitors: ["Arsenal", "Brighton"] })]),
   suitors: judged([
     row("Arsenal, Brighton and Aston Villa are monitoring Sturm Graz midfielder John Doe.", { stage: "rumour", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_from: "Sturm Graz", verdict_to: "Arsenal", verdict_suitors: ["Brighton", "Aston Villa"] }),
     row("Brighton keep tabs on John Doe of Sturm Graz.", { stage: "rumour", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_from: "Sturm Graz", verdict_to: "Brighton", verdict_suitors: ["Arsenal"] }),
@@ -479,7 +480,8 @@ const UNIT = [
   { name: "선수 없음 — LLM이 읽은 선수(verdict_player_name)로 딜이 묶이고 LLM 단계·구단을 쓴다", got: pick(VERDICT.unnamedJudged.deals[0] ?? {}, ["player", "from_club_code", "to_club_code", "stage"]), want: { player: "John Doe", from_club_code: "sc-freiburg", to_club_code: "aston-villa", stage: "rumour" } },
   { name: "선수 없음 — 이동 아님으로 판정된 보도는 다시 묻지 않는다", got: [VERDICT.unnamedNotMove.judgeNeeds.length, VERDICT.unnamedNotMove.deals.length], want: [0, 0] },
   { name: "단계 — 다선수 기사에서 규칙이 그 선수의 단계를 못 읽으면 LLM 단계(talks)를 쓴다", got: [VERDICT.llmStage.deals[0]?.stage, VERDICT.llmStage.skipped["그 선수의 단계 없음"] ?? 0], want: ["talks", 0] },
-  { name: "관심 구단 — 행선지는 최신 보도(2배)의 브라이턴, 나머지가 표 순으로 suitor_codes에 모이고 구단 행도 만든다", got: [VERDICT.suitors.deals[0]?.to_club_code, VERDICT.suitors.deals[0]?.suitor_codes, VERDICT.suitors.clubs.map((c) => c.code).sort()], want: ["brighton-hove", ["aston-villa", "arsenal"], ["arsenal", "aston-villa", "brighton-hove", "sturm-graz"]] },
+  { name: "관심 구단 — 행선지는 최신 보도(2배)의 브라이턴, 나머지가 표 순으로 suitorCodes에 모이고 구단 행도 만든다", got: [VERDICT.suitors.deals[0]?.to_club_code, VERDICT.suitors.deals[0]?.suitorCodes, VERDICT.suitors.clubs.map((c) => c.code).sort()], want: ["brighton-hove", ["aston-villa", "arsenal"], ["arsenal", "aston-villa", "brighton-hove", "sturm-graz"]] },
+  { name: "관심 구단 — 행선지 없이 관심 구단만 있는 루머(비5대 리그 소속, 5대 리그 구단들이 관심)도 딜이고 이름 조회 대상에 관심 구단이 든다", got: [VERDICT.suitorsOnly.deals[0]?.to_club_code ?? null, VERDICT.suitorsOnly.deals[0]?.suitorCodes, VERDICT.suitorsOnly.nameNeeds[0]?.suitorCanonicals], want: [null, ["arsenal", "brighton-hove"], ["Arsenal", "Brighton"]] },
   { name: "게이트 — 사전에도 캐시에도 없는 선수는 딜을 만들지 않고 이름 조회 대상으로 넘긴다", got: [GATE.unknown.deals.length, GATE.unknown.nameNeeds.map((x) => x.playerKey), GATE.unknown.skipped["미확인 선수"], GATE.unknown.clubs.length], want: [0, ["jane roe"], 1, 0] },
   { name: "게이트 — 위키데이터에서 찾은 선수(한국어 표기 없음)는 연다", got: GATE.cached.deals.length, want: 1 },
   { name: "게이트 — 찾아봤지만 없던 이름은 막는다", got: GATE.notFound.deals.length, want: 0 },

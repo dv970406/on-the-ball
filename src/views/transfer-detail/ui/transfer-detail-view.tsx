@@ -8,6 +8,8 @@ import {
   type TransferReport,
   TransferCrest,
   routeLabels,
+  destinationClubs,
+  CrestStack,
 } from "@/entities/transfer";
 import { WatchToggle } from "@/features/watch-transfer";
 import { ROUTES } from "@/shared/config";
@@ -59,6 +61,7 @@ function RouteCell({
   label,
   club,
   text,
+  clubs,
   className,
 }: {
   label: string;
@@ -66,6 +69,8 @@ function RouteCell({
   club: TransferDeal["fromClub"];
   /** 칸에 쓸 글자 — 구단이 없을 때의 문구(`FA`·`미확인`·`미정`)까지 `routeLabels`가 정한다 */
   text: string;
+  /** 행선지 칸의 구단들 — 둘 이상이면 엠블럼을 겹쳐 그린다(여러 구단이 노리는 루머) */
+  clubs?: TransferDeal["suitors"];
   className?: string;
 }) {
   return (
@@ -74,9 +79,13 @@ function RouteCell({
         {label}
       </span>
       <div className="mt-2 flex items-center gap-2 text-[14px] font-medium leading-[1.3] tracking-[-0.3px] text-ink">
-        <TransferCrest club={club} size={24} className="shrink-0" />
-        {/* 경로 카드만 정식명이다 — 목록 행·칩은 약칭(`TransferClub` 주석) */}
-        <span className="truncate">{text}</span>
+        {clubs && clubs.length > 1 ? (
+          <CrestStack clubs={clubs} size={24} />
+        ) : (
+          <TransferCrest club={club} size={24} className="shrink-0" />
+        )}
+        {/* 경로 카드만 정식명이다 — 목록 행·칩은 약칭(`TransferClub` 주석). 구단이 여럿이면 세 줄까지 흘려 전부 적는다 */}
+        <span className={clubs && clubs.length > 1 ? "line-clamp-3" : "truncate"}>{text}</span>
       </div>
       {/* 5대 리그 밖은 `null`이라 줄을 비운다 — 모르는 리그명을 지어내지 않는다 */}
       {club?.league && <div className="mt-1 text-[11px] text-ink-mute">{club.league}</div>}
@@ -273,7 +282,7 @@ export function TransferDetailView({
               >
                 <Icon as={ArrowRight} size={16} />
               </div>
-              <RouteCell label="TO" club={deal.toClub} text={routeLabels(deal, { full: true }).to} className="bg-canvas-soft" />
+              <RouteCell label="TO" club={deal.toClub ?? deal.suitors[0] ?? null} clubs={destinationClubs(deal)} text={routeLabels(deal, { full: true }).to} className="bg-canvas-soft" />
             </section>
 
             <FeeCard deal={deal} />
