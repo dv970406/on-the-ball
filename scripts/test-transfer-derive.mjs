@@ -314,12 +314,19 @@ const DUP = {
     row("John Doe joins Chelsea from Benfica. Deal agreed.", { url: "https://www.skysports.com/a" }),
   ]),
 };
+// 가십 문형 — "competition from X"·"interest from X"의 X는 데려가려는 구단이다
+const SUITOR = {
+  competition: derive([row("Newcastle are keeping an eye on Rennes defender John Doe, 20, but face competition from Everton and Brentford.")]),
+  renewal: derive([row("Brentford are in discussions with John Doe about a new long-term contract amid increasing interest from Liverpool.")]),
+};
 const UNIT = [
   { name: "중복 — BBC 개정판(같은 URL·쿼리·끝 슬래시 차이)은 한 보도이고 대표는 나중에 수집된 개정판", got: [DUP.revisions.reps.length, DUP.revisions.duplicates, DUP.revisions.reps[0].id], want: [1, 2, 3] },
   { name: "중복 — 리트윗은 원문과 같은 보도이고 대표는 먼저 게시된 원문", got: [DUP.retweet.reps.length, DUP.retweet.reps[0].id], want: [1, 10] },
   { name: "중복 — 짧은 문구(40자 미만)가 같다고 합치지 않는다", got: DUP.short.reps.length, want: 2 },
   { name: "중복 — 가십 항목은 같은 칼럼 URL이어도 따로 세고, 두 피드의 같은 항목은 합친다", got: DUP.items.reps.map((r) => r.id).sort(), want: [31, 32] },
   { name: "가십 — BBC 가십·스카이 신문 요약은 가십 모음이고, 거기서 나눈 항목은 아니다", got: [isRoundup({ source_id: "rss:bbc-gossip", body: "Chelsea lead race for Scott" }), isRoundup({ source_id: "rss:sky-transfers", body: "Papers: Man Utd line up Conte" }), isRoundup({ source_id: "rss:bbc-gossip", external_id: "aaaa#item-1", body: "Chelsea target Bournemouth's Alex Scott. (Mail)" }), isRoundup({ source_id: "rss:sky-transfers", body: "Arsenal complete signing of John Doe" })], want: [true, true, false, false] },
+  { name: "방향 — 경쟁 구단(competition from X)은 출발 구단이 아니다", got: SUITOR.competition.deals[0]?.from_club_code ?? null, want: null },
+  { name: "재계약 — \"new long-term contract\"는 재계약이고 interest from X는 옮긴다는 표현이 아니다", got: [SUITOR.renewal.deals.length, SUITOR.renewal.skipped["재계약·첫 프로 계약"]], want: [0, 1] },
   { name: "중복 — 딜의 보도 수는 서로 다른 보도만 센다", got: [DUP.counted.deals[0]?.report_count, DUP.counted.skipped["중복 보도"]], want: [2, 1] },
   { name: "판정 — 판정 없는 새 딜은 열지 않고 물을 대상으로 넘긴다", got: [VERDICT.unjudgedNew.deals.length, VERDICT.unjudgedNew.verdictNeeds.map((n) => n.playerKey), VERDICT.unjudgedNew.skipped["판정 대기(LLM)"], VERDICT.unjudgedNew.clubs.length], want: [0, ["john doe"], 1, 0] },
   { name: "판정 — 이동 판정이 있는 새 딜은 연다(다시 묻지 않는다)", got: [VERDICT.movedNew.deals.length, VERDICT.movedNew.verdictNeeds.length], want: [1, 0] },

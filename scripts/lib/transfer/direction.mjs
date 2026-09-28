@@ -39,8 +39,15 @@ export const DEST = [
   P(String.raw`\b(?:to|move to|new)\s+${NAME}`, false),
   P(String.raw`\bat\s+${NAME}`, false),
 ];
+/**
+ * "competition from X"·"interest from X"·"offers from X"의 X는 **데려가려는 구단**이지 소속팀이 아니다 —
+ * 가십 칼럼의 "Newcastle are keeping an eye on Rennes defender X, but face competition from Everton"에서 에버턴이
+ * 출발 구단이 됐다(운영). 데려가려는 구단이 여럿일 수 있어 행선지 표로도 세지 않는다.
+ */
+export const SUITOR_FROM = String.raw`(?<!\b(?:competition|interest|interested|offers?|bids?|approach(?:es)?|attention|enquir(?:y|ies)|rivals|suitors|including)\s+)`;
+
 export const FROM = [
-  P(String.raw`\bfrom\s+(?:his\s+parent\s+club\s+|the\s+)?${NAME}`, true),
+  P(String.raw`${SUITOR_FROM}\bfrom\s+(?:his\s+parent\s+club\s+|the\s+)?${NAME}`, true),
   P(String.raw`\bparent club\s+${NAME}`, true),
 ];
 export const LEFT_FREE = [P(String.raw`\b(?:leaving|left|leaves)\s+${NAME}\s+(?:as (?:a )?free agent|on a free)`, true)];

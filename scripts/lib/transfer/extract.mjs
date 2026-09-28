@@ -136,10 +136,19 @@ function detectStage(text) {
   //   규칙에 걸려 오피셜 딜이 생겼다(지역지·유럽 매체 RSS를 넣으면서 실측). 이적 표현이 함께 있으면 그대로 판정한다.
   if (INJURY.test(t) && !TRANSFER_WORD.test(t)) return "unknown";
   for (const r of STAGE_RULES) {
-    if (r.pattern.test(t)) return r.stage;
+    if (!r.pattern.test(t)) continue;
+    // ⚠ 입단 테스트·전지훈련 합류는 이적 완료가 아니다 — "has joined Hibernian at their training camp … on trial"이
+    //   오피셜 딜이 됐다(운영). 계약 표현이 없으면 앞으로의 이동 가능성(루머)이다
+    if (r.stage === "official" && TRIAL.test(t) && !SIGNED.test(t)) return "rumour";
+    return r.stage;
   }
   return "unknown";
 }
+
+/** 입단 테스트 — 선수를 데려와 훈련시켜 보는 단계라 계약 전이다 */
+const TRIAL = /\b(?:on (?:a )?trial|trial (?:with|at)|training camp|train(?:s|ing)? with)\b/i;
+/** 테스트 끝에 계약했다는 표현 — 있으면 오피셜 그대로 둔다 */
+const SIGNED = /\b(?:signs?|signed|permanent|(?:on|agreed|handed) (?:a |an )?(?:[\w-]+ )?(?:contract|deal)|deal (?:until|to)|until (?:the end of|june|20\d\d))\b/i;
 
 const CURRENCY = { "€": "EUR", "£": "GBP", "$": "USD" };
 

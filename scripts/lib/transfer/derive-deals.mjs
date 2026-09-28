@@ -19,7 +19,7 @@ import { readFileSync } from "node:fs";
 import { clampCp, slugify, upsertRows } from "../sync-db.mjs";
 import { clubCode, clubDisplay } from "./club-display.mjs";
 import { contractText, parseContract } from "./contract.mjs";
-import { DEST, FORMER, FROM, LEFT_FREE, addVotes, collectVotes, topVote } from "./direction.mjs";
+import { DEST, FORMER, FROM, LEFT_FREE, SUITOR_FROM, addVotes, collectVotes, topVote } from "./direction.mjs";
 import { extractTransfer } from "./extract.mjs";
 import { createNameBook, loadGlossary, loadNameBook, loadPlayerDictionary, lookupAndCache, missingNames } from "./names-ko.mjs";
 import { RANK, RENEWAL, cleanBody, isRoundup, isRoundupItem, mentionRe, sentencesOf } from "./story.mjs";
@@ -148,8 +148,8 @@ const needsVerdict = (r, key, nowMs) =>
 
 /** 옮긴다는 표현 — 재계약 기사와 이적 기사를 가른다(재계약 표현만 있고 이것이 없으면 딜이 아니다) */
 const MOVE_WORDS = /\b(?:join(?:s|ed|ing)?|move(?:s|d)?\s+to|transfer(?:s|red)?\s+(?:to|from)|switch(?:es|ed)?\s+to|sign(?:s|ed|ing)?\s+for|leav(?:e|es|ing)|left(?!-)|depart(?:s|ed|ure)?|arriv(?:e|es|ed|al)|loan(?:ed)?\s+(?:to|from))\b/iu;
-/** "from Man City" — 대문자로 시작하는 출발 구단 */
-const FROM_CLUB = /\bfrom\s+\p{Lu}/u;
+/** "from Man City" — 대문자로 시작하는 출발 구단. "interest from X"(데려가려는 구단)는 옮긴다는 표현이 아니다 */
+const FROM_CLUB = new RegExp(String.raw`${SUITOR_FROM}\bfrom\s+\p{Lu}`, "u");
 const MOVE = { test: (s) => MOVE_WORDS.test(s) || FROM_CLUB.test(s) };
 
 /**

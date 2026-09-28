@@ -53,6 +53,9 @@ const CASES = [
   { expect: "collapsed",      text: "Barcelona have ruled out signing Argentina forward John Doe from Atletico Madrid in January. (Sport)" },
   { expect: "collapsed",      text: "Arsenal have no intention of selling 27-year-old Spanish midfielder John Doe in January. (Football Insider)" },
   { expect: "collapsed",      text: "Tottenham will not pursue a move to sign 33-year-old striker John Doe, who is a free agent. (Football Insider)" },
+  // 입단 테스트는 이적 완료가 아니다(운영 — 전지훈련 합류가 오피셜 딜이 됐다). 계약까지 했으면 오피셜이다
+  { expect: "rumour",         text: "Former Rangers winger John Doe has joined Hibernian at their training camp in La Manga as the 26-year-old looks to win a contract after his release. (Record)" },
+  { expect: "official",       text: "Hibernian have confirmed John Doe has joined on a contract until the end of the season after a trial." },
   // 넓힌 어휘가 이적이 아닌 문장을 잡지 않는다
   { expect: "unknown",        text: "Harry Kane has been ruled out for six weeks with an ankle injury." },
   { expect: "unknown",        text: "‘I love football; I’m not interested in politics’ – Rayan Cherki on dreaming to win the Ballon d’Or" },

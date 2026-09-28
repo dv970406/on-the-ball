@@ -252,6 +252,10 @@ BBC 이적 가십·스카이 신문 요약("Papers: …")은 여러 신문의 �
 - 칼럼 문형에 맞춘 추출 규칙이 함께 있다 — 나이·국적 수식 뒤 이름("18-year-old Paraguay defender Mauro Coronel"),
   이름 뒤 나이 동격("Alex Scott, 23,"), 주시·추적·문의·판매 거부 어휘. 넓힌 뒤 운영 저장분 전체를 신·구 추출기로
   돌려 일반 기사에서 새로 후보가 된 행을 훑었다(위 추출 규칙 절의 절차).
+  - ⚠ **"competition from X"·"interest from X"의 X는 데려가려는 구단이다**(`SUITOR_FROM`) — 출발 구단으로 읽었더니
+    "크리스털 팰리스의 미첼"이 맨유발 딜이 됐다(운영). 출발 구단 판정과 "옮긴다는 표현"(재계약 판별) 둘 다 이 문형을 뺀다.
+  - ⚠ **입단 테스트는 오피셜이 아니다** — "has joined Hibernian at their training camp … looks to win a contract"가 오피셜
+    딜이 됐다(운영). 계약을 **맺었다는** 표현("on a contract until…")이 없으면 루머다.
 
 ### 이동 판정 — LLM은 딜 후보에 **거부권만** 가진다
 

@@ -13,7 +13,7 @@ export const RANK = ["rumour", "talks", "offer", "agreement", "personal_terms", 
  * 재계약·첫 프로 계약 — 같은 구단에 남는 계약이라 이적이 아니다. 소속·행선지를 못 읽었는데 이 표현이 있으면
  * 이적 기사로 보지 않는다.
  */
-export const RENEWAL = /\b(?:new (?:deal|contract)|contract extension|extends?|extension|renew(?:s|ed|al)?|stay(?:s)? at|(?:first )?professional (?:contract|deal)|first senior (?:deal|contract))\b/i;
+export const RENEWAL = /\b(?:new (?:long-term |long term |multi-year |improved |bumper )?(?:deal|contract)|contract extension|extends?|extension|renew(?:s|ed|al)?|stay(?:s)? at|(?:first )?professional (?:contract|deal)|first senior (?:deal|contract))\b/i;
 
 /** 가십 칼럼에서 나눈 항목 행의 표지 — 칼럼 external_id 뒤에 붙는다(`roundup.mjs`) */
 export const ITEM_MARK = "#item-";
