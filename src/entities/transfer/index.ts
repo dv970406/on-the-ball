@@ -42,7 +42,6 @@ export { formatFee, formatFeeRange } from "./lib/fee";
 // ⚠ 경로 두 칸의 문구(FA·미확인·미정·외 N)의 단일 소스 — 상세 경로 카드와 목록 UI가 같은 말을 한다
 export { destinationClubs, routeLabels } from "./lib/route-label";
 // ⚠ 여러 구단이 노리는 루머의 행선지 자리 — 엠블럼 겹치기. 상세 경로 카드가 쓴다(목록 UI는 같은 슬라이스라 상대 경로)
-export { CrestStack } from "./ui/crest-stack";
 // ⚠ 이적료 칸은 금액 · FA(확인된 자유계약) · 미공개 셋 중 하나다 — 빈 이적료를 FA로 추정하지 않는다
 export { FeeValue } from "./ui/fee-value";
 export { DealRow } from "./ui/deal-row";

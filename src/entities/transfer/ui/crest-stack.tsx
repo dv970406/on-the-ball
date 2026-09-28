@@ -1,10 +1,8 @@
 // ⚠ 배럴이 아니라 직접 경로다 — `"use client"`가 없어 서버 렌더 여지를 남긴다(`pill.tsx`와 같은 이유)
 import { cn } from "@/shared/lib/cn";
+import { ROUTE_CLUB_LIMIT } from "../lib/route-label";
 import type { TransferClub } from "../model/types";
 import { TransferCrest } from "./transfer-crest";
-
-/** 겹쳐 그리는 엠블럼 수의 상한 — 그 뒤는 `+N`으로 접는다(이름은 호출부가 전부 적는다) */
-const MAX_STACK = 4;
 
 interface CrestStackProps {
   /** 관련 구단들(언급 순). 하나면 호출부가 `TransferCrest`를 그대로 쓰는 편이 낫다 */
@@ -18,10 +16,12 @@ interface CrestStackProps {
  * 엠블럼 겹치기 — 여러 구단이 노리는 루머의 행선지 자리. 엠블럼을 아바타 스택처럼 1/4씩 겹쳐 놓는다.
  * 각 엠블럼을 캔버스색 테두리로 감싸 겹친 자리에서 서로 분리돼 보이게 한다(그림자·링을 쓰지 않는다 — `styling.md`).
  * ⚠ `+N` 원은 컨트롤이 아니라 표시 요소이지만 `rounded-full` 예외 목록을 늘리지 않으려고 `rounded-sm`이다.
- * ⚠ 이름은 여기 없다 — 엠블럼만으로는 사전 밖 구단(모노그램)을 알아볼 수 없어 호출부가 이름을 전부 적는다.
+ * ⚠ 이름은 여기 없다 — 엠블럼만으로는 사전 밖 구단(모노그램)을 알아볼 수 없어 호출부가 이름을 적는다.
+ *   겹치는 수의 상한은 `routeLabels`가 이름을 적는 수와 같은 `ROUTE_CLUB_LIMIT`이다 — 엠블럼과 이름이 같은 구단을 가리키고
+ *   `+N`과 `외 N`이 같은 수여야 한다.
  */
 export function CrestStack({ clubs, size, className }: CrestStackProps) {
-  const shown = clubs.slice(0, MAX_STACK);
+  const shown = clubs.slice(0, ROUTE_CLUB_LIMIT);
   const rest = clubs.length - shown.length;
   const overlap = Math.round(size / 4);
   return (

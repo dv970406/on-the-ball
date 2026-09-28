@@ -9,7 +9,6 @@ import {
   TransferCrest,
   routeLabels,
   destinationClubs,
-  CrestStack,
 } from "@/entities/transfer";
 import { WatchToggle } from "@/features/watch-transfer";
 import { ROUTES } from "@/shared/config";
@@ -67,28 +66,46 @@ function RouteCell({
   label: string;
   // ⚠ `TransferClub`은 배럴에 없다(슬라이스 밖 소비자가 없어 올리지 않았다) — 딜의 필드 타입으로 받는다
   club: TransferDeal["fromClub"];
-  /** 칸에 쓸 글자 — 구단이 없을 때의 문구(`FA`·`미확인`·`미정`)까지 `routeLabels`가 정한다 */
+  /** 칸에 쓸 글자 — 구단이 없을 때의 문구(`FA`·`미확인`·`미정`)까지 `routeLabels`가 정한다. 구단이 여럿이면 쓰지 않는다(아래) */
   text: string;
-  /** 행선지 칸의 구단들 — 둘 이상이면 엠블럼을 겹쳐 그린다(여러 구단이 노리는 루머) */
+  /** 행선지 칸의 구단들 — 둘 이상이면 한 줄에 하나씩 전부 적는다(여러 구단이 노리는 루머) */
   clubs?: TransferDeal["suitors"];
   className?: string;
 }) {
+  const listed = clubs && clubs.length > 1 ? clubs : null;
   return (
     <div className={cn("min-w-0 p-[12px_14px]", className)}>
       <span className="font-mono text-[10px] uppercase tracking-[0.5px] text-ink-mute-2">
         {label}
       </span>
-      <div className="mt-2 flex items-center gap-2 text-[14px] font-medium leading-[1.3] tracking-[-0.3px] text-ink">
-        {clubs && clubs.length > 1 ? (
-          <CrestStack clubs={clubs} size={24} />
-        ) : (
-          <TransferCrest club={club} size={24} className="shrink-0" />
-        )}
-        {/* 경로 카드만 정식명이다 — 목록 행·칩은 약칭(`TransferClub` 주석). 구단이 여럿이면 세 줄까지 흘려 전부 적는다 */}
-        <span className={clubs && clubs.length > 1 ? "line-clamp-3" : "truncate"}>{text}</span>
-      </div>
-      {/* 5대 리그 밖은 `null`이라 줄을 비운다 — 모르는 리그명을 지어내지 않는다 */}
-      {club?.league && <div className="mt-1 text-[11px] text-ink-mute">{club.league}</div>}
+      {listed ? (
+        // 여러 구단이 노리는 루머 — 목록·카드는 `routeLabels`가 `외 N`으로 접지만 이 카드는 폭을 이름에 전부 내줄 수 있는
+        // 유일한 자리라 **전부** 적는다. 다만 `·`로 이어 흘리면 어디서 한 구단이 끝나는지 읽기 어렵고 겹친 엠블럼이 그 덩어리
+        // 가운데 떠 FROM 칸과 줄이 어긋났다 → 한 줄에 엠블럼 하나 + 이름 하나. 첫 줄이 FROM 칸의 구단 줄과 같은 높이에 놓인다.
+        // ⚠ 리그 줄을 두지 않는다 — 구단마다 리그가 다를 수 있어 첫 구단의 리그만 적으면 나머지도 그 리그인 것처럼 읽힌다.
+        <ul className="mt-2 flex flex-col gap-1.5">
+          {listed.map((c) => (
+            <li
+              key={c.code}
+              className="flex min-w-0 items-center gap-2 text-[14px] font-medium leading-[1.3] tracking-[-0.3px] text-ink"
+            >
+              <TransferCrest club={c} size={24} className="shrink-0" />
+              {/* 정식명이 좁은 칸에서 한 줄을 넘으면 자르지 않고 두 줄로 흘린다 — 잘린 구단 이름은 어느 구단인지 알 수 없다 */}
+              <span className="line-clamp-2">{c.name}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <>
+          <div className="mt-2 flex items-center gap-2 text-[14px] font-medium leading-[1.3] tracking-[-0.3px] text-ink">
+            <TransferCrest club={club} size={24} className="shrink-0" />
+            {/* 경로 카드만 정식명이다 — 목록 행·칩은 약칭(`TransferClub` 주석) */}
+            <span className="truncate">{text}</span>
+          </div>
+          {/* 5대 리그 밖은 `null`이라 줄을 비운다 — 모르는 리그명을 지어내지 않는다 */}
+          {club?.league && <div className="mt-1 text-[11px] text-ink-mute">{club.league}</div>}
+        </>
+      )}
     </div>
   );
 }

@@ -72,7 +72,7 @@ export function RumorCard({ deal, report, nowMs }: RumorCardProps) {
             ) : (
               <TransferCrest club={destinations[0] ?? null} size={40} />
             )}
-            {/* 관심 구단이 여럿이면 이름을 두 줄까지 흘려 전부 적는다(`ClubRoute`와 같은 판단) */}
+            {/* 관심 구단이 여럿이면 `routeLabels`가 접은 글자(앞 셋 + `외 N`)를 두 줄까지 흘린다(`ClubRoute`와 같은 판단) */}
             <span className={destinations.length > 1 ? "line-clamp-2 px-1 text-center" : "max-w-full truncate whitespace-nowrap px-1"}>
               {route.to}
             </span>
