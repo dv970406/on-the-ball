@@ -15,7 +15,18 @@ export const RANK = ["rumour", "talks", "offer", "agreement", "personal_terms", 
  */
 export const RENEWAL = /\b(?:new (?:deal|contract)|contract extension|extends?|extension|renew(?:s|ed|al)?|stay(?:s)? at|(?:first )?professional (?:contract|deal)|first senior (?:deal|contract))\b/i;
 
-export const isRoundup = (r) => r.source_id === "rss:bbc-gossip" || /\bgossip\b/i.test(r.body.split("\n")[0]);
+/** 가십 칼럼에서 나눈 항목 행의 표지 — 칼럼 external_id 뒤에 붙는다(`roundup.mjs`) */
+export const ITEM_MARK = "#item-";
+/** 가십 칼럼에서 나눈 항목 행인가 — 한 문단 = 한 이적설이라 가십 모음이 아니다 */
+export const isRoundupItem = (r) => typeof r.external_id === "string" && r.external_id.includes(ITEM_MARK);
+
+/**
+ * 가십 칼럼 — BBC 이적 가십(제목에 "gossip")과 스카이 신문 요약("Papers: …").
+ * ⚠ 칼럼에서 나눈 항목 행은 칼럼과 같은 소스지만 가십 모음이 아니다(`isRoundupItem`).
+ */
+export const isRoundup = (r) =>
+  !isRoundupItem(r) &&
+  (r.source_id === "rss:bbc-gossip" || /\bgossip\b/i.test(r.body.split("\n")[0]) || (r.source_id === "rss:sky-transfers" && /^Papers:/u.test(r.body)));
 
 /** 인용·판정에 쓸 본문 — 링크·트윗 서명·Google News의 제목 반복을 걷어낸다 */
 export function cleanBody(r) {

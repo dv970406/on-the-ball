@@ -6,6 +6,7 @@
  */
 import { resolveAttribution } from "./lib/transfer/attribution.mjs";
 import { bylineOf, canonicalGuid, parseTelegram, stripHtml } from "./lib/transfer/sources.mjs";
+import { itemExternalId, parseRoundupItems } from "./lib/transfer/roundup.mjs";
 
 let pass = 0;
 let fail = 0;
@@ -48,6 +49,32 @@ check("byline — 없으면 null", bylineOf({}) === null);
 const manual = { kind: "bluesky", tier: 2, defaultAttribution: "verified_author", verification: { issuerHandle: null, method: "byline-links" } };
 check("수동 확인 계정 — 본인 글로 귀속", resolveAttribution(manual, { authorHandle: "leeryder.bsky.social" })?.attribution === "verified_author");
 check("확인 기록이 없으면 저장하지 않는다(이름만 보고 등록한 계정)", resolveAttribution({ ...manual, verification: undefined }, { authorHandle: "x.bsky.social" }) === null);
+
+// ── 가십 칼럼 → 항목 — 출처 신문 표기로 끝나는 문단만 항목이다(합성 HTML — 실제 기사 문장을 커밋하지 않는다) ──
+const bbcColumn = `<html><body><article>
+  <p>Chelsea lead race for John Doe, Bayern interested in Jack Roe, and more.</p>
+  <p>Chelsea are leading the race to sign Bournemouth midfielder John Doe, 22. (Mail), external</p>
+  <p>Bayern Munich are interested in Barcelona forward Jack Roe, 28. (Sport - in Spanish), external</p>
+  <p>Newcastle are keeping an eye on Rennes defender Tom Poe, 20. (Marca - in Spanish, external)</p>
+  <p>Short one. (Mail), external</p>
+  <p>Hibs take winger on trial - Sunday's Scottish gossip</p>
+</article></body></html>`;
+const bbcItems = parseRoundupItems(bbcColumn);
+check("가십 — BBC 문단을 항목으로 나누고 출처 신문을 괄호로 남긴다", JSON.stringify(bbcItems) === JSON.stringify([
+  "Chelsea are leading the race to sign Bournemouth midfielder John Doe, 22. (Mail)",
+  "Bayern Munich are interested in Barcelona forward Jack Roe, 28. (Sport)",
+  "Newcastle are keeping an eye on Rennes defender Tom Poe, 20. (Marca)",
+]), JSON.stringify(bbcItems));
+const skyBody = "The top stories... <h3>PREMIER LEAGUE</h3><p><strong>Chelsea</strong> have made <strong>John Doe</strong> their top target for January - <em>Daily Mirror</em></p><ul><li><a href=\"x\">Transfer Centre LIVE!</a></li></ul><p><strong>Arsenal</strong> are monitoring <strong>Jack Roe</strong> ahead of the winter window - <em>The Sun</em></p><p>Barcelona are closely monitoring Tom Poe's situation at Chelsea - <em>Sport </em>(Spanish).</p>";
+const skyColumn = `<html><head><script type="application/ld+json">${JSON.stringify({ "@type": "NewsArticle", articleBody: skyBody })}</script></head><body></body></html>`;
+const skyItems = parseRoundupItems(skyColumn);
+check("가십 — 스카이 articleBody의 HTML 문단을 항목으로 나눈다", JSON.stringify(skyItems) === JSON.stringify([
+  "Chelsea have made John Doe their top target for January (Daily Mirror)",
+  "Arsenal are monitoring Jack Roe ahead of the winter window (The Sun)",
+  "Barcelona are closely monitoring Tom Poe's situation at Chelsea (Sport)",
+]), JSON.stringify(skyItems));
+check("가십 — 칼럼이 아닌 기사에서는 항목이 없다", parseRoundupItems("<article><p>Chelsea have completed the signing of John Doe from Benfica for a fee of £40m.</p></article>").length === 0);
+check("가십 — 항목 키는 칼럼 키 + 본문 해시(같은 본문은 같은 키)", itemExternalId("abc", "x y z") === itemExternalId("abc", "x y z") && itemExternalId("abc", "x y z").startsWith("abc#item-") && itemExternalId("abc", "x") !== itemExternalId("abc", "y"));
 
 console.log(`\n수집 어댑터 ${pass}/${pass + fail} 통과`);
 if (fail) process.exit(1);

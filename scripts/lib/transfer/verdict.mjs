@@ -24,6 +24,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import * as cheerio from "cheerio";
 import { COLLECTOR_UA } from "./sources.mjs";
+import { isRoundupItem } from "./story.mjs";
 import { SUMMARY_MODEL, clampBody, stripLinks } from "./summarize.mjs";
 
 /** 요약과 같은 모델 — 실측(보도 10건)에서 Haiku 4.5가 공식 이적 보도를 "무관"으로 버린 적이 있다 */
@@ -39,8 +40,12 @@ export const VERDICT_EVIDENCE_MAX = 300;
 export const ARTICLE_MAX_CHARS = 4_000;
 const ARTICLE_TIMEOUT_MS = 10_000;
 
-/** 기사 본문을 받을 보도인가 — 매체 RSS만(텔레그램·블루스카이는 저장된 글이 전문, 구글 뉴스는 리다이렉트) */
-export const wantsArticle = (row) => typeof row.source_id === "string" && row.source_id.startsWith("rss:") && /^https?:\/\//u.test(row.url ?? "");
+/**
+ * 기사 본문을 받을 보도인가 — 매체 RSS만(텔레그램·블루스카이는 저장된 글이 전문, 구글 뉴스는 리다이렉트).
+ * ⚠ 가십 칼럼의 항목 행은 받지 않는다 — 저장된 문단이 그 이적설의 전부이고, URL은 칼럼 전체라 남의 이적설까지 싣게 된다.
+ */
+export const wantsArticle = (row) =>
+  typeof row.source_id === "string" && row.source_id.startsWith("rss:") && /^https?:\/\//u.test(row.url ?? "") && !isRoundupItem(row);
 
 /**
  * 기사 HTML → 본문 글자. JSON-LD의 `articleBody`가 있으면 그것(가장 긴 것), 없으면 기사 영역의 문단들.
@@ -63,7 +68,9 @@ export function extractArticleText(html) {
       // 깨진 JSON-LD는 건너뛴다
     }
   });
-  const text = bodies.sort((a, b) => b.length - a.length)[0] ??
+  // ⚠ 스카이는 articleBody에 HTML째로 넣는다 — 태그를 걷어 글자만 보낸다(태그가 판정 입력 토큰을 태웠다)
+  const longest = bodies.sort((a, b) => b.length - a.length)[0];
+  const text = (longest != null ? (/<[a-z][^>]*>/iu.test(longest) ? cheerio.load(longest.replace(/<\/(?:p|h\d|li)>/giu, "$& ")).root().text() : longest) : null) ??
     $("article p, main p, [itemprop=articleBody] p").map((_, p) => $(p).text().trim()).get().filter((t) => t.length > 40).join("\n");
   const flat = String(text).replace(/\s+/gu, " ").trim();
   const cps = [...flat];

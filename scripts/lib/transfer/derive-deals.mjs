@@ -22,7 +22,7 @@ import { contractText, parseContract } from "./contract.mjs";
 import { DEST, FORMER, FROM, LEFT_FREE, addVotes, collectVotes, topVote } from "./direction.mjs";
 import { extractTransfer } from "./extract.mjs";
 import { createNameBook, loadGlossary, loadNameBook, loadPlayerDictionary, lookupAndCache, missingNames } from "./names-ko.mjs";
-import { RANK, RENEWAL, cleanBody, isRoundup, mentionRe, sentencesOf } from "./story.mjs";
+import { RANK, RENEWAL, cleanBody, isRoundup, isRoundupItem, mentionRe, sentencesOf } from "./story.mjs";
 
 /** 이적 관련성 하한 — 그 아래는 경기 리뷰·부상 소식이 단계 규칙에 스친 것이다 */
 export const MIN_RELEVANCE = 0.3;
@@ -107,6 +107,8 @@ function textKey(body) {
  *   550행이 같은 URL). 그대로 두면 딜의 보도 수가 부풀고 판정·요약을 같은 글에 여러 번 부른다.
  * ⚠ **행을 지우지 않는다** — 파생에서만 대표 하나를 쓴다(지우는 것은 되돌릴 수 없다). 대표는 가장 이른 게시 시각,
  *   같으면 나중에 수집된 행(= 최신 개정판)이다.
+ * ⚠ **가십 칼럼의 항목 행은 URL로 합치지 않는다** — 한 칼럼의 항목이 전부 칼럼 URL을 물려받는다(`roundup.mjs`).
+ *   두 피드에 실린 같은 칼럼의 항목은 본문이 같아 본문 키로 합쳐진다.
  * @returns {{ reps: object[], duplicates: number }}
  */
 export function dedupeRows(rows) {
@@ -120,7 +122,7 @@ export function dedupeRows(rows) {
   };
   const owner = new Map();
   for (const r of rows) {
-    for (const k of [urlKey(r.url) && `u:${urlKey(r.url)}`, textKey(r.body) && `t:${textKey(r.body)}`]) {
+    for (const k of [!isRoundupItem(r) && urlKey(r.url) && `u:${urlKey(r.url)}`, textKey(r.body) && `t:${textKey(r.body)}`]) {
       if (!k) continue;
       if (owner.has(k)) parent.set(find(r.id), find(owner.get(k)));
       else owner.set(k, r.id);
@@ -433,7 +435,7 @@ export function deriveDeals(rows, opts) {
      *   시간에 보드가 통째로 비지 않게. 이미 있는 딜도 "이동 아님" 보도는 위에서 빠진다.
      */
     if (opts.requireVerdict) {
-      for (const it of items) if (verdictOf(it.row, key) === null && needsVerdict(it.row, key, opts.nowMs)) verdictNeeds.push({ id: it.row.id, playerKey: key, player, body: it.row.body, source_id: it.row.source_id, url: it.row.url });
+      for (const it of items) if (verdictOf(it.row, key) === null && needsVerdict(it.row, key, opts.nowMs)) verdictNeeds.push({ id: it.row.id, playerKey: key, player, body: it.row.body, source_id: it.row.source_id, external_id: it.row.external_id, url: it.row.url });
       const confirmed = items.some((it) => verdictOf(it.row, key) === "move");
       if (!confirmed && !opts.existingKeys?.has(dealKey(key))) {
         unconfirmed.push(player);
@@ -524,7 +526,7 @@ async function loadRows(supabase, startMs) {
   for (;;) {
     const { data, error } = await supabase
       .from(NEWS)
-      .select("id, source_id, url, stage, players, body, published_at, relevance, deal_id, verdict, verdict_player, verdict_at")
+      .select("id, source_id, external_id, url, stage, players, body, published_at, relevance, deal_id, verdict, verdict_player, verdict_at")
       .gte("published_at", new Date(startMs).toISOString())
       .or(`deal_id.not.is.null,and(stage.neq.unknown,relevance.gte.${MIN_RELEVANCE})`)
       .gt("id", lastId)

@@ -6,6 +6,7 @@
  * 픽스처 행 배열 → 파생 결과를 **정확 일치**로 본다. 규칙(계획서 §2-2)을 고치면 이걸 먼저 돌린다.
  */
 import { createNameBook } from "./lib/transfer/names-ko.mjs";
+import { isRoundup } from "./lib/transfer/story.mjs";
 import { boardScopeStartMs, clubRecord, createExtractMemo, dealKey, dedupeRows, deriveDeals, derivationStartMs, normalizePlayer, windowSpan } from "./lib/transfer/derive-deals.mjs";
 
 const NOW = Date.parse("2026-09-25T00:00:00Z");
@@ -301,6 +302,12 @@ const DUP = {
     { id: 20, url: "https://a.test/1", body: "Official!", published_at: "2026-07-10T00:00:00Z" },
     { id: 21, url: "https://a.test/2", body: "Official!", published_at: "2026-07-10T00:00:00Z" },
   ]),
+  // 가십 칼럼의 항목 행 — 칼럼 URL을 물려받지만 서로 다른 보도다. 두 피드에 실린 같은 항목은 본문으로 합친다
+  items: dedupeRows([
+    { id: 30, external_id: "aaaa#item-1", url: BBC, body: "Arsenal are monitoring Bayer Leverkusen midfielder John Doe, 20. (Teamtalk)", published_at: "2026-07-10T00:00:00Z" },
+    { id: 31, external_id: "aaaa#item-2", url: BBC, body: "Newcastle are keeping an eye on Rennes defender Jack Roe, 21. (Football Insider)", published_at: "2026-07-10T00:00:00Z" },
+    { id: 32, external_id: "bbbb#item-1", url: BBC, body: "Arsenal are monitoring Bayer Leverkusen midfielder John Doe, 20. (Teamtalk)", published_at: "2026-07-10T00:00:00Z" },
+  ]),
   counted: derive([
     row("Chelsea agree deal for John Doe from Benfica.", { url: BBC }),
     row("Chelsea agree deal for John Doe from Benfica. Updated.", { url: BBC.replace("rss", "x") }),
@@ -311,6 +318,8 @@ const UNIT = [
   { name: "중복 — BBC 개정판(같은 URL·쿼리·끝 슬래시 차이)은 한 보도이고 대표는 나중에 수집된 개정판", got: [DUP.revisions.reps.length, DUP.revisions.duplicates, DUP.revisions.reps[0].id], want: [1, 2, 3] },
   { name: "중복 — 리트윗은 원문과 같은 보도이고 대표는 먼저 게시된 원문", got: [DUP.retweet.reps.length, DUP.retweet.reps[0].id], want: [1, 10] },
   { name: "중복 — 짧은 문구(40자 미만)가 같다고 합치지 않는다", got: DUP.short.reps.length, want: 2 },
+  { name: "중복 — 가십 항목은 같은 칼럼 URL이어도 따로 세고, 두 피드의 같은 항목은 합친다", got: DUP.items.reps.map((r) => r.id).sort(), want: [31, 32] },
+  { name: "가십 — BBC 가십·스카이 신문 요약은 가십 모음이고, 거기서 나눈 항목은 아니다", got: [isRoundup({ source_id: "rss:bbc-gossip", body: "Chelsea lead race for Scott" }), isRoundup({ source_id: "rss:sky-transfers", body: "Papers: Man Utd line up Conte" }), isRoundup({ source_id: "rss:bbc-gossip", external_id: "aaaa#item-1", body: "Chelsea target Bournemouth's Alex Scott. (Mail)" }), isRoundup({ source_id: "rss:sky-transfers", body: "Arsenal complete signing of John Doe" })], want: [true, true, false, false] },
   { name: "중복 — 딜의 보도 수는 서로 다른 보도만 센다", got: [DUP.counted.deals[0]?.report_count, DUP.counted.skipped["중복 보도"]], want: [2, 1] },
   { name: "판정 — 판정 없는 새 딜은 열지 않고 물을 대상으로 넘긴다", got: [VERDICT.unjudgedNew.deals.length, VERDICT.unjudgedNew.verdictNeeds.map((n) => n.playerKey), VERDICT.unjudgedNew.skipped["판정 대기(LLM)"], VERDICT.unjudgedNew.clubs.length], want: [0, ["john doe"], 1, 0] },
   { name: "판정 — 이동 판정이 있는 새 딜은 연다(다시 묻지 않는다)", got: [VERDICT.movedNew.deals.length, VERDICT.movedNew.verdictNeeds.length], want: [1, 0] },

@@ -129,6 +129,8 @@ const fakeClient = (answers) => ({
   check(`본문 — ${ARTICLE_MAX_CHARS}자에서 자른다`, [...extractArticleText(`<script type="application/ld+json">{"articleBody":"${"a".repeat(ARTICLE_MAX_CHARS + 500)}"}</script>`)].length === ARTICLE_MAX_CHARS + 1);
   check("받기 — HTTP 실패는 빈 문자열(판정은 저장된 글로)", (await fetchArticleText("https://x.test/a", async () => ({ ok: false, status: 403, text: async () => "" }))) === "");
   check("받기 — 네트워크 오류도 던지지 않는다", (await fetchArticleText("https://x.test/a", async () => { throw new Error("timeout"); })) === "");
+  check("대상 — 가십 칼럼의 항목 행은 받지 않는다(URL이 칼럼 전체다)", !wantsArticle({ source_id: "rss:bbc-gossip", external_id: "abc#item-1a2b", url: "https://www.bbc.co.uk/sport/football/articles/x" }));
+  check("본문 — articleBody 안의 HTML 태그를 걷고 문단 사이를 띄운다", extractArticleText(`<script type="application/ld+json">${JSON.stringify({ articleBody: "<p><strong>Chelsea</strong> want Doe - <em>Mirror</em></p><p>Arsenal eye Roe</p>" })}</script>`) === "Chelsea want Doe - Mirror Arsenal eye Roe");
   check("대상 — 매체 RSS만 받는다", wantsArticle({ source_id: "rss:fl-arsenal", url: "https://www.football.london/a" }) && !wantsArticle({ source_id: "tg:romano", url: "https://t.me/x" }) && !wantsArticle({ source_id: "gnews:romano", url: "https://news.google.com/x" }) && !wantsArticle({ source_id: "rss:bbc", url: null }));
 }
 {

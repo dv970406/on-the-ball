@@ -39,6 +39,22 @@ const CASES = [
   { expect: "talks",          text: "Chelsea nearly signed him two years ago but are now in talks again with Bayern." },
   { expect: "rumour",         text: "Arsenal are interested in the striker, who could move in the summer." },
   { expect: "official",       text: "Chelsea have announced the signing of Jamie Gittens, who impressed on loan last season." },
+  // 가십 칼럼 항목 문형 — 금액이 낀 입찰 의향은 루머, 지난 창의 거절은 회고다(지금 이야기는 남는다)
+  { expect: "rumour",         text: "Bayern Munich are prepared to make a £69m bid for Barcelona and Spain forward Dani Olmo, 28. (Sport)" },
+  { expect: "rumour",         text: "AS Roma are expected to double their asking price for Chelsea target Manu Kone, 25, to £86m in January after the Blues reportedly rejected a chance to sign the France midfielder for £43m in the summer. (Gazzetta)" },
+  { expect: "collapsed",      text: "Real Madrid rejected a £90m bid from Chelsea for the midfielder on Monday." },
+  // 가십 칼럼의 어휘 — 주시·추적·문의·배제·판매 거부
+  { expect: "rumour",         text: "Aston Villa attacking midfielder John Doe is being monitored by clubs in La Liga. (AS)" },
+  { expect: "rumour",         text: "Arsenal and Chelsea are chasing Feyenoord midfielder Jack Roe, 22. (Caught Offside)" },
+  { expect: "rumour",         text: "Liverpool and Aston Villa are among the clubs tracking Fiorentina's Italy midfielder Tom Poe, 22. (Caught Offside)" },
+  { expect: "rumour",         text: "Brazil winger John Doe is frustrated at Chelsea, and Barcelona are keeping tabs on the 19-year-old's situation. (Sport)" },
+  { expect: "offer",          text: "Real Madrid and Barcelona have made fresh enquiries about American teenager John Doe, 16. (Athletic)" },
+  { expect: "talks",          text: "John Doe's agent has held talks with multiple Premier League clubs over a potential move. (Football Insider)" },
+  { expect: "collapsed",      text: "Barcelona have ruled out signing Argentina forward John Doe from Atletico Madrid in January. (Sport)" },
+  { expect: "collapsed",      text: "Arsenal have no intention of selling 27-year-old Spanish midfielder John Doe in January. (Football Insider)" },
+  { expect: "collapsed",      text: "Tottenham will not pursue a move to sign 33-year-old striker John Doe, who is a free agent. (Football Insider)" },
+  // 넓힌 어휘가 이적이 아닌 문장을 잡지 않는다
+  { expect: "unknown",        text: "Harry Kane has been ruled out for six weeks with an ankle injury." },
   { expect: "unknown",        text: "‘I love football; I’m not interested in politics’ – Rayan Cherki on dreaming to win the Ballon d’Or" },
   { expect: "agreement",      text: "German club RB Leipzig are close to reaching an agreement in principle with Chelsea for the transfer of striker Marc Guiu." },
   { expect: "unknown",        text: "🚨 James Maddison suffered slight fracture to shoulder after landing awkwardly. Out for around four weeks." },
@@ -198,6 +214,15 @@ const PLAYER_CASES = [
   { players: [], text: "Harry Kane confirms new deal talks with FC Bayern are advancing." },
   // 오탐 — "in agreement with"은 의견 동의다(대표팀 소집 논평이 투헬의 합의 딜이 됐다)
   { players: [], text: "Alan Shearer in agreement with Thomas Tuchel after brutal Cole Palmer blast" },
+  // 가십 항목 끝의 출처 신문 괄호는 선수가 아니다
+  { players: ["Tomas Araujo"], text: "Bayern Munich are keen on Benfica's 24-year-old Portugal defender Tomas Araujo. (Bild)" },
+  { players: ["Ibrahim Maza"], text: "Arsenal and Tottenham are monitoring Bayer Leverkusen's Algeria midfielder Ibrahim Maza, 20. (Teamtalk)" },
+  // 가십 칼럼의 소개 문형 — 나이·국적 수식 뒤 이름, 이름 뒤 나이 동격
+  { players: ["Mauro Coronel"], text: "Brighton and Aston Villa are both interested in signing Nacional's 18-year-old Paraguay Under-20 defender Mauro Coronel. (Teamtalk)" },
+  { players: ["Paul Wanner"], text: "Liverpool, Bayern Munich and Real Madrid are all interested in PSV Eindhoven's 20-year-old Austrian international Paul Wanner. (Caught Offside)" },
+  { players: ["Alex Scott", "Adam Wharton"], text: "Bournemouth's Alex Scott, 23, and Crystal Palace and England's Adam Wharton, 22, are Chelsea's primary midfield targets. (Telegraph)" },
+  // 동격 나이 앞이 구단·연도면 사람이 아니다
+  { players: [], text: "Real Madrid, 1902, is the oldest club in the league and Chelsea, 20 points clear, lead the table." },
   // 오탐 — 부정("not interested in")은 관심 표현이 아니다
   { players: [], text: "‘I love football; I’m not interested in politics’ – Rayan Cherki on dreaming to win the Ballon d’Or" },
   // 오탐 — "to" 뒤 구단은 바로 뒤여야 한다(뒤쪽의 Roma를 잡았다)

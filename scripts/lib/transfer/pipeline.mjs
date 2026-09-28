@@ -9,7 +9,9 @@ import { clampCp, isoOrNull, str, upsertRows } from "../sync-db.mjs";
 import { resolveAttribution, clusterKey } from "./attribution.mjs";
 import { extractTransfer } from "./extract.mjs";
 import { MAX_ITEM_AGE_DAYS, findSource } from "./registry.mjs";
-import { createAdapter } from "./sources.mjs";
+import { itemExternalId, parseRoundupItems } from "./roundup.mjs";
+import { COLLECTOR_UA, createAdapter } from "./sources.mjs";
+import { ITEM_MARK, isRoundup } from "./story.mjs";
 
 const TABLE = "transfer_news";
 const CONFLICT = "source_id,external_id";
@@ -341,6 +343,102 @@ export async function reprocessAll(supabase, opts = {}) {
     stats.updated += up.saved.length;
     stats.failed += up.failed.length;
     if (up.aborted) throw new Error("계통적 실패로 재처리를 중단했다");
+  }
+  return stats;
+}
+
+/** 가십 칼럼을 싣는 소스 — 이 소스의 칼럼만 항목으로 나눈다(`story.mjs`의 `isRoundup`과 같은 소스) */
+const ROUNDUP_SOURCES = ["rss:bbc-gossip", "rss:bbc-football", "rss:sky-transfers"];
+/** 실행당 받는 칼럼 상한 — 첫 실행(최근 14일 백필)이나 페이지 구조가 바뀐 날에도 요청이 몰리지 않게 */
+export const ROUNDUP_MAX_PER_RUN = 20;
+const ROUNDUP_TIMEOUT_MS = 10_000;
+
+/** 칼럼 HTML 받기 — 실패하면 null(다음 실행이 다시 받는다). 던지지 않는다 */
+async function fetchRoundupHtml(url, fetchImpl) {
+  try {
+    const res = await fetchImpl(url, { headers: { "User-Agent": COLLECTOR_UA }, signal: AbortSignal.timeout(ROUNDUP_TIMEOUT_MS), redirect: "follow" });
+    return res.ok ? await res.text() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 가십 칼럼을 항목 행으로 나눠 저장한다(`roundup.mjs` 머리말).
+ *
+ * 최근 `MAX_ITEM_AGE_DAYS`일의 칼럼 중 **항목 행이 아직 없는 것**만 받는다 — 칼럼마다 한 번이다.
+ * 새로 수집한 칼럼과 이 기능 이전에 저장된 칼럼(백필)을 같은 경로가 맡는다.
+ *
+ * ⚠ 항목 행은 칼럼 행과 **같은 `toRow`** 로 만든다 — 귀속·추출·저장 검사가 새로 수집한 행과 갈리지 않는다.
+ *   수집 컬럼(URL·게시 시각·작성자)은 칼럼 행의 값을 물려받는다.
+ * ⚠ 받지 못한 칼럼(403·시간 초과·구조 변경으로 항목 0개)은 경고만 남기고 다음 실행이 다시 받는다 —
+ *   칼럼 행은 그대로라 잃는 것이 없다.
+ * @param {{ dryRun?: boolean, nowMs?: number, fetchImpl?: typeof fetch, limit?: number }} opts
+ */
+export async function expandRoundups(supabase, opts = {}) {
+  const nowMs = opts.nowMs ?? Date.now();
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  const limit = opts.limit ?? ROUNDUP_MAX_PER_RUN;
+  const floorMs = nowMs - MAX_ITEM_AGE_DAYS * 86_400_000;
+  const floorIso = new Date(floorMs).toISOString();
+  const stats = { columns: 0, fetched: 0, items: 0, inserted: 0, failed: [], deferred: 0, preview: [] };
+
+  const { data: rows, error } = await supabase
+    .from(TABLE)
+    .select("source_id, external_id, url, provenance_url, author_handle, body, published_at")
+    .in("source_id", ROUNDUP_SOURCES)
+    .gte("published_at", floorIso)
+    .not("external_id", "like", `%${ITEM_MARK}%`)
+    .order("published_at", { ascending: false })
+    .limit(500);
+  if (error) throw new Error(`가십 칼럼 조회 실패: ${error.message}`);
+  const columns = rows.filter((r) => isRoundup(r) && r.url);
+  stats.columns = columns.length;
+  if (!columns.length) return stats;
+
+  // 이미 나눈 칼럼 — 항목 행의 external_id 앞부분이 칼럼의 external_id다
+  const { data: done, error: e2 } = await supabase
+    .from(TABLE)
+    .select("source_id, external_id")
+    .in("source_id", ROUNDUP_SOURCES)
+    .gte("published_at", floorIso)
+    .like("external_id", `%${ITEM_MARK}%`)
+    .limit(10_000);
+  if (e2) throw new Error(`가십 항목 조회 실패: ${e2.message}`);
+  const expanded = new Set(done.map((r) => `${r.source_id}|${r.external_id.split(ITEM_MARK)[0]}`));
+  // 최신 칼럼부터 — 상한에 걸리면 오래된 칼럼이 다음 실행으로 밀린다
+  const todo = columns.filter((c) => !expanded.has(`${c.source_id}|${c.external_id}`));
+  stats.deferred = Math.max(0, todo.length - limit);
+
+  for (const col of todo.slice(0, limit)) {
+    const def = findSource(col.source_id);
+    if (!def) continue;
+    const html = await fetchRoundupHtml(col.url, fetchImpl);
+    const texts = html ? parseRoundupItems(html) : [];
+    if (!texts.length) {
+      stats.failed.push(col.url);
+      continue;
+    }
+    stats.fetched += 1;
+    const itemRows = [];
+    for (const text of texts) {
+      const r = toRow(
+        def,
+        { externalId: itemExternalId(col.external_id, text), url: col.url, provenanceUrl: col.provenance_url, authorHandle: col.author_handle, text, publishedAt: col.published_at },
+        { floorMs, nowMs },
+      );
+      if (typeof r !== "string") itemRows.push(r);
+    }
+    stats.items += itemRows.length;
+    if (opts.dryRun) {
+      stats.preview.push({ column: col.body.split("\n")[0], items: itemRows.map((r) => ({ stage: r.stage, players: r.players, body: r.body })) });
+      continue;
+    }
+    if (!itemRows.length) continue;
+    const up = await upsertRows(supabase, TABLE, itemRows, { onConflict: CONFLICT, ignoreDuplicates: true });
+    if (up.aborted) throw new Error("계통적 실패로 가십 항목 저장을 중단했다");
+    if (up.failed.length) throw new Error(`가십 항목 저장 실패 ${up.failed.length}건 — ${up.failed[0].message}`);
+    stats.inserted += up.saved.length;
   }
   return stats;
 }

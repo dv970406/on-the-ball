@@ -23,7 +23,7 @@ const STAGE_RULES = [
   {
     stage: "collapsed",
     pattern:
-      /\b(collapsed|called off|broken down|rebuffed|(?<!not )(?<!never )(?:turned down|reject(?:s|ed)?)|will not negotiate|no longer (?:interested|pursuing)|not going to join|off the table)\b|(?<!never )(?<!not )\bin (?:serious )?doubt\b/i,
+      /\b(collapsed|called off|broken down|rebuffed|(?<!not )(?<!never )(?:turned down|reject(?:s|ed)?)|will not negotiate|no longer (?:interested|pursuing)|will not pursue|rul(?:e|es|ed|ing) out (?:(?:a )?move for|(?:re-)?signing|the possibility of (?:re-)?signing)|(?:no plans|no intention|not prepared|not willing|refus(?:e|es|ing)) to (?:sell|let \w+ leave)|no intention of selling|not going to join|off the table)\b|(?<!never )(?<!not )\bin (?:serious )?doubt\b/i,
   },
   // 로마노 확정 시그널
   // ⚠ "아직 아니다"를 말하는 문장을 배제한다. 로마노는 합의 단계에서 "Formal steps needed
@@ -68,18 +68,18 @@ const STAGE_RULES = [
   {
     stage: "offer",
     pattern:
-      /\b(submit(?:ted|s)? (?:an? )?(?:offer|bid|proposal)|make[sd]? (?:an? )?(?:offer|bid|approach)|made (?:an? )?(?:offer|bid|approach)|(?:offer|bid|proposal) (?:of|worth)|opening (?:bid|offer)|enquir(?:y|ed)|approach(?:ed)? (?:for|to)|loan offer)\b/i,
+      /\b(submit(?:ted|s)? (?:an? )?(?:offer|bid|proposal)|make[sd]? (?:an? )?(?:offer|bid|approach)|made (?:an? )?(?:offer|bid|approach)|(?:offer|bid|proposal) (?:of|worth)|opening (?:bid|offer)|enquir(?:y|ies|ed)|approach(?:ed)? (?:for|to)|approached|loan offer)\b/i,
   },
   {
     stage: "talks",
     pattern:
-      /\b((?:in|holding|advancing in|advanced) talks|negotiat(?:ing|ions)|discussions? (?:with|over)|working on (?:a )?deal|close to (?:an? )?(?:deal|agreement)|closing in on|advanced negotiations)\b/i,
+      /\b((?:in|holding|held|advancing in|advanced) talks|(?:set|expected|poised) to (?:join|move to|sign for)|negotiat(?:ing|ions)|discussions? (?:with|over)|working on (?:a )?deal|close to (?:an? )?(?:deal|agreement)|closing in on|advanced negotiations)\b/i,
   },
   {
     stage: "rumour",
     pattern:
       // ⚠ 부정은 제외한다 — "I'm not interested in politics"(인터뷰)가 루머 딜이 됐다(운영)
-      /(?<!\b(?:not|never|no longer|isn['’]t|aren['’]t|wasn['’]t)\s+)\b(interested in|monitor(?:ing)?|eye(?:ing)?|target(?:ing)?|linked with|considering|exploring (?:a )?(?:deal|move)|keen on|weighing|scouting)\b/i,
+      /(?<!\b(?:not|never|no longer|isn['’]t|aren['’]t|wasn['’]t)\s+)\b(interested in|monitor(?:ing)?|eye(?:ing)?|target(?:ing)?|linked with|considering|exploring (?:a )?(?:deal|move)|keen on|weighing|scouting|track(?:ing|ed)|chas(?:e|es|ing)|monitored|keeping (?:tabs|an eye|a close eye) on|(?:showing|shown|expressed) interest in|subject of interest|on (?:[\w'’]+ )?radar|face competition from|keen to (?:sign|explore|bring|land|add|make)|wants? to sign|(?:not|never) given up on|refus(?:e|es|ing) to give up on|been offered to|(?:could|set to|will look to|likely to) leave)\b|\b(?:prepared|ready|plan(?:ning|s)?|set|poised) to (?:make|launch|table|submit) (?:an? )?(?:(?:€|£|\$)[\d.]+m )?(?:bid|offer|approach)\b/i,
   },
 ];
 
@@ -102,6 +102,9 @@ const RETROSPECTIVE = new RegExp(
     String.raw`\b(?:almost|nearly) (?:join(?:ed)?|sign(?:ed)?|moved|completed|became)\b`,
     String.raw`\bcame (?:so )?close to (?:join|sign|mov)`,
     String.raw`\bcould have (?:join|sign|mov|been)`,
+    // 지난 창의 결정 — "the Blues rejected a chance to sign him for £43m in the summer". 과거 시제 동사와
+    // 창을 가리키는 말이 한 절에 함께 있을 때만이다(시간 표현 단독은 위 주석대로 걸지 않는다)
+    String.raw`\b(?:rejected|turned down|snubbed|attracted|chose|opted|refused|blocked)\b[^,.;]{0,80}\b(?:in|during|over) the (?:summer|january)(?: (?:transfer )?window)?\b`,
   ].join("|"),
   "i",
 );
@@ -337,6 +340,12 @@ const PLAYER_ANCHORS = [
   { nameFirst: true, re: new RegExp(`${NAME}['’]s\\s+${alt(["signing", "move", "transfer", "arrival", "switch"])}\\b`, "gud") },
   // <name> to <구단> — "David Alaba to Udinese, here we go". ⚠ 뒤 구단이 사전에 있을 때만
   { nameFirst: true, re: new RegExp(`${NAME}\\s+${ci("to")}\\s+(?=[\\p{Lu}#])`, "gud"), requireClubAfter: true },
+  // 가십 칼럼의 소개 문형 — "Nacional's 18-year-old Paraguay Under-20 defender Mauro Coronel",
+  // "20-year-old Austrian international Paul Wanner". 나이 뒤 수식어(국적·연령대 대표) 셋까지를 건너 포지션 뒤 이름을 받는다
+  new RegExp(`\\b\\d{2}-year-old\\s+(?:[\\p{L}\\d'’-]+\\s+){0,3}?${alt([...POSITIONS, "international", "prospect", "talent", "wonderkid"])}\\s+${NAME}`, "gud"),
+  // 이름 뒤 나이 동격 — "Bournemouth's Alex Scott, 23, and …" · "Tomas Araujo, 24." 가십 칼럼이 선수를 소개하는 방식이다.
+  // ⚠ 나이는 15~45만 — 연도("Real Madrid, 1902")·스코어를 받지 않는다. 구단·일반 명사는 `cleanCandidate`와 검증 게이트가 막는다
+  new RegExp(`${NAME},\\s+(?:1[5-9]|[2-4]\\d)(?=[,.)]|\\s)`, "gud"),
 ];
 
 /**

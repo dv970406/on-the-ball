@@ -38,7 +38,7 @@ import { clampCp, createSyncClient, flag, guardTarget, loadEnv } from "./lib/syn
 import { runDerivation } from "./lib/transfer/derive-deals.mjs";
 import { SUMMARY_MODEL, runSummaries } from "./lib/transfer/summarize.mjs";
 import { VERDICT_MODEL, runVerdicts } from "./lib/transfer/verdict.mjs";
-import { reprocessAll, syncSources } from "./lib/transfer/pipeline.mjs";
+import { expandRoundups, reprocessAll, syncSources } from "./lib/transfer/pipeline.mjs";
 import { SOURCES, enabledSources, findSource, maxRunIntervalMinutes } from "./lib/transfer/registry.mjs";
 import { inspectTelegramChannel, verifyBlueskyAccount } from "./lib/transfer/sources.mjs";
 
@@ -141,6 +141,7 @@ if (reprocess) {
     console.error(`✗ ${e.message}`);
     process.exitCode = 1;
   }
+  await expand();
   // 추출 컬럼(players·stage)이 바뀌었으니 딜도 다시 만든다
   await derive({ dryRun: false });
   await summarize({ dryRun: false });
@@ -151,6 +152,7 @@ if (reprocess) {
 const t0 = Date.now();
 const results = await syncSources(supabase, targets);
 printResults(results);
+await expand();
 // ⚠ 소스가 실패해도 파생은 돈다 — 성공한 소스의 새 보도가 보드에 닿아야 한다. 종료 코드는 둘 중 하나라도 실패면 1이다
 await derive({ dryRun: false });
 await summarize({ dryRun: false });
@@ -158,6 +160,21 @@ console.log(`\n${((Date.now() - t0) / 1000).toFixed(1)}초 · 대상: ${url}`);
 process.exit(process.exitCode ?? 0);
 
 // ─────────────────────────────────────────────────────────────────────
+
+/**
+ * 가십 칼럼 → 항목 행(`pipeline.mjs`의 `expandRoundups`). 파생보다 먼저 돈다 — 새 항목이 같은 실행에서 딜에 닿게.
+ * ⚠ 칼럼을 받지 못한 것은 경고다(다음 실행이 다시 받는다). 저장 실패만 종료 코드 1이다.
+ */
+async function expand() {
+  try {
+    const r = await expandRoundups(supabase);
+    console.log(`\n가십 칼럼: 최근 ${r.columns}편 · 이번에 나눔 ${r.fetched}편 → 항목 ${r.items}건(새로 저장 ${r.inserted})${r.deferred ? ` · 다음 실행으로 ${r.deferred}편` : ""}`);
+    for (const u of r.failed) console.warn(`⚠ 가십 칼럼을 받지 못했습니다(다음 실행에 다시): ${u}`);
+  } catch (e) {
+    console.error(`✗ 가십 칼럼 나누기 실패: ${e.message}`);
+    process.exitCode = 1;
+  }
+}
 
 /** 딜 파생 — 결과 요약을 찍고, 행 단위 실패가 하나라도 있으면 종료 코드 1 */
 async function derive({ dryRun: summaryOnly }) {
