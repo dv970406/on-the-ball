@@ -159,7 +159,8 @@ async function derive({ dryRun: summaryOnly, rejudge: again = false }) {
       ? async (needs, names) => {
           try {
             // --rejudge는 사람이 한 번에 끝내려고 돌리는 명령이다 — 실행당 상한을 크게 연다(비용은 호출부가 안다)
-            return await runJudgements(supabase, needs, { apiKey, names, limit: again ? 1000 : undefined });
+            console.log(`\nLLM 판정 시작: ${needs.length}건(한 건 3초 안팎 — 끝날 때까지 결과는 찍히지 않는다)`);
+            return await runJudgements(supabase, needs, { apiKey, names, limit: again ? 1000 : undefined, log: console });
           } catch (e) {
             console.error(`✗ LLM 판정 실패: ${e instanceof Error ? e.message : String(e)}`);
             process.exitCode = 1;

@@ -352,10 +352,10 @@ export async function resolveClubs(m, book, { lookup = lookupKo, cacheRows = [],
  * @param {{ id: number, playerKey: string | null, player: string | null, body: string, clubs?: string[], source_id?: string, external_id?: string, url?: string, summary_ko?: string | null }[]} needs
  *   `playerKey`가 null이면 규칙이 선수를 못 뽑은 보도다 — 모델이 선수를 읽는다.
  * @param {{ apiKey?: string, names: ReturnType<import("./names-ko.mjs").createNameBook>, limit?: number, client?: object, fetchImpl?: typeof fetch, lookup?: typeof lookupKo, corrections?: object, nowMs?: number }} opts
- *   `client`·`fetchImpl`·`lookup`은 테스트용. `corrections`가 없으면 `glossary-ko.json`의 교정표를 쓴다.
+ *   `client`·`fetchImpl`·`lookup`은 테스트용. `corrections`가 없으면 `glossary-ko.json`의 교정표를 쓴다. `log`(Console)를 주면 20건마다 진행을 찍는다.
  * @returns 저장한 값(`updates` — 파생이 메모리의 행에 곧바로 입혀 다시 파생한다)과 집계. `namesWritten`이 0보다 크면 이름 사전을 다시 읽는다
  */
-export async function runJudgements(supabase, needs, { apiKey, names, limit = JUDGE_MAX_PER_RUN, client, fetchImpl = fetch, lookup = lookupKo, corrections, nowMs = Date.now() } = {}) {
+export async function runJudgements(supabase, needs, { apiKey, names, limit = JUDGE_MAX_PER_RUN, client, fetchImpl = fetch, lookup = lookupKo, corrections, nowMs = Date.now(), log = null } = {}) {
   const api = client ?? new Anthropic({ apiKey });
   const system = buildSystem();
   const fixes = corrections ?? loadGlossary().corrections;
@@ -373,7 +373,10 @@ export async function runJudgements(supabase, needs, { apiKey, names, limit = JU
   const koEntries = [];
 
   const batch = needs.slice(0, limit);
+  const started = Date.now();
   for (const [i, n] of batch.entries()) {
+    // 호출이 한 건에 3초 안팎이라 수십 건이면 몇 분 동안 아무 출력이 없다 — 20건마다 진행을 찍는다(호출부가 log를 줄 때만)
+    if (log && i > 0 && i % 20 === 0) log.log(`  LLM 판정 진행 ${i}/${batch.length} · ${((Date.now() - started) / 1000).toFixed(0)}초`);
     // 기사 본문 — 받지 못하면 저장된 글만으로 판정한다(실패가 아니다)
     let article = "";
     if (wantsArticle(n)) {
