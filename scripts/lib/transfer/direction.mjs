@@ -1,11 +1,11 @@
 /**
- * 이적 **방향** 판정 — 어느 구단에서 어느 구단으로 가는가.
+ * 이적 **방향**의 규칙 판정 — 문장 문형으로 소속·행선지 구단에 표를 준다.
  *
- * 딜 파생(`derive-deals.mjs`)이 쓴다. 순수 함수뿐이다.
+ * 딜 파생(`derive-deals.mjs`)이 쓴다. LLM 판정(`judge.mjs`)이 읽은 출발·행선지가 있으면 그 표가 더 크고,
+ * 여기 규칙은 LLM이 비운 칸을 채우거나 판정 전의 후보 구단을 모으는 데 쓰인다. 순수 함수뿐이다.
  *
  * ⚠ **틀린 값보다 빈 칸이 낫다.** 소속팀·행선지는 그 선수가 나오는 문장에서만 읽고, 사전 밖
- *   이름은 구단처럼 생겼을 때만 받는다 — "Verbal"·"Deal"·"Sources"·기자명·경기장·국가가
- *   행선지로 들어왔다(QA).
+ *   이름은 구단처럼 생겼을 때만 받는다("Verbal"·"Sources"·기자명·경기장·국가가 행선지로 들어온 적이 있다).
  */
 import { detectClubs } from "./clubs.mjs";
 
@@ -13,10 +13,8 @@ import { detectClubs } from "./clubs.mjs";
 const NAME = String.raw`((?:[A-Z][\p{L}\p{N}'.-]*)(?:\s(?:[A-Z][\p{L}\p{N}'.-]*|\d{2,4}))*)`;
 /** 이름 앞에 붙는 속보 표식 — 구단명의 일부가 아니다 */
 const TAG = String.raw`(?:(?:EXCL|EXCLUSIVE|BREAKING|OFFICIAL|Official|Understand|RT)\b[:,]?\s+)*`;
-/**
- * 사전 밖 이름은 **구단처럼 생겼을 때만** 받는다. 사전에 없는 구단은 대개 이런 표지를 달고 다닌다.
- */
-const CLUB_LIKE = /\b(?:FC|CF|SC|AC|AFC|CD|SV|FK|SK|IF|BK|SL|United|City|Town|Rovers|Athletic|Sporting|Club|Olympique|Dynamo|Dinamo)\b|\s\d{2,4}$/;
+/** 사전 밖 이름은 **구단처럼 생겼을 때만** 받는다 — 규칙 판정과 LLM 구단명 검증(`judge.mjs`)이 같은 기준을 쓴다 */
+export const CLUB_LIKE = /\b(?:FC|CF|SC|AC|AFC|CD|SV|FK|SK|IF|BK|SL|United|City|Town|Rovers|Athletic|Sporting|Club|Olympique|Dynamo|Dinamo)\b|\s\d{2,4}$/;
 
 function resolveClub(phrase, strong, player) {
   const raw = phrase.trim();

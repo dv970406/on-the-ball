@@ -5,13 +5,141 @@
     "없는 선수는 화면이 영문명으로 그린다 — 파생이 실패하지 않고 경고로 찍는다(엠블럼·팀 표기와 같은 운영 모델).",
     "형식은 scripts/test-transfer-extract.mjs가 검사한다."
   ],
-  "david alaba": { "ko": "다비드 알라바", "position": "CB/LB", "birthYear": 1992, "nationality": "AUT" },
-  "alexander isak": { "ko": "알렉산데르 이사크", "position": "ST", "birthYear": 1999, "nationality": "SWE" },
-  "michail antonio": { "ko": "미카일 안토니오", "position": "ST", "birthYear": 1990, "nationality": "JAM" },
-  "jadon sancho": { "ko": "제이든 산초", "position": "RW/LW", "birthYear": 2000, "nationality": "ENG" },
-  "anthony martial": { "ko": "앙토니 마르시알", "position": "ST", "birthYear": 1995, "nationality": "FRA" },
-  "philippe coutinho": { "ko": "필리페 쿠티뉴", "position": "AM", "birthYear": 1992, "nationality": "BRA" },
-  "tyrick mitchell": { "ko": "타이릭 미첼", "position": "LB", "birthYear": 1999, "nationality": "ENG" },
-  "morgan gibbswhite": { "ko": "모건 깁스화이트", "position": "AM", "birthYear": 2000, "nationality": "ENG" },
-  "bradley barcola": { "ko": "브래들리 바르콜라", "position": "LW/RW", "birthYear": 2002, "nationality": "FRA" }
+  "david alaba": {
+    "ko": "다비드 알라바",
+    "position": "CB/LB",
+    "birthYear": 1992,
+    "nationality": "AUT"
+  },
+  "alexander isak": {
+    "ko": "알렉산데르 이사크",
+    "position": "ST",
+    "birthYear": 1999,
+    "nationality": "SWE"
+  },
+  "michail antonio": {
+    "ko": "미카일 안토니오",
+    "position": "ST",
+    "birthYear": 1990,
+    "nationality": "JAM"
+  },
+  "jadon sancho": {
+    "ko": "제이든 산초",
+    "position": "RW/LW",
+    "birthYear": 2000,
+    "nationality": "ENG"
+  },
+  "anthony martial": {
+    "ko": "앙토니 마르시알",
+    "position": "ST",
+    "birthYear": 1995,
+    "nationality": "FRA"
+  },
+  "philippe coutinho": {
+    "ko": "필리페 쿠티뉴",
+    "position": "AM",
+    "birthYear": 1992,
+    "nationality": "BRA"
+  },
+  "tyrick mitchell": {
+    "ko": "타이릭 미첼",
+    "position": "LB",
+    "birthYear": 1999,
+    "nationality": "ENG"
+  },
+  "morgan gibbswhite": {
+    "ko": "모건 깁스화이트",
+    "position": "AM",
+    "birthYear": 2000,
+    "nationality": "ENG"
+  },
+  "bradley barcola": {
+    "ko": "브래들리 바르콜라",
+    "position": "LW/RW",
+    "birthYear": 2002,
+    "nationality": "FRA"
+  },
+  "folarin balogun": {
+    "ko": "폴라린 발로군",
+    "position": "ST",
+    "birthYear": 2001,
+    "nationality": "USA"
+  },
+  "cody gakpo": {
+    "ko": "코디 가크포",
+    "position": "LW/ST",
+    "birthYear": 1999,
+    "nationality": "NED"
+  },
+  "johan manzambi": {
+    "ko": "요한 만잠비",
+    "position": "CM",
+    "birthYear": 2005,
+    "nationality": "SUI"
+  },
+  "gjivai zechiel": {
+    "ko": "기바이 제키엘",
+    "position": "CM",
+    "birthYear": 2006,
+    "nationality": "NED"
+  },
+  "estevao": {
+    "ko": "에스테방",
+    "position": "RW",
+    "birthYear": 2007,
+    "nationality": "BRA"
+  },
+  "estevao willian": {
+    "ko": "에스테방 윌리앙",
+    "position": "RW",
+    "birthYear": 2007,
+    "nationality": "BRA"
+  },
+  "neto": {
+    "ko": "네투",
+    "position": "GK",
+    "birthYear": 1989,
+    "nationality": "BRA"
+  },
+  "endrick": {
+    "ko": "엔드릭",
+    "position": "ST",
+    "birthYear": 2006,
+    "nationality": "BRA"
+  },
+  "inacio": {
+    "ko": "곤살루 이나시우",
+    "position": "CB",
+    "birthYear": 2001,
+    "nationality": "POR"
+  },
+  "gilberto mora": {
+    "ko": "힐베르토 모라",
+    "position": "AM",
+    "birthYear": 2008,
+    "nationality": "MEX"
+  },
+  "mora": {
+    "ko": "힐베르토 모라",
+    "position": "AM",
+    "birthYear": 2008,
+    "nationality": "MEX"
+  },
+  "mauro coronel": {
+    "ko": "마우로 코로넬",
+    "position": "CB",
+    "nationality": "PAR"
+  },
+  "richarlison": {
+    "ko": "히샬리송",
+    "position": "ST",
+    "birthYear": 1997,
+    "nationality": "BRA"
+  },
+  "alexanderarnold": {
+    "ko": "트렌트 알렉산더아널드",
+    "position": "RB",
+    "birthYear": 1998,
+    "nationality": "ENG"
+  }
 }

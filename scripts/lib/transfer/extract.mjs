@@ -2,10 +2,10 @@ import { readFileSync } from "node:fs";
 import { detectClubs, isClubName } from "./clubs.mjs";
 
 /**
- * 규칙 기반 구조화 추출.
+ * 규칙 기반 구조화 추출 — 단계·선수·구단·이적료·주급·옵션·관련성.
  *
- * LLM 을 붙이면 정확도가 올라가지만, 우선 규칙으로 시작한다.
- * `extractTransfer`의 시그니처(text → 결과)를 지키는 한 나중에 갈아끼울 수 있다.
+ * 추출은 규칙이 한다(LLM은 그 뒤에서 거부권·방향·요약만 — `judge.mjs`). 딜 파생이 이 값 위에 서 있어,
+ * 추출이 틀리면 없는 이적이 보드에 생긴다 → **정밀도를 택하고 재현율을 포기한다**(틀린 값보다 빈 값).
  * 규칙을 고쳤으면 `node scripts/test-transfer-extract.mjs`로 회귀를 확인하고
  * `node scripts/sync-transfer-news.mjs --reprocess`로 저장분을 다시 추출한다.
  */
@@ -23,7 +23,14 @@ const STAGE_RULES = [
   {
     stage: "collapsed",
     pattern:
-      /\b(collapsed|called off|broken down|rebuffed|(?<!not )(?<!never )(?:turned down|reject(?:s|ed)?)|will not negotiate|no longer (?:interested|pursuing)|will not pursue|rul(?:e|es|ed|ing) out (?:(?:a )?move for|(?:re-)?signing|the possibility of (?:re-)?signing)|(?:no plans|no intention|not prepared|not willing|refus(?:e|es|ing)) to (?:sell|let \w+ leave)|no intention of selling|not going to join|off the table)\b|(?<!never )(?<!not )\bin (?:serious )?doubt\b/i,
+      /\b(collapsed|called off|broken down|rebuffed|(?<!not )(?<!never )(?:turned down|reject(?:s|ed)?)|off the table)\b|(?<!never )(?<!not )\bin (?:serious )?doubt\b/i,
+  },
+  // 부인 — 루머·관심에 대한 "아니다"(매각 거부·관심 없음·이적 생각 없음·기자의 부인). 진행 중이던 딜이 깨진 결렬과 다르다.
+  // 딜의 최종 단계는 파생이 이력으로 가른다(부인 보도 앞에 협상 이상이 있었으면 결렬) — 여기서는 문형만 본다
+  {
+    stage: "denied",
+    pattern:
+      /\b(?:will not negotiate|no longer (?:interested|pursuing)|(?:will not|won['’]t|unlikely to) pursue|rul(?:e|es|ed|ing) out (?:(?:a )?move for|(?:re-)?signing|the possibility of (?:re-)?signing|(?:a )?(?:january|summer) (?:move|exit|departure))|(?:no plans|no intention|not prepared|not willing|refus(?:e|es|ing)) to (?:sell|let \w+ leave)|no intention of selling|not going to join|not (?:considering|contemplating|planning) (?:a |any )?(?:move|departure|exit|transfer)|(?:denie[sd]|dismiss(?:es|ed)|rubbish(?:es|ed)|play(?:s|ed) down|pour(?:s|ed) cold water on) (?:the |any |recent |those |these )?(?:rumours?|reports?|speculation|links?|talk|suggestions?|claims?|interest)|not for sale)\b/i,
   },
   // 로마노 확정 시그널
   // ⚠ "아직 아니다"를 말하는 문장을 배제한다. 로마노는 합의 단계에서 "Formal steps needed
@@ -53,6 +60,12 @@ const STAGE_RULES = [
     stage: "official",
     pattern:
       /^(?:RT @\w+:\s*)?[^\p{L}\p{N}]*official\b\s*[,:!.—–-](?![\s\S]*\b(?:new (?:deal|contract)|contract extension|extends?|extension|renew(?:s|ed|al)?|(?:first )?professional (?:contract|deal)|first senior (?:deal|contract)|postponed|sacked|appoint(?:s|ed|ment)?|not for sale|full[- ]time)\b)(?=[\s\S]*\b(?:joins?|joined|signs?|signed|signing|completes?|completed|move|transfer|loan|arrives?)\b)/iu,
+  },
+  // "<구단> sign <선수> from <구단>" — 완료를 말하는 영입 문장. 의지·전망("want to sign", "set to sign")과 재계약("sign a new deal")은 뺀다
+  {
+    stage: "official",
+    pattern:
+      /(?<!\b(?:to|will|could|would|might|may|can|should|must|and)\s)\b(?:have\s+|has\s+)?sign(?:s|ed)?\s+(?!for\b|a\s+new\b|new\b|an?\s+(?:one|two|three|four|five)[\s-])(?:[^.!?]{0,60}?\s)?from\s+\p{Lu}/u,
   },
   { stage: "medical", pattern: /\bmedical\b/i },
   // 개인 조건. "on personal terms" 처럼 전치사가 붙는 형태까지 포함한다.
@@ -587,6 +600,16 @@ function cleanCandidate(raw, text, start, nameFirst = false) {
   return name;
 }
 
+/**
+ * 사람 이름처럼 생긴 문자열인가 — 판정자(LLM)가 읊은 선수 이름을 받을 때 쓴다. 규칙 추출과 같은 어휘 판정(`cleanCandidate`)을
+ * 지나 국적·역할어·구단·매체·소유격 덩어리("Argentine international", "Left-Back Target")를 거른다. 통과하면 다듬은 이름, 아니면 null.
+ * ⚠ 한 토큰 이름은 사람 사전에 있을 때만 받는다(규칙과 같다).
+ */
+export function personName(raw) {
+  if (typeof raw !== "string" || !raw.trim() || /[-‑]$/u.test(raw.trim())) return null;
+  return cleanCandidate(raw.trim(), raw.trim(), 0, false);
+}
+
 function detectPlayers(text, clubs) {
   const found = new Set();
   for (const anchor of PLAYER_ANCHORS) {
@@ -631,11 +654,7 @@ function scoreRelevance(text, stage, clubs, players) {
   return Math.max(0, Math.min(1, s));
 }
 
-/**
- * 게시물 하나를 구조화한다.
- * ⚠ 크롤러는 `Extractor` 인터페이스로 LLM 추출기와 갈아끼울 자리를 두었다 — 그 자리는
- *   이 함수의 시그니처(text → 결과)다.
- */
+/** 게시물 하나를 구조화한다 — 순수 함수(같은 글이면 같은 결과). 파생의 추출 메모가 이 성질에 기댄다 */
 export function extractTransfer(text) {
   const stage = detectStage(text);
   const clubs = detectClubs(text);

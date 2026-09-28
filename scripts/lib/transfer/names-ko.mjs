@@ -1,6 +1,6 @@
 /**
  * 이름 사전 — 선수·구단의 한국어 표기를 **한 곳에서** 정한다. 딜 파생(`derive-deals.mjs` — 화면의 선수명·구단명)과
- * 한국어 요약(`summarize.mjs` — LLM에 넘기는 표기)이 같은 사전을 본다. 둘이 갈리면 화면의 이름과 요약문의
+ * LLM 판정·요약(`judge.mjs` — 모델에 넘기는 표기)이 같은 사전을 본다. 둘이 갈리면 화면의 이름과 요약문의
  * 이름이 다르게 나온다.
  *
  * 우선순위(앞이 이긴다):
@@ -49,20 +49,27 @@ export function shortClubName(name) {
   return short || name;
 }
 
+/** LLM 음역을 캐시에 쓸 때의 `checked_at` — 위키데이터 확인 전이라는 뜻(다음 실행이 곧 찾는다) */
+export const NEVER_CHECKED = "1970-01-01T00:00:00.000Z";
+
 /**
  * 이름 사전 — 순수한 조회기. 캐시 행을 받아 만든다(DB 없이 테스트가 돈다).
- * @param {{ players?: object, clubs?: object, cache?: { kind: string, key: string, name_ko: string | null, wikidata_id?: string | null, checked_at: string }[] }} src
+ * @param {{ players?: object, clubs?: object, cache?: { kind: string, key: string, name_ko: string | null, wikidata_id?: string | null, source?: string, checked_at: string }[] }} src
  */
 export function createNameBook({ players = {}, clubs = {}, cache = [] } = {}) {
   const cached = new Map(cache.map((r) => [`${r.kind}:${r.key}`, r]));
   return {
-    /** 선수 한국어 표기 — 키는 `normalizePlayer` 결과 */
+    /** 선수 한국어 표기 — 키는 `normalizePlayer` 결과. 사람 사전 → 캐시(위키데이터 또는 LLM 음역) */
     playerKo: (key) => players[key]?.ko ?? cached.get(`player:${key}`)?.name_ko ?? null,
     /**
-     * 확인된 선수인가 — 사람 사전에 있거나, 위키데이터에서 이름이 통째로 같은 현역(감독 아닌) 축구 선수로 찾았다
-     * (캐시에 `wikidata_id`가 있다 — 한국어 표기는 없을 수 있다). 딜 파생의 검증 게이트가 이것만 본다.
+     * 확인된 선수인가 — 사람 사전에 있거나, 위키데이터에서 현역(감독 아닌) 축구 선수로 찾았다(캐시에 `wikidata_id`가 있다).
+     * LLM 음역만 있는 행은 확인이 아니다. 딜 파생의 검증 관문이 이것만 본다.
      */
     isVerifiedPlayer: (key) => Boolean(players[key]) || Boolean(cached.get(`player:${key}`)?.wikidata_id),
+    /** 사전 밖 구단 이름이 위키데이터에서 축구 클럽으로 확인됐는가 — 판정자가 읊은 구단명을 받을지 가른다 */
+    isVerifiedClub: (canonical) => Boolean(cached.get(`club:${canonical}`)?.wikidata_id),
+    /** 캐시 행 그대로(있으면) — 캐시에 덧쓸 때 기존 값을 보존하는 데 쓴다 */
+    entry: (kind, key) => cached.get(`${kind}:${key}`) ?? null,
     /** 사람이 적은 선수 정보(포지션·생년·국적) — 자동 캐시에는 없다 */
     playerInfo: (key) => players[key] ?? null,
     /** 구단 표기 — `{ name, short }`. 프리셋 구단은 프리셋, 아니면 사람 → 캐시. 없으면 `null`(영문 그대로) */
@@ -72,13 +79,13 @@ export function createNameBook({ players = {}, clubs = {}, cache = [] } = {}) {
       const ko = clubs[canonical] ?? cached.get(`club:${canonical}`)?.name_ko ?? null;
       return ko ? { name: ko, short: shortClubName(ko) } : null;
     },
-    /** 이 이름을 지금 찾아야 하는가 — 캐시에 없거나, 찾지 못한 채 `RECHECK_MS`가 지났다 */
+    /** 이 이름을 지금 위키데이터에서 찾아야 하는가 — 캐시에 없거나, 항목을 찾지 못한 채 `RECHECK_MS`가 지났다(LLM 음역만 있는 행 포함) */
     needsLookup: (kind, key, nowMs) => {
       if (kind === "player" && players[key]?.ko) return false;
       if (kind === "club" && (clubDisplay(key).league || clubs[key])) return false;
       const row = cached.get(`${kind}:${key}`);
       if (!row) return true;
-      return row.name_ko === null && nowMs - Date.parse(row.checked_at) >= RECHECK_MS;
+      return !row.wikidata_id && nowMs - Date.parse(row.checked_at) >= RECHECK_MS;
     },
   };
 }
@@ -88,13 +95,32 @@ export async function loadNameBook(supabase) {
   const cache = [];
   let from = 0;
   for (;;) {
-    const { data, error } = await supabase.from(NAME_TABLE).select("kind, key, name_ko, wikidata_id, checked_at").range(from, from + 999);
+    const { data, error } = await supabase.from(NAME_TABLE).select("kind, key, name_en, name_ko, wikidata_id, source, checked_at").range(from, from + 999);
     if (error) throw new Error(`이름 사전 조회 실패: ${error.message}`);
     cache.push(...data);
     if (data.length < 1000) break;
     from += 1000;
   }
   return createNameBook({ players: loadPlayerDictionary(), clubs: loadGlossary().clubs, cache });
+}
+
+/**
+ * 판정자(LLM)의 음역을 캐시에 쓴다 — 위키데이터에 표기가 없는 선수의 임시 표기다(`source = 'llm'`).
+ * 사람 사전·위키데이터 표기가 있는 이름은 쓰지 않는다. 기존 행이 있으면 확인 시각·항목 id는 그대로 두고 표기만 채운다.
+ * @param {{ key: string, name: string, ko: string }[]} entries
+ * @returns {number} 쓴 행 수
+ */
+export async function cacheLlmNames(supabase, entries, book) {
+  const rows = [];
+  for (const e of entries) {
+    if (book.playerKo(e.key)) continue;
+    const prev = book.entry("player", e.key);
+    rows.push({ kind: "player", key: e.key, name_en: e.name.slice(0, 120), name_ko: e.ko, wikidata_id: prev?.wikidata_id ?? null, source: "llm", checked_at: prev?.checked_at ?? NEVER_CHECKED });
+  }
+  if (!rows.length) return 0;
+  const { error } = await supabase.from(NAME_TABLE).upsert(rows, { onConflict: "kind,key" });
+  if (error) throw new Error(`LLM 음역 저장 실패: ${error.message}`);
+  return rows.length;
 }
 
 /**
@@ -115,10 +141,12 @@ export function missingNames(deals, book, nowMs) {
 
 /**
  * 이름들을 위키데이터에서 찾아 캐시에 쓴다. 찾지 못한 것도 쓴다(`name_ko` null — 매시간 다시 찾지 않게).
+ * LLM 음역만 있던 행은 위키데이터 표기가 있으면 그것으로 덮고, 없으면 음역을 남긴다(`source`는 그대로 llm).
  * ⚠ 네트워크·HTTP 오류가 난 이름은 **쓰지 않는다** — 다음 실행이 다시 찾는다. 실패는 경고일 뿐이다
  *   (사전이 비어도 화면은 영문으로 그린다 — 파생·수집을 실패시킬 이유가 없다).
+ * @param {{ fetchImpl?: typeof fetch, limit?: number, book?: ReturnType<typeof createNameBook> }} opts `book`이 있으면 기존 행의 음역을 보존한다
  */
-export async function lookupAndCache(supabase, names, { fetchImpl = fetch, limit = LOOKUP_MAX_PER_RUN } = {}) {
+export async function lookupAndCache(supabase, names, { fetchImpl = fetch, limit = LOOKUP_MAX_PER_RUN, book } = {}) {
   // verified: 항목을 찾았다(한국어 표기가 없어도) — 검증 게이트가 열리므로 다시 파생할 이유가 된다
   const out = { tried: 0, found: 0, notFound: 0, verified: 0, failed: 0, warnings: [] };
   const rows = [];
@@ -126,7 +154,9 @@ export async function lookupAndCache(supabase, names, { fetchImpl = fetch, limit
     out.tried += 1;
     try {
       const r = await lookupKo(n.name, n.kind, fetchImpl);
-      rows.push({ kind: n.kind, key: n.key, name_en: n.name.slice(0, 120), name_ko: r.nameKo, wikidata_id: r.wikidataId, checked_at: new Date().toISOString() });
+      const prev = book?.entry(n.kind, n.key);
+      const keepLlm = !r.nameKo && prev?.source === "llm" && prev.name_ko;
+      rows.push({ kind: n.kind, key: n.key, name_en: n.name.slice(0, 120), name_ko: r.nameKo ?? (keepLlm ? prev.name_ko : null), wikidata_id: r.wikidataId, source: keepLlm ? "llm" : "wikidata", checked_at: new Date().toISOString() });
       out[r.nameKo ? "found" : "notFound"] += 1;
       if (r.wikidataId) out.verified += 1;
     } catch (e) {

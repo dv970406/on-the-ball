@@ -5,8 +5,14 @@
  * 글의 소속팀과 보드의 출발 구단이 갈린다.
  */
 
-/** 진전 순서 — 무산은 여기 없다(따로 다룬다) */
+/** 진전 순서 — 죽은 단계(결렬·부인)는 여기 없다(따로 다룬다) */
 export const RANK = ["rumour", "talks", "offer", "agreement", "personal_terms", "medical", "here_we_go", "official"];
+/**
+ * 죽은 단계 — `collapsed`(결렬: 협상·제안·합의까지 갔던 딜이 깨졌다) · `denied`(부인: 관심·연결 루머를 구단·선수·기자가 부인했다).
+ * 보도 한 건의 단계는 문형이 정하지만, 딜의 최종 단계는 파생이 이력으로 정한다(`derive-deals.mjs`의 `resolveStage`).
+ */
+export const DEAD = ["collapsed", "denied"];
+export const isDead = (stage) => DEAD.includes(stage);
 
 /** 여러 선수를 한데 모은 가십 칼럼 — 한 선수의 이야기로 읽으면 남의 구단·금액이 섞인다 */
 /**
@@ -26,7 +32,13 @@ export const isRoundupItem = (r) => typeof r.external_id === "string" && r.exter
  */
 export const isRoundup = (r) =>
   !isRoundupItem(r) &&
-  (r.source_id === "rss:bbc-gossip" || /\bgossip\b/i.test(r.body.split("\n")[0]) || (r.source_id === "rss:sky-transfers" && /^Papers:/u.test(r.body)));
+  (r.source_id === "rss:bbc-gossip" || /\bgossip\b/i.test(r.body.split("\n")[0]) || (r.source_id === "rss:sky-transfers" && /^Papers:/u.test(r.body)) || REVIEW_LIST.test(r.body.split("\n")[0]));
+
+/**
+ * 지난 창의 영입을 정리·평가하는 목록 기사("Ten of the best-value deals from this summer's window") — 여러 선수의 끝난 이적을
+ * 한 글에 모은 회고라 가십 모음처럼 딜 후보가 아니다. 첫 줄(제목)의 "숫자·best·worst·top + signings/deals/transfers" 문형으로 본다.
+ */
+const REVIEW_LIST = /^(?:the\s+)?(?:\d+|ten|five|six|seven|eight|nine|twelve|top|best|worst)\b[^\n]{0,60}\b(?:signings|deals|transfers|bargains)\b/iu;
 
 /** 인용·판정에 쓸 본문 — 링크·트윗 서명·Google News의 제목 반복을 걷어낸다 */
 export function cleanBody(r) {

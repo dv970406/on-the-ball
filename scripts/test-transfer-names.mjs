@@ -46,7 +46,10 @@ const JP_HITS = toHits([
   { id: "Q96384789", label: "João Pedro", match: { type: "label", text: "João Pedro" } },
 ]);
 check("선수 — 별칭 앞부분만 맞는 다른 선수(칸셀루)를 고르지 않는다", eq(pickEntity(JP_HITS, JP, "player", "Joao Pedro"), { wikidataId: "Q64005114", nameKo: "주앙 페드루" }));
-check("선수 — 이름이 통째로 같은 후보가 없으면 고르지 않는다", eq(pickEntity([hit("Q6298063", "João Cancelo", "Joao Pedro Cavaco Cancelo")], JP, "player", "Joao Pedro"), { wikidataId: null, nameKo: null }));
+check("선수 — 별칭만 앞부분이 같은 후보는 하나뿐이어도 고르지 않는다(칸셀루)", eq(pickEntity([hit("Q6298063", "João Cancelo", "Joao Pedro Cavaco Cancelo")], JP, "player", "Joao Pedro"), { wikidataId: null, nameKo: null }));
+check("선수 — 레이블이 찾는 이름으로 시작하는 후보가 하나뿐이면 받는다(Valentin Atangana ↔ Valentin Atangana Edoa)", eq(pickEntity([hit("Q6298063", "Valentin Atangana Edoa")], JP, "player", "Valentin Atangana"), { wikidataId: "Q6298063", nameKo: "주앙 칸셀루" }));
+check("선수 — 찾는 이름이 레이블로 시작하고 별칭이 찾는 이름으로 시작하면 받는다(Estevao Willian ↔ Estevão + 긴 별칭)", eq(pickEntity([hit("Q6298063", "Estevão", "Estêvão Willian Almeida de Oliveira Gonçalves")], JP, "player", "Estevao Willian"), { wikidataId: "Q6298063", nameKo: "주앙 칸셀루" }));
+check("선수 — 앞부분 일치 후보가 둘이면 비운다", eq(pickEntity([hit("Q6298063", "Valentin Atangana Edoa"), hit("Q64005114", "Valentin Atangana Nkosi")], JP, "player", "Valentin Atangana"), { wikidataId: null, nameKo: null }));
 check("선수 — 별칭이 통째로 같으면 받는다", eq(pickEntity([hit("Q6298063", "João Cancelo", "Joao Cancelo")], JP, "player", "Joao Cancelo"), { wikidataId: "Q6298063", nameKo: "주앙 칸셀루" }));
 check(
   "선수 — 같은 이름의 선수가 서로 다른 한국어 표기로 여럿이면 고르지 않는다(틀린 칸보다 빈 칸)",

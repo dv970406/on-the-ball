@@ -7,6 +7,7 @@ import {
   type TransferDeal,
   type TransferReport,
   TransferCrest,
+  routeLabels,
 } from "@/entities/transfer";
 import { WatchToggle } from "@/features/watch-transfer";
 import { ROUTES } from "@/shared/config";
@@ -52,17 +53,19 @@ interface TransferDetailViewProps {
 }
 
 /** 방향을 못 읽은 구단의 표기 — 경로 카드에서는 이름 자리를 `—`로 비운다 */
-const UNKNOWN_CLUB = "—";
 
 /** 경로 카드의 한 칸 — `FROM`/`TO` 라벨 · 엠블럼 24 + 정식명 · 리그 */
 function RouteCell({
   label,
   club,
+  text,
   className,
 }: {
   label: string;
   // ⚠ `TransferClub`은 배럴에 없다(슬라이스 밖 소비자가 없어 올리지 않았다) — 딜의 필드 타입으로 받는다
   club: TransferDeal["fromClub"];
+  /** 칸에 쓸 글자 — 구단이 없을 때의 문구(`FA`·`미확인`·`미정`)까지 `routeLabels`가 정한다 */
+  text: string;
   className?: string;
 }) {
   return (
@@ -73,7 +76,7 @@ function RouteCell({
       <div className="mt-2 flex items-center gap-2 text-[14px] font-medium leading-[1.3] tracking-[-0.3px] text-ink">
         <TransferCrest club={club} size={24} className="shrink-0" />
         {/* 경로 카드만 정식명이다 — 목록 행·칩은 약칭(`TransferClub` 주석) */}
-        <span className="truncate">{club?.name ?? UNKNOWN_CLUB}</span>
+        <span className="truncate">{text}</span>
       </div>
       {/* 5대 리그 밖은 `null`이라 줄을 비운다 — 모르는 리그명을 지어내지 않는다 */}
       {club?.league && <div className="mt-1 text-[11px] text-ink-mute">{club.league}</div>}
@@ -263,14 +266,14 @@ export function TransferDetailView({
               aria-label="이적 경로"
               className="mt-3 grid grid-cols-[1fr_32px_1fr] overflow-hidden rounded-lg border border-hairline"
             >
-              <RouteCell label="FROM" club={deal.fromClub} />
+              <RouteCell label="FROM" club={deal.fromClub} text={routeLabels(deal, { full: true }).from} />
               <div
                 aria-hidden
                 className="flex items-center justify-center border-x border-hairline text-ink"
               >
                 <Icon as={ArrowRight} size={16} />
               </div>
-              <RouteCell label="TO" club={deal.toClub} className="bg-canvas-soft" />
+              <RouteCell label="TO" club={deal.toClub} text={routeLabels(deal, { full: true }).to} className="bg-canvas-soft" />
             </section>
 
             <FeeCard deal={deal} />

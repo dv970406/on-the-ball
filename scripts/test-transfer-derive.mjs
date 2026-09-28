@@ -14,7 +14,7 @@ const WINDOWS = [
   { key: "2026-summer", label: "2026 여름", opensAt: "2026-06-01T00:00:00Z", closesAt: "2026-09-01T18:00:00Z" },
   { key: "2027-winter", label: "2027 겨울", opensAt: "2027-01-01T00:00:00Z", closesAt: "2027-02-01T19:00:00Z" },
 ];
-const DICT = { "john doe": { ko: "존 도", position: "ST", birthYear: 2001, nationality: "ENG" } };
+const DICT = { "john doe": { ko: "존 도", position: "ST", birthYear: 2001, nationality: "ENG" }, doe: { ko: "도" } };
 
 let n = 0;
 const row = (body, extra = {}) => ({
@@ -60,8 +60,8 @@ const CASES = [
     want: true,
   },
   {
-    name: "이적료가 비었다고 FA가 아니다 — 금액이 보도되지 않은 루머",
-    rows: [row("Chelsea interested in John Doe.", { stage: "rumour" })],
+    name: "이적료가 비었다고 FA가 아니다 — 금액이 보도되지 않은 루머(행선지는 LLM이 읽었다)",
+    rows: [row("Chelsea interested in John Doe.", { stage: "rumour", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_to: "Chelsea" })],
     expect: (r) => pick(r.deals[0], ["is_free_agent", "fee_amount"]),
     want: { is_free_agent: false, fee_amount: null },
   },
@@ -100,6 +100,51 @@ const CASES = [
     ],
     expect: (r) => r.deals[0].stage,
     want: "agreement",
+  },
+  {
+    name: "부인 — 루머만 있다가 부인 보도가 오면 부인(denied)",
+    rows: [
+      row("Chelsea agree deal for John Doe.", { stage: "rumour" }),
+      row("Chelsea have no plans to sell John Doe despite the links.", { stage: "denied" }),
+    ],
+    expect: (r) => r.deals[0].stage,
+    want: "denied",
+  },
+  {
+    name: "결렬 — 협상 이상까지 갔다가 부인 문형이 오면 결렬(이력이 문형을 이긴다)",
+    rows: [
+      row("Chelsea agree deal for John Doe.", { stage: "talks" }),
+      row("Chelsea will not pursue John Doe any further.", { stage: "denied" }),
+    ],
+    expect: (r) => r.deals[0].stage,
+    want: "collapsed",
+  },
+  {
+    name: "부인 보도 하나뿐이면 부인, 결렬 보도 하나뿐이면 결렬",
+    rows: [row("Chelsea agree deal for John Doe. Chelsea have no intention of selling.", { stage: "denied" })],
+    expect: (r) => [r.deals[0].stage, derive([row("John Doe deal with Chelsea has collapsed. Chelsea agree deal for John Doe.", { stage: "collapsed" })]).deals[0].stage],
+    want: ["denied", "collapsed"],
+  },
+  {
+    name: "루머 뒤 결렬 문형(collapsed)은 결렬로 남는다 — 우리가 못 본 협상이 있었다는 말이다",
+    rows: [
+      row("Chelsea agree deal for John Doe.", { stage: "rumour" }),
+      row("John Doe deal with Chelsea has collapsed.", { stage: "collapsed" }),
+    ],
+    expect: (r) => r.deals[0].stage,
+    want: "collapsed",
+  },
+  {
+    name: "규칙이 결렬로 읽은 완료 문장(rejected offers … to join)은 LLM 단계가 official이면 오피셜이다",
+    rows: [row("John Doe rejected offers from Italy and Germany to join Chelsea for £60m.", { stage: "collapsed", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_stage: "official", verdict_to: "Chelsea", summary_ko: "요약" })],
+    expect: (r) => r.deals[0].stage,
+    want: "official",
+  },
+  {
+    name: "규칙의 결렬은 LLM 단계가 협상이라고 해도 그대로다(완료·확정만 뒤집는다)",
+    rows: [row("John Doe deal with Chelsea has collapsed. Chelsea agree deal for John Doe.", { stage: "collapsed", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_stage: "talks", summary_ko: "요약" })],
+    expect: (r) => r.deals[0].stage,
+    want: "collapsed",
   },
   {
     name: "공식 발표는 그 뒤 어떤 보도도 뒤집지 않는다",
@@ -162,10 +207,28 @@ const CASES = [
     want: { deals: 1, player: "John Doe", stage: "here_we_go", report_count: 2, key: true },
   },
   {
+    name: "사람 사전의 한 토큰 이름은 첫 토큰이 같은 두 토큰 이름과도 합친다(Doe ↔ Doe Willian — 브라질식 한 이름)",
+    rows: [
+      row("Chelsea agree deal for Doe Willian.", { stage: "agreement", players: ["Doe Willian"] }),
+      row("Doe joins Chelsea, here we go.", { stage: "here_we_go", players: ["Doe"] }),
+    ],
+    expect: (r) => ({ deals: r.deals.length, player: r.deals[0]?.player, reports: r.deals[0]?.report_count }),
+    want: { deals: 1, player: "Doe Willian", reports: 2 },
+  },
+  {
+    name: "사전에 없는 한 토큰 이름은 첫 토큰이 같아도 합치지 않는다",
+    rows: [
+      row("Chelsea agree deal for Roe Willian.", { stage: "agreement", players: ["Roe Willian"] }),
+      row("Roe joins Chelsea, here we go.", { stage: "here_we_go", players: ["Roe"] }),
+    ],
+    expect: (r) => r.deals.map((d) => d.player).sort(),
+    want: ["Roe", "Roe Willian"],
+  },
+  {
     name: "두 토큰 이름끼리는 합치지 않는다(동성이인) — 그리고 성이 같은 두 토큰 이름이 여럿이면 한 토큰 이름도 합치지 않는다",
     rows: [
-      row("Chelsea in talks for John Doe.", { stage: "talks", players: ["John Doe"] }),
-      row("Arsenal in talks for Jane Doe.", { stage: "talks", players: ["Jane Doe"] }),
+      row("Chelsea agree deal for John Doe.", { stage: "talks", players: ["John Doe"] }),
+      row("Arsenal agree deal for Jane Doe.", { stage: "talks", players: ["Jane Doe"] }),
       row("Doe joins Chelsea.", { stage: "official", players: ["Doe"] }),
     ],
     expect: (r) => r.deals.map((d) => d.player).sort(),
@@ -193,8 +256,8 @@ const CASES = [
   {
     name: "범위 시작(마지막 개장 창 opensAt − 14일) 이전 보도는 후보가 아니다",
     rows: [
-      row("Chelsea eye John Doe.", { stage: "rumour", published_at: "2026-05-17T23:59:59Z" }),
-      row("Chelsea eye John Doe again.", { stage: "rumour", published_at: "2026-05-18T00:00:00Z" }),
+      row("Chelsea agree deal for John Doe.", { stage: "rumour", published_at: "2026-05-17T23:59:59Z" }),
+      row("Chelsea agree deal for John Doe again.", { stage: "rumour", published_at: "2026-05-18T00:00:00Z" }),
     ],
     expect: (r) => ({ deals: r.deals.length, reports: r.deals[0]?.report_count, skipped: r.skipped["범위 밖"], start: new Date(r.startMs).toISOString() }),
     want: { deals: 1, reports: 1, skipped: 1, start: "2026-05-18T00:00:00.000Z" },
@@ -222,10 +285,52 @@ const CASES = [
     want: { from_club_code: "real-madrid", to_club_code: "udinese" },
   },
   {
-    name: "소속·행선지를 못 읽으면 null(틀린 칸보다 빈 칸) — 딜은 남는다",
-    rows: [row("John Doe agrees terms. Deal done.", { stage: "agreement" })],
+    name: "구단을 하나도 못 읽으면 딜을 만들지 않는다 — 어디서 어디로 가는지 모르는 이적설은 보드에 싣지 않는다",
+    rows: [row("John Doe agrees terms. Deal done. Chelsea watching.", { stage: "agreement" })],
+    expect: (r) => ({ deals: r.deals.length, skipped: r.skipped["구단 미확인"] }),
+    want: { deals: 0, skipped: 1 },
+  },
+  {
+    name: "LLM이 읽은 출발·행선지(verdict_from·verdict_to)로 방향을 채운다 — 규칙이 못 읽은 문장",
+    rows: [row("John Doe agrees terms with the club. Deal done.", { stage: "agreement", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_from: "Benfica", verdict_to: "Chelsea" })],
     expect: (r) => pick(r.deals[0], ["from_club_code", "to_club_code"]),
-    want: { from_club_code: null, to_club_code: null },
+    want: { from_club_code: "benfica", to_club_code: "chelsea" },
+  },
+  {
+    name: "LLM의 표가 규칙의 확실한 문형보다 크다 — 같은 행에서 규칙은 Benfica, LLM은 Porto",
+    rows: [row("Chelsea in talks for John Doe from Benfica.", { stage: "talks", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_from: "Porto", verdict_to: "Chelsea" })],
+    expect: (r) => pick(r.deals[0], ["from_club_code", "to_club_code"]),
+    want: { from_club_code: "porto", to_club_code: "chelsea" },
+  },
+  {
+    name: "다른 선수에 대한 LLM 판정의 구단은 세지 않는다 — 구단이 하나도 남지 않아 5대 리그 관문에서 빠진다",
+    rows: [row("John Doe agrees terms with the club.", { stage: "agreement", verdict: "move", verdict_player: "jane roe", verdict_at: "2026-09-24T00:00:00Z", verdict_from: "Benfica", verdict_to: "Chelsea" })],
+    expect: (r) => ({ deals: r.deals.length, skipped: r.skipped["5대 리그 밖"] }),
+    want: { deals: 0, skipped: 1 },
+  },
+  {
+    name: "5대 리그 밖 → 5대 리그 밖은 딜이 아니다(알힐랄 ← 갈라타사라이)",
+    rows: [row("John Doe joins Al Hilal from Galatasaray.", { stage: "official" })],
+    expect: (r) => ({ deals: r.deals.length, skipped: r.skipped["5대 리그 밖"] }),
+    want: { deals: 0, skipped: 1 },
+  },
+  {
+    name: "5대 리그 → 5대 리그 밖은 딜이다(아스날 → 알힐랄) — 프리셋 밖 구단은 slugify 코드",
+    rows: [row("John Doe joins Al Hilal from Arsenal.", { stage: "official" })],
+    expect: (r) => pick(r.deals[0], ["from_club_code", "to_club_code"]),
+    want: { from_club_code: "arsenal", to_club_code: "al-hilal" },
+  },
+  {
+    name: "5대 리그 밖 → 5대 리그도 딜이다(갈라타사라이 → 아스날)",
+    rows: [row("John Doe joins Arsenal from Galatasaray.", { stage: "official" })],
+    expect: (r) => pick(r.deals[0], ["from_club_code", "to_club_code"]),
+    want: { from_club_code: "galatasaray", to_club_code: "arsenal" },
+  },
+  {
+    name: "5대 리그 구단이 스쳐도 방향에 없으면 딜이 아니다(첼시가 언급됐지만 알힐랄 ← 갈라타사라이)",
+    rows: [row("Chelsea-linked John Doe joins Al Hilal from Galatasaray.", { stage: "official" })],
+    expect: (r) => ({ deals: r.deals.length, skipped: r.skipped["5대 리그 밖"] }),
+    want: { deals: 0, skipped: 1 },
   },
   {
     name: "구단 행 — 프리셋 구단은 그 코드·한국어, 프리셋 밖은 slugify(정규 영문명)·영문 그대로·리그 null",
@@ -270,7 +375,8 @@ const GATE = {
 const judged = (rows, existing = []) =>
   deriveDeals(rows, { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: DICT }), requireVerified: true, requireVerdict: true, existingKeys: new Set(existing) });
 const JOHN = dealKey(normalizePlayer("John Doe"));
-const V = (verdict, extra = {}) => ({ verdict, verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", ...extra });
+// 이미 판정·요약된 행 — 요약을 함께 둔다(없으면 최근 보도는 24시간 뒤 요약을 다시 묻는 대상이 되어 픽스처 순서에 따라 흔들린다)
+const V = (verdict, extra = {}) => ({ verdict, verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", summary_ko: verdict === "move" ? "요약" : null, ...extra });
 const VERDICT = {
   unjudgedNew: judged([row("Chelsea agree deal for John Doe from Benfica.")]),
   movedNew: judged([row("Chelsea agree deal for John Doe from Benfica.", V("move"))]),
@@ -285,6 +391,26 @@ const VERDICT = {
   invalidRecent: judged([row("Chelsea agree deal for John Doe from Benfica.", { verdict: null, verdict_player: "john doe", verdict_at: new Date(NOW - 3_600_000).toISOString() })]),
   invalidOld: judged([row("Chelsea agree deal for John Doe from Benfica.", { verdict: null, verdict_player: "john doe", verdict_at: new Date(NOW - 25 * 3_600_000).toISOString() })]),
   off: deriveDeals([row("Chelsea agree deal for John Doe from Benfica.", V("not_move"))], { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: DICT }) }),
+  // 요약 실패 — 최근 보도만 24시간 뒤 다시 묻는다
+  noSummaryRecent: judged([row("Chelsea agree deal for John Doe from Benfica.", V("move", { verdict_at: new Date(NOW - 25 * 3_600_000).toISOString(), published_at: new Date(NOW - 2 * 86_400_000).toISOString(), summary_ko: null }))]),
+  noSummaryFresh: judged([row("Chelsea agree deal for John Doe from Benfica.", V("move", { verdict_at: new Date(NOW - 3_600_000).toISOString(), published_at: new Date(NOW - 2 * 86_400_000).toISOString(), summary_ko: null }))]),
+  noSummaryOld: judged([row("Chelsea agree deal for John Doe from Benfica.", V("move", { verdict_at: new Date(NOW - 25 * 3_600_000).toISOString(), published_at: new Date(NOW - 20 * 86_400_000).toISOString(), summary_ko: null }))]),
+  summarized: judged([row("Chelsea agree deal for John Doe from Benfica.", V("move", { verdict_at: new Date(NOW - 25 * 3_600_000).toISOString(), published_at: new Date(NOW - 2 * 86_400_000).toISOString(), summary_ko: "첼시가 존 도 영입에 합의했다." }))]),
+  rejudge: deriveDeals([row("Chelsea agree deal for John Doe from Benfica.", V("move", { summary_ko: "요약" }))], { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: DICT }), requireVerified: true, requireVerdict: true, rejudge: true, existingKeys: new Set() }),
+  // 5대 리그 구단이 걸리지 않은 후보는 LLM에 묻지 않는다
+  outsideTopLeagues: judged([row("John Doe joins Al Hilal from Galatasaray.", { stage: "official" })]),
+  // 규칙이 선수를 못 뽑은 보도 — 5대 리그 구단이 언급됐으면 선수까지 LLM에 묻는다
+  unnamed: judged([row("Johan Manzambi addresses rumours after €70m Aston Villa transfer from Freiburg.", { stage: "rumour", players: [] })]),
+  unnamedOutside: judged([row("Galatasaray agree deal to sign a striker from Al Hilal.", { stage: "agreement", players: [] })]),
+  unnamedJudged: judged([row("Johan Manzambi addresses rumours after €70m Aston Villa transfer from Freiburg.", { stage: "rumour", players: [], verdict: "move", verdict_player: "john doe", verdict_player_name: "John Doe", verdict_at: "2026-09-24T00:00:00Z", verdict_from: "SC Freiburg", verdict_to: "Aston Villa", verdict_stage: "official" })]),
+  unnamedNotMove: judged([row("Aston Villa announce record revenues.", { stage: "official", players: [], verdict: "not_move", verdict_player: null, verdict_at: "2026-09-24T00:00:00Z" })]),
+  // 규칙이 그 선수의 단계를 못 읽은 문장은 LLM 단계를 쓴다
+  llmStage: judged([row("Chelsea have been told the price for John Doe by Benfica, with Jane Roe also mentioned.", { stage: "offer", players: ["John Doe", "Jane Roe"], verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_to: "Chelsea", verdict_stage: "talks" })]),
+  // 관심 구단이 여럿 — 행선지 밖 구단이 suitor_codes로 모인다
+  suitors: judged([
+    row("Arsenal, Brighton and Aston Villa are monitoring Sturm Graz midfielder John Doe.", { stage: "rumour", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_from: "Sturm Graz", verdict_to: "Arsenal", verdict_suitors: ["Brighton", "Aston Villa"] }),
+    row("Brighton keep tabs on John Doe of Sturm Graz.", { stage: "rumour", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_from: "Sturm Graz", verdict_to: "Brighton", verdict_suitors: ["Arsenal"] }),
+  ]),
 };
 // ── 중복 보도 — 같은 URL(쿼리·조각 제외)이나 같은 본문은 한 보도다 ──
 const BBC = "https://www.bbc.co.uk/sport/football/articles/cmx2zv4e320do?at_medium=RSS&amp;at_campaign=rss";
@@ -317,6 +443,7 @@ const DUP = {
 // 가십 문형 — "competition from X"·"interest from X"의 X는 데려가려는 구단이다
 const SUITOR = {
   competition: derive([row("Newcastle are keeping an eye on Rennes defender John Doe, 20, but face competition from Everton and Brentford.")]),
+  competitionJudged: derive([row("Newcastle are keeping an eye on Rennes defender John Doe, 20, but face competition from Everton and Brentford.", { verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_from: "Rennes", verdict_to: "Newcastle United" })]),
   renewal: derive([row("Brentford are in discussions with John Doe about a new long-term contract amid increasing interest from Liverpool.")]),
 };
 const UNIT = [
@@ -324,19 +451,35 @@ const UNIT = [
   { name: "중복 — 리트윗은 원문과 같은 보도이고 대표는 먼저 게시된 원문", got: [DUP.retweet.reps.length, DUP.retweet.reps[0].id], want: [1, 10] },
   { name: "중복 — 짧은 문구(40자 미만)가 같다고 합치지 않는다", got: DUP.short.reps.length, want: 2 },
   { name: "중복 — 가십 항목은 같은 칼럼 URL이어도 따로 세고, 두 피드의 같은 항목은 합친다", got: DUP.items.reps.map((r) => r.id).sort(), want: [31, 32] },
+  { name: "가십 — 지난 창의 영입 정리 기사(Ten of the best-value deals …)는 가십 모음처럼 후보가 아니다", got: [isRoundup({ source_id: "rss:guardian-football", body: "Ten of the best-value deals from this summer’s transfer window\nFrom veteran strikers…" }), isRoundup({ source_id: "rss:guardian-football", body: "Chelsea agree deal to sign John Doe\n…" })], want: [true, false] },
   { name: "가십 — BBC 가십·스카이 신문 요약은 가십 모음이고, 거기서 나눈 항목은 아니다", got: [isRoundup({ source_id: "rss:bbc-gossip", body: "Chelsea lead race for Scott" }), isRoundup({ source_id: "rss:sky-transfers", body: "Papers: Man Utd line up Conte" }), isRoundup({ source_id: "rss:bbc-gossip", external_id: "aaaa#item-1", body: "Chelsea target Bournemouth's Alex Scott. (Mail)" }), isRoundup({ source_id: "rss:sky-transfers", body: "Arsenal complete signing of John Doe" })], want: [true, true, false, false] },
-  { name: "방향 — 경쟁 구단(competition from X)은 출발 구단이 아니다", got: SUITOR.competition.deals[0]?.from_club_code ?? null, want: null },
+  { name: "방향 — 경쟁 구단(competition from X)은 출발 구단이 아니다 → 규칙만으로는 구단을 못 읽어 딜이 없다", got: [SUITOR.competition.deals.length, SUITOR.competition.skipped["구단 미확인"]], want: [0, 1] },
+  { name: "방향 — 같은 문장을 LLM이 읽으면 렌 → 뉴캐슬", got: pick(SUITOR.competitionJudged.deals[0] ?? {}, ["from_club_code", "to_club_code"]), want: { from_club_code: "rennes", to_club_code: "newcastle" } },
   { name: "재계약 — \"new long-term contract\"는 재계약이고 interest from X는 옮긴다는 표현이 아니다", got: [SUITOR.renewal.deals.length, SUITOR.renewal.skipped["재계약·첫 프로 계약"]], want: [0, 1] },
   { name: "중복 — 딜의 보도 수는 서로 다른 보도만 센다", got: [DUP.counted.deals[0]?.report_count, DUP.counted.skipped["중복 보도"]], want: [2, 1] },
-  { name: "판정 — 판정 없는 새 딜은 열지 않고 물을 대상으로 넘긴다", got: [VERDICT.unjudgedNew.deals.length, VERDICT.unjudgedNew.verdictNeeds.map((n) => n.playerKey), VERDICT.unjudgedNew.skipped["판정 대기(LLM)"], VERDICT.unjudgedNew.clubs.length], want: [0, ["john doe"], 1, 0] },
-  { name: "판정 — 이동 판정이 있는 새 딜은 연다(다시 묻지 않는다)", got: [VERDICT.movedNew.deals.length, VERDICT.movedNew.verdictNeeds.length], want: [1, 0] },
-  { name: "판정 — 이미 있는 딜은 판정이 없어도 남긴다(판정이 멎어도 보드가 비지 않게)", got: [VERDICT.unjudgedExisting.deals.length, VERDICT.unjudgedExisting.verdictNeeds.length], want: [1, 1] },
+  { name: "판정 — 판정 없는 새 딜은 열지 않고 물을 대상으로 넘긴다", got: [VERDICT.unjudgedNew.deals.length, VERDICT.unjudgedNew.judgeNeeds.map((n) => n.playerKey), VERDICT.unjudgedNew.skipped["판정 대기(LLM)"], VERDICT.unjudgedNew.clubs.length], want: [0, ["john doe"], 1, 0] },
+  { name: "판정 — 이동 판정이 있는 새 딜은 연다(다시 묻지 않는다)", got: [VERDICT.movedNew.deals.length, VERDICT.movedNew.judgeNeeds.length], want: [1, 0] },
+  { name: "판정 — 이미 있는 딜은 판정이 없어도 남긴다(판정이 멎어도 보드가 비지 않게)", got: [VERDICT.unjudgedExisting.deals.length, VERDICT.unjudgedExisting.judgeNeeds.length], want: [1, 1] },
   { name: "판정 — 이미 있는 딜도 보도가 전부 '이동 아님'이면 사라진다", got: [VERDICT.allVetoedExisting.deals.length, VERDICT.allVetoedExisting.skipped["이동 아님(LLM 판정)"], VERDICT.allVetoedExisting.assignments.size], want: [0, 2, 0] },
-  { name: "판정 — '이동 아님' 보도는 딜에서 빠지고 단계에도 들어가지 않는다(오피셜 보도가 빠져 협상·합의만 남는다)", got: [VERDICT.mixed.deals[0]?.report_count, VERDICT.mixed.deals[0]?.stage, VERDICT.mixed.verdictNeeds.length], want: [2, "agreement", 1] },
-  { name: "판정 — 다른 선수로 내린 판정은 없는 것이다(다시 묻는다)", got: [VERDICT.otherPlayer.deals.length, VERDICT.otherPlayer.verdictNeeds.length], want: [0, 1] },
-  { name: "판정 — 판정 불가는 24시간 동안 다시 묻지 않는다", got: [VERDICT.invalidRecent.deals.length, VERDICT.invalidRecent.verdictNeeds.length], want: [0, 0] },
-  { name: "판정 — 판정 불가가 24시간 지나면 다시 묻는다", got: VERDICT.invalidOld.verdictNeeds.length, want: 1 },
+  { name: "판정 — '이동 아님' 보도는 딜에서 빠지고 단계에도 들어가지 않는다(오피셜 보도가 빠져 협상·합의만 남는다)", got: [VERDICT.mixed.deals[0]?.report_count, VERDICT.mixed.deals[0]?.stage, VERDICT.mixed.judgeNeeds.length], want: [2, "agreement", 1] },
+  { name: "판정 — 다른 선수로 내린 판정은 없는 것이다(다시 묻는다)", got: [VERDICT.otherPlayer.deals.length, VERDICT.otherPlayer.judgeNeeds.length], want: [0, 1] },
+  { name: "판정 — 판정 불가는 24시간 동안 다시 묻지 않는다", got: [VERDICT.invalidRecent.deals.length, VERDICT.invalidRecent.judgeNeeds.length], want: [0, 0] },
+  { name: "판정 — 판정 불가가 24시간 지나면 다시 묻는다", got: VERDICT.invalidOld.judgeNeeds.length, want: 1 },
   { name: "판정 — 관문을 켜지 않으면 판정을 보지 않는다(기존 동작)", got: VERDICT.off.deals.length, want: 1 },
+  { name: "판정 — 이동인데 요약이 없으면 24시간 뒤 다시 묻는다(최근 보도)", got: [VERDICT.noSummaryRecent.judgeNeeds.length, VERDICT.noSummaryRecent.deals.length], want: [1, 1] },
+  { name: "판정 — 요약이 없어도 24시간 안에는 다시 묻지 않는다", got: VERDICT.noSummaryFresh.judgeNeeds.length, want: 0 },
+  { name: "판정 — 오래된 보도(14일 밖)의 요약 실패는 다시 묻지 않는다(영문 발췌로 둔다)", got: VERDICT.noSummaryOld.judgeNeeds.length, want: 0 },
+  { name: "판정 — 요약까지 있으면 다시 묻지 않는다", got: VERDICT.summarized.judgeNeeds.length, want: 0 },
+  { name: "판정 — rejudge는 저장된 판정이 있어도 다시 묻고, 딜은 그대로 둔다", got: [VERDICT.rejudge.judgeNeeds.length, VERDICT.rejudge.deals.length], want: [1, 1] },
+  { name: "판정 — 물을 대상에 그 보도의 구단·옛 요약을 함께 싣는다(표기 사전·요약 보존용)", got: [VERDICT.unjudgedNew.judgeNeeds[0].clubs.sort(), VERDICT.summarized.judgeNeeds.length, "summary_ko" in VERDICT.unjudgedNew.judgeNeeds[0]], want: [["Benfica", "Chelsea"], 0, true] },
+  { name: "판정 — 5대 리그 구단이 걸리지 않은 후보는 LLM에 묻지 않는다(비용을 쓰지 않는다)", got: [VERDICT.outsideTopLeagues.judgeNeeds.length, VERDICT.outsideTopLeagues.skipped["5대 리그 밖"]], want: [0, 1] },
+  { name: "선수 없음 — 5대 리그 구단이 언급된 보도는 선수까지 LLM에 묻는다(playerKey null · 언급 구단 동봉)", got: [VERDICT.unnamed.judgeNeeds.length, VERDICT.unnamed.judgeNeeds[0]?.playerKey, VERDICT.unnamed.judgeNeeds[0]?.clubs.sort(), VERDICT.unnamed.skipped["선수 없음(판정 대기)"]], want: [1, null, ["Aston Villa", "SC Freiburg"], 1] },
+  { name: "선수 없음 — 5대 리그 구단이 없으면 묻지 않는다", got: [VERDICT.unnamedOutside.judgeNeeds.length, VERDICT.unnamedOutside.skipped["선수 없음"]], want: [0, 1] },
+  { name: "선수 없음 — 관문을 켜지 않으면 그냥 건너뛴다(기존 동작)", got: derive([row("Chelsea sign someone from Benfica.", { players: [] })]).skipped["선수 없음"], want: 1 },
+  { name: "선수 없음 — LLM이 읽은 선수(verdict_player_name)로 딜이 묶이고 LLM 단계·구단을 쓴다", got: pick(VERDICT.unnamedJudged.deals[0] ?? {}, ["player", "from_club_code", "to_club_code", "stage"]), want: { player: "John Doe", from_club_code: "sc-freiburg", to_club_code: "aston-villa", stage: "rumour" } },
+  { name: "선수 없음 — 이동 아님으로 판정된 보도는 다시 묻지 않는다", got: [VERDICT.unnamedNotMove.judgeNeeds.length, VERDICT.unnamedNotMove.deals.length], want: [0, 0] },
+  { name: "단계 — 다선수 기사에서 규칙이 그 선수의 단계를 못 읽으면 LLM 단계(talks)를 쓴다", got: [VERDICT.llmStage.deals[0]?.stage, VERDICT.llmStage.skipped["그 선수의 단계 없음"] ?? 0], want: ["talks", 0] },
+  { name: "관심 구단 — 행선지는 최신 보도(2배)의 브라이턴, 나머지가 표 순으로 suitor_codes에 모이고 구단 행도 만든다", got: [VERDICT.suitors.deals[0]?.to_club_code, VERDICT.suitors.deals[0]?.suitor_codes, VERDICT.suitors.clubs.map((c) => c.code).sort()], want: ["brighton-hove", ["aston-villa", "arsenal"], ["arsenal", "aston-villa", "brighton-hove", "sturm-graz"]] },
   { name: "게이트 — 사전에도 캐시에도 없는 선수는 딜을 만들지 않고 이름 조회 대상으로 넘긴다", got: [GATE.unknown.deals.length, GATE.unknown.nameNeeds.map((x) => x.playerKey), GATE.unknown.skipped["미확인 선수"], GATE.unknown.clubs.length], want: [0, ["jane roe"], 1, 0] },
   { name: "게이트 — 위키데이터에서 찾은 선수(한국어 표기 없음)는 연다", got: GATE.cached.deals.length, want: 1 },
   { name: "게이트 — 찾아봤지만 없던 이름은 막는다", got: GATE.notFound.deals.length, want: 0 },

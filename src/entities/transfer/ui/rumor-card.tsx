@@ -6,14 +6,13 @@ import { ROUTES } from "@/shared/config";
 import { formatRelativeTime } from "@/shared/lib";
 import { Icon } from "@/shared/ui";
 import { reporterName } from "../lib/reporter";
+import { routeLabels } from "../lib/route-label";
 import type { TransferDealListItem, TransferReport } from "../model/types";
 import { StatusBadge } from "./status-badge";
 import { FeeValue } from "./fee-value";
 import { CredibilityBadge } from "./credibility-badge";
 import { TransferCrest } from "./transfer-crest";
 
-/** 방향을 못 읽은 구단의 표기 — `ClubRoute`와 같은 말 */
-const UNKNOWN_CLUB_LABEL = "미확인";
 
 interface RumorCardProps {
   deal: TransferDealListItem;
@@ -34,6 +33,7 @@ interface RumorCardProps {
  */
 export function RumorCard({ deal, report, nowMs }: RumorCardProps) {
   const name = deal.playerKo ?? deal.player;
+  const route = routeLabels(deal);
 
   return (
     <li className="w-[300px] shrink-0 snap-start">
@@ -57,7 +57,7 @@ export function RumorCard({ deal, report, nowMs }: RumorCardProps) {
           <span className="flex flex-col items-center gap-[7px] whitespace-nowrap text-[12px] text-ink-mute">
             <TransferCrest club={deal.fromClub} size={40} />
             <span className="max-w-full truncate px-1">
-              {deal.fromClub?.shortName ?? UNKNOWN_CLUB_LABEL}
+              {route.from}
             </span>
           </span>
           <span className="flex justify-center text-ink">
@@ -67,7 +67,7 @@ export function RumorCard({ deal, report, nowMs }: RumorCardProps) {
           <span className="flex flex-col items-center gap-[7px] whitespace-nowrap text-[12px] font-medium text-ink">
             <TransferCrest club={deal.toClub} size={40} />
             <span className="max-w-full truncate px-1">
-              {deal.toClub?.shortName ?? UNKNOWN_CLUB_LABEL}
+              {route.to}
             </span>
           </span>
         </div>

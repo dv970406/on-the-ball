@@ -6,7 +6,7 @@ export type TransferNewsRow = Database["public"]["Tables"]["transfer_news"]["Row
 export type TransferDealWatchRow = Database["public"]["Tables"]["transfer_deal_watch"]["Row"];
 
 /**
- * 'rumour' | 'talks' | … | 'collapsed' | 'unknown' — DB enum에서 생성된 타입이라 손으로 적지 않는다.
+ * 'rumour' | 'talks' | … | 'collapsed' | 'denied' | 'unknown' — DB enum에서 생성된 타입이라 손으로 적지 않는다.
  * ⚠ `unknown`은 `transfer_news`에만 있는 값이다 — `transfer_deal.stage`는 CHECK가 그 값을 거부한다.
  *   그래도 타입은 enum 그대로라 `Record<TransferStage, …>` 맵이 그 키를 **`null`로** 채운다
  *   (`never`로 막으면 enum에 값이 늘 때 컴파일 에러가 나는 장치가 함께 죽는다).
@@ -20,10 +20,10 @@ export type TransferStage = Database["public"]["Enums"]["transfer_stage"];
 export type TransferGroupKey = "official" | "hwg" | "prog" | "rumor" | "dead";
 
 /**
- * 상태 뱃지의 톤 — 단계를 여섯 가지 표시로 접은 것(`합의 임박`·`협상 중`이 여러 단계를 담는다).
- * ⚠ 구간(`TransferGroupKey`)과도 다르다 — `prog` 구간 안에 `imminent`·`talks` 두 톤이 있다.
+ * 상태 뱃지의 톤 — 단계를 일곱 가지 표시로 접은 것(`합의 임박`·`협상 중`이 여러 단계를 담는다).
+ * ⚠ 구간(`TransferGroupKey`)과도 다르다 — `prog` 구간 안에 `imminent`·`talks` 두 톤, `dead` 구간 안에 `dead`(결렬)·`denied`(부인) 두 톤이 있다.
  */
-export type TransferStatus = "official" | "hwg" | "imminent" | "talks" | "rumor" | "dead";
+export type TransferStatus = "official" | "hwg" | "imminent" | "talks" | "rumor" | "dead" | "denied";
 
 /** 보드 정렬 — URL `?sort=`가 소유한다. 해석은 `lib/league.ts`의 `parseTransferSort` */
 export type TransferSort = "latest" | "fee";
@@ -112,9 +112,11 @@ export interface TransferDeal {
   birthYear: TransferDealRow["birth_year"];
   /** `^[A-Z]{3}$` */
   nationality: TransferDealRow["nationality"];
-  /** 방향 투표로 못 읽으면 `null` — 화면은 `미확인`으로 그린다("틀린 칸보다 빈 칸") */
+  /** 출발·행선지 — 빈 칸의 문구(`FA`·`미확인`·`미정`·`외 N`)는 `lib/route-label.ts`가 단독으로 정한다 */
   fromClub: TransferClub | null;
   toClub: TransferClub | null;
+  /** 행선지 밖의 관심 구단 수 — 여러 구단이 노리는 루머에서 "행선지 외 N"을 그린다(`suitor_codes`의 길이) */
+  suitorCount: number;
   stage: TransferStage;
   /** 최신 보도의 이적료 — 단위는 **백만**(`€95M`의 95). 셋은 함께 있거나 함께 없다(DB CHECK) */
   feeAmount: TransferDealRow["fee_amount"];

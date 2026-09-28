@@ -12,7 +12,7 @@ import { XMLParser } from "fast-xml-parser";
 import { createHash } from "node:crypto";
 import { clampCp } from "../sync-db.mjs";
 
-/** 수집기의 User-Agent — 이동 판정이 기사 본문을 받을 때도 같은 값을 쓴다(`verdict.mjs`). 브라우저로 위장하지 않는다 */
+/** 수집기의 User-Agent — LLM 판정이 기사 본문을 받을 때도 같은 값을 쓴다(`judge.mjs`). 브라우저로 위장하지 않는다 */
 export const COLLECTOR_UA = "Mozilla/5.0 (compatible; on-the-ball-transfer-sync/0.1)";
 const UA = COLLECTOR_UA;
 

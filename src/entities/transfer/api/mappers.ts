@@ -28,7 +28,7 @@ export const RUMOR_CAROUSEL_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
 const CLUB_COLUMNS = "code, name, short_name, league";
 const DEAL_COLUMNS =
-  "id, player, player_ko, position, birth_year, nationality, stage, fee_amount, fee_currency, fee_text, prev_fee_amount, fee_low_amount, fee_high_amount, add_on_amount, contract_text, wage_text, first_reported_at, latest_reported_at, report_count, is_free_agent";
+  "id, player, player_ko, position, birth_year, nationality, stage, fee_amount, fee_currency, fee_text, prev_fee_amount, fee_low_amount, fee_high_amount, add_on_amount, contract_text, wage_text, first_reported_at, latest_reported_at, report_count, is_free_agent, suitor_codes";
 /**
  * ⚠ **`body`가 없다.** anon·authenticated에는 `body`를 뺀 컬럼만 grant돼 있어 `select=*`도
  *   `body`도 42501이다(`api-and-db.md` 이적 소식 절) — 그래서 컬럼을 나열한다.
@@ -149,6 +149,7 @@ export interface DealSelectRow {
   latest_reported_at: TransferDealRow["latest_reported_at"];
   report_count: TransferDealRow["report_count"];
   is_free_agent: TransferDealRow["is_free_agent"];
+  suitor_codes: TransferDealRow["suitor_codes"];
   from: ClubSelectRow | null;
   to: ClubSelectRow | null;
   /** SELECT 정책이 "내 행만"이라 길이가 0 또는 1이다 */
@@ -179,6 +180,7 @@ export function buildDeal(row: DealSelectRow): TransferDeal {
     latestReportedAt: row.latest_reported_at,
     reportCount: row.report_count,
     isFreeAgent: row.is_free_agent,
+    suitorCount: row.suitor_codes.length,
     // 정책이 "내 행만"이라 임베딩 결과에 남의 관심이 섞일 수 없다
     isWatched: (row.transfer_deal_watch?.length ?? 0) > 0,
   };

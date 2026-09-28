@@ -15,6 +15,7 @@ export const STAGE_GROUP: Record<TransferStage, TransferGroupKey | null> = {
   talks: "prog",
   rumour: "rumor",
   collapsed: "dead",
+  denied: "dead",
   unknown: null,
 };
 
@@ -37,7 +38,7 @@ export const GROUP_LABEL: Record<TransferGroupKey, string> = {
   hwg: "합의 완료",
   prog: "진행 중",
   rumor: "루머",
-  dead: "결렬",
+  dead: "결렬·부인",
 };
 
 /**
@@ -54,6 +55,7 @@ export const STAGE_STATUS: Record<TransferStage, TransferStatus | null> = {
   talks: "talks",
   rumour: "rumor",
   collapsed: "dead",
+  denied: "denied",
   unknown: null,
 };
 
@@ -65,12 +67,13 @@ export const STATUS_LABEL: Record<TransferStatus, string> = {
   talks: "협상 중",
   rumor: "루머",
   dead: "결렬",
+  denied: "부인",
 };
 
 /**
- * 결렬인가 — 목록 행의 회색 변형·경로의 X 원·취소선이 전부 이 판정을 본다.
+ * 죽은 딜인가(결렬·부인) — 목록 행의 회색 변형·경로의 표시 원·취소선이 전부 이 판정을 본다.
  * ⚠ `STAGE_GROUP[stage] === "dead"`를 호출부가 각자 적지 않는다 — 판정이 갈리면 행은 회색인데
- *   뱃지는 협상 중인 조합이 생긴다.
+ *   뱃지는 협상 중인 조합이 생긴다. 결렬과 부인의 구분은 `stage === "denied"` 하나다(뱃지·경로 아이콘·sr 텍스트가 같은 판정을 쓴다).
  */
 export function isDeadStage(stage: TransferStage): boolean {
   return STAGE_GROUP[stage] === "dead";

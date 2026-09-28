@@ -97,13 +97,28 @@ export function pickEntity(hits, entities, kind, name, nowYear = new Date().getU
     return hit ? { wikidataId: hit.id, nameKo: koLabel(entities[hit.id]) } : none;
   }
   const wanted = normalizeName(name);
-  const exact = hits.filter(
+  const eligible = hits.filter(
     (h) =>
       claimIds(entities[h.id], "P106").includes(FOOTBALLER) &&
       !claimIds(entities[h.id], "P106").includes(FOOTBALL_MANAGER) &&
-      !(birthYear(entities[h.id]) !== null && nowYear - birthYear(entities[h.id]) > MAX_PLAYER_AGE) &&
-      h.texts.some((t) => normalizeName(t) === wanted),
+      !(birthYear(entities[h.id]) !== null && nowYear - birthYear(entities[h.id]) > MAX_PLAYER_AGE),
   );
+  let exact = eligible.filter((h) => h.texts.some((t) => normalizeName(t) === wanted));
+  /*
+   * 통째 일치가 없으면 **레이블 기준의 앞부분 일치**를 후보가 하나뿐일 때만 받는다. 위키데이터 레이블이 기사 표기보다
+   * 길거나 짧은 실존 선수가 막혔다 — "Valentin Atangana" ↔ 레이블 "Valentin Atangana Edoa"(레이블이 찾는 이름으로 시작),
+   * "Estevao Willian" ↔ 레이블 "Estevão" + 별칭 "Estêvão Willian Almeida …"(찾는 이름이 레이블로 시작하고 별칭이 찾는 이름으로 시작).
+   * ⚠ 별칭만 앞부분이 같은 후보는 받지 않는다 — "Joao Pedro"가 별칭 "Joao Pedro Cavaco Cancelo"의 칸셀루로 풀린 일이 그 자리다.
+   *   `texts[0]`이 레이블이다(`toHits`).
+   */
+  if (!exact.length) {
+    const prefixed = (t) => normalizeName(t).startsWith(`${wanted} `);
+    const prefix = eligible.filter((h) => {
+      const label = normalizeName(h.texts[0] ?? "");
+      return prefixed(label) || (wanted.startsWith(`${label} `) && h.texts.slice(1).some(prefixed));
+    });
+    if (prefix.length === 1) exact = prefix;
+  }
   if (!exact.length) return none;
   const labels = new Set(exact.map((h) => koLabel(entities[h.id])).filter((v) => v !== null));
   if (labels.size > 1) {

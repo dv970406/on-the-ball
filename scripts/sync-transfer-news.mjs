@@ -1,43 +1,28 @@
 /**
- * 이적 소식을 `transfer_news`에 동기화한다. 소스는 Bluesky · 텔레그램 · 매체 RSS다
+ * 이적 소식을 `transfer_news`에 동기화하고 보드(`transfer_deal`)를 파생한다. 소스는 Bluesky · 텔레그램 · 매체 RSS
  * (목록과 선정 근거는 `scripts/lib/transfer/registry.mjs`).
  *
- *   node scripts/sync-transfer-news.mjs                     # 켜진 소스 전부
+ *   node scripts/sync-transfer-news.mjs                          # 수집 → 가십 칼럼 나누기 → 딜 파생(LLM 판정·요약 포함)
  *   node scripts/sync-transfer-news.mjs --only tg:romano,bsky:ornstein
- *   node scripts/sync-transfer-news.mjs --dry-run           # 수집·추출만 하고 쓰지 않는다
- *   node scripts/sync-transfer-news.mjs --reprocess         # 재수집 없이 저장분을 다시 추출한다(뒤에 파생도 돈다)
- *   node scripts/sync-transfer-news.mjs --derive-only       # 수집 없이 딜 파생(transfer_deal)만 돈다
- *   node scripts/sync-transfer-news.mjs --derive-only --dry-run  # 파생 결과 요약만 찍고 쓰지 않는다
- *   node scripts/sync-transfer-news.mjs --summarize-only    # 수집·파생 없이 한국어 요약(LLM)만 돈다
- *   node scripts/sync-transfer-news.mjs --summarize-only --dry-run  # 요약을 만들어 찍기만 하고 쓰지 않는다
- *   node scripts/sync-transfer-news.mjs --summarize-only --resummarize  # 이미 요약한 보도도 다시(사전·용어를 고친 뒤)
- *   node scripts/sync-transfer-news.mjs --verify            # 계정 인증·채널 출처를 점검한다
- *   node scripts/sync-transfer-news.mjs --remote            # 원격 프로젝트에 쓴다 (명시적일 때만)
+ *   node scripts/sync-transfer-news.mjs --dry-run                # 수집·추출만 하고 쓰지 않는다
+ *   node scripts/sync-transfer-news.mjs --reprocess              # 재수집 없이 저장분을 다시 추출한다(뒤에 파생도 돈다)
+ *   node scripts/sync-transfer-news.mjs --derive-only            # 수집 없이 딜 파생만 돈다
+ *   node scripts/sync-transfer-news.mjs --derive-only --dry-run  # 파생 결과 요약만 찍고 쓰지 않는다(LLM도 부르지 않는다)
+ *   node scripts/sync-transfer-news.mjs --derive-only --rejudge  # 저장된 판정을 무시하고 전부 다시 묻는다(지시문·사전을 고친 뒤)
+ *   node scripts/sync-transfer-news.mjs --verify                 # 계정 인증·채널 출처를 점검한다
+ *   node scripts/sync-transfer-news.mjs --remote                 # 원격 프로젝트에 쓴다(명시적일 때만)
  *
- * **딜 파생은 마지막 단계다** — 수집(소스 실패 여부와 무관)·재처리 뒤에 `transfer_news` → `transfer_deal`을
- * 다시 만든다(`scripts/lib/transfer/derive-deals.mjs`). 보드 화면의 유일한 원천이라 수집이 돌면 파생도 돈다.
- * 파생 안에서 **이동 판정(LLM)**이 돈다(`scripts/lib/transfer/verdict.mjs`) — 규칙이 딜로 묶은 보도가 정말 그 선수의
- * 구단 이동을 말하는지 묻고, 아니면 딜에서 뺀다(거부권만 가진다). 키가 없으면 판정 없이 파생한다 — 판정을 받지 못한
- * **새** 딜은 열리지 않고 이미 있는 딜은 남는다.
- * **그 뒤에 한국어 요약(LLM)이 돈다**(`scripts/lib/transfer/summarize.mjs`) — 요약하지 않은 최근 보도만,
- * 실행당 상한까지. 요약 실패는 경고일 뿐이지만(화면이 영문 발췌로 대신한다) 키가 없거나 틀리면 실패다.
+ * 단계: 수집 → 가십 칼럼을 항목 행으로 → 딜 파생. 파생 안에서 이름 조회(위키데이터)와 **LLM 판정·요약**(`judge.mjs` —
+ * 보도 한 건에 한 번, 이동 여부·출발·행선지·한국어 요약)이 돈다. `ANTHROPIC_API_KEY`가 없으면 판정 없이 파생한다 —
+ * 판정을 받지 못한 **새** 딜은 열리지 않고 이미 있는 딜은 남는다(원격 실행은 키가 없으면 실패다).
  *
- * ⚠ **정기 실행 주기는 `maxRunIntervalMinutes()`(registry.mjs) 이하여야 한다.** 그보다 느리면
- *   보관시간이 짧은 피드에서 항목이 밀려나 유실된다. 이 스크립트는 자기 실행 주기를 알 수 없어
- *   검사하지 못한다 — 스케줄을 정하는 쪽이 지킨다. `--verify`가 그 값을 출력한다.
- *   스케줄은 `.github/workflows/sync-transfer-news.yml`(매시, `--remote`)이다.
- *   한 번 돌 때 켜진 소스를 전부 돈다 — 소스별 주기는 없다(사유는 registry.mjs 머리말).
- *
- * ⚠ **소스 하나라도 실패하면 종료 코드가 1이다.** 읽는 화면이 없어 종료 코드가 유일한 신호다
- *   (크론 핸들러가 부분 실패를 500으로 내는 것과 같은 이유 — `nextjs.md`).
- *
- * 원래 별도 프로젝트(transfer-market-crawler)였다. 추출 규칙의 회귀 테스트는
- * `scripts/test-transfer-extract.mjs`가 갖는다.
+ * ⚠ 정기 실행 주기는 `maxRunIntervalMinutes()`(registry.mjs) 이하여야 한다 — 그보다 느리면 보관시간이 짧은 피드에서
+ *   항목이 밀려나 유실된다. 스케줄은 `.github/workflows/sync-transfer-news.yml`(매시, `--remote`)이다.
+ * ⚠ 소스 하나라도 실패하거나 행 단위 저장이 실패하면 종료 코드 1이다 — 읽는 화면이 없어 종료 코드가 유일한 신호다.
  */
 import { clampCp, createSyncClient, flag, guardTarget, loadEnv } from "./lib/sync-db.mjs";
 import { runDerivation } from "./lib/transfer/derive-deals.mjs";
-import { SUMMARY_MODEL, runSummaries } from "./lib/transfer/summarize.mjs";
-import { VERDICT_MODEL, runVerdicts } from "./lib/transfer/verdict.mjs";
+import { JUDGE_MODEL, runJudgements } from "./lib/transfer/judge.mjs";
 import { expandRoundups, reprocessAll, syncSources } from "./lib/transfer/pipeline.mjs";
 import { SOURCES, enabledSources, findSource, maxRunIntervalMinutes } from "./lib/transfer/registry.mjs";
 import { inspectTelegramChannel, verifyBlueskyAccount } from "./lib/transfer/sources.mjs";
@@ -47,26 +32,20 @@ const allowRemote = argv.includes("--remote");
 const dryRun = argv.includes("--dry-run");
 const reprocess = argv.includes("--reprocess");
 const deriveOnly = argv.includes("--derive-only");
-const summarizeOnly = argv.includes("--summarize-only");
-const resummarize = argv.includes("--resummarize");
+const rejudge = argv.includes("--rejudge");
 const onlyArg = flag(argv, "only");
 
-/*
- * ⚠ **모르는 플래그와 뜻이 겹치는 조합은 거부한다.** 조용히 무시하면 의도와 다른 일이 원격에 일어난다
- *   — 값 없는 `--only`(예: `--only --remote`)가 null이 되어 **켜진 소스 전부**를 돌렸고,
- *   `--reprocess --dry-run`은 재처리가 아니라 수집 드라이런을 돌렸다(QA).
- * ⚠ `--derive-only`·`--summarize-only`만 `--dry-run`과 짝이 된다(결과만 찍는다) — 수집 드라이런과 뜻이 다르므로 그 조합 말고는 막는다.
- */
-const KNOWN = new Set(["--remote", "--dry-run", "--reprocess", "--derive-only", "--summarize-only", "--resummarize", "--verify", "--only"]);
+// 모르는 플래그와 뜻이 겹치는 조합은 거부한다 — 조용히 무시하면 의도와 다른 일이 원격에 일어난다
+const KNOWN = new Set(["--remote", "--dry-run", "--reprocess", "--derive-only", "--rejudge", "--verify", "--only"]);
 const unknownFlags = argv.filter((a, i) => a.startsWith("--") ? !KNOWN.has(a) : argv[i - 1] !== "--only");
 if (unknownFlags.length) usage(`알 수 없는 인자: ${unknownFlags.join(" ")}`);
 if (argv.includes("--only") && !onlyArg) usage("--only 뒤에 소스 id가 필요합니다");
-if ([dryRun && !deriveOnly && !summarizeOnly, reprocess, deriveOnly, summarizeOnly, argv.includes("--verify")].filter(Boolean).length > 1) {
-  usage("--dry-run · --reprocess · --derive-only · --summarize-only · --verify 는 함께 쓸 수 없습니다(--derive-only/--summarize-only 와 --dry-run 만 예외)");
+if ([dryRun && !deriveOnly, reprocess, deriveOnly, argv.includes("--verify")].filter(Boolean).length > 1) {
+  usage("--dry-run · --reprocess · --derive-only · --verify 는 함께 쓸 수 없습니다(--derive-only 와 --dry-run 만 예외)");
 }
-if (resummarize && !summarizeOnly) usage("--resummarize 는 --summarize-only 와 함께만 씁니다");
+if (rejudge && (!deriveOnly || dryRun)) usage("--rejudge 는 --derive-only 와 함께만 씁니다(--dry-run 과는 함께 쓸 수 없습니다)");
 if (reprocess && onlyArg) usage("--reprocess 는 저장분 전체를 다시 추출합니다 — --only 와 함께 쓸 수 없습니다");
-if ((deriveOnly || summarizeOnly) && onlyArg) usage("--derive-only · --summarize-only 는 소스를 읽지 않습니다 — --only 와 함께 쓸 수 없습니다");
+if (deriveOnly && onlyArg) usage("--derive-only 는 소스를 읽지 않습니다 — --only 와 함께 쓸 수 없습니다");
 
 function usage(message) {
   console.error(message);
@@ -84,15 +63,12 @@ let targets = enabledSources();
 if (onlyArg) {
   const ids = onlyArg.split(",").map((s) => s.trim()).filter(Boolean);
   const unknown = ids.filter((id) => !findSource(id));
-  if (unknown.length) {
-    console.error(`알 수 없는 소스: ${unknown.join(", ")}`);
-    process.exit(1);
-  }
+  if (unknown.length) usage(`알 수 없는 소스: ${unknown.join(", ")}`);
   targets = ids.map(findSource);
 }
 
 // ── 드라이런 — 수집·추출만 ──────────────────────────────────────────────
-if (dryRun && !deriveOnly && !summarizeOnly) {
+if (dryRun && !deriveOnly) {
   const results = await syncSources(null, targets, { dryRun: true });
   printResults(results);
   for (const r of results) {
@@ -107,21 +83,12 @@ if (dryRun && !deriveOnly && !summarizeOnly) {
 const env = loadEnv(["ANTHROPIC_API_KEY"]);
 const url = env.NEXT_PUBLIC_SUPABASE_URL;
 const key = env.SUPABASE_SERVICE_ROLE_KEY;
-if (!url || !key) {
-  console.error("NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY가 필요합니다");
-  process.exit(1);
-}
+if (!url || !key) usage("NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY가 필요합니다");
 guardTarget(url, allowRemote);
 const supabase = createSyncClient(url, key);
 
-if (summarizeOnly) {
-  await summarize({ dryRun, resummarize });
-  console.log(`\n대상: ${url}`);
-  process.exit(process.exitCode ?? 0);
-}
-
 if (deriveOnly) {
-  await derive({ dryRun });
+  await derive({ dryRun, rejudge });
   console.log(`\n대상: ${url}`);
   process.exit(process.exitCode ?? 0);
 }
@@ -131,7 +98,7 @@ if (reprocess) {
     const s = await reprocessAll(supabase);
     console.log(`재처리: 읽음 ${s.read} · 갱신 ${s.updated} · 실패 ${s.failed}`);
     if (s.lostAttribution.length) {
-      // ⚠ 실패로 알린다 — 그 행들은 옛 저자 표기를 단 채 공개돼 있다(pipeline.mjs의 reprocessAll)
+      // 실패로 알린다 — 그 행들은 옛 저자 표기를 단 채 공개돼 있다(pipeline.mjs의 reprocessAll)
       console.error(`✗ 규칙 변경으로 귀속을 잃은 행 ${s.lostAttribution.length}건 — 지우지 않고 남겼습니다. 확인 후 삭제하세요`);
       console.error(`  id: ${s.lostAttribution.join(", ")}`);
     }
@@ -142,9 +109,7 @@ if (reprocess) {
     process.exitCode = 1;
   }
   await expand();
-  // 추출 컬럼(players·stage)이 바뀌었으니 딜도 다시 만든다
-  await derive({ dryRun: false });
-  await summarize({ dryRun: false });
+  await derive({ dryRun: false }); // 추출 컬럼(players·stage)이 바뀌었으니 딜도 다시 만든다
   console.log(`\n대상: ${url}`);
   process.exit(process.exitCode ?? 0);
 }
@@ -153,18 +118,14 @@ const t0 = Date.now();
 const results = await syncSources(supabase, targets);
 printResults(results);
 await expand();
-// ⚠ 소스가 실패해도 파생은 돈다 — 성공한 소스의 새 보도가 보드에 닿아야 한다. 종료 코드는 둘 중 하나라도 실패면 1이다
+// 소스가 실패해도 파생은 돈다 — 성공한 소스의 새 보도가 보드에 닿아야 한다. 종료 코드는 둘 중 하나라도 실패면 1이다
 await derive({ dryRun: false });
-await summarize({ dryRun: false });
 console.log(`\n${((Date.now() - t0) / 1000).toFixed(1)}초 · 대상: ${url}`);
 process.exit(process.exitCode ?? 0);
 
 // ─────────────────────────────────────────────────────────────────────
 
-/**
- * 가십 칼럼 → 항목 행(`pipeline.mjs`의 `expandRoundups`). 파생보다 먼저 돈다 — 새 항목이 같은 실행에서 딜에 닿게.
- * ⚠ 칼럼을 받지 못한 것은 경고다(다음 실행이 다시 받는다). 저장 실패만 종료 코드 1이다.
- */
+/** 가십 칼럼 → 항목 행. 파생보다 먼저 돈다. 칼럼을 받지 못한 것은 경고(다음 실행이 다시 받는다), 저장 실패만 종료 코드 1 */
 async function expand() {
   try {
     const r = await expandRoundups(supabase);
@@ -176,25 +137,30 @@ async function expand() {
   }
 }
 
-/** 딜 파생 — 결과 요약을 찍고, 행 단위 실패가 하나라도 있으면 종료 코드 1 */
-async function derive({ dryRun: summaryOnly }) {
+/**
+ * 딜 파생(+ LLM 판정·요약) — 결과 요약을 찍고, 행 단위 실패가 하나라도 있으면 종료 코드 1.
+ * 키가 없으면 판정 없이 파생한다. 원격 실행에서 키가 없으면 실패다 — 조용히 지나가면 새 딜이 영영 열리지 않고 화면이 영문으로 남는다.
+ * 판정이 계통적으로 실패해도(인증) 파생은 끝까지 쓴다(새 딜은 닫힘·기존 딜은 유지) — 종료 코드만 올린다.
+ */
+async function derive({ dryRun: summaryOnly, rejudge: again = false }) {
   try {
     const apiKey = env.ANTHROPIC_API_KEY;
-    if (!apiKey && !summaryOnly) console.log("\nANTHROPIC_API_KEY가 없어 이동 판정을 건너뜁니다 — 판정 없는 새 딜은 열리지 않습니다");
-    // ⚠ 판정이 계통적으로 실패해도(인증) 파생은 끝까지 쓴다 — 판정 없는 파생(새 딜은 닫힘·기존 딜은 유지)으로 떨어진다.
-    //   종료 코드는 올린다(키가 틀린 채 초록으로 지나가면 새 딜이 영영 열리지 않는다)
+    if (!apiKey && !summaryOnly) {
+      const msg = "ANTHROPIC_API_KEY가 없어 LLM 판정·요약을 건너뜁니다 — 판정 없는 새 딜은 열리지 않습니다";
+      if (allowRemote) { console.error(`✗ ${msg}`); process.exitCode = 1; } else console.log(`\n${msg}`);
+    }
     const judge = apiKey
-      ? async (needs) => {
+      ? async (needs, names) => {
           try {
-            return await runVerdicts(supabase, needs, { apiKey });
+            return await runJudgements(supabase, needs, { apiKey, names });
           } catch (e) {
-            console.error(`✗ 이동 판정 실패: ${e instanceof Error ? e.message : String(e)}`);
+            console.error(`✗ LLM 판정 실패: ${e instanceof Error ? e.message : String(e)}`);
             process.exitCode = 1;
-            return { read: needs.length, move: 0, notMove: 0, invalid: 0, failed: needs.length, articles: 0, articleMissing: 0, inputTokens: 0, outputTokens: 0, warnings: [], updates: [] };
+            return { warnings: [], updates: [] };
           }
         }
       : null;
-    const r = await runDerivation(supabase, { dryRun: summaryOnly, judge });
+    const r = await runDerivation(supabase, { dryRun: summaryOnly, rejudge: again, judge });
     const s = r.summary;
     const stages = Object.entries(s.stages).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(" · ") || "—";
     console.log(`\n딜 파생${summaryOnly ? "(드라이런)" : ""}: 딜 ${s.deals} · 구단 ${s.clubs} · 연결된 보도 ${s.linkedRows}건`);
@@ -203,7 +169,11 @@ async function derive({ dryRun: summaryOnly }) {
     const skipped = Object.entries(r.skipped).map(([k, v]) => `${k} ${v}`).join(" · ");
     if (skipped) console.log(`  건너뜀: ${skipped}`);
     if (r.lookup) console.log(`  이름 사전(위키데이터): 조회 ${r.lookup.tried} · 찾음 ${r.lookup.found} · 없음 ${r.lookup.notFound} · 실패 ${r.lookup.failed}`);
-    if (r.verdicts) console.log(`  이동 판정 · ${VERDICT_MODEL}: 대상 ${r.verdicts.read} · 이동 ${r.verdicts.move} · 아님 ${r.verdicts.notMove} · 판정 불가 ${r.verdicts.invalid} · 실패 ${r.verdicts.failed} · 기사 본문 ${r.verdicts.articles}(못 받음 ${r.verdicts.articleMissing}) · 토큰 ${r.verdicts.inputTokens}/${r.verdicts.outputTokens}`);
+    const j = r.judged;
+    if (j && "read" in j) {
+      console.log(`  LLM 판정·요약 · ${JUDGE_MODEL}: 대상 ${j.read} · 이동 ${j.move}(요약 ${j.summarized}, 요약 버림 ${j.summaryInvalid}) · 아님 ${j.notMove} · 판정 불가 ${j.invalid} · 실패 ${j.failed} · 기사 본문 ${j.articles}(못 받음 ${j.articleMissing})`);
+      console.log(`  토큰: 입력 ${j.inputTokens}(캐시 읽음 ${j.cacheReadTokens} · 캐시 씀 ${j.cacheWriteTokens}) · 출력 ${j.outputTokens}`);
+    }
     for (const w of r.warnings) console.warn(`  ⚠ ${w}`);
     if (summaryOnly) {
       for (const d of r.deals.slice(0, 20)) {
@@ -216,35 +186,6 @@ async function derive({ dryRun: summaryOnly }) {
     }
   } catch (e) {
     console.error(`✗ 딜 파생 실패: ${e.message}`);
-    process.exitCode = 1;
-  }
-}
-
-/**
- * 한국어 요약 — 행 단위 실패는 경고, 키 없음·인증 실패는 종료 코드 1.
- * ⚠ 키가 없을 때 **원격 실행이면 실패**다 — 크론이 조용히 초록으로 지나가면 화면이 영영 영문이다.
- *   로컬은 키 없이도 수집·파생을 돌릴 수 있어야 하므로 알리고 건너뛴다.
- */
-async function summarize({ dryRun: previewOnly, resummarize: again = false }) {
-  const apiKey = env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    const msg = "ANTHROPIC_API_KEY가 없어 한국어 요약을 건너뜁니다";
-    if (allowRemote) {
-      console.error(`✗ ${msg}`);
-      process.exitCode = 1;
-    } else console.log(`\n${msg}`);
-    return;
-  }
-  try {
-    const r = await runSummaries(supabase, { apiKey, dryRun: previewOnly, resummarize: again });
-    console.log(`\n한국어 요약${previewOnly ? "(드라이런)" : ""} · ${SUMMARY_MODEL}: 대상 ${r.read} · 요약 ${r.summarized} · 무관 ${r.irrelevant} · 버림 ${r.invalid} · 실패 ${r.failed}`);
-    console.log(`  토큰: 입력 ${r.inputTokens} · 출력 ${r.outputTokens}`);
-    for (const w of r.warnings) console.warn(`  ⚠ ${w}`);
-    for (const p of r.preview) {
-      console.log(`  #${p.id} ${p.verdict.kind === "summary" ? p.verdict.text : `[${p.verdict.kind}] ${p.verdict.reason ?? ""}`}`);
-    }
-  } catch (e) {
-    console.error(`✗ 한국어 요약 실패: ${e.message}`);
     process.exitCode = 1;
   }
 }
@@ -265,16 +206,13 @@ function printResults(results) {
   if (failed.length) process.exitCode = 1;
 }
 
-/**
- * 빈도가 높다고 좋은 소스가 아니다 — 사칭 계정이나 정체불명 미러도 물량은 많다.
- * 등록된 소스가 여전히 "그 사람 본인"인지, 미러가 출처를 밝히는지 확인한다.
- */
+/** 등록된 소스가 여전히 "그 사람 본인"인지, 미러가 출처를 밝히는지 확인한다 — 빈도가 높다고 좋은 소스가 아니다 */
 async function verify() {
   console.log(`정기 실행 주기 상한: ${maxRunIntervalMinutes()}분 (가장 짧은 피드 보관시간 ÷ 3)\n`);
   for (const s of SOURCES.filter((x) => x.kind === "bluesky")) {
     try {
       const v = await verifyBlueskyAccount(s.config.handle);
-      // 배지 없이 사람이 확인해 등록한 계정 — 배지를 기대하지 않는다. 계정이 살아 있는지와 **배지가 새로 붙었는지**만 알린다
+      // 배지 없이 사람이 확인해 등록한 계정 — 배지를 기대하지 않는다. 계정이 살아 있는지와 배지가 새로 붙었는지만 알린다
       if (s.verification?.method) {
         console.log(`${s.id.padEnd(20)} ○ 수동 확인(${s.verification.method}, ${s.verification.checkedAt})  배지 ${v.issuerHandle ?? "—"}  팔로워 ${v.followersCount}`);
         continue;

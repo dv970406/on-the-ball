@@ -60,13 +60,7 @@ export function DealRow({ deal, nowMs }: DealRowProps) {
             {deal.isWatched && <WatchMark />}
             <span className="truncate">{name}</span>
           </h3>
-          <ClubRoute
-            from={deal.fromClub}
-            to={deal.toClub}
-            size={16}
-            dead={dead}
-            className="mt-1.5"
-          />
+          <ClubRoute deal={deal} size={16} className="mt-1.5" />
         </div>
 
         <div className={cn("flex flex-col items-end gap-[3px] text-right", dead && "opacity-60")}>

@@ -1131,12 +1131,26 @@ select set_config('request.jwt.claims', '{}', true);
 select count(*) = 1 from public.transfer_deal where id = :td2 and is_free_agent = false;
 rollback to s;
 
+\echo ''
+\echo '-- 36f. 관심 구단 (20260928000003) — 행선지 밖 구단 코드 배열, 공개 --'
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[t 기대] 비로그인이 관심 구단을 읽는다(기본값은 빈 배열)'
+select suitor_codes = '{}' from public.transfer_deal where id = :td2;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 관심 구단 11개'
+update public.transfer_deal set suitor_codes = array['a','b','c','d','e','f','g','h','i','j','k'] where id = :td2;
+rollback to s;
+
 rollback to s36;
 
 \echo ''
-\echo '=== 37. 이적 소식 한국어 요약 (20260925000002) ==='
-\echo '  설계 요약: summary_ko는 요약 단계(LLM, service_role)만 쓰는 추출 컬럼이다. 비로그인도 읽고,'
-\echo '  시도 표시(summarized_at)는 열지 않는다. 원문 전문의 우회 재배포를 막는 길이 상한이 있다.'
+\echo '=== 37. 이적 소식 한국어 요약 (20260925000002 · 20260928000002) ==='
+\echo '  설계 요약: summary_ko는 LLM 판정 단계(service_role)만 쓰는 추출 컬럼이다. 비로그인도 읽는다.'
+\echo '  원문 전문의 우회 재배포를 막는 길이 상한이 있다. 시도 시각은 verdict_at 하나다(summarized_at은 없다).'
 savepoint s37;
 
 insert into public.transfer_news (source_id, external_id, body, published_at, attribution, attributed_to, tier, stage, relevance)
@@ -1159,48 +1173,34 @@ select set_config('request.jwt.claims', '{}', true);
 select count(*) = 1 from public.transfer_news where id = :ts1 and summary_ko is null;
 rollback to s;
 
-savepoint s;
-select set_config('request.jwt.claims', '{}', true);
-:login_anon
-\echo '[❌차단] 비로그인이 시도 표시(summarized_at)를 읽는다 — 운영 표시라 열지 않는다'
-select summarized_at from public.transfer_news where id = :ts1;
-rollback to s;
-
 \echo ''
 \echo '-- 37c. 스키마 불변식 (writer가 service_role이라 CHECK가 유일한 방어다) --'
 savepoint s;
-\echo '[❌차단] 시도 시각 없는 요약'
-update public.transfer_news set summary_ko = '아스날이 영입에 합의했다.' where id = :ts1;
-rollback to s;
-
-savepoint s;
 \echo '[❌차단] 160자 초과 — 요약이 아니라 전문 번역이 들어오는 것을 막는다'
-update public.transfer_news set summary_ko = repeat('가', 161), summarized_at = now() where id = :ts1;
+update public.transfer_news set summary_ko = repeat('가', 161) where id = :ts1;
 rollback to s;
 
 savepoint s;
 \echo '[❌차단] 보이지 않는 요약(제로폭 공백)'
-update public.transfer_news set summary_ko = E'​', summarized_at = now() where id = :ts1;
+update public.transfer_news set summary_ko = E'​' where id = :ts1;
 rollback to s;
 
 savepoint s;
 \echo '[t 기대] 요약을 쓴다 — 원문 고정 트리거(수집 컬럼)에 걸리지 않는다'
-update public.transfer_news set summary_ko = repeat('가', 160), summarized_at = now() where id = :ts1;
+update public.transfer_news set summary_ko = repeat('가', 160) where id = :ts1;
 select char_length(summary_ko) = 160 from public.transfer_news where id = :ts1;
 rollback to s;
 
-savepoint s;
-\echo '[t 기대] 무관 판정 — 요약 없이 시도 시각만 남는다'
-update public.transfer_news set summarized_at = now() where id = :ts1;
-select summary_ko is null and summarized_at is not null from public.transfer_news where id = :ts1;
-rollback to s;
+\echo '[0행 기대] 요약 시도 시각 컬럼은 없다 — 시도 시각은 verdict_at 하나다'
+select column_name from information_schema.columns
+ where table_schema = 'public' and table_name = 'transfer_news' and column_name = 'summarized_at';
 
 rollback to s37;
 
 \echo ''
-\echo '=== 37-1. 이적 소식 이동 판정 (20260928000001) ==='
+\echo '=== 37-1. 이적 소식 LLM 판정 (20260928000001 · 20260928000002) ==='
 \echo '  설계 요약: verdict*는 판정 단계(LLM, service_role)만 쓰는 비공개 추출 컬럼이다. 앱은 읽지도 쓰지도 못한다.'
-\echo '  판정 불가는 값 없이 시도 시각만 남고, 판정에는 선수·시각이 따른다(CHECK가 유일한 방어다).'
+\echo '  판정 불가는 값 없이 시도 시각만 남고, 판정에는 선수·시각이 따른다. 근거·출발·행선지 구단은 판정에 딸린다(CHECK가 유일한 방어다).'
 savepoint s37v;
 
 insert into public.transfer_news (source_id, external_id, body, published_at, attribution, attributed_to, tier, stage, relevance)
@@ -1256,6 +1256,65 @@ update public.transfer_news set verdict_player = 'barcola', verdict_at = now() w
 select verdict is null and verdict_at is not null from public.transfer_news where id = :tv1;
 rollback to s;
 
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[❌차단] 비로그인이 판정자가 읽은 출발·행선지 구단을 읽는다 — 화면은 파생된 딜의 구단을 그린다'
+select verdict_from, verdict_to from public.transfer_news where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 판정 없는 출발 구단'
+update public.transfer_news set verdict_from = 'Paris Saint-Germain', verdict_player = 'barcola', verdict_at = now() where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 120자 넘는 행선지 구단'
+update public.transfer_news set verdict = 'move', verdict_player = 'barcola', verdict_at = now(), verdict_to = repeat('a', 121) where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[t 기대] 출발·행선지 구단을 판정과 함께 쓴다'
+update public.transfer_news set verdict = 'move', verdict_player = 'barcola', verdict_at = now(), verdict_from = 'Paris Saint-Germain', verdict_to = 'Liverpool', summary_ko = '리버풀이 바르콜라 영입에 합의했다.' where id = :tv1;
+select verdict_from = 'Paris Saint-Germain' and verdict_to = 'Liverpool' and summary_ko is not null from public.transfer_news where id = :tv1;
+rollback to s;
+
+\echo ''
+\echo '-- 37-2. 판정자가 읽은 선수·단계·관심 구단 (20260928000003) --'
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[❌차단] 비로그인이 판정자가 읽은 선수 이름·단계·관심 구단을 읽는다 — 비공개 추출 컬럼'
+select verdict_player_name, verdict_stage, verdict_suitors from public.transfer_news where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[t 기대] "이동 아님"은 선수 없이도 성립한다(규칙이 선수를 못 뽑은 보도의 판정)'
+update public.transfer_news set verdict = 'not_move', verdict_player = null, verdict_at = now() where id = :tv1;
+select verdict = 'not_move' and verdict_player is null from public.transfer_news where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] "이동"은 선수가 있어야 한다'
+update public.transfer_news set verdict = 'move', verdict_player = null, verdict_at = now() where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 판정 없는 선수 이름·단계·관심 구단'
+update public.transfer_news set verdict_player_name = 'Bradley Barcola', verdict_stage = 'agreement', verdict_suitors = array['Chelsea'] where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 관심 구단 11개'
+update public.transfer_news set verdict = 'move', verdict_player = 'barcola', verdict_at = now(), verdict_suitors = array['a','b','c','d','e','f','g','h','i','j','k'] where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[t 기대] 선수 이름·단계·관심 구단을 판정과 함께 쓴다'
+update public.transfer_news set verdict = 'move', verdict_player = 'barcola', verdict_player_name = 'Bradley Barcola', verdict_stage = 'agreement', verdict_suitors = array['Chelsea', 'Arsenal'], verdict_at = now() where id = :tv1;
+select verdict_player_name = 'Bradley Barcola' and verdict_stage = 'agreement' and cardinality(verdict_suitors) = 2 from public.transfer_news where id = :tv1;
+rollback to s;
+
 rollback to s37v;
 
 \echo ''
@@ -1295,9 +1354,20 @@ insert into public.transfer_name_ko (kind, key, name_en, name_ko, wikidata_id) v
 rollback to s;
 
 savepoint s;
-\echo '[t 기대] 찾지 못한 이름도 행으로 남는다(매시간 다시 찾지 않게)'
+\echo '[t 기대] 찾지 못한 이름도 행으로 남는다(매시간 다시 찾지 않게) — 출처 기본값은 wikidata'
 insert into public.transfer_name_ko (kind, key, name_en) values ('club', 'rlstest club', 'Rlstest Club');
-select name_ko is null and wikidata_id is null from public.transfer_name_ko where key = 'rlstest club';
+select name_ko is null and wikidata_id is null and source = 'wikidata' from public.transfer_name_ko where key = 'rlstest club';
+rollback to s;
+
+savepoint s;
+\echo '[t 기대] LLM 음역은 위키데이터 항목 없이도 남는다(source = llm) — 임시 표기'
+insert into public.transfer_name_ko (kind, key, name_en, name_ko, source) values ('player', 'rlstest llm', 'Rlstest Llm', '알엘 음역', 'llm');
+select name_ko = '알엘 음역' and wikidata_id is null from public.transfer_name_ko where key = 'rlstest llm';
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 모르는 출처'
+insert into public.transfer_name_ko (kind, key, name_en, name_ko, source) values ('player', 'rlstest llm', 'Rlstest Llm', '알엘 음역', 'human');
 rollback to s;
 
 rollback to s38;

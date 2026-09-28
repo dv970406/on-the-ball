@@ -1,4 +1,4 @@
-import { CircleX } from "lucide-react";
+import { CircleSlash, CircleX } from "lucide-react";
 // ⚠ 배럴이 아니라 직접 경로다 — `"use client"`가 없어 서버 렌더 여지를 남긴다(`pill.tsx`와 같은 이유)
 import { cn } from "@/shared/lib/cn";
 import { Icon } from "@/shared/ui";
@@ -20,27 +20,29 @@ const STATUS_CLASS: Record<TransferStatus, string> = {
   talks: "border border-hairline-strong text-ink-secondary",
   rumor: "border border-hairline-cool bg-canvas-soft text-ink-mute",
   dead: "border border-crimson/35 text-crimson",
+  // 부인은 결렬과 같은 톤이다 — 둘을 가르는 것은 글자("부인")와 목록 행의 아이콘(⊘)이다(색이 정보를 혼자 지지 않는다)
+  denied: "border border-crimson/35 text-crimson",
 };
 
-/** 목록 행의 결렬 — 크림슨 채움 + 흰 글자 + 아이콘. 행이 `grayscale`이라 회색으로 보인다 */
+/** 목록 행의 결렬·부인 — 크림슨 채움 + 흰 글자 + 아이콘(결렬 ⊗ · 부인 ⊘). 행이 `grayscale`이라 회색으로 보인다 */
 const DEAD_INLINE_CLASS = "bg-crimson text-white";
 
 interface StatusBadgeProps {
   stage: TransferStage;
-  /** 목록 행 안의 변형 — 결렬만 채움+아이콘으로 바뀐다. 다른 상태는 기본과 같다 */
+  /** 목록 행 안의 변형 — 결렬·부인만 채움+아이콘으로 바뀐다. 다른 상태는 기본과 같다 */
   inline?: boolean;
   className?: string;
 }
 
 /**
- * 상태 뱃지 — 단계를 여섯 톤으로 접어 그린다(handoff §3 `Status`). **확률 병합은 없다**(보류).
+ * 상태 뱃지 — 단계를 일곱 톤으로 접어 그린다(handoff §3 `Status`). **확률 병합은 없다**(보류).
  * ⚠ 알약(`rounded-full`)은 컨트롤이 아니라 표시 요소라 `styling.md` 예외 표의 "대상이 아닌 것"이다.
  * ⚠ `unknown` 단계는 아무것도 그리지 않는다 — 딜에는 애초에 들어오지 않는다.
  */
 export function StatusBadge({ stage, inline, className }: StatusBadgeProps) {
   const status = STAGE_STATUS[stage];
   if (status === null) return null;
-  const deadInline = inline === true && status === "dead";
+  const deadInline = inline === true && (status === "dead" || status === "denied");
   return (
     <span
       className={cn(
@@ -49,7 +51,7 @@ export function StatusBadge({ stage, inline, className }: StatusBadgeProps) {
         className,
       )}
     >
-      {deadInline && <Icon as={CircleX} size={11} />}
+      {deadInline && <Icon as={status === "denied" ? CircleSlash : CircleX} size={11} />}
       {STATUS_LABEL[status]}
     </span>
   );

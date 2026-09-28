@@ -3,7 +3,7 @@
  *
  *   node scripts/eval-transfer.mjs --export [--remote]   # 운영(또는 로컬) 보도를 로컬 스냅샷으로 받는다(.cache/, 읽기만)
  *   node scripts/eval-transfer.mjs                        # 스냅샷으로 채점(LLM 토큰 0 — 저장된·캐시된 판정만 쓴다)
- *   node scripts/eval-transfer.mjs --verdict              # 판정이 없는 후보를 LLM에 묻고 캐시에 남긴다(토큰을 쓴다)
+ *   node scripts/eval-transfer.mjs --judge                # 판정이 없는 후보를 LLM에 묻고 캐시에 남긴다(토큰을 쓴다)
  *   node scripts/eval-transfer.mjs --offline              # 위키데이터 이름 조회도 하지 않는다(스냅샷의 캐시만)
  *
  * 규칙을 고칠 때마다 돌려 **정밀도(보드에 오른 딜이 맞는가)와 재현율(이적 보도를 딜로 잡았는가)을 같은 기준으로** 본다.
@@ -20,7 +20,7 @@ import { extractTransfer } from "./lib/transfer/extract.mjs";
 import { deriveDeals, normalizePlayer } from "./lib/transfer/derive-deals.mjs";
 import { createNameBook, loadGlossary, loadPlayerDictionary, missingNames } from "./lib/transfer/names-ko.mjs";
 import { lookupKo } from "./lib/transfer/wikidata.mjs";
-import { runVerdicts } from "./lib/transfer/verdict.mjs";
+import { runJudgements } from "./lib/transfer/judge.mjs";
 
 const argv = process.argv.slice(2);
 const DIR = ".cache/transfer-eval";
@@ -50,7 +50,7 @@ const rows = snap.rows.map((r) => {
 const applyVerdicts = () => {
   for (const r of rows) {
     const hit = Object.entries(verdictCache).find(([k]) => k.startsWith(`${r.id}:`));
-    if (hit) Object.assign(r, { verdict: hit[1].verdict, verdict_player: hit[0].slice(String(r.id).length + 1), verdict_at: hit[1].at });
+    if (hit) Object.assign(r, { verdict: hit[1].verdict, verdict_player: hit[0].slice(String(r.id).length + 1), verdict_player_name: hit[1].playerName ?? null, verdict_at: hit[1].at, verdict_from: hit[1].from ?? null, verdict_to: hit[1].to ?? null, verdict_suitors: hit[1].suitors ?? [], verdict_stage: hit[1].stage ?? null, summary_ko: hit[1].summary ?? null });
   }
 };
 applyVerdicts();
@@ -70,18 +70,18 @@ if (!argv.includes("--offline")) {
   d = derive();
 }
 
-// LLM 판정 — --verdict일 때만(토큰을 쓴다). 결과는 캐시에 남긴다
-let tokens = { input: 0, output: 0, calls: 0 };
-if (argv.includes("--verdict") && d.verdictNeeds.length) {
+// LLM 판정 — --judge일 때만(토큰을 쓴다). 결과는 캐시에 남긴다
+let tokens = { input: 0, output: 0, cached: 0, calls: 0 };
+if (argv.includes("--judge") && d.judgeNeeds.length) {
   const env = loadEnv(["ANTHROPIC_API_KEY"]);
   if (!env.ANTHROPIC_API_KEY) {
     console.error("ANTHROPIC_API_KEY가 필요합니다");
     process.exit(1);
   }
   const fakeDb = { from: () => ({ update: () => ({ eq: async () => ({ error: null }) }) }) };
-  const v = await runVerdicts(fakeDb, d.verdictNeeds, { apiKey: env.ANTHROPIC_API_KEY, limit: 1000 });
-  tokens = { input: v.inputTokens, output: v.outputTokens, calls: v.move + v.notMove + v.invalid };
-  for (const u of v.updates) if (u.verdict) verdictCache[`${u.id}:${u.verdict_player}`] = { verdict: u.verdict, evidence: u.verdict_evidence, at: u.verdict_at };
+  const v = await runJudgements(fakeDb, d.judgeNeeds, { apiKey: env.ANTHROPIC_API_KEY, names: book(), limit: 1000 });
+  tokens = { input: v.inputTokens, output: v.outputTokens, cached: v.cacheReadTokens, calls: v.move + v.notMove + v.invalid };
+  for (const u of v.updates) if (u.verdict) verdictCache[`${u.id}:${u.verdict_player ?? ""}`] = { verdict: u.verdict, evidence: u.verdict_evidence, playerName: u.verdict_player_name, from: u.verdict_from, to: u.verdict_to, suitors: u.verdict_suitors, stage: u.verdict_stage, summary: u.summary_ko ?? null, at: u.verdict_at };
   fs.mkdirSync(DIR, { recursive: true });
   fs.writeFileSync(VERDICTS, JSON.stringify(verdictCache, null, 1));
   for (const w of v.warnings) console.warn(`⚠ ${w}`);
@@ -128,12 +128,13 @@ for (const g of goldenIn.filter((x) => x.is_move_report)) {
 const pct = (a, b) => (b ? `${((a / b) * 100).toFixed(0)}%` : "—");
 console.log(`\n이적 딜 정확도 — 정답 ${goldenIn.length}건(스냅샷 ${snap.nowIso})`);
 console.log(`  보드 딜 ${d.deals.length}건 · 정답으로 채점 가능한 딜 ${graded.length}건 · 맞음 ${correct} → 정밀도 ${pct(correct, graded.length)}`);
-for (const deal of d.deals) console.log(`    ${wrong.some((w) => w.startsWith(`${deal.player} —`)) ? "✗" : "·"} ${deal.player}${deal.player_ko ? `(${deal.player_ko})` : ""} [${deal.stage}] 보도 ${deal.report_count}`);
+for (const deal of d.deals) console.log(`    ${wrong.some((w) => w.startsWith(`${deal.player} —`)) ? "✗" : "·"} ${deal.player}${deal.player_ko ? `(${deal.player_ko})` : ""} [${deal.stage}] ${deal.from_club_code ?? "?"} → ${deal.to_club_code ?? "?"} 보도 ${deal.report_count}`);
 console.log(`  재현율(이동 보도 선수 → 딜) ${covered.length}/${truePlayers.size} = ${pct(covered.length, truePlayers.size)}`);
 console.log(`  추출 재현율(이동 보도에서 선수 이름을 뽑음) ${extHit}/${extAll} = ${pct(extHit, extAll)}`);
+console.log(`  방향 채움(출발·행선지 둘 다) ${d.deals.filter((x) => x.from_club_code && x.to_club_code).length}/${d.deals.length}`);
 console.log(`  건너뜀: ${Object.entries(d.skipped).map(([k, v]) => `${k} ${v}`).join(" · ")}`);
-console.log(`  판정 대기(캐시에 판정 없음 — --verdict로 묻는다) ${d.verdictNeeds.length}건`);
-console.log(`  LLM 토큰(이번 실행): 호출 ${tokens.calls} · 입력 ${tokens.input} · 출력 ${tokens.output}`);
+console.log(`  판정 대기(캐시에 판정 없음 — --judge로 묻는다) ${d.judgeNeeds.length}건`);
+console.log(`  LLM 토큰(이번 실행): 호출 ${tokens.calls} · 입력 ${tokens.input}(캐시 읽음 ${tokens.cached}) · 출력 ${tokens.output}`);
 
 async function exportSnapshot() {
   const env = loadEnv();

@@ -5,14 +5,13 @@ import Link from "next/link";
 import { ROUTES } from "@/shared/config";
 import { formatRelativeTime } from "@/shared/lib";
 import { Icon } from "@/shared/ui";
+import { routeLabels } from "../lib/route-label";
 import type { TransferDealListItem } from "../model/types";
 import { FeeDelta } from "./fee-delta";
 import { FeeValue } from "./fee-value";
 import { TransferCrest } from "./transfer-crest";
 import { WatchMark } from "./watch-mark";
 
-/** 방향을 못 읽은 구단의 표기 — `ClubRoute`와 같은 말 */
-const UNKNOWN_CLUB_LABEL = "미확인";
 
 interface DealMiniCardProps {
   deal: TransferDealListItem;
@@ -30,6 +29,7 @@ interface DealMiniCardProps {
  */
 export function DealMiniCard({ deal, nowMs }: DealMiniCardProps) {
   const name = deal.playerKo ?? deal.player;
+  const route = routeLabels(deal);
 
   return (
     <li className="w-[200px] shrink-0 snap-start">
@@ -54,10 +54,10 @@ export function DealMiniCard({ deal, nowMs }: DealMiniCardProps) {
           <span className="truncate">{name}</span>
         </h3>
         <p className="mt-[3px] truncate text-[12px] text-ink-mute">
-          {deal.fromClub?.shortName ?? UNKNOWN_CLUB_LABEL}
+          {route.from}
           {/* 문장 안의 `→`는 허용된다(아이콘 대체가 아니라 텍스트다 — handoff §0) */}
           {" → "}
-          <span className="font-medium text-ink">{deal.toClub?.shortName ?? UNKNOWN_CLUB_LABEL}</span>
+          <span className="font-medium text-ink">{route.to}</span>
         </p>
 
         <div className="mt-2.5 flex flex-wrap items-baseline gap-1.5 border-t border-hairline-cool pt-2.5">

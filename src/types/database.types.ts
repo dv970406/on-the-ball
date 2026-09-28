@@ -80,6 +80,7 @@ export type Database = {
           prev_fee_amount: number | null
           report_count: number
           stage: Database["public"]["Enums"]["transfer_stage"]
+          suitor_codes: string[]
           to_club_code: string | null
           updated_at: string
           wage_text: string | null
@@ -106,6 +107,7 @@ export type Database = {
           prev_fee_amount?: number | null
           report_count: number
           stage: Database["public"]["Enums"]["transfer_stage"]
+          suitor_codes?: string[]
           to_club_code?: string | null
           updated_at?: string
           wage_text?: string | null
@@ -132,6 +134,7 @@ export type Database = {
           prev_fee_amount?: number | null
           report_count?: number
           stage?: Database["public"]["Enums"]["transfer_stage"]
+          suitor_codes?: string[]
           to_club_code?: string | null
           updated_at?: string
           wage_text?: string | null
@@ -284,6 +287,7 @@ export type Database = {
           kind: string
           name_en: string
           name_ko: string | null
+          source: string
           wikidata_id: string | null
         }
         Insert: {
@@ -292,6 +296,7 @@ export type Database = {
           kind: string
           name_en: string
           name_ko?: string | null
+          source?: string
           wikidata_id?: string | null
         }
         Update: {
@@ -300,6 +305,7 @@ export type Database = {
           kind?: string
           name_en?: string
           name_ko?: string | null
+          source?: string
           wikidata_id?: string | null
         }
         Relationships: []
@@ -326,14 +332,18 @@ export type Database = {
           relevance: number
           source_id: string
           stage: Database["public"]["Enums"]["transfer_stage"]
-          summarized_at: string | null
           summary_ko: string | null
           tier: number
           url: string | null
           verdict: Database["public"]["Enums"]["transfer_verdict"] | null
           verdict_at: string | null
           verdict_evidence: string | null
+          verdict_from: string | null
           verdict_player: string | null
+          verdict_player_name: string | null
+          verdict_stage: Database["public"]["Enums"]["transfer_stage"] | null
+          verdict_suitors: string[]
+          verdict_to: string | null
         }
         Insert: {
           attributed_to?: string | null
@@ -356,14 +366,18 @@ export type Database = {
           relevance: number
           source_id: string
           stage: Database["public"]["Enums"]["transfer_stage"]
-          summarized_at?: string | null
           summary_ko?: string | null
           tier: number
           url?: string | null
           verdict?: Database["public"]["Enums"]["transfer_verdict"] | null
           verdict_at?: string | null
           verdict_evidence?: string | null
+          verdict_from?: string | null
           verdict_player?: string | null
+          verdict_player_name?: string | null
+          verdict_stage?: Database["public"]["Enums"]["transfer_stage"] | null
+          verdict_suitors?: string[]
+          verdict_to?: string | null
         }
         Update: {
           attributed_to?: string | null
@@ -386,14 +400,18 @@ export type Database = {
           relevance?: number
           source_id?: string
           stage?: Database["public"]["Enums"]["transfer_stage"]
-          summarized_at?: string | null
           summary_ko?: string | null
           tier?: number
           url?: string | null
           verdict?: Database["public"]["Enums"]["transfer_verdict"] | null
           verdict_at?: string | null
           verdict_evidence?: string | null
+          verdict_from?: string | null
           verdict_player?: string | null
+          verdict_player_name?: string | null
+          verdict_stage?: Database["public"]["Enums"]["transfer_stage"] | null
+          verdict_suitors?: string[]
+          verdict_to?: string | null
         }
         Relationships: [
           {
@@ -427,6 +445,7 @@ export type Database = {
         | "here_we_go"
         | "official"
         | "collapsed"
+        | "denied"
         | "unknown"
       transfer_verdict: "move" | "not_move"
     }
@@ -567,6 +586,7 @@ export const Constants = {
         "here_we_go",
         "official",
         "collapsed",
+        "denied",
         "unknown",
       ],
       transfer_verdict: ["move", "not_move"],

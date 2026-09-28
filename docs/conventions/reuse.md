@@ -109,8 +109,9 @@
 - **`TRANSFER_LEAGUES`** — 리그 시트의 노출 순서(5대 리그). `TransferLeague` 유니온과 `as const satisfies` + 망라성 가드로 서로 대조한다 — DB `transfer_club.league`가 enum이 아니라 `text + check`라 생성 타입에서 못 뽑아 손으로 적었기 때문이다.
 - **`dealInLeague(deal, league)` / `parseTransferLeague(value)` / `parseTransferSort(value)`** — 리그 필터(출발 **또는** 도착 일치, `null`은 전체) · URL `?league=`·`?sort=` 해석. ⚠ **모르는 리그는 `null`(전체로 폴백), 모르는 정렬은 `latest`로 폴백** — 파라미터 오염이 404를 양산하면 안 된다(`nextjs.md`의 필터 절). 링크를 만드는 곳과 URL을 해석하는 곳이 갈리면 조용히 어긋나므로 **역방향 판정을 호출부가 직접 짜지 말 것**. 서버에서는 `@/entities/transfer/lib/league` 직접 경로.
 - **`groupDeals(deals)` / `sortDeals(deals, sort)`** — 정렬 → 구간 분류. `sortDeals`가 **먼저**다(안정 정렬 — 같은 값끼리는 서버가 준 순서를 유지한다). `groupDeals`는 **빈 구간을 뺀다**(구간 점프 칩은 `GROUP_ORDER`·`GROUP_LABEL`을 직접 돌아 빈 구간도 0건으로 그린다).
-- `GROUP_LABEL` / `GROUP_ORDER` — 보드 구간(오피셜·합의 완료·진행 중·루머·결렬)의 라벨·고정 순서.
+- `GROUP_LABEL` / `GROUP_ORDER` — 보드 구간(오피셜·합의 완료·진행 중·루머·결렬·부인)의 라벨·고정 순서. 결렬(`collapsed`)과 부인(`denied`)은 같은 구간이고 뱃지·아이콘(⊗/⊘)이 가른다 — 판정은 `isDeadStage`와 `stage === "denied"` 둘뿐이다.
 - **`CredibilityBadge`** — 출처 공신력: 🎖️(오피셜에 육박하는 매체에만) 또는 🌑~🌕(그 밖의 매체와 기자 — 5단계). 등급의 단일 소스는 `scripts/lib/transfer/reporters.json`의 `credibility`다 — 매체는 **소스 id**로(같은 "BBC" 표기를 BBC Sport와 BBC 이적 가십이 함께 쓴다), 기자는 보도 주체 표기로 매긴다. 등재되지 않은 출처는 그리지 않는다. ⚠ 🎖은 **U+FE0F를 붙여야** Windows에서 컬러로 그려진다(기본 표시가 글자다). ⚠ 이모지는 `aria-hidden`이고 뜻은 `sr-only` 글자가 진다 — 스크린리더는 이모지를 모양 이름("보름달")으로 읽는다. DB의 `tier`(1·2)는 수집기의 귀속 판정용이라 화면에 쓰지 않는다.
+- **`routeLabels(deal, { full })`** — 경로 두 칸의 글자. 빈 칸의 문구(자유계약 출발 `FA` · 모르는 출발 `미확인` · 아직 정해지지 않은 행선지 `미정` · 관심 구단이 더 있으면 `행선지 외 N`)를 **여기 하나가** 정한다 — 목록 행·미니 카드·캐러셀·상세 경로 카드가 같은 말을 한다. `full`이면 정식명(상세 경로 카드), 아니면 약칭.
 - `DealRow` / `DealMiniCard` / `RumorCard` / `StatusBadge` / `FeeDelta` / `TransferCrest` — 목록 행 · 미니 카드 · 캐러셀 카드 · 상태 뱃지 · 변동폭 · 구단 엠블럼(`Crest`의 얇은 래퍼 — 코드로 경로를 조립하는 도메인 지식만 갖는다).
   ⚠ **엠블럼을 직접 `<img>`로 그리지 말 것** — 폴백이 두 갈래인데 둘 다 필요하다: 코드가 비었을 때와, **파일이 없어 404일 때**(새 구단이 생기면 반드시 겪는다). 메커니즘은 `@/shared/ui`의 `Crest`가 갖는다.
 - ⚠ **한국어로는 "이적시장"·"딜"로 부른다.** URL(`/transfers`)·테이블(`transfer_deal`)·식별자(`transfer`)는 그대로 두고 화면·주석의 한국어만 통일한다.

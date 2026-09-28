@@ -35,6 +35,8 @@ export { pickRecentRumors } from "./lib/rumors";
 export { dealInLeague, parseTransferLeague, parseTransferSort } from "./lib/league";
 // ⚠ 이적료 표기·범위 — 상세의 이적료 카드가 쓴다(목록 UI는 같은 슬라이스라 상대 경로)
 export { formatFee, formatFeeRange } from "./lib/fee";
+// ⚠ 경로 두 칸의 문구(FA·미확인·미정·외 N)의 단일 소스 — 상세 경로 카드와 목록 UI가 같은 말을 한다
+export { routeLabels } from "./lib/route-label";
 // ⚠ 이적료 칸은 금액 · FA(확인된 자유계약) · 미공개 셋 중 하나다 — 빈 이적료를 FA로 추정하지 않는다
 export { FeeValue } from "./ui/fee-value";
 export { DealRow } from "./ui/deal-row";
