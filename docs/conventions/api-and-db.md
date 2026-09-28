@@ -196,6 +196,13 @@ enum이면 양쪽에 라벨 → 부호 변환이 한 벌씩 생긴다. 라벨이
   ⚠ **선수명 추출은 정밀도를 택한다**(`cleanCandidate`) — 한 토큰 이름은 사람 사전에 있을 때만, 이름 바로 뒤가
   역할어("World Cup **winner**", "Eastern European **striker**")면 수식어, 이름에 붙은 역할("as sporting director",
   "manager X")이면 선수가 아니다. 대문자 동사("Agree"·"Completes")는 **다음 낱말도 대문자인 헤드라인**에서만 앵커다.
+  ⚠ **지나간 이적설의 회고는 단계가 아니다**(`withoutRetrospective`) — "admits the Brazilian was a target in the summer"
+  같은 회고 기사가 루머 딜이 됐다. 떴다가 무산되는 이적설은 추적하지만 과거의 관심을 되짚는 글은 추적하지 않는다.
+  회고가 든 문장에서 **회고 절만** 빼고 단계를 판정한다("who were linked with him last summer, have now made an offer"는
+  제안으로 남는다). 표지는 과거 시제의 관심·연결·성사 직전 동사("were linked with"·"came close to signing")뿐이다 —
+  ⚠ 시간 표현("last season")만으로는 걸지 않는다. 이적 발표도 "who impressed on loan last season"처럼 지난 시즌을 말한다.
+  ⚠ 행은 **그대로 저장한다**(단계만 `unknown`) — 수집 단계에서 버리면 규칙이 틀렸을 때 피드에서 밀려난 기사를
+  되찾을 수 없다. 저장만 되고 딜·LLM 판정·요약 대상이 아니라 비용이 들지 않는다.
   규칙을 넓힐 때는 회귀 테스트에 더해 **운영 저장분 전체를 신·구 추출기로 돌려 달라진 행을 사람이 훑는다** —
   직접 만든 예문만으로 맞추면 실제 문장에서 새 오탐이 난다.
   ⚠ 구단 사전(`clubs.mjs`)이 잡은 구단은 글에서 한국어명·엠블럼으로 그려진다 — **오탐이 곧 거짓 표기**다.

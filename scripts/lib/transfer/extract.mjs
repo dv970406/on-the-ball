@@ -88,9 +88,47 @@ const INJURY = /\b(?:injur(?:y|ies|ed)|ligament|ruled out|surgery|fracture|diagn
 /** 이적을 말하는 동사·명사 — 부상 보도에 이게 없으면 이적 단계가 아니다 */
 const TRANSFER_WORD = /\b(?:sign(?:s|ed|ing)?|join(?:s|ed|ing)?|transfer|loan|deal|fee|move|agree(?:s|d|ment)?)\b/i;
 
+/**
+ * 지난 일을 되짚는 표현 — "was a target in the summer"·"came close to joining"·"last season".
+ * 지난 이적설을 회고하는 기사("Vinicius Jr to Arsenal truth emerges" — 코치가 여름에 관심이 있었다고 인정)가
+ * 루머 딜이 됐다(운영). 이적설이 떴다가 무산되는 것은 추적하지만, **지나간 이적설의 회고는 추적하지 않는다.**
+ * ⚠ 선수 경력 소개("former Real Madrid defender")는 회고가 아니다 — 과거 **이적설·관심**을 말하는 표현만 적는다.
+ * ⚠ **시간 표현("last season"·"in the summer"·"years ago")만으로는 걸지 않는다** — 이적 발표도 "who impressed on loan
+ *   last season"처럼 지난 시즌을 말하고, 5월의 "in the summer"는 다가올 창이다. 과거 시제의 관심·연결·성사 직전 동사만 표지다.
+ */
+const RETROSPECTIVE = new RegExp(
+  [
+    String.raw`\b(?:was|were|had been) (?:\w+ ){0,2}(?:target(?:ed|ing)?|interested in|linked with|keen on|monitoring|eyeing|chasing|close to (?:sign|join))`,
+    String.raw`\b(?:almost|nearly) (?:join(?:ed)?|sign(?:ed)?|moved|completed|became)\b`,
+    String.raw`\bcame (?:so )?close to (?:join|sign|mov)`,
+    String.raw`\bcould have (?:join|sign|mov|been)`,
+  ].join("|"),
+  "i",
+);
+
+/**
+ * 단계 판정에서 회고하는 부분을 뺀다. 회고가 있는 문장만 절(쉼표·but·now)로 나눠 **회고 절만** 버린다 —
+ * "Arsenal, who were linked with him last summer, have now made an offer"는 지금의 제안이라 남아야 한다.
+ * 회고가 없는 문장은 통째로 둔다(규칙들이 쉼표를 건너는 문구를 전제로 짜여 있다).
+ */
+function withoutRetrospective(text) {
+  if (!RETROSPECTIVE.test(text)) return text;
+  return text
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((sentence) =>
+      RETROSPECTIVE.test(sentence)
+        ? sentence
+            .split(/,\s*|\s+(?=(?:but|however|and now|now)\b)/i)
+            .filter((clause) => !RETROSPECTIVE.test(clause))
+            .join(", ")
+        : sentence,
+    )
+    .join("\n");
+}
+
 function detectStage(text) {
   // 따옴표를 걷고 공백을 접은 사본으로 판정한다 — 규칙들이 문구 사이 공백 하나를 전제로 짜여 있다
-  const t = text.replace(/[“”"‘’'«»]/g, "").replace(/\s+/g, " ");
+  const t = withoutRetrospective(text).replace(/[“”"‘’'«»]/g, "").replace(/\s+/g, " ");
   // ⚠ 부상 발표를 오피셜로 잡지 않는다 — "Real Madrid have announced … ligament injury"가 `have announced`
   //   규칙에 걸려 오피셜 딜이 생겼다(지역지·유럽 매체 RSS를 넣으면서 실측). 이적 표현이 함께 있으면 그대로 판정한다.
   if (INJURY.test(t) && !TRANSFER_WORD.test(t)) return "unknown";

@@ -30,6 +30,15 @@ const CASES = [
   { expect: "rumour",         text: "Manchester City are interested in a move for Everton forward Iliman Ndiaye." },
   // "in agreement with"은 의견 동의 · "not interested in"은 관심이 아니다(운영에서 딜이 됐다)
   { expect: "unknown",        text: "Alan Shearer in agreement with Thomas Tuchel after brutal Cole Palmer blast" },
+  // 지난 이적설의 회고는 단계가 아니다(운영 — 코치가 "여름에 관심이 있었다"고 인정한 기사가 루머 딜이 됐다)
+  { expect: "unknown",        text: "Vinicius Jr to Arsenal truth emerges after Mikel Arteta secrecy as assistant coach speaks out\n\nArsenal's silence regarding their interest in Vinicius Junior has finally broken after Mikel Arteta's assistant admits the Brazilian was a target in the summer" },
+  { expect: "unknown",        text: "Manchester United miss transfer chance as £86m decision made\n\nManchester United were linked with a move for Roma star Manu Kone during the summer transfer window" },
+  { expect: "unknown",        text: "Liverpool came close to signing the midfielder last season before talks collapsed over the fee." },
+  // 회고가 곁들여져도 지금의 움직임은 그대로 잡는다 — 회고 절만 뺀다
+  { expect: "offer",          text: "Arsenal, who were linked with him last summer, have now made an offer for Alexander Isak." },
+  { expect: "talks",          text: "Chelsea nearly signed him two years ago but are now in talks again with Bayern." },
+  { expect: "rumour",         text: "Arsenal are interested in the striker, who could move in the summer." },
+  { expect: "official",       text: "Chelsea have announced the signing of Jamie Gittens, who impressed on loan last season." },
   { expect: "unknown",        text: "‘I love football; I’m not interested in politics’ – Rayan Cherki on dreaming to win the Ballon d’Or" },
   { expect: "agreement",      text: "German club RB Leipzig are close to reaching an agreement in principle with Chelsea for the transfer of striker Marc Guiu." },
   { expect: "unknown",        text: "🚨 James Maddison suffered slight fracture to shoulder after landing awkwardly. Out for around four weeks." },
