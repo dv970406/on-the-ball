@@ -10,7 +10,8 @@
  *   node scripts/sync-transfer-news.mjs --derive-only --dry-run  # 파생 결과 요약만 찍고 쓰지 않는다(LLM도 부르지 않는다)
  *   node scripts/sync-transfer-news.mjs --derive-only --rejudge  # 저장된 판정을 무시하고 전부 다시 묻는다(지시문·사전을 고친 뒤)
  *   node scripts/sync-transfer-news.mjs --verify                 # 계정 인증·채널 출처를 점검한다
- *   node scripts/sync-transfer-news.mjs --remote                 # 원격 프로젝트에 쓴다(명시적일 때만)
+ *   node scripts/sync-transfer-news.mjs --remote                 # 원격 프로젝트에 쓴다(명시적일 때만). 대상은 환경변수다 —
+ *                                                                #   로컬에서는 `set -a; source .env.prod; set +a` 뒤에 붙인다(.env.local은 로컬 값)
  *
  * 단계: 수집 → 가십 칼럼을 항목 행으로 → 딜 파생. 파생 안에서 이름 조회(위키데이터)와 **LLM 판정·요약**(`judge.mjs` —
  * 보도 한 건에 한 번, 이동 여부·출발·행선지·한국어 요약)이 돈다. `ANTHROPIC_API_KEY`가 없으면 판정 없이 파생한다 —
@@ -85,6 +86,11 @@ const url = env.NEXT_PUBLIC_SUPABASE_URL;
 const key = env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !key) usage("NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY가 필요합니다");
 guardTarget(url, allowRemote);
+// --remote는 원격 URL을 허용할 뿐 대상을 바꾸지 않는다 — 대상은 환경변수(없으면 .env.local)다. 로컬 값인데 --remote를 붙였다면
+// 원격 자격 증명을 싣지 않은 것이다(로컬에 --rejudge를 돌린 적이 있다) → 조용히 로컬에 쓰지 않고 멈춘다
+if (allowRemote && /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(url)) {
+  usage(`--remote인데 대상이 로컬입니다(${url}) — 원격 자격 증명을 환경에 실으세요. 예: set -a; source .env.prod; set +a; node scripts/sync-transfer-news.mjs --remote …`);
+}
 const supabase = createSyncClient(url, key);
 
 if (deriveOnly) {
@@ -152,7 +158,8 @@ async function derive({ dryRun: summaryOnly, rejudge: again = false }) {
     const judge = apiKey
       ? async (needs, names) => {
           try {
-            return await runJudgements(supabase, needs, { apiKey, names });
+            // --rejudge는 사람이 한 번에 끝내려고 돌리는 명령이다 — 실행당 상한을 크게 연다(비용은 호출부가 안다)
+            return await runJudgements(supabase, needs, { apiKey, names, limit: again ? 1000 : undefined });
           } catch (e) {
             console.error(`✗ LLM 판정 실패: ${e instanceof Error ? e.message : String(e)}`);
             process.exitCode = 1;
