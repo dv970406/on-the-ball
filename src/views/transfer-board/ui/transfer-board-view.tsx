@@ -19,11 +19,11 @@ import { boardHref } from "../lib/board-href";
 import { useTransferBoard } from "../model/use-transfer-board";
 import { BoardHeader } from "./board-header";
 import { BoardSections } from "./board-sections";
-import { BoardTools } from "./board-tools";
-import { ClubChips } from "./club-chips";
-import { GroupChips } from "./group-chips";
+import { FilterRail } from "./filter-rail";
+import { GroupTabs } from "./group-tabs";
 import { LeagueSheet } from "./league-sheet";
 import { RumorCarousel } from "./rumor-carousel";
+import { SortLinks } from "./sort-links";
 import { TransferBoardSkeleton } from "./transfer-board-skeleton";
 import { useGroupJump } from "./use-group-jump";
 
@@ -51,7 +51,10 @@ interface TransferBoardViewProps {
  * 이적시장 보드(handoff 4장 · 계획서 §3-6).
  *
  * 위→아래: 앱바 · 최근 3일 소식 캐러셀 · 이적시장 헤더(창 · 추적 건수 · 마감 카운트다운) ·
- * 구간 점프 칩 · 도구줄 · 구단 필터 칩 · 구간들(긴 구간은 접혀 있다 — `BoardSections`).
+ * 구간 점프 탭 + 정렬(한 줄, `GroupTabs`) · 필터 레일(리그 버튼 + 구단 칩, `FilterRail`) ·
+ * 구간들(긴 구간은 접혀 있다 — `BoardSections`).
+ * ⚠ 이동·정렬·필터가 **각각 다른 형태**(밑줄 탭 · 텍스트 링크 · 칩)인 것이 규약이다 — 셋이 같은 칩 모양으로
+ *   세 줄 쌓여 있을 때 전부 필터로 읽혔다.
  *
  * ⚠ `SignInDialog`를 두지 않는다 — 보드에는 로그인이 필요한 액션이 없다(관심 토글은 상세에만).
  * ⚠ 이 슬라이스는 에메랄드·`rounded-full`·`shadow-`를 새로 쓰지 않는다 — 엔티티 컴포넌트가
@@ -151,9 +154,19 @@ export function TransferBoardView({
 
             {/* 구간 섹션들을 담으므로 점프 훅의 ref가 여기 붙는다 */}
             <div ref={panelRef}>
-              <GroupChips counts={counts} active={activeGroup} onJump={jump} />
-              <BoardTools league={league} sort={sort} club={club} onOpenLeague={() => setLeagueSheetOpen(true)} />
-              <ClubChips options={clubOptions} club={club} league={league} sort={sort} />
+              <GroupTabs
+                counts={counts}
+                active={activeGroup}
+                onJump={jump}
+                trailing={<SortLinks league={league} sort={sort} club={club} />}
+              />
+              <FilterRail
+                options={clubOptions}
+                club={club}
+                league={league}
+                sort={sort}
+                onOpenLeague={() => setLeagueSheetOpen(true)}
+              />
 
               {groups.length === 0 ? (
                 <EmptyState title="조건에 맞는 이적 건이 없어요" />
