@@ -5,7 +5,7 @@
  *   node scripts/test-transfer-sources.mjs
  */
 import { resolveAttribution } from "./lib/transfer/attribution.mjs";
-import { bylineOf, parseTelegram, stripHtml } from "./lib/transfer/sources.mjs";
+import { bylineOf, canonicalGuid, parseTelegram, stripHtml } from "./lib/transfer/sources.mjs";
 
 let pass = 0;
 let fail = 0;
@@ -14,6 +14,11 @@ function check(name, ok, detail = "") {
   else fail += 1;
   console.log(`${ok ? "✅" : "❌"} ${name}${ok ? "" : ` — ${detail}`}`);
 }
+
+// ── RSS guid — BBC가 고칠 때마다 올리는 개정 번호를 걷는다(같은 기사가 새 행이 됐다) ──
+check("guid — 끝의 #숫자(개정 번호)를 걷는다", canonicalGuid("https://www.bbc.co.uk/sport/football/articles/c6r7dy2yyx2xo#3") === "https://www.bbc.co.uk/sport/football/articles/c6r7dy2yyx2xo");
+check("guid — 숫자가 아닌 조각은 그대로 둔다", canonicalGuid("https://a.test/x#comments") === "https://a.test/x#comments");
+check("guid — URL이 아닌 guid도 그대로 둔다", canonicalGuid("tag:site,2026:123") === "tag:site,2026:123");
 
 // ── RSS 설명 — 태그째 걷는다 ──────────────────────────────────────────────
 const rss = stripHtml('<p>Alaba joins Udinese.</p><img src="https://cdn.example.com/alaba.jpg" alt="Alaba signs"><figure><img src="x.png"></figure>');

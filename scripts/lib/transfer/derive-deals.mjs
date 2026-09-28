@@ -76,6 +76,66 @@ export const dealKey = (normalized) => createHash("sha1").update(normalized).dig
 const ts = (r) => Date.parse(r.published_at);
 const tokens = (normalized) => normalized.split(" ");
 
+/** 보도 대조용 URL — 쿼리·조각·`www.`·끝 슬래시를 걷는다(같은 기사의 추적 파라미터·개정 번호 차이를 접는다) */
+function urlKey(u) {
+  if (!u) return null;
+  try {
+    const x = new URL(u);
+    return `${x.hostname.replace(/^www\./u, "")}${x.pathname.replace(/\/+$/u, "")}`.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+/** 보도 대조용 본문 — 리트윗 머리("RT @x:")·링크·기호를 걷은 앞 180자. 40자 미만이면 쓰지 않는다(짧은 문구끼리 우연히 같다) */
+function textKey(body) {
+  const t = String(body ?? "")
+    .replace(/^\s*RT\s+@\w+:\s*/u, "")
+    .replace(/https?:\/\/\S+/gu, " ")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .slice(0, 180);
+  return t.length >= 40 ? t : null;
+}
+
+/**
+ * 같은 보도를 한 행으로 모은다 — URL이 같거나(쿼리·조각 제외) 본문이 같으면 같은 보도다.
+ * ⚠ 같은 기사가 여러 행으로 저장돼 있다: BBC가 고칠 때마다 올리는 guid 개정 번호(`#0`·`#1`)로 같은 URL이 최대 6행,
+ *   BBC 가십 칼럼이 두 피드(bbc-gossip·bbc-football)에 함께 실리고, 리트윗이 원문과 같은 글로 들어온다(운영: 2,297행 중
+ *   550행이 같은 URL). 그대로 두면 딜의 보도 수가 부풀고 판정·요약을 같은 글에 여러 번 부른다.
+ * ⚠ **행을 지우지 않는다** — 파생에서만 대표 하나를 쓴다(지우는 것은 되돌릴 수 없다). 대표는 가장 이른 게시 시각,
+ *   같으면 나중에 수집된 행(= 최신 개정판)이다.
+ * @returns {{ reps: object[], duplicates: number }}
+ */
+export function dedupeRows(rows) {
+  const parent = new Map(rows.map((r) => [r.id, r.id]));
+  const find = (x) => {
+    while (parent.get(x) !== x) {
+      parent.set(x, parent.get(parent.get(x)));
+      x = parent.get(x);
+    }
+    return x;
+  };
+  const owner = new Map();
+  for (const r of rows) {
+    for (const k of [urlKey(r.url) && `u:${urlKey(r.url)}`, textKey(r.body) && `t:${textKey(r.body)}`]) {
+      if (!k) continue;
+      if (owner.has(k)) parent.set(find(r.id), find(owner.get(k)));
+      else owner.set(k, r.id);
+    }
+  }
+  const groups = new Map();
+  for (const r of rows) {
+    const g = find(r.id);
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(r);
+  }
+  const reps = [...groups.values()].map((g) => g.sort((a, b) => ts(a) - ts(b) || b.id - a.id)[0]);
+  return { reps, duplicates: rows.length - reps.length };
+}
+
 /** 판정 불가로 끝난 행을 다시 묻기까지의 간격 — `verdict.mjs`의 `VERDICT_RETRY_MS`와 같은 값(순환 import를 피해 따로 둔다) */
 const VERDICT_RETRY_MS = 24 * 3_600_000;
 /** 그 선수에 대한 LLM 판정 — 다른 선수로 판정했으면(추출이 바뀌어 딜이 옮겨 감) 판정이 없는 것이다 */
@@ -289,7 +349,10 @@ export function deriveDeals(rows, opts) {
   const skipped = {};
   const skip = (why) => { skipped[why] = (skipped[why] ?? 0) + 1; };
 
-  const candidates = rows.filter((r) => {
+  // 같은 보도는 대표 한 행만 본다(나머지는 딜에 묶이지 않고 판정·요약 대상도 아니다)
+  const { reps, duplicates } = dedupeRows(rows);
+  if (duplicates) skipped["중복 보도"] = duplicates;
+  const candidates = reps.filter((r) => {
     if (isCandidate(r, startMs)) return true;
     skip(r.stage === "unknown" ? "단계 없음" : !r.players?.length ? "선수 없음" : Number(r.relevance) < MIN_RELEVANCE ? "관련성 미달" : isRoundup(r) ? "가십 모음" : "범위 밖");
     return false;

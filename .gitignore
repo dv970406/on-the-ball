@@ -43,3 +43,6 @@ next-env.d.ts
 # .env.example은 커밋 허용
 !.env.example
 .env*.local
+
+# 로컬 평가 스냅샷(운영 보도 본문 — 공개 저장소에 올리지 않는다)
+/.cache/

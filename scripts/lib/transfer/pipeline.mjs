@@ -63,6 +63,27 @@ async function existingIds(supabase, sourceId, ids) {
   return found;
 }
 
+/**
+ * 같은 소스에 이미 저장된 URL — 항목 키가 달라도 URL이 같으면 같은 기사다.
+ * ⚠ 개정 번호를 걷기 전(`canonicalGuid`)에 저장된 행은 키가 옛 해시라 키만으로는 걸러지지 않는다 — 규칙을 바꾼 첫
+ *   수집에서 피드에 남아 있던 기사가 전부 한 번 더 들어온다. URL로 한 번 더 거른다.
+ * ⚠ 같은 URL을 계속 고쳐 쓰는 라이브 블로그는 첫 판만 남는다 — 여러 선수가 섞인 글이라 딜의 근거로 쓰지 않는다.
+ */
+async function existingUrls(supabase, sourceId, urls) {
+  const found = new Set();
+  const list = [...new Set(urls.filter(Boolean))];
+  for (let i = 0; i < list.length; i += 50) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select("url")
+      .eq("source_id", sourceId)
+      .in("url", list.slice(i, i + 50));
+    if (error) throw new Error(`기존 URL 조회 실패: ${error.message}`);
+    for (const r of data) found.add(r.url);
+  }
+  return found;
+}
+
 async function countRows(supabase, sourceId) {
   const { count, error } = await supabase
     .from(TABLE)
@@ -210,8 +231,19 @@ async function syncSource(supabase, def, opts = {}) {
       result.preview = rows;
     } else if (rows.length) {
       const seen = await existingIds(supabase, def.id, rows.map((r) => r.external_id));
-      const fresh = rows.filter((r) => !seen.has(r.external_id));
+      const byKey = rows.filter((r) => !seen.has(r.external_id));
       if (seen.size) result.skipped["이미 있음"] = seen.size;
+      // 키는 새것이지만 URL이 이미 있는 항목(같은 기사의 개정판) — 매체 RSS만 본다(게시글은 URL이 곧 키다)
+      const seenUrls = def.kind === "rss" ? await existingUrls(supabase, def.id, byKey.map((r) => r.url)) : new Set();
+      // 같은 배치 안의 같은 URL도 한 번만 넣는다(피드가 같은 기사를 두 번 싣는다)
+      const batchUrls = new Set();
+      const fresh = byKey.filter((r) => {
+        if (!r.url || def.kind !== "rss") return true;
+        if (seenUrls.has(r.url) || batchUrls.has(r.url)) return false;
+        batchUrls.add(r.url);
+        return true;
+      });
+      if (byKey.length > fresh.length) result.skipped["같은 URL(개정판)"] = byKey.length - fresh.length;
       if (!fresh.length) {
         result.ok = true;
         result.ms = Date.now() - started;

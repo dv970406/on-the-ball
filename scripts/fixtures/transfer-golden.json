@@ -1,0 +1,1049 @@
+{
+ "_comment": [
+  "이적 딜 파생의 정답 세트 — 운영 transfer_news 행 id별로 \"이 보도가 특정 선수의 구단 이동을 (현재 진행형으로) 보도하는가\"와 그 선수들.",
+  "2026-09-28 운영 보도 101건(딜 후보 합집합 41 + 미선택 이적 어휘 보도 무작위 60)을 파이프라인 결과를 보지 않은 독립 채점자 둘이 원문 기사를 읽고 매겼다. 둘이 갈린 9건은 원문으로 판정했다(가십 모음은 두 채점자가 모두 적은 선수만).",
+  "⚠ 저장소가 공개라 본문을 싣지 않는다(재배포 원칙) — 본문은 scripts/eval-transfer.mjs --export 로 받은 로컬 스냅샷(.cache/, gitignore)에서 읽는다."
+ ],
+ "items": [
+  {
+   "id": 5,
+   "source": "bsky:benjacobs",
+   "url": "https://bsky.app/profile/jacobsben.bsky.social/post/3mvat6fofxs23",
+   "is_move_report": true,
+   "players": [
+    "Andria Bartishvili"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 6,
+   "source": "bsky:benjacobs",
+   "url": "https://bsky.app/profile/jacobsben.bsky.social/post/3mvasur2zbk23",
+   "is_move_report": true,
+   "players": [
+    "Michail Antonio"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 33,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mw732m6zvc2o",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 229,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mv7pnxxqc72c",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 337,
+   "source": "tg:romano",
+   "url": "https://x.com/FabrizioRomano/status/2103089119194648740",
+   "is_move_report": true,
+   "players": [
+    "David Alaba"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 353,
+   "source": "tg:romano",
+   "url": "https://x.com/FabrizioRomano/status/2102798534986846341",
+   "is_move_report": true,
+   "players": [
+    "David Alaba"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 355,
+   "source": "tg:romano",
+   "url": "https://x.com/FabrizioRomano/status/2102797265823793635",
+   "is_move_report": true,
+   "players": [
+    "David Alaba"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 372,
+   "source": "tg:romano",
+   "url": "https://x.com/FabrizioRomano/status/2102764831761998206",
+   "is_move_report": true,
+   "players": [
+    "David Alaba",
+    "Neto"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 373,
+   "source": "tg:romano",
+   "url": "https://x.com/FabrizioRomano/status/2102735942456930783",
+   "is_move_report": true,
+   "players": [
+    "Dany Freire"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 374,
+   "source": "tg:romano",
+   "url": "https://x.com/FabrizioRomano/status/2102725056031814136",
+   "is_move_report": true,
+   "players": [
+    "David Alaba"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 377,
+   "source": "tg:romano",
+   "url": "https://x.com/FabrizioRomano/status/2102722185349525797",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 381,
+   "source": "tg:romano",
+   "url": "https://x.com/FabrizioRomano/status/2102669302956695804",
+   "is_move_report": true,
+   "players": [
+    "David Alaba"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 423,
+   "source": "rss:bbc-gossip",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6g7k421gvj4o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Tyrick Mitchell",
+    "Alejandro Garnacho",
+    "Morgan Gibbs-White",
+    "Florian Wirtz",
+    "Adama Jeng",
+    "Endrick",
+    "Arthur Dias"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 425,
+   "source": "rss:bbc-gossip",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6y8z29nxn4mo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Morgan Gibbs-White",
+    "Mezian Mesloub",
+    "JJ Gabriel",
+    "Ibrahim Maza",
+    "Jon Aramburu",
+    "Lamine Camara",
+    "Maximilian Beier",
+    "Bo Hegland"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 428,
+   "source": "rss:bbc-gossip",
+   "url": "https://www.bbc.co.uk/sport/football/articles/crn8ez44ywqdo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Eli Junior Kroupi",
+    "Jarrad Branthwaite",
+    "Nico Williams",
+    "Cavan Sullivan",
+    "Rayan",
+    "Julián Alvarez"
+   ],
+   "basis": "판정"
+  },
+  {
+   "id": 430,
+   "source": "rss:bbc-gossip",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cqzezjn3wzjpo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Harry Kane",
+    "Erling Haaland",
+    "Julián Alvarez",
+    "Nick Woltemade",
+    "Jarrad Branthwaite",
+    "Rio Ngumoha",
+    "Morgan Gibbs-White",
+    "Endrick"
+   ],
+   "basis": "판정"
+  },
+  {
+   "id": 432,
+   "source": "rss:bbc-gossip",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cr4v345pdq0o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Florian Wirtz",
+    "Rayan",
+    "Pierre Kalulu",
+    "Jadon Sancho",
+    "Louis Page",
+    "Luke Chambers"
+   ],
+   "basis": "판정"
+  },
+  {
+   "id": 433,
+   "source": "rss:bbc-gossip",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c2e0mzdwmkko?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Nico Paz",
+    "Cher Ndour",
+    "Geny Catamo",
+    "Lamine Camara",
+    "Luke Chambers",
+    "Wilfried Zaha",
+    "Gabriel Rajkovic"
+   ],
+   "basis": "판정"
+  },
+  {
+   "id": 434,
+   "source": "rss:bbc-gossip",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cn0jrn8n7pjo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Richarlison",
+    "Philippe Coutinho",
+    "Adrien Truffert",
+    "Aleksandar Stankovic",
+    "Raphael le Guen",
+    "Michael Olise",
+    "Mauro Icardi",
+    "Anthony Martial"
+   ],
+   "basis": "판정"
+  },
+  {
+   "id": 435,
+   "source": "rss:bbc-gossip",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cd68352z4vjo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Martin Zubimendi",
+    "Mauro Icardi"
+   ],
+   "basis": "판정"
+  },
+  {
+   "id": 445,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/23/summer-football-transfer-window-best-value-deals",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 446,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/23/florian-wirtz-liverpool-playmaker-opta",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 463,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/21/ghosts-2023-surface-borussia-dortmund-bundesliga-summit-stuttgart",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 501,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMi7AFBVV95cUxOa0dCQ1RIeGkzdEJzeVlESUppUHRNZUEtSGF4TDNwbHdieFMtc09pbGxPVkNiZkNZc21JNmo4NHNyWFdnaE1qTW1tNWs0SWhYRjVxYWxBdjB4M3dMWktZdWtDVUswLTJOWEtRV0I0QU9fdENicHpPQ3Z4Q1d5SzJiZFlUTlo1VzNtQUdXWWtFbWdfall6ZWhfWjlhRFFBUzJpRXlXeTdDVktOejBoMEQ3a3d1R1R1Nnp1Y2pkVks4RVhyazNBSkhwVHNkRGJlakRZbUJWZDE3bnlPcnFVRGVGWldDUTlUTzZuTlJfMA?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 506,
+   "source": "gnews:ornstein",
+   "url": "https://news.google.com/rss/articles/CBMilgFBVV95cUxQZ1pBLUNQM3lSY29tTUNGS09faTFHMnJNWWdxeDJPWGhjeTZKdHNoMXViVVpoQTU4YWxOejJ3ejdZX0Y3aUZaaUIzZl9wZ1VUZmJTbi1CTndwUnVjWWRSNVBmNTBkZVFnN3d4NlRGRXNBeVRNMWVqeHlOSFZnRkhiaXZMY19McDZIOHRKYllxVmhYTzBPTmc?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 516,
+   "source": "gnews:ornstein",
+   "url": "https://news.google.com/rss/articles/CBMipAFBVV95cUxOVHZQblcza01QZ19sbF8tSmktTlJWR2M5dW1vaHJyT3h4ZDlUVG80ZFJkdTlaX2xPMmpsd1E0X042VjRLa2c0TkVpeUpqdUo1SV8zamZiV012d2x3eF9rTzZGSVN2TEpRbDFBUWstd084Vy1OVnptMEFMMGkzUjVtdmRhV2w3OHVBcmEtR2xnQ2g5SzduRUZTU1l5TFNfUjc4TkdEVQ?oc=5",
+   "is_move_report": true,
+   "players": [
+    "Rio Ngumoha"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 517,
+   "source": "gnews:ornstein",
+   "url": "https://news.google.com/rss/articles/CBMi7wFBVV95cUxOU1M3aWRhSWJqUEp2OWYtdURRNXF2QVN0aC1HeGt6NEhsUUlmNDNFclBUM3lXcllsVjNJQ1JIM3ZBLXYtdFhfZ0xrZk9abkdYazNfa3k2dWR6aVNUWFJOSUNnZEZ4Zi1adEM5dWl4WkUtaU0tRVpMZFVSRVlTMFB3MTV0Z3lfbEUtaFp5anZZZkNGV2s1SzJpNzE2eXc3b2VlN0MwVnI0RGtRUnVzUkJ4Q2RzZGlXdE5aVjFrNkUwSmp1NXNuUXpzZGtfajhNeHlWY2tyTlJRbFFjajBmLVNfcU82RF9TT1YzczRXVjhjNA?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 519,
+   "source": "gnews:ornstein",
+   "url": "https://news.google.com/rss/articles/CBMi6gFBVV95cUxQcWthbTktSzRMckd3UG1McEFldnAyelpMUXh6VjJIYzFKcVQzWjk5UnhabENJWExnRmg5ZmM2OWtZUjdpcEYzREhIRlNFc1RuYmFraDRua2gtN2liLTRoREN4SFhjZmdFVWlqcVl0aEpZRFhHWDh2R3NEXzB6UDZlVWdfakJoeUtsUW5fZDhsazVnMXRseWRkMGo5UkNvS3d0aWhMSkRtLUxSbDVXMDZYbDlxR0VxV0dRUmRCcGxUZ2lwYTYwMDYyandyU3hzd3BFa19uVWdGY3JoOHF4YmxJUlRVT083Vmhwc2c?oc=5",
+   "is_move_report": true,
+   "players": [
+    "Rio Ngumoha"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 522,
+   "source": "gnews:mokbel",
+   "url": "https://news.google.com/rss/articles/CBMia0FVX3lxTE5wVnFhSzhHVFlzcFdXcnhHYnpld3RBYXlHVlJ3NVhXSXAtNFR3bGYzLXhmSXo5MVNTbjVVODlpMFh3RkpDMG10UENTYjh6dTkwVzl3amJXNVAyY2hmLUhXQ3VOV2Z1X0Zzd1Zj?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 538,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/ck4glyl0nwd6o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 572,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/24/raphinha-barcelona-interview-la-liga-no9",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 578,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMikgFBVV95cUxQclhIbWdUNGJKejM3dWZTdGtJTk1iVURkRVU0ckp1aGVTblJPYVh5eWhpRjVmWndpU3NRelpZQmlvc3RBaTUxaGxaQmM3TXdENVdpZ196Q25PR1R6eEg4bmZIb1AyQkdWM2lta21ZeTFLLU1RREk5NkRfQmg1OGUzVWpJaWx2SS0xS1Z4MTdxRDBKZw?oc=5",
+   "is_move_report": true,
+   "players": [
+    "Philippe Coutinho"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 582,
+   "source": "rss:bbc-gossip",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6eq8eygy4e5o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Alex Scott",
+    "Dani Olmo",
+    "Giorgio Scalvini",
+    "Tyler Morton",
+    "Abdukodir Khusanov",
+    "Alisson",
+    "Alessandro Bastoni"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 587,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c639merx84jno?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 591,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6eq8eygy4e5o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Alex Scott",
+    "Dani Olmo",
+    "Giorgio Scalvini",
+    "Tyler Morton",
+    "Abdukodir Khusanov",
+    "Alisson",
+    "Alessandro Bastoni"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 600,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cw98022gvjr1o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 650,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mwcwehhovq2m",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 658,
+   "source": "tg:romano",
+   "url": "https://x.com/FabrizioRomano/status/2103300708833645009",
+   "is_move_report": true,
+   "players": [
+    "Isaac Konde"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 679,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6eq8eygy4e5o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Alex Scott",
+    "Dani Olmo",
+    "Giorgio Scalvini",
+    "Tyler Morton",
+    "Abdukodir Khusanov",
+    "Alisson",
+    "Alessandro Bastoni"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 720,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cq62k9pzy21do?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 739,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6eq8eygy4e5o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Alex Scott",
+    "Dani Olmo",
+    "Giorgio Scalvini",
+    "Tyler Morton",
+    "Abdukodir Khusanov",
+    "Alisson",
+    "Alessandro Bastoni"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 778,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMiZEFVX3lxTFBRLVlaNXpvanl3MjJoY3ZYUGpHRVdJX1h1Z04xc2lNWXNIczc3dURyM0FqOTFkMjdBLTNJWURCbENEZ2dLT3NodEMxZWs3OXpkdlp0N01wUkF4Nm82ZDNVOG05RVE?oc=5",
+   "is_move_report": true,
+   "players": [
+    "Federico Chiesa"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 780,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMitgFBVV95cUxPbUhVWU9SU3lzV1VldTYtaVBnMHlQQ3Nvazh3SkhBZ1dMajlvbjkyXzZqV0VncDFLaDE0azU1bFdqNHpNdU5uWFd1U1NiMkxXbmhhbDBmeTdyOGtLLUZ5TTZfVmI0dkFUYkZLVE9QbDlBOE5aMDBNbnhpSVFqVGhhLWE1dHJzeDE1bnNieWtTd0NVYzA3a3hBT1pxSm1QMXV3YUVPeFNaRFBTUWs1ZVdMa056Mk5lQdIBuwFBVV95cUxQU0YwVXlXYUVCVUtJekpXVFREUHZ3Tm5tNWVEQWdfc0lWWVNPbVlEQ1haX3J4NHZ2R3JKZDlTbXY2UWloV3I0QmlrMmp4SHdvTHZuNHlyQ1hBMTlfeHdBZHp3b25ZNlR4M3NIRlNJR1VjV3dFRnNUZXFHVE5MZzNpZFBZZC1zTVhqbDVyRjlORWNkRWpqRjNlMzR2ZmJXRWd5M294bVRmMHM4TXdmRDZBZURWWXgtMnhaN2NB?oc=5",
+   "is_move_report": true,
+   "players": [
+    "Isaac Konde"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 812,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/ckeq8vq7rwe7o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "JJ Gabriel"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 826,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c639merx84jno?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 842,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6eq8eygy4e5o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Alex Scott",
+    "Dani Olmo",
+    "Giorgio Scalvini",
+    "Tyler Morton",
+    "Abdukodir Khusanov",
+    "Alisson",
+    "Alessandro Bastoni"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 878,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13591878/transfer-news-brentford-hold-kevin-schade-contract-talks-as-arsenal-liverpool-track-germany-winger",
+   "is_move_report": true,
+   "players": [
+    "Kevin Schade"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 882,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/25/manchester-city-fans-fear-relegation-losing-trophies",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 887,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/25/liverpool-cody-gakpo-tough-summer-manchester-city",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 905,
+   "source": "tg:romano",
+   "url": "https://x.com/FabrizioRomano/status/2103563304593477890",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 916,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c84gkkepxxl4o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Marcos Llorente",
+    "Alessandro Bastoni",
+    "Kevin Schade",
+    "Ronald Araujo",
+    "Tyrick Mitchell",
+    "Finn Jeltsch",
+    "Valentin Atangana"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 944,
+   "source": "rss:bbc-gossip",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c84gkkepxxl4o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Marcos Llorente",
+    "Alessandro Bastoni",
+    "Kevin Schade",
+    "Ronald Araujo",
+    "Tyrick Mitchell",
+    "Finn Jeltsch",
+    "Valentin Atangana"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 981,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c84gkkepxxl4o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Marcos Llorente",
+    "Alessandro Bastoni",
+    "Kevin Schade",
+    "Ronald Araujo",
+    "Tyrick Mitchell",
+    "Finn Jeltsch",
+    "Valentin Atangana"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1001,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/26/manchester-city-financial-charges-premier-league-uefa-abu-dhabi",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1074,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c84gkkepxxl4o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Marcos Llorente",
+    "Alessandro Bastoni",
+    "Kevin Schade",
+    "Ronald Araujo",
+    "Tyrick Mitchell",
+    "Finn Jeltsch",
+    "Valentin Atangana"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1115,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/live/2026/sep/26/england-v-spain-nations-league-football-live-score-updates",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1127,
+   "source": "rss:bbc-gossip",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cw770034l523o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Dani Olmo",
+    "Trent Alexander-Arnold",
+    "Alejandro Balde",
+    "Micky van de Ven",
+    "Fikayo Tomori",
+    "Ruben Loftus-Cheek",
+    "Tomas Araujo",
+    "Erling Haaland",
+    "Manu Kone"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1131,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cw770034l523o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Dani Olmo",
+    "Trent Alexander-Arnold",
+    "Alejandro Balde",
+    "Micky van de Ven",
+    "Fikayo Tomori",
+    "Ruben Loftus-Cheek",
+    "Tomas Araujo",
+    "Erling Haaland",
+    "Manu Kone"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1178,
+   "source": "bsky:gold",
+   "url": "https://bsky.app/profile/alasdairgold.bsky.social/post/3mw4qxmnjy22m",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1186,
+   "source": "bsky:gold",
+   "url": "https://bsky.app/profile/alasdairgold.bsky.social/post/3mvux5aqzmk2z",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1268,
+   "source": "bsky:waugh",
+   "url": "https://bsky.app/profile/chrisdhwaugh.bsky.social/post/3mwfnae2ics27",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1343,
+   "source": "bsky:boyland",
+   "url": "https://bsky.app/profile/paddyboyland.bsky.social/post/3mvmo4alkmc2o",
+   "is_move_report": false,
+   "players": [],
+   "basis": "판정"
+  },
+  {
+   "id": 1381,
+   "source": "bsky:doyle",
+   "url": "https://bsky.app/profile/iandoylesport.bsky.social/post/3mw6ycmmrcs2e",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1388,
+   "source": "bsky:doyle",
+   "url": "https://bsky.app/profile/iandoylesport.bsky.social/post/3mvzn22yky227",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1397,
+   "source": "bsky:doyle",
+   "url": "https://bsky.app/profile/iandoylesport.bsky.social/post/3mvrtnxydas2u",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1464,
+   "source": "bsky:ryder",
+   "url": "https://bsky.app/profile/leeryder.bsky.social/post/3mvug5tbjlk2i",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1601,
+   "source": "tg:dimarzio",
+   "url": "https://t.me/Dimarzio/2260",
+   "is_move_report": true,
+   "players": [
+    "David Alaba"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1610,
+   "source": "rss:men-manutd",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/manchester-united-confirm-another-talented-34670960",
+   "is_move_report": true,
+   "players": [
+    "David Eze"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1713,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/news/joao-pedro-agreement-reached-after-34670603",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1739,
+   "source": "rss:fl-arsenal",
+   "url": "https://www.football.london/arsenal-fc/news/arsenal-now-clear-run-julian-34672900",
+   "is_move_report": true,
+   "players": [
+    "Julián Alvarez"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1747,
+   "source": "rss:fl-arsenal",
+   "url": "https://www.football.london/arsenal-fc/transfer-news/vinicius-jr-arsenal-truth-emerges-34670712",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1769,
+   "source": "rss:fl-tottenham",
+   "url": "https://www.football.london/tottenham-hotspur-fc/news/strange-quirk-explains-tottenham-hope-34668502",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1772,
+   "source": "rss:fl-tottenham",
+   "url": "https://www.football.london/tottenham-hotspur-fc/news/tanguy-ndombele-what-happened-tottenhams-34665080",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1781,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/sport/football/football-news/newcastle-uniteds-intriguing-next-move-34676155",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1804,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/sport/football/football-news/nick-woltemade-newcastle-transfer-bayern-34668549",
+   "is_move_report": false,
+   "players": [],
+   "basis": "판정"
+  },
+  {
+   "id": 1858,
+   "source": "rss:standard-football",
+   "url": "https://www.standard.co.uk/sport/football/transfer-news-live-arsenal-fc-chelsea-man-utd-liverpool-alexander-arnold-alvarez-b1284294.html",
+   "is_move_report": true,
+   "players": [
+    "Trent Alexander-Arnold",
+    "Alex Scott"
+   ],
+   "basis": "판정"
+  },
+  {
+   "id": 1932,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/milan-scouts-also-impressed-cagliari-mendy",
+   "is_move_report": true,
+   "players": [
+    "Paul Mendy",
+    "Alessandro Romano"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1935,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/van-bommel-reflects-milan-managing-one-day",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1939,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/ramos-milan-fans-amorim-life-away",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1943,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/agent-corinthians-andre-collapsed-deal-modric",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1953,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/milan-begin-talks-napoli-anguissa-agents",
+   "is_move_report": true,
+   "players": [
+    "André-Frank Zambo Anguissa"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1959,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/milan-yet-to-open-pulisic-contract-talks",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1961,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/milan-save-manchester-united-10m-amorim",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1967,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/milan-doumbia-sporting-cp-26m-bid",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1972,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/official-matteo-pagliei-professional-milan-contract",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1975,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/milan-double-pavlovic-salary-contract-meeting",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1988,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/why-chances-coming-comotto-diawara-camarda",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 4017,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cw770034l523o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Dani Olmo",
+    "Trent Alexander-Arnold",
+    "Alejandro Balde",
+    "Micky van de Ven",
+    "Fikayo Tomori",
+    "Ruben Loftus-Cheek",
+    "Tomas Araujo",
+    "Erling Haaland",
+    "Manu Kone"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 4043,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13592359/man-utd-transfer-news-barcelona-left-back-alejandro-balde-eyed-for-january-move-paper-talk",
+   "is_move_report": true,
+   "players": [
+    "Alejandro Balde"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 4045,
+   "source": "rss:men-manutd",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/transfer-news/alejandro-garnacho-transfer-villa-chelsea-34678771",
+   "is_move_report": true,
+   "players": [
+    "Alejandro Garnacho"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 4048,
+   "source": "rss:echo-liverpool",
+   "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/liverpool-found-perfect-andoni-iraola-34620605",
+   "is_move_report": true,
+   "players": [
+    "Lamine Camara"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 4056,
+   "source": "rss:fl-arsenal",
+   "url": "https://www.football.london/arsenal-fc/news/cesc-fabregas-arsenal-clause-confirmed-34672184",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 4058,
+   "source": "rss:fl-arsenal",
+   "url": "https://www.football.london/arsenal-fc/news/arsenal-transfer-news-erling-haaland-34678278",
+   "is_move_report": true,
+   "players": [
+    "Erling Haaland",
+    "Kevin Schade"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 4061,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/news/cole-palmer-alan-shearer-england-34678719",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 4067,
+   "source": "rss:birmingham-villa",
+   "url": "https://www.birminghammail.co.uk/sport/football/football-news/aston-villa-transfers-kim-minjae-34678883",
+   "is_move_report": true,
+   "players": [
+    "Kim Min-jae"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 4140,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cw770034l523o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Dani Olmo",
+    "Trent Alexander-Arnold",
+    "Alejandro Balde",
+    "Micky van de Ven",
+    "Fikayo Tomori",
+    "Ruben Loftus-Cheek",
+    "Tomas Araujo",
+    "Erling Haaland",
+    "Manu Kone"
+   ],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 4197,
+   "source": "rss:standard-football",
+   "url": "https://www.standard.co.uk/sport/football/man-utd-dorgu-injury-latest-premier-league-b1298580.html",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 4200,
+   "source": "rss:standard-football",
+   "url": "https://www.standard.co.uk/sport/football/chelsea-fc-joao-felix-transfer-dream-b1298572.html",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 4204,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/napoli-reach-agreement-to-extend-rrahmani/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 4292,
+   "source": "rss:echo-liverpool",
+   "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/liverpool-agreed-virgil-van-dijk-34679057",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  },
+  {
+   "id": 4296,
+   "source": "rss:gffn",
+   "url": "https://www.getfootballnewsfrance.com/2026/i-love-football-im-not-interested-in-politics-manchester-city-midfielder-rayan-cherki-on-dreaming-to-win-the-ballon-dor/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "두 채점자 일치"
+  }
+ ]
+}

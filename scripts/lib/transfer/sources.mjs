@@ -376,6 +376,15 @@ export function bylineOf(e) {
   return clampCp(name, 200);
 }
 
+/**
+ * RSS guid → 항목 키의 원천. **끝의 개정 번호(`#0`·`#1`…)를 걷는다.**
+ * ⚠ BBC는 기사를 고칠 때마다 guid 끝의 번호를 올린다(`…/articles/c6r7dy2yyx2xo#0` → `#1`). 그대로 해시하면
+ *   같은 기사가 고쳐질 때마다 새 행이 됐다(운영: 같은 URL 136건이 516행 — 판정·요약 호출과 딜의 보도 수가 함께 부풀었다).
+ */
+export function canonicalGuid(guid) {
+  return String(guid).replace(/#\d+$/u, "");
+}
+
 async function fetchRss(def, since) {
   const warnings = [];
   const body = await getText(def.config.url, `rss ${def.id}`);
@@ -395,8 +404,9 @@ async function fetchRss(def, since) {
   const items = [];
   for (const e of entries) {
     const link = entryLink(e);
-    const guid = textOf(e.guid) || textOf(e.id) || link;
-    if (!guid) continue;
+    const rawGuid = textOf(e.guid) || textOf(e.id) || link;
+    if (!rawGuid) continue;
+    const guid = canonicalGuid(rawGuid);
 
     const published = parseFeedDate(textOf(e.pubDate)) ?? parseFeedDate(textOf(e.published)) ?? parseFeedDate(textOf(e.updated));
     if (!published) {
