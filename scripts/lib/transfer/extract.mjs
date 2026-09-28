@@ -58,10 +58,12 @@ const STAGE_RULES = [
   // 개인 조건. "on personal terms" 처럼 전치사가 붙는 형태까지 포함한다.
   { stage: "personal_terms", pattern: /\bpersonal terms\b/i },
   // 합의. 로마노는 "verbal agreement" 를 상시 사용하므로 반드시 포함해야 한다.
+  // ⚠ "(be) in (full) agreement with …"는 **의견에 동의한다**는 관용구다 — "Alan Shearer in agreement with Thomas
+  //   Tuchel after brutal Cole Palmer blast"(대표팀 소집 논평)가 합의 단계 딜이 됐다(운영).
   {
     stage: "agreement",
     pattern:
-      /\b(?:verbal |full |total |complete )?agreement\b|\b(?:reach(?:ed|es)? (?:an? )?agreement|agreement in principle|strike[sd]? (?:an? )?agreement|accept(?:ed|s)? (?:a|an|the)? ?(?:€|£|\$)?[\d.]*m? ?(?:bid|offer)|agree[sd]? (?:a |an |the )?(?:£|€|\$)?[\d.,]*m? ?(?:deal|fee|move|transfer)|deal (?:is )?(?:agreed|done)|finalising (?:an? )?(?:agreement|deal)|close to (?:finalising|completing))\b/i,
+      /(?<!\bin (?:full |total |complete )?)\b(?:verbal |full |total |complete )?agreement\b|\b(?:reach(?:ed|es)? (?:an? )?agreement|agreement in principle|strike[sd]? (?:an? )?agreement|accept(?:ed|s)? (?:a|an|the)? ?(?:€|£|\$)?[\d.]*m? ?(?:bid|offer)|agree[sd]? (?:a |an |the )?(?:£|€|\$)?[\d.,]*m? ?(?:deal|fee|move|transfer)|deal (?:is )?(?:agreed|done)|finalising (?:an? )?(?:agreement|deal)|close to (?:finalising|completing))\b/i,
   },
   {
     stage: "offer",
@@ -76,7 +78,8 @@ const STAGE_RULES = [
   {
     stage: "rumour",
     pattern:
-      /\b(interested in|monitor(?:ing)?|eye(?:ing)?|target(?:ing)?|linked with|considering|exploring (?:a )?(?:deal|move)|keen on|weighing|scouting)\b/i,
+      // ⚠ 부정은 제외한다 — "I'm not interested in politics"(인터뷰)가 루머 딜이 됐다(운영)
+      /(?<!\b(?:not|never|no longer|isn['’]t|aren['’]t|wasn['’]t)\s+)\b(interested in|monitor(?:ing)?|eye(?:ing)?|target(?:ing)?|linked with|considering|exploring (?:a )?(?:deal|move)|keen on|weighing|scouting)\b/i,
   },
 ];
 
@@ -256,7 +259,16 @@ const NAME = `(${TOKEN}(?:\\s+(?:${PARTICLE}\\s+){0,2}${TOKEN}){0,3})`;
  * "Liverpool to Anfield"·"Monday to Friday"가 선수가 된다.
  */
 function knownClubAfter(text, from) {
-  return detectClubs(text.slice(from, from + 60)).length > 0;
+  // ⚠ 구단은 "to" **바로 뒤**여야 한다(첫 1~4토큰) — 60자 안 어디든 받았더니 "Spence Returns to Group Training
+  //   but Misses Roma Trip"의 "Roma"가 걸려 "Spence Returns"가 선수가 됐다(sempreinter 피드).
+  const head = text.slice(from, from + 60).match(/^#?[\p{L}\p{M}'’.&-]+(?:\s+[\p{L}\p{M}'’.&-]+){0,3}/u)?.[0] ?? "";
+  const words = head.split(/\s+/);
+  for (let n = words.length; n >= 1; n--) {
+    const cand = words.slice(0, n).join(" ");
+    if (isClubName(cand) || isClubName(cand.replace(/^#/, ""))) return true;
+  }
+  // 해시태그(#MUFC)·정규명 별칭은 detectClubs가 안다 — 단 그 구단이 첫 낱말에서 시작해야 한다
+  return detectClubs(words[0] ?? "").length > 0 || (words.length > 1 && detectClubs(words.slice(0, 2).join(" ")).length > 0);
 }
 
 const PLAYER_ANCHORS = [
@@ -264,10 +276,16 @@ const PLAYER_ANCHORS = [
   new RegExp(`\\b(?:${ci("re")}-)?${ci("sign")}(?:ing)?\\s+(?:${ci("of")}\\s+)?${ROLE_PREFIX}${NAME}`, "gud"),
   // move|bid|offer|deal|… for <name>
   new RegExp(`\\b${alt(["move", "bid", "offer", "deal", "proposal", "approach", "talks", "interest", "agreement"])}\\b[^.!?]{0,40}?\\b${ci("for")}\\s+${ROLE_PREFIX}${NAME}`, "gud"),
+  // 루머 동사 + <name> — "Arsenal are interested in Rayan Cherki", "linked with a move for …"는 위 for 앵커가 받는다
+  // ⚠ 부정("not interested in")은 받지 않는다 — 단계 판정과 같은 규칙이다
+  new RegExp(`(?<!\\b(?:not|never|no longer)\\s+)\\b${alt(["interested in", "linked with", "eyeing", "monitoring", "keen on", "chasing", "pursuing", "scouting"])}\\s+${ROLE_PREFIX}${NAME}`, "gud"),
   // transfer of / loan of <name>
   new RegExp(`\\b${alt(["transfer", "loan"])}\\s+${ci("of")}\\s+${ROLE_PREFIX}${NAME}`, "gud"),
-  // (personal) terms / agreement / contract with <name> — "Barcelona agree personal terms with X"
-  new RegExp(`\\b${alt(["terms", "agreement", "contract", "talks"])}\\s+${ci("with")}\\s+${ROLE_PREFIX}${NAME}`, "gud"),
+  // (personal) terms / (verbal) agreement / talks with <name> — "Barcelona agree personal terms with X"
+  // ⚠ "agreement with"은 **합의에 이른** 표현만 받는다 — "Alan Shearer in agreement with Thomas Tuchel"(의견 동의)이
+  //   합의 단계 딜이 됐다(운영). "contract with"도 뺀다 — "extends contract with Milan Futuro"처럼 구단이 온다.
+  new RegExp(`\\b${alt(["terms", "talks"])}\\s+${ci("with")}\\s+${ROLE_PREFIX}${NAME}`, "gud"),
+  new RegExp(`(?<!\\b[Ii]n\\s+)\\b${ci("agreement")}\\s+(?:${ci("in")}\\s+${ci("principle")}\\s+)?${ci("with")}\\s+${ROLE_PREFIX}${NAME}`, "gud"),
   // "<Club> <position> <name>" — "Everton forward Iliman Ndiaye" 처럼 구단명이 끼는 어순
   new RegExp(`\\b\\p{Lu}\\p{L}+\\s+${alt(POSITIONS)}\\s+${NAME}`, "gud"),
   // <name> completes move / joins / agrees / arrives / undergoes medical … (이름이 동사 앞에 오는 어순)

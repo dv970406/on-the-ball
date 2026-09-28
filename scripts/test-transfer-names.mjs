@@ -69,6 +69,23 @@ check("선수 — 동명이인의 유명도가 비슷하면 비운다", eq(pickE
   });
   check("선수 — 이름 한 토큰(Joao)은 위키데이터를 부르지도 않는다", eq(r, { wikidataId: null, nameKo: null }) && calls === 0);
 }
+{
+  // 선수 출신 감독 — 직업에 "축구 선수"와 "축구 감독"이 함께 붙어 있다(투헬)
+  const TT = { Q1: { labels: { ko: { value: "토마스 투헬" } }, claims: { P106: [claim("Q937857"), claim("Q628099")] } } };
+  check("선수 — 직업에 축구 감독이 함께 붙은 사람은 선수로 보지 않는다", eq(pickEntity([hit("Q1", "Thomas Tuchel")], TT, "player", "Thomas Tuchel"), { wikidataId: null, nameKo: null }));
+}
+{
+  // 이름이 통째로 같은 은퇴 선수(1969년생) — 칼리아리 유망주 "Alessandro Romano"가 이 사람으로 확인됐다
+  const born = (y) => ({ P569: [{ mainsnak: { datavalue: { value: { time: `+${y}-09-30T00:00:00Z` } } } }] });
+  const AR = {
+    Q1: { labels: {}, claims: { P106: [claim("Q937857")], ...born(1969) } },
+    Q2: { labels: { ko: { value: "젊은 로마노" } }, claims: { P106: [claim("Q937857")], ...born(2008) } },
+    Q3: { labels: {}, claims: { P106: [claim("Q937857")] } },
+  };
+  check("선수 — 40세를 넘은 동명이인은 받지 않는다(은퇴 선수)", eq(pickEntity([hit("Q1", "Alessandro Romano")], AR, "player", "Alessandro Romano", 2026), { wikidataId: null, nameKo: null }));
+  check("선수 — 같은 이름이라도 나이가 맞는 쪽을 고른다", eq(pickEntity([hit("Q1", "Alessandro Romano"), hit("Q2", "Alessandro Romano")], AR, "player", "Alessandro Romano", 2026), { wikidataId: "Q2", nameKo: "젊은 로마노" }));
+  check("선수 — 출생일이 없으면 나이로 거르지 않는다", pickEntity([hit("Q3", "Alessandro Romano")], AR, "player", "Alessandro Romano", 2026).wikidataId === "Q3");
+}
 check("normalizeName — 악센트·대소문자·기호를 접는다", normalizeName("João  Pedro-") === normalizeName("joao pedro"));
 check("koLabel — 한글이 있어야 한다", koLabel(ENT.Q3) === "페데리코 키에사" && koLabel(ENT.Q4) === null);
 

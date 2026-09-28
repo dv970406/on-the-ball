@@ -330,6 +330,10 @@ export type Database = {
           summary_ko: string | null
           tier: number
           url: string | null
+          verdict: Database["public"]["Enums"]["transfer_verdict"] | null
+          verdict_at: string | null
+          verdict_evidence: string | null
+          verdict_player: string | null
         }
         Insert: {
           attributed_to?: string | null
@@ -356,6 +360,10 @@ export type Database = {
           summary_ko?: string | null
           tier: number
           url?: string | null
+          verdict?: Database["public"]["Enums"]["transfer_verdict"] | null
+          verdict_at?: string | null
+          verdict_evidence?: string | null
+          verdict_player?: string | null
         }
         Update: {
           attributed_to?: string | null
@@ -382,6 +390,10 @@ export type Database = {
           summary_ko?: string | null
           tier?: number
           url?: string | null
+          verdict?: Database["public"]["Enums"]["transfer_verdict"] | null
+          verdict_at?: string | null
+          verdict_evidence?: string | null
+          verdict_player?: string | null
         }
         Relationships: [
           {
@@ -416,6 +428,7 @@ export type Database = {
         | "official"
         | "collapsed"
         | "unknown"
+      transfer_verdict: "move" | "not_move"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -556,6 +569,7 @@ export const Constants = {
         "collapsed",
         "unknown",
       ],
+      transfer_verdict: ["move", "not_move"],
     },
   },
 } as const

@@ -16,6 +16,9 @@
  *
  * **딜 파생은 마지막 단계다** — 수집(소스 실패 여부와 무관)·재처리 뒤에 `transfer_news` → `transfer_deal`을
  * 다시 만든다(`scripts/lib/transfer/derive-deals.mjs`). 보드 화면의 유일한 원천이라 수집이 돌면 파생도 돈다.
+ * 파생 안에서 **이동 판정(LLM)**이 돈다(`scripts/lib/transfer/verdict.mjs`) — 규칙이 딜로 묶은 보도가 정말 그 선수의
+ * 구단 이동을 말하는지 묻고, 아니면 딜에서 뺀다(거부권만 가진다). 키가 없으면 판정 없이 파생한다 — 판정을 받지 못한
+ * **새** 딜은 열리지 않고 이미 있는 딜은 남는다.
  * **그 뒤에 한국어 요약(LLM)이 돈다**(`scripts/lib/transfer/summarize.mjs`) — 요약하지 않은 최근 보도만,
  * 실행당 상한까지. 요약 실패는 경고일 뿐이지만(화면이 영문 발췌로 대신한다) 키가 없거나 틀리면 실패다.
  *
@@ -34,6 +37,7 @@
 import { clampCp, createSyncClient, flag, guardTarget, loadEnv } from "./lib/sync-db.mjs";
 import { runDerivation } from "./lib/transfer/derive-deals.mjs";
 import { SUMMARY_MODEL, runSummaries } from "./lib/transfer/summarize.mjs";
+import { VERDICT_MODEL, runVerdicts } from "./lib/transfer/verdict.mjs";
 import { reprocessAll, syncSources } from "./lib/transfer/pipeline.mjs";
 import { SOURCES, enabledSources, findSource, maxRunIntervalMinutes } from "./lib/transfer/registry.mjs";
 import { inspectTelegramChannel, verifyBlueskyAccount } from "./lib/transfer/sources.mjs";
@@ -158,7 +162,22 @@ process.exit(process.exitCode ?? 0);
 /** 딜 파생 — 결과 요약을 찍고, 행 단위 실패가 하나라도 있으면 종료 코드 1 */
 async function derive({ dryRun: summaryOnly }) {
   try {
-    const r = await runDerivation(supabase, { dryRun: summaryOnly });
+    const apiKey = env.ANTHROPIC_API_KEY;
+    if (!apiKey && !summaryOnly) console.log("\nANTHROPIC_API_KEY가 없어 이동 판정을 건너뜁니다 — 판정 없는 새 딜은 열리지 않습니다");
+    // ⚠ 판정이 계통적으로 실패해도(인증) 파생은 끝까지 쓴다 — 판정 없는 파생(새 딜은 닫힘·기존 딜은 유지)으로 떨어진다.
+    //   종료 코드는 올린다(키가 틀린 채 초록으로 지나가면 새 딜이 영영 열리지 않는다)
+    const judge = apiKey
+      ? async (needs) => {
+          try {
+            return await runVerdicts(supabase, needs, { apiKey });
+          } catch (e) {
+            console.error(`✗ 이동 판정 실패: ${e instanceof Error ? e.message : String(e)}`);
+            process.exitCode = 1;
+            return { read: needs.length, move: 0, notMove: 0, invalid: 0, failed: needs.length, articles: 0, articleMissing: 0, inputTokens: 0, outputTokens: 0, warnings: [], updates: [] };
+          }
+        }
+      : null;
+    const r = await runDerivation(supabase, { dryRun: summaryOnly, judge });
     const s = r.summary;
     const stages = Object.entries(s.stages).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(" · ") || "—";
     console.log(`\n딜 파생${summaryOnly ? "(드라이런)" : ""}: 딜 ${s.deals} · 구단 ${s.clubs} · 연결된 보도 ${s.linkedRows}건`);
@@ -167,6 +186,7 @@ async function derive({ dryRun: summaryOnly }) {
     const skipped = Object.entries(r.skipped).map(([k, v]) => `${k} ${v}`).join(" · ");
     if (skipped) console.log(`  건너뜀: ${skipped}`);
     if (r.lookup) console.log(`  이름 사전(위키데이터): 조회 ${r.lookup.tried} · 찾음 ${r.lookup.found} · 없음 ${r.lookup.notFound} · 실패 ${r.lookup.failed}`);
+    if (r.verdicts) console.log(`  이동 판정 · ${VERDICT_MODEL}: 대상 ${r.verdicts.read} · 이동 ${r.verdicts.move} · 아님 ${r.verdicts.notMove} · 판정 불가 ${r.verdicts.invalid} · 실패 ${r.verdicts.failed} · 기사 본문 ${r.verdicts.articles}(못 받음 ${r.verdicts.articleMissing}) · 토큰 ${r.verdicts.inputTokens}/${r.verdicts.outputTokens}`);
     for (const w of r.warnings) console.warn(`  ⚠ ${w}`);
     if (summaryOnly) {
       for (const d of r.deals.slice(0, 20)) {

@@ -1198,6 +1198,67 @@ rollback to s;
 rollback to s37;
 
 \echo ''
+\echo '=== 37-1. 이적 소식 이동 판정 (20260928000001) ==='
+\echo '  설계 요약: verdict*는 판정 단계(LLM, service_role)만 쓰는 비공개 추출 컬럼이다. 앱은 읽지도 쓰지도 못한다.'
+\echo '  판정 불가는 값 없이 시도 시각만 남고, 판정에는 선수·시각이 따른다(CHECK가 유일한 방어다).'
+savepoint s37v;
+
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, attributed_to, tier, stage, relevance)
+values ('rss:rlstest-v', 'x1', 'Liverpool agree deal for Barcola', now() - interval '1 hour', 'outlet', null, 1, 'agreement', 0.8)
+returning id as tv1 \gset
+
+savepoint s; :login_alice
+\echo '[❌차단] 로그인 유저가 판정을 쓴다 — update grant가 없다'
+update public.transfer_news set verdict = 'move', verdict_player = 'barcola', verdict_at = now() where id = :tv1;
+rollback to s;
+
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[❌차단] 비로그인이 판정을 읽는다 — 운영 표시라 열지 않는다'
+select verdict from public.transfer_news where id = :tv1;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 로그인 유저가 판정 근거를 읽는다'
+select verdict_evidence from public.transfer_news where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 누구에 대한 판정인지 없는 판정'
+update public.transfer_news set verdict = 'move', verdict_at = now() where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 판정 없는 근거'
+update public.transfer_news set verdict_evidence = 'Liverpool agree deal', verdict_player = 'barcola', verdict_at = now() where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 300자 넘는 근거'
+update public.transfer_news set verdict = 'move', verdict_player = 'barcola', verdict_at = now(), verdict_evidence = repeat('a', 301) where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 판정 값은 enum 밖을 받지 않는다'
+update public.transfer_news set verdict = 'maybe', verdict_player = 'barcola', verdict_at = now() where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[t 기대] 판정을 쓴다 — 원문 고정 트리거(수집 컬럼)에 걸리지 않는다'
+update public.transfer_news set verdict = 'not_move', verdict_player = 'barcola', verdict_at = now(), verdict_evidence = repeat('a', 300) where id = :tv1;
+select verdict = 'not_move' and char_length(verdict_evidence) = 300 from public.transfer_news where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[t 기대] 판정 불가 — 값 없이 선수·시도 시각만 남는다'
+update public.transfer_news set verdict_player = 'barcola', verdict_at = now() where id = :tv1;
+select verdict is null and verdict_at is not null from public.transfer_news where id = :tv1;
+rollback to s;
+
+rollback to s37v;
+
+\echo ''
 \echo '=== 38. 이름 사전 자동 캐시 (20260925000004) ==='
 \echo '  설계 요약: 선수·구단 한국어 표기의 위키데이터 캐시. writer는 service_role 파생 스크립트뿐이고'
 \echo '  읽기는 공개다. 찾지 못한 이름도 행으로 남는다(name_ko null).'

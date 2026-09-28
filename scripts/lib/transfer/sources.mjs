@@ -12,7 +12,9 @@ import { XMLParser } from "fast-xml-parser";
 import { createHash } from "node:crypto";
 import { clampCp } from "../sync-db.mjs";
 
-const UA = "Mozilla/5.0 (compatible; on-the-ball-transfer-sync/0.1)";
+/** 수집기의 User-Agent — 이동 판정이 기사 본문을 받을 때도 같은 값을 쓴다(`verdict.mjs`). 브라우저로 위장하지 않는다 */
+export const COLLECTOR_UA = "Mozilla/5.0 (compatible; on-the-ball-transfer-sync/0.1)";
+const UA = COLLECTOR_UA;
 
 /**
  * ⚠ 타임아웃을 건다 — 없으면 응답 없는 호스트 하나가 undici 기본값(300초)까지 워커를 붙잡아

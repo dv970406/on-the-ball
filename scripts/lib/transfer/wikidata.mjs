@@ -15,6 +15,8 @@ const API = "https://www.wikidata.org/w/api.php";
 const USER_AGENT = "on-the-ball-transfer-sync/1.0 (https://github.com/dv970406/on-the-ball)";
 /** 직업(P106) — 축구 선수 */
 const FOOTBALLER = "Q937857";
+/** 직업(P106) — 축구 감독. 은퇴 후 감독이 된 사람은 "축구 선수"도 함께 달고 있다 */
+const FOOTBALL_MANAGER = "Q628099";
 /** 분류(P31) — 축구 클럽 */
 const FOOTBALL_CLUB = "Q476028";
 /** 검색 결과에서 볼 후보 수 — 도시·동명이인 뒤에 있는 구단·선수를 놓치지 않을 만큼 */
@@ -33,6 +35,18 @@ export function koLabel(entity) {
   const v = entity?.labels?.ko?.value;
   return typeof v === "string" && /[가-힣]/.test(v) ? v.trim() : null;
 }
+
+/**
+ * 선수로 받을 최고 나이 — 출생 연도(P569)가 이보다 오래면 은퇴한 동명이인이다.
+ * ⚠ "Alessandro Romano"(칼리아리 10대 유망주 — 위키데이터에 없다)가 1969년생 동명 선수로 확인됐다(원문 대조 QA).
+ *   이름이 통째로 같아도 세대가 다르면 다른 사람이다. 투헬(1973년생)도 이 기준만으로 빠진다.
+ *   출생일이 없는 항목은 거르지 않는다(모르는 것을 틀렸다고 하지 않는다).
+ */
+const MAX_PLAYER_AGE = 40;
+const birthYear = (entity) => {
+  const t = entity?.claims?.P569?.find((c) => c?.mainsnak?.datavalue?.value?.time)?.mainsnak.datavalue.value.time;
+  return t ? Number(t.slice(1, 5)) : null;
+};
 
 /** 동명이인 중 "압도적으로 유명한 한 명"의 기준 — 위키백과 언어판 수 */
 const DOMINANT_MIN = 10;
@@ -61,15 +75,22 @@ export function normalizeName(v) {
  *   베르나르두 실바·코나테 같은 간판 선수가 영문으로 남았다(유명 선수 999명 시뮬레이션에서 22명).
  *   이적 보도에 오르는 선수는 대개 그 이름의 가장 유명한 사람이다. 비슷하면 여전히 비운다 —
  *   틀린 표기보다 빈 칸(영문)이 낫고, 필요하면 사람이 `players-ko.json`으로 채운다.
+ * ⚠ **직업에 "축구 감독"이 함께 붙은 후보는 선수로 보지 않는다** — 투헬·클롭·아르테타는 선수 출신이라
+ *   "축구 선수"도 달고 있어, 직업 확인만으로는 "Alan Shearer in agreement with Thomas Tuchel"이 딜이 됐다(운영).
+ *   유명 선수 999명 중 이 표시가 붙은 사람은 16명(1.6%)이고 대부분 은퇴해 지도자가 된 선수다. 선수 겸 코치처럼
+ *   예외가 필요하면 사람 사전(`players-ko.json`)에 넣는다 — 사람 사전이 이 판정보다 먼저다.
+ * ⚠ "현재 소속팀(P54 종료일 없음)"은 쓰지 않는다 — 유명 선수 999명 중 130명(홀란·사카·반다이크 포함)이
+ *   소속팀 없음으로 나왔고, 투헬은 소속팀이 있다고 나왔다(측정).
  * ⚠ 구단은 이름 일치를 요구하지 않는다 — 사전의 정규명("Watford")과 항목 레이블("Watford F.C.")이
  *   원래 다르고, 분류(축구 클럽)가 동명이인을 거른다.
  * @param {{ id: string, texts: string[] }[]} hits 검색 결과 순서의 후보(`texts`는 레이블·일치한 별칭)
  * @param {Record<string, object>} entities wbgetentities 응답의 `entities`
  * @param {"player" | "club"} kind
  * @param {string} name 찾은 이름
+ * @param {number} [nowYear] 나이 판정 기준 연도(테스트가 고정한다)
  * @returns {{ wikidataId: string | null, nameKo: string | null }}
  */
-export function pickEntity(hits, entities, kind, name) {
+export function pickEntity(hits, entities, kind, name, nowYear = new Date().getUTCFullYear()) {
   const none = { wikidataId: null, nameKo: null };
   if (kind === "club") {
     const hit = hits.find((h) => claimIds(entities[h.id], "P31").includes(FOOTBALL_CLUB));
@@ -79,6 +100,8 @@ export function pickEntity(hits, entities, kind, name) {
   const exact = hits.filter(
     (h) =>
       claimIds(entities[h.id], "P106").includes(FOOTBALLER) &&
+      !claimIds(entities[h.id], "P106").includes(FOOTBALL_MANAGER) &&
+      !(birthYear(entities[h.id]) !== null && nowYear - birthYear(entities[h.id]) > MAX_PLAYER_AGE) &&
       h.texts.some((t) => normalizeName(t) === wanted),
   );
   if (!exact.length) return none;

@@ -76,6 +76,20 @@ export const dealKey = (normalized) => createHash("sha1").update(normalized).dig
 const ts = (r) => Date.parse(r.published_at);
 const tokens = (normalized) => normalized.split(" ");
 
+/** 판정 불가로 끝난 행을 다시 묻기까지의 간격 — `verdict.mjs`의 `VERDICT_RETRY_MS`와 같은 값(순환 import를 피해 따로 둔다) */
+const VERDICT_RETRY_MS = 24 * 3_600_000;
+/** 그 선수에 대한 LLM 판정 — 다른 선수로 판정했으면(추출이 바뀌어 딜이 옮겨 감) 판정이 없는 것이다 */
+const verdictOf = (r, key) => (r.verdict_player === key ? (r.verdict ?? null) : null);
+/** 지금 물어야 하는가 — 그 선수로 판정한 적이 없거나, 판정 불가로 끝난 지 `VERDICT_RETRY_MS`가 지났다 */
+const needsVerdict = (r, key, nowMs) =>
+  r.verdict_player !== key || (r.verdict == null && (!r.verdict_at || nowMs - Date.parse(r.verdict_at) >= VERDICT_RETRY_MS));
+
+/** 옮긴다는 표현 — 재계약 기사와 이적 기사를 가른다(재계약 표현만 있고 이것이 없으면 딜이 아니다) */
+const MOVE_WORDS = /\b(?:join(?:s|ed|ing)?|move(?:s|d)?\s+to|transfer(?:s|red)?\s+(?:to|from)|switch(?:es|ed)?\s+to|sign(?:s|ed|ing)?\s+for|leav(?:e|es|ing)|left(?!-)|depart(?:s|ed|ure)?|arriv(?:e|es|ed|al)|loan(?:ed)?\s+(?:to|from))\b/iu;
+/** "from Man City" — 대문자로 시작하는 출발 구단 */
+const FROM_CLUB = /\bfrom\s+\p{Lu}/u;
+const MOVE = { test: (s) => MOVE_WORDS.test(s) || FROM_CLUB.test(s) };
+
 /**
  * 후보 행 — 선수가 잡혔고 이적 단계가 있는 보도. 가십 모음은 뺀다(한 선수의 이야기로 읽으면 남의 구단·금액이 섞인다).
  */
@@ -255,10 +269,15 @@ export function clubRecord(canonical, names = createNameBook()) {
 
 /**
  * @param {object[]} rows  transfer_news 행(id, source_id, stage, players, body, published_at, relevance)
- * @param {{ nowMs: number, windows?: object[], names?: ReturnType<typeof createNameBook>, memo?: ReturnType<typeof createExtractMemo> }} opts
+ * @param {{ nowMs: number, windows?: object[], names?: ReturnType<typeof createNameBook>, memo?: ReturnType<typeof createExtractMemo>, requireVerified?: boolean, requireVerdict?: boolean, existingKeys?: Set<string> }} opts
+ *   `requireVerified`: 확인된 선수(`names.isVerifiedPlayer`)의 딜만 만든다(검증 게이트). 운영 실행(`runDerivation`)이 켠다.
+ *   `requireVerdict`: LLM 판정(`verdict.mjs`)을 관문으로 쓴다 — "이동 아님" 보도는 딜에서 빼고, **새 딜**은 "이동"
+ *     판정이 한 건 이상 있어야 연다. `existingKeys`(이미 저장된 딜 키)에 있는 딜은 판정이 없어도 둔다(판정이 멎어도
+ *     보드가 비지 않게). 운영 실행이 켠다.
  *   `names`가 없으면 사람이 고친 JSON만으로 만든 사전을 쓴다(자동 캐시 없음 — 테스트가 이 경로다).
  *   `memo`가 없으면 이 호출 안에서만 쓰는 메모를 만든다.
- * @returns {{ deals: object[], clubs: object[], assignments: Map<number, string>, nameNeeds: object[], warnings: string[], skipped: Record<string, number>, startMs: number }}
+ * @returns {{ deals: object[], clubs: object[], assignments: Map<number, string>, nameNeeds: object[], verdictNeeds: object[], warnings: string[], skipped: Record<string, number>, startMs: number }}
+ *   `verdictNeeds`는 LLM에 물어야 할 보도(행 id · 선수 키 · 표시 이름 · 원문) — 확인된 선수의 딜에 든 행만이다.
  *   `nameNeeds`는 딜마다 선수 키·구단 정규명 — 이름 사전에서 빠진 것을 찾는 데 쓴다(저장하지 않는다).
  */
 export function deriveDeals(rows, opts) {
@@ -280,9 +299,19 @@ export function deriveDeals(rows, opts) {
   const clubs = new Map();
   const assignments = new Map();
   const missingKo = [];
+  const unverified = [];
+  const unconfirmed = [];
   const nameNeeds = [];
+  const verdictNeeds = [];
 
-  for (const [key, group] of groupByPlayer(candidates)) {
+  for (const [key, grouped] of groupByPlayer(candidates)) {
+    // LLM이 "이 선수의 이동이 아니다"라고 한 보도는 딜에서 뺀다 — 단계·이적료·방향에도 들어가지 않는다
+    let group = grouped;
+    if (opts.requireVerdict) {
+      group = grouped.filter((r) => verdictOf(r, key) !== "not_move");
+      for (let i = group.length; i < grouped.length; i++) skip("이동 아님(LLM 판정)");
+      if (!group.length) continue;
+    }
     const player = displayName(group, key);
     const surname = tokens(key).at(-1);
     // 성이 짧으면(≤2) 풀네임으로만 찾는다 — 두 글자 성은 다른 단어에 너무 자주 나온다
@@ -303,9 +332,11 @@ export function deriveDeals(rows, opts) {
     if (!items.length) continue;
 
     const dir = resolveDirection(items, player);
-    // 소속·행선지를 못 읽었는데 재계약·첫 프로 계약 표현이면 이적이 아니다 —
-    // 유스 선수의 "first professional contract" 공지가 오피셜 딜로 잡혔다(실측)
-    if (!dir.from && !dir.to && !dir.isFree && items.some((it) => it.storySentences.some((s) => RENEWAL.test(s)))) {
+    // 재계약·첫 프로 계약 표현이 있고 **옮긴다는 표현이 하나도 없으면** 이적이 아니다 —
+    // 유스 선수의 "first professional contract" 공지가 오피셜 딜로 잡혔고(실측), 구단을 읽은 재계약
+    // ("Napoli reach agreement to extend Rrahmani contract")은 소속 구단이 행선지로 읽혀 합의 딜이 됐다(운영)
+    const story = items.flatMap((it) => it.storySentences);
+    if (!dir.isFree && story.some((s) => RENEWAL.test(s)) && !story.some((s) => MOVE.test(s))) {
       skip("재계약·첫 프로 계약");
       continue;
     }
@@ -318,12 +349,38 @@ export function deriveDeals(rows, opts) {
     const fromClub = dir.from ? clubRecord(dir.from, names) : null;
     let toClub = dir.to ? clubRecord(dir.to, names) : null;
     if (fromClub && toClub && fromClub.code === toClub.code) toClub = null; // CHECK from <> to
-    for (const c of [fromClub, toClub]) if (c) clubs.set(c.code, c);
 
     const playerKo = names.playerKo(key);
     const info = names.playerInfo(key);
-    if (!playerKo) missingKo.push(player);
     nameNeeds.push({ player, playerKey: key, fromCanonical: fromClub ? dir.from : null, toCanonical: toClub ? dir.to : null });
+    /*
+     * ⚠ 검증 게이트 — 확인된 선수가 아니면 딜을 만들지 않는다. 추출은 규칙이라 처음 보는 문형에서 반드시 틀린다
+     *   ("South American star", 감독 이름) — 그 오탐이 보드에 오르지 않게 하는 마지막 관문이다.
+     *   이름 조회는 이 뒤에 돈다(`nameNeeds`에는 넣는다) — 찾으면 같은 실행에서 다시 파생해 곧바로 열린다.
+     *   못 찾은 선수는 경고로 남긴다(사람이 보고 `players-ko.json`에 넣으면 열린다).
+     */
+    if (opts.requireVerified && !names.isVerifiedPlayer(key)) {
+      unverified.push(player);
+      skip("미확인 선수");
+      continue;
+    }
+    /*
+     * ⚠ LLM 판정 관문 — 새 딜은 "이동" 판정이 한 건 이상 있어야 연다. 아직 묻지 않은 보도는 `verdictNeeds`로 넘긴다
+     *   (호출부가 묻고 같은 실행에서 다시 파생한다). 이미 있는 딜은 판정이 없어도 둔다 — 판정이 멎은(키 없음·API 장애)
+     *   시간에 보드가 통째로 비지 않게. 이미 있는 딜도 "이동 아님" 보도는 위에서 빠진다.
+     */
+    if (opts.requireVerdict) {
+      for (const it of items) if (verdictOf(it.row, key) === null && needsVerdict(it.row, key, opts.nowMs)) verdictNeeds.push({ id: it.row.id, playerKey: key, player, body: it.row.body, source_id: it.row.source_id, url: it.row.url });
+      const confirmed = items.some((it) => verdictOf(it.row, key) === "move");
+      if (!confirmed && !opts.existingKeys?.has(dealKey(key))) {
+        unconfirmed.push(player);
+        skip("판정 대기(LLM)");
+        continue;
+      }
+    }
+    // 구단 행은 게이트를 지난 딜의 것만 쓴다
+    for (const c of [fromClub, toClub]) if (c) clubs.set(c.code, c);
+    if (!playerKo) missingKo.push(player);
 
     const times = items.map((it) => ts(it.row));
     deals.push({
@@ -356,9 +413,11 @@ export function deriveDeals(rows, opts) {
     for (const it of items) assignments.set(it.row.id, dealKey(key));
   }
 
+  if (unconfirmed.length) warnings.push(`이동 판정(LLM)을 받지 못한 새 딜 ${unconfirmed.length}건 — 보드에 올리지 않았다: ${unconfirmed.join(", ")}`);
+  if (unverified.length) warnings.push(`확인되지 않은 선수 ${unverified.length}명 — 보드에 올리지 않았다(선수가 맞으면 players-ko.json에 넣는다): ${unverified.join(", ")}`);
   if (missingKo.length) warnings.push(`한국어 표기가 없는 선수 ${missingKo.length}명(사람 사전·위키데이터 모두 없음) — 영문명으로 그려진다: ${missingKo.join(", ")}`);
   deals.sort((a, b) => b.latest_reported_at.localeCompare(a.latest_reported_at));
-  return { deals, clubs: [...clubs.values()], assignments, nameNeeds, warnings, skipped, startMs };
+  return { deals, clubs: [...clubs.values()], assignments, nameNeeds, verdictNeeds, warnings, skipped, startMs };
 }
 
 /** 요약(로그·드라이런) */
@@ -402,7 +461,7 @@ async function loadRows(supabase, startMs) {
   for (;;) {
     const { data, error } = await supabase
       .from(NEWS)
-      .select("id, source_id, stage, players, body, published_at, relevance, deal_id")
+      .select("id, source_id, url, stage, players, body, published_at, relevance, deal_id, verdict, verdict_player, verdict_at")
       .gte("published_at", new Date(startMs).toISOString())
       .or(`deal_id.not.is.null,and(stage.neq.unknown,relevance.gte.${MIN_RELEVANCE})`)
       .gt("id", lastId)
@@ -581,8 +640,12 @@ export async function writeDeals(supabase, derived, rows, opts = {}) {
 }
 
 /**
- * 조회 → 파생 → (dryRun이 아니면) 쓰기.
- * @returns {{ summary: object, warnings: string[], skipped: object, write: object | null }}
+ * 조회 → 파생 → 이름 조회 → 이동 판정(LLM) → (dryRun이 아니면) 쓰기.
+ * @param {{ dryRun?: boolean, nowMs?: number, log?: Console, fetchImpl?: typeof fetch, lookupNames?: boolean,
+ *   judge?: ((needs: object[]) => Promise<{ updates: object[] }>) | null }} opts
+ *   `judge`는 이동 판정 함수(`verdict.mjs`의 `runVerdicts`를 호출부가 감싸 넘긴다 — 순환 import를 피한다).
+ *   없으면(키가 없다) 판정하지 않는다 — 판정이 없는 **새** 딜은 열리지 않고 이미 있는 딜은 남는다.
+ * @returns {{ summary: object, warnings: string[], skipped: object, write: object | null, lookup: object | null, verdicts: object | null }}
  */
 export async function runDerivation(supabase, opts = {}) {
   const log = opts.log ?? console;
@@ -590,9 +653,12 @@ export async function runDerivation(supabase, opts = {}) {
   const windows = loadWindows();
   const rows = await loadRows(supabase, derivationStartMs(nowMs, windows));
   let names = await loadNameBook(supabase);
-  // 이름을 찾아 다시 파생할 때 추출을 되풀이하지 않도록 메모를 두 번의 파생이 나눠 쓴다
+  // 이미 저장된 딜 — 판정이 없어도 남긴다(판정이 멎은 시간에 보드가 통째로 비지 않게)
+  const existingKeys = new Set((await readAll(supabase, DEALS, "deal_key", "deal_key")).map((d) => d.deal_key));
+  // 이름을 찾아 다시 파생할 때 추출을 되풀이하지 않도록 메모를 여러 번의 파생이 나눠 쓴다
   const memo = createExtractMemo();
-  let derived = deriveDeals(rows, { nowMs, windows, names, memo });
+  const derive = () => deriveDeals(rows, { nowMs, windows, names, memo, requireVerified: true, requireVerdict: true, existingKeys });
+  let derived = derive();
 
   /*
    * 이름 사전 채우기 — 딜에 오른 이름 중 한국어 표기가 없는 것만 위키데이터에서 찾아 캐시에 쓴다.
@@ -604,13 +670,34 @@ export async function runDerivation(supabase, opts = {}) {
     const missing = missingNames(derived.nameNeeds, names, nowMs);
     if (missing.length) {
       lookup = await lookupAndCache(supabase, missing, { fetchImpl: opts.fetchImpl });
-      if (lookup.found > 0) {
+      if (lookup.found > 0 || lookup.verified > 0) {
         names = await loadNameBook(supabase);
-        derived = deriveDeals(rows, { nowMs, windows, names, memo });
+        derived = derive();
       }
     }
   }
 
+  /*
+   * 이동 판정(LLM) — 확인된 선수의 딜에 든 보도 중 아직 묻지 않은 것만 묻는다. 이름 조회 **뒤**에 돈다(조회로 확인된
+   * 선수의 보도도 같은 실행에서 판정받게). 판정을 메모리의 행에 입혀 **다시 파생**한다.
+   * ⚠ 드라이런은 묻지 않는다(비용이 들고 DB에 쓴다) — 저장된 판정만으로 파생한다.
+   */
+  let verdicts = null;
+  if (!opts.dryRun && opts.judge && derived.verdictNeeds.length) {
+    verdicts = await opts.judge(derived.verdictNeeds);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    for (const u of verdicts.updates) Object.assign(byId.get(u.id) ?? {}, { verdict: u.verdict, verdict_player: u.verdict_player, verdict_at: u.verdict_at });
+    if (verdicts.updates.length) derived = derive();
+  }
+
   const write = opts.dryRun ? null : await writeDeals(supabase, derived, rows, { log });
-  return { summary: summarize(derived), warnings: [...derived.warnings, ...(lookup?.warnings ?? [])], skipped: derived.skipped, deals: derived.deals, write, lookup };
+  return {
+    summary: summarize(derived),
+    warnings: [...derived.warnings, ...(lookup?.warnings ?? []), ...(verdicts?.warnings ?? [])],
+    skipped: derived.skipped,
+    deals: derived.deals,
+    write,
+    lookup,
+    verdicts,
+  };
 }

@@ -28,6 +28,9 @@ const CASES = [
   { expect: "official",       text: "🚨 Ezri Konsa completes move from Aston Villa to Arsenal. Fee £42m" },
   { expect: "agreement",      text: "🚨 BREAKING: Chelsea reach agreement with Aston Villa to sign Emi Martinez. Permanent deal for 33yo #AVFC goalkeeper" },
   { expect: "rumour",         text: "Manchester City are interested in a move for Everton forward Iliman Ndiaye." },
+  // "in agreement with"은 의견 동의 · "not interested in"은 관심이 아니다(운영에서 딜이 됐다)
+  { expect: "unknown",        text: "Alan Shearer in agreement with Thomas Tuchel after brutal Cole Palmer blast" },
+  { expect: "unknown",        text: "‘I love football; I’m not interested in politics’ – Rayan Cherki on dreaming to win the Ballon d’Or" },
   { expect: "agreement",      text: "German club RB Leipzig are close to reaching an agreement in principle with Chelsea for the transfer of striker Marc Guiu." },
   { expect: "unknown",        text: "🚨 James Maddison suffered slight fracture to shoulder after landing awkwardly. Out for around four weeks." },
   // ── 실제 수집 데이터에서 발견한 오분류 회귀 테스트 ──
@@ -184,6 +187,14 @@ const PLAYER_CASES = [
   { players: ["Danny Ings"], text: "Wycombe sign ex-England striker Ings Wycombe Wanderers sign former Burnley striker Danny Ings." },
   { players: [], text: "Official: Tommaso Mancioppi extends contract with Milan Futuro By: Oliver Fisher" },
   { players: [], text: "Harry Kane confirms new deal talks with FC Bayern are advancing." },
+  // 오탐 — "in agreement with"은 의견 동의다(대표팀 소집 논평이 투헬의 합의 딜이 됐다)
+  { players: [], text: "Alan Shearer in agreement with Thomas Tuchel after brutal Cole Palmer blast" },
+  // 오탐 — 부정("not interested in")은 관심 표현이 아니다
+  { players: [], text: "‘I love football; I’m not interested in politics’ – Rayan Cherki on dreaming to win the Ballon d’Or" },
+  // 오탐 — "to" 뒤 구단은 바로 뒤여야 한다(뒤쪽의 Roma를 잡았다)
+  { players: [], text: "Spence Returns to Group Training but Misses Roma Trip" },
+  // 루머 동사 뒤 이름
+  { players: ["Rayan Cherki"], text: "Arsenal are interested in Rayan Cherki." },
 ];
 let playerPass = 0;
 for (const c of PLAYER_CASES) {

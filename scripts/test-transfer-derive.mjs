@@ -252,7 +252,56 @@ const CASES = [
   },
 ];
 
+// ── 검증 게이트 — 확인된 선수의 딜만 만든다 ──
+const gated = (rows, cache = []) =>
+  deriveDeals(rows, { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: DICT, cache }), requireVerified: true });
+const GATE = {
+  unknown: gated([row("Chelsea agree deal for Jane Roe from Benfica.", { players: ["Jane Roe"] })]),
+  cached: gated([row("Chelsea agree deal for Jane Roe from Benfica.", { players: ["Jane Roe"] })], [
+    { kind: "player", key: "jane roe", name_ko: null, wikidata_id: "Q1", checked_at: "2026-09-20T00:00:00Z" },
+  ]),
+  notFound: gated([row("Chelsea agree deal for Jane Roe from Benfica.", { players: ["Jane Roe"] })], [
+    { kind: "player", key: "jane roe", name_ko: null, wikidata_id: null, checked_at: "2026-09-20T00:00:00Z" },
+  ]),
+  human: gated([row("Chelsea agree deal for John Doe from Benfica.")]),
+};
+// ── 이동 판정(LLM) 관문 — 거부권만, 새 딜은 "이동" 판정이 있어야, 있던 딜은 판정이 없어도 남는다 ──
+const judged = (rows, existing = []) =>
+  deriveDeals(rows, { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: DICT }), requireVerified: true, requireVerdict: true, existingKeys: new Set(existing) });
+const JOHN = dealKey(normalizePlayer("John Doe"));
+const V = (verdict, extra = {}) => ({ verdict, verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", ...extra });
+const VERDICT = {
+  unjudgedNew: judged([row("Chelsea agree deal for John Doe from Benfica.")]),
+  movedNew: judged([row("Chelsea agree deal for John Doe from Benfica.", V("move"))]),
+  unjudgedExisting: judged([row("Chelsea agree deal for John Doe from Benfica.")], [JOHN]),
+  allVetoedExisting: judged([row("Alan Shearer in agreement with John Doe after the blast.", V("not_move")), row("John Doe agreement reached after verdict.", V("not_move"))], [JOHN]),
+  mixed: judged([
+    row("Chelsea in talks for John Doe from Benfica.", { stage: "talks", ...V("move") }),
+    row("John Doe joins Chelsea from Benfica. Deal agreed.", { stage: "official", ...V("not_move") }),
+    row("Chelsea agree deal for John Doe from Benfica.", { stage: "agreement" }),
+  ]),
+  otherPlayer: judged([row("Chelsea agree deal for John Doe from Benfica.", { verdict: "move", verdict_player: "jane roe", verdict_at: "2026-09-24T00:00:00Z" })]),
+  invalidRecent: judged([row("Chelsea agree deal for John Doe from Benfica.", { verdict: null, verdict_player: "john doe", verdict_at: new Date(NOW - 3_600_000).toISOString() })]),
+  invalidOld: judged([row("Chelsea agree deal for John Doe from Benfica.", { verdict: null, verdict_player: "john doe", verdict_at: new Date(NOW - 25 * 3_600_000).toISOString() })]),
+  off: deriveDeals([row("Chelsea agree deal for John Doe from Benfica.", V("not_move"))], { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: DICT }) }),
+};
 const UNIT = [
+  { name: "판정 — 판정 없는 새 딜은 열지 않고 물을 대상으로 넘긴다", got: [VERDICT.unjudgedNew.deals.length, VERDICT.unjudgedNew.verdictNeeds.map((n) => n.playerKey), VERDICT.unjudgedNew.skipped["판정 대기(LLM)"], VERDICT.unjudgedNew.clubs.length], want: [0, ["john doe"], 1, 0] },
+  { name: "판정 — 이동 판정이 있는 새 딜은 연다(다시 묻지 않는다)", got: [VERDICT.movedNew.deals.length, VERDICT.movedNew.verdictNeeds.length], want: [1, 0] },
+  { name: "판정 — 이미 있는 딜은 판정이 없어도 남긴다(판정이 멎어도 보드가 비지 않게)", got: [VERDICT.unjudgedExisting.deals.length, VERDICT.unjudgedExisting.verdictNeeds.length], want: [1, 1] },
+  { name: "판정 — 이미 있는 딜도 보도가 전부 '이동 아님'이면 사라진다", got: [VERDICT.allVetoedExisting.deals.length, VERDICT.allVetoedExisting.skipped["이동 아님(LLM 판정)"], VERDICT.allVetoedExisting.assignments.size], want: [0, 2, 0] },
+  { name: "판정 — '이동 아님' 보도는 딜에서 빠지고 단계에도 들어가지 않는다(오피셜 보도가 빠져 협상·합의만 남는다)", got: [VERDICT.mixed.deals[0]?.report_count, VERDICT.mixed.deals[0]?.stage, VERDICT.mixed.verdictNeeds.length], want: [2, "agreement", 1] },
+  { name: "판정 — 다른 선수로 내린 판정은 없는 것이다(다시 묻는다)", got: [VERDICT.otherPlayer.deals.length, VERDICT.otherPlayer.verdictNeeds.length], want: [0, 1] },
+  { name: "판정 — 판정 불가는 24시간 동안 다시 묻지 않는다", got: [VERDICT.invalidRecent.deals.length, VERDICT.invalidRecent.verdictNeeds.length], want: [0, 0] },
+  { name: "판정 — 판정 불가가 24시간 지나면 다시 묻는다", got: VERDICT.invalidOld.verdictNeeds.length, want: 1 },
+  { name: "판정 — 관문을 켜지 않으면 판정을 보지 않는다(기존 동작)", got: VERDICT.off.deals.length, want: 1 },
+  { name: "게이트 — 사전에도 캐시에도 없는 선수는 딜을 만들지 않고 이름 조회 대상으로 넘긴다", got: [GATE.unknown.deals.length, GATE.unknown.nameNeeds.map((x) => x.playerKey), GATE.unknown.skipped["미확인 선수"], GATE.unknown.clubs.length], want: [0, ["jane roe"], 1, 0] },
+  { name: "게이트 — 위키데이터에서 찾은 선수(한국어 표기 없음)는 연다", got: GATE.cached.deals.length, want: 1 },
+  { name: "게이트 — 찾아봤지만 없던 이름은 막는다", got: GATE.notFound.deals.length, want: 0 },
+  { name: "게이트 — 사람 사전의 선수는 연다", got: GATE.human.deals.length, want: 1 },
+  { name: "게이트 — 막은 선수는 경고로 남긴다(사람이 검토한다)", got: GATE.unknown.warnings.some((w) => w.includes("확인되지 않은 선수") && w.includes("Jane Roe")), want: true },
+  { name: "재계약 — 구단을 읽었어도 옮긴다는 표현이 없으면 딜이 아니다", got: derive([row("Napoli reach agreement to extend John Doe contract until 2029. Napoli have agreed terms with John Doe over a new deal.")]).deals.length, want: 0 },
+  { name: "재계약 표현이 있어도 옮기면 딜이다", got: derive([row("John Doe joins Napoli from Benfica and signs a new contract until 2029.")]).deals.length, want: 1 },
   { name: "normalizePlayer — 악센트·하이픈·대소문자·공백", got: normalizePlayer("  Rafael  LEÃO "), want: "rafael leao" },
   { name: "normalizePlayer — 비분리 하이픈(U+2011)과 보통 하이픈이 같은 키", got: normalizePlayer("Morgan Gibbs‑White") === normalizePlayer("Morgan Gibbs-White"), want: true },
   { name: "dealKey — 16자리 소문자 hex(DB CHECK)", got: /^[0-9a-f]{16}$/.test(dealKey("john doe")), want: true },

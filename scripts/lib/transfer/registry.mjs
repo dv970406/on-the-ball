@@ -499,9 +499,14 @@ export const SOURCES = [
     kind: "rss",
     tier: 2,
     defaultAttribution: "outlet",
-    enabled: true,
+    enabled: false,
     config: { url: "https://sempreinter.com/feed" },
-    measured: { note: "인테르 팬 매체(영어). 루머 재인용이 많다." },
+    measured: {
+      note:
+        "인테르 팬 매체(영어). 루머 재인용이 많다. ⚠ 꺼 둔다(2026-09-28): Cloudflare가 GitHub Actions 러너 IP에 403을 준다" +
+        "(같은 User-Agent로 가정용 IP에서는 200). 저장된 행이 0건이었고, 피드 20건 중 딜 후보는 1건이었다 — 세리에 A는 " +
+        "football-italia·dimarzio·romano·sempremilan이 덮는다. 차단이 풀렸는지는 러너에서 --only로 다시 잰다.",
+    },
     retentionHours: 271,
   },
   {

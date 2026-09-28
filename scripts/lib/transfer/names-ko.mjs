@@ -51,13 +51,18 @@ export function shortClubName(name) {
 
 /**
  * 이름 사전 — 순수한 조회기. 캐시 행을 받아 만든다(DB 없이 테스트가 돈다).
- * @param {{ players?: object, clubs?: object, cache?: { kind: string, key: string, name_ko: string | null, checked_at: string }[] }} src
+ * @param {{ players?: object, clubs?: object, cache?: { kind: string, key: string, name_ko: string | null, wikidata_id?: string | null, checked_at: string }[] }} src
  */
 export function createNameBook({ players = {}, clubs = {}, cache = [] } = {}) {
   const cached = new Map(cache.map((r) => [`${r.kind}:${r.key}`, r]));
   return {
     /** 선수 한국어 표기 — 키는 `normalizePlayer` 결과 */
     playerKo: (key) => players[key]?.ko ?? cached.get(`player:${key}`)?.name_ko ?? null,
+    /**
+     * 확인된 선수인가 — 사람 사전에 있거나, 위키데이터에서 이름이 통째로 같은 현역(감독 아닌) 축구 선수로 찾았다
+     * (캐시에 `wikidata_id`가 있다 — 한국어 표기는 없을 수 있다). 딜 파생의 검증 게이트가 이것만 본다.
+     */
+    isVerifiedPlayer: (key) => Boolean(players[key]) || Boolean(cached.get(`player:${key}`)?.wikidata_id),
     /** 사람이 적은 선수 정보(포지션·생년·국적) — 자동 캐시에는 없다 */
     playerInfo: (key) => players[key] ?? null,
     /** 구단 표기 — `{ name, short }`. 프리셋 구단은 프리셋, 아니면 사람 → 캐시. 없으면 `null`(영문 그대로) */
@@ -83,7 +88,7 @@ export async function loadNameBook(supabase) {
   const cache = [];
   let from = 0;
   for (;;) {
-    const { data, error } = await supabase.from(NAME_TABLE).select("kind, key, name_ko, checked_at").range(from, from + 999);
+    const { data, error } = await supabase.from(NAME_TABLE).select("kind, key, name_ko, wikidata_id, checked_at").range(from, from + 999);
     if (error) throw new Error(`이름 사전 조회 실패: ${error.message}`);
     cache.push(...data);
     if (data.length < 1000) break;
@@ -114,7 +119,8 @@ export function missingNames(deals, book, nowMs) {
  *   (사전이 비어도 화면은 영문으로 그린다 — 파생·수집을 실패시킬 이유가 없다).
  */
 export async function lookupAndCache(supabase, names, { fetchImpl = fetch, limit = LOOKUP_MAX_PER_RUN } = {}) {
-  const out = { tried: 0, found: 0, notFound: 0, failed: 0, warnings: [] };
+  // verified: 항목을 찾았다(한국어 표기가 없어도) — 검증 게이트가 열리므로 다시 파생할 이유가 된다
+  const out = { tried: 0, found: 0, notFound: 0, verified: 0, failed: 0, warnings: [] };
   const rows = [];
   for (const n of names.slice(0, limit)) {
     out.tried += 1;
@@ -122,6 +128,7 @@ export async function lookupAndCache(supabase, names, { fetchImpl = fetch, limit
       const r = await lookupKo(n.name, n.kind, fetchImpl);
       rows.push({ kind: n.kind, key: n.key, name_en: n.name.slice(0, 120), name_ko: r.nameKo, wikidata_id: r.wikidataId, checked_at: new Date().toISOString() });
       out[r.nameKo ? "found" : "notFound"] += 1;
+      if (r.wikidataId) out.verified += 1;
     } catch (e) {
       out.failed += 1;
       out.warnings.push(`이름 조회 실패(${n.kind} ${n.name}): ${e instanceof Error ? e.message : String(e)}`);
@@ -133,6 +140,7 @@ export async function lookupAndCache(supabase, names, { fetchImpl = fetch, limit
     if (error) {
       out.warnings.push(`이름 사전 저장 실패: ${error.message}`);
       out.found = 0;
+      out.verified = 0;
     }
   }
   return out;
