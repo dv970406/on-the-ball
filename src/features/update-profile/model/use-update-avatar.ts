@@ -1,17 +1,16 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
+import { requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
 import { AVATAR_BUCKET } from "@/shared/config";
 import { useToast } from "@/shared/lib";
-import { commentKeys } from "@/entities/comment";
-import { profileKeys } from "@/entities/profile";
 import {
   ACCEPTED_IMAGE_TYPES,
   MAX_SOURCE_BYTES,
   MAX_UPLOAD_BYTES,
   resizeToAvatar,
 } from "../lib/resize-image";
+import { invalidateProfileConsumers } from "../lib/invalidate-profile-consumers";
 
 /**
  * 아바타 교체 — **1계정 : 1프로필사진**을 지킨다.
@@ -97,7 +96,7 @@ export function useUpdateAvatar(userId: string | undefined) {
         await clearAvatarPath(supabase, userId);
         if (error) {
           console.error("[profile] 아바타 경로 저장 실패:", error);
-          throw new Error(toDbErrorMessage(error));
+          throw new Error(await toWriteErrorMessage(supabase, error));
         }
         throw new Error("변경 권한이 없어요.");
       }
@@ -105,8 +104,7 @@ export function useUpdateAvatar(userId: string | undefined) {
       return path;
     },
     /**
-     * ⚠ 아바타를 싣는 캐시가 새로 생기면(작성자 표기 등) 여기 함께 무효화한다 — 지금은 댓글의
-     *   작성자 임베딩(`COMMENT_SELECT`의 `author`)이 그 자리다.
+     * 무효화 대상은 `invalidateProfileConsumers`가 단독으로 갖는다(닉네임 훅과 같은 목록).
      * 낙관적 업데이트가 없으므로 Promise를 반환해 리페치까지 isPending을 유지한다.
      *
      * ⚠ **`onSuccess`가 아니라 `onSettled`다.** 이 훅은 업로드 전에 폴더를 비우므로
@@ -115,13 +113,7 @@ export function useUpdateAvatar(userId: string | undefined) {
      *   바로 위에 **방금 지운 사진이 그대로** 떠 있다.
      */
     onSettled: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: profileKeys.all }),
-        // ⚠ 무효화만 한다(지우지 않는다) — 지우면 뒤로가기가 되살린 **옛 서버 페이로드**가 빈 캐시에
-        //   신선한 데이터로 앉아 옛 작성자 표기가 새로고침 전까지 남았다(QA 실측). stale로 남겨 두면
-        //   돌아온 순간 다시 받는다(그 왕복 동안의 옛 표기는 남는다).
-        queryClient.invalidateQueries({ queryKey: commentKeys.all }),
-      ]),
+      invalidateProfileConsumers(queryClient),
     // ⚠ 실패를 반드시 알린다 — 이 훅은 업로드 전에 기존 사진을 지우므로,
     //   놓치면 사진이 사라진 이유를 알 수 없다.
     onError: (error) => toast(error.message),

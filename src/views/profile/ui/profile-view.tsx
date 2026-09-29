@@ -17,7 +17,6 @@ import { LinkedAccounts } from "./linked-accounts";
 interface ProfileViewProps {
   /** 계정 연결에서 돌아왔는지 — 서버가 판정해 내려준다(app/profile/page.tsx 주석 참고) */
   linkPending: boolean;
-  /** 프로바이더가 거부한 경우 (`?error=`) */
   /** 프로바이더가 거부한 경우의 **상위 분류** (`?error=`) */
   errorKind: string | null;
   /** 그 실패의 **구체 코드** (`?error_code=`) — 한국어 문구가 여기에 붙는다 */

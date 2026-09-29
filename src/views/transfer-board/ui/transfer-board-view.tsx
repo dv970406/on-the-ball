@@ -48,7 +48,7 @@ interface TransferBoardViewProps {
 }
 
 /**
- * 이적시장 보드(handoff 4장 · 계획서 §3-6).
+ * 이적시장 보드.
  *
  * 위→아래: 앱바 · 최근 3일 소식 캐러셀 · 이적시장 헤더(창 · 추적 건수 · 마감 카운트다운) ·
  * 구간 점프 탭 + 정렬(한 줄, `GroupTabs`) · 필터 레일(리그 버튼 + 구단 칩, `FilterRail`) ·

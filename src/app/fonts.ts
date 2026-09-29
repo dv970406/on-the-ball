@@ -14,5 +14,12 @@ export const jetbrainsMono = localFont({
     { path: "./fonts/JetBrainsMono-Medium.subset.woff2", weight: "500" },
   ],
   display: "swap",
+  /**
+   * ⚠ preload하지 않는다. 기본값(true)이면 두 웨이트(약 47KB)가 모든 라우트에서 첫 페인트 자원과
+   *   경쟁하는데, 이 폰트가 그리는 것은 상대시각·카운트·이적료 같은 **작은 보조 숫자**뿐이다.
+   *   `swap` + Next가 만드는 폴백 메트릭(`adjustFontFallback`)이 교체 시 시프트를 막는다.
+   *   Pretendard 본문 조각 두 개는 그대로 `app/layout.tsx`가 preload한다.
+   */
+  preload: false,
   variable: "--font-jetbrains-mono",
 });

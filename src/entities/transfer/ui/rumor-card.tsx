@@ -13,6 +13,7 @@ import { FeeValue } from "./fee-value";
 import { CredibilityBadge } from "./credibility-badge";
 import { CrestStack } from "./crest-stack";
 import { TransferCrest } from "./transfer-crest";
+import { playerName } from "../lib/player-name";
 
 
 interface RumorCardProps {
@@ -21,19 +22,21 @@ interface RumorCardProps {
   report: TransferReport;
   /** 기준 시각 — `serverNowMs ?? useNowMs()`는 뷰가 한다 */
   nowMs: number | null;
+  /** 트랙의 첫 카드 — 첫 화면에 보이므로 엠블럼을 지연 로드하지 않는다 */
+  priority?: boolean;
 }
 
 /**
- * "최근 3일 소식" 캐러셀의 300px 카드(handoff §4-1). 가로 스냅 트랙의 항목이라 `li` + `Link`.
+ * "최근 3일 소식" 캐러셀의 300px 카드. 가로 스냅 트랙의 항목이라 `li` + `Link`.
  *
- * ⚠ **확률이 없다** — 푸터는 상태 뱃지 · 우측 이적료뿐(`확률 N%`는 보류 — 계획서 §0).
+ * ⚠ **확률이 없다** — 푸터는 상태 뱃지 · 우측 이적료뿐(`확률 N%`는 보류).
  * ⚠ 보도 주체는 **목록·타임라인과 같은 한국어 표기**(`reporterName` — "벤 제이콥스")다. 소스 등록용 영어 라벨을
  *   쓰면 화면마다 같은 기자가 "Fabrizio Romano"·"파브리지오 로마노"로 갈린다.
  * ⚠ 요지는 2줄 클램프 + `min-h-10`으로 카드 높이를 맞춘다 — 요지가 없는 보도가 섞여도 트랙이
  *   들쭉날쭉하지 않게.
  */
-export function RumorCard({ deal, report, nowMs }: RumorCardProps) {
-  const name = deal.playerKo ?? deal.player;
+export function RumorCard({ deal, report, nowMs, priority }: RumorCardProps) {
+  const name = playerName(deal);
   const route = routeLabels(deal);
   const destinations = destinationClubs(deal);
 
@@ -57,7 +60,7 @@ export function RumorCard({ deal, report, nowMs }: RumorCardProps) {
         {/* 경로 블록 — 3열 `1fr 40px 1fr`, 로고 40 + 약칭. 행선지만 500 ink */}
         <div className="mt-4 mb-3.5 grid grid-cols-[1fr_40px_1fr] items-center rounded-md border border-hairline-cool bg-canvas-soft py-3.5">
           <span className="flex flex-col items-center gap-[7px] whitespace-nowrap text-[12px] text-ink-mute">
-            <TransferCrest club={deal.fromClub} size={40} />
+            <TransferCrest club={deal.fromClub} size={40} priority={priority} />
             <span className="max-w-full truncate px-1">
               {route.from}
             </span>
@@ -70,7 +73,7 @@ export function RumorCard({ deal, report, nowMs }: RumorCardProps) {
             {destinations.length > 1 ? (
               <CrestStack clubs={destinations} size={40} />
             ) : (
-              <TransferCrest club={destinations[0] ?? null} size={40} />
+              <TransferCrest club={destinations[0] ?? null} size={40} priority={priority} />
             )}
             {/* 관심 구단이 여럿이면 `routeLabels`가 접은 글자(앞 셋 + `외 N`)를 두 줄까지 흘린다(`ClubRoute`와 같은 판단) */}
             <span className={destinations.length > 1 ? "line-clamp-2 px-1 text-center" : "max-w-full truncate whitespace-nowrap px-1"}>

@@ -62,7 +62,8 @@ check('move가 불리언이 아니면 판정 불가("yes")', parseJudgement(JSON
 {
   const long = "a ".repeat(400).trim();
   const r = parseJudgement(J({ move: false, evidence: long }), long, NO_FIX);
-  check(`근거는 ${EVIDENCE_MAX_CHARS}자로 자른다(DB CHECK와 같은 값)`, r.kind === "not_move" && [...r.evidence].length === EVIDENCE_MAX_CHARS + 1 && r.evidence.endsWith("…"));
+  // ⚠ 정확히 상한이다 — 전에는 `…`를 붙여 301코드포인트가 됐고 CHECK(`between 1 and 300`)가 그 행의 판정 저장을 거부했다
+  check(`근거는 ${EVIDENCE_MAX_CHARS}자로 자른다(DB CHECK와 같은 값)`, r.kind === "not_move" && [...r.evidence].length === EVIDENCE_MAX_CHARS && !r.evidence.endsWith("…"));
 }
 {
   // 모델이 두 문장을 이으며 사이 이모지를 떨어뜨렸다(글자는 그대로)

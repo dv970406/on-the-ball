@@ -13,13 +13,13 @@ interface DeadlineCountdownProps {
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /**
- * `마감까지 / 06일 14:22:08` — 헤더 우측의 마감 카운트다운(handoff §4-2).
+ * `마감까지 / 06일 14:22:08` — 헤더 우측의 마감 카운트다운.
  *
  * ⚠ **마감에 닿으면 라벨째 사라진다.** `00일 00:00:00`을 남기지 않는다 — 닫힌 창의 카운트다운은
  *   보여줄 것이 없다. 다음 창이 열릴 때까지 헤더에는 창 이름과 건수만 남는다.
  * ⚠ **1초 틱의 리렌더를 이 컴포넌트 안에 가둔다.** 헤더나 뷰가 시계를 들면 매초 보드 전체가
  *   다시 그려진다 — 그래서 `useDeadline`의 state가 여기서만 산다.
- * ⚠ 숫자는 mono + `tabular-nums`(handoff §0). `whitespace-nowrap`이 없으면 좁은 폭에서
+ * ⚠ 숫자는 mono + `tabular-nums`. `whitespace-nowrap`이 없으면 좁은 폭에서
  *   `일`과 시각 사이가 접힌다.
  */
 export function DeadlineCountdown({ closesAt, serverNowMs }: DeadlineCountdownProps) {

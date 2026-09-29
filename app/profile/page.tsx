@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { AuthRequired } from "@/entities/session";
 import { ProfileView } from "@/views/profile";
+// ⚠ 배럴(@/shared/lib)이 아니라 직접 경로 — 배럴은 "use client" 훅을 포함한다
+import { firstParam } from "@/shared/lib/search-params";
 
 export const metadata: Metadata = {
   title: "프로필",
@@ -16,8 +18,6 @@ export const metadata: Metadata = {
  */
 export default async function Page(props: PageProps<"/profile">) {
   const params = await props.searchParams;
-  const first = (value: string | string[] | undefined) =>
-    (Array.isArray(value) ? value[0] : value) ?? null;
 
   return (
     <AuthRequired>
@@ -26,11 +26,11 @@ export default async function Page(props: PageProps<"/profile">) {
         // 교환이 끝나야 첫 인증 이벤트가 와서 `AuthRequired`가 화면을 연다 — 그래서 연결 목록은
         // 교환 **뒤에** 처음 조회되어 새 수단을 담는다(프로바이더를 다녀온 전체 로드라 캐시도 새것이다).
         // 같은 유저의 SIGNED_IN은 캐시를 무효화하지 않으므로 거기에 기대지 않는다(`use-session-sync`).
-        linkPending={first(params.code) !== null}
+        linkPending={firstParam(params.code) !== null}
         // ⚠ `error`는 상위 분류, `error_code`가 구체 사유다 — 둘 다 내려야 한국어 문구가 붙는다
-        errorKind={first(params.error)}
-        errorCode={first(params.error_code)}
-        errorDescription={first(params.error_description)}
+        errorKind={firstParam(params.error)}
+        errorCode={firstParam(params.error_code)}
+        errorDescription={firstParam(params.error_description)}
       />
     </AuthRequired>
   );

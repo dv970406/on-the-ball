@@ -11,14 +11,14 @@ interface CommentFormProps {
   placeholder: string;
   /** 스크린리더용 라벨 — placeholder는 라벨이 아니다(입력이 시작되면 사라진다) */
   label: string;
-  /** 답글 칸에만 — `등록` 왼쪽의 `취소`(handoff §5-1-4) */
+  /** 답글 칸에만 — `등록` 왼쪽의 `취소` */
   onCancel?: () => void;
   /** 세션 복원 중 — 자리는 그대로 두고 조작만 막는다(로그인 안내가 깜빡였다가 폼으로 바뀌지 않게) */
   disabled?: boolean;
   className?: string;
 }
 
-/** 입력칸 외곽 — 44px · 1px 선 · radius 8, 포커스 시 잉크 선(handoff §5-1-1). 비로그인 트리거와 공유한다 */
+/** 입력칸 외곽 — 44px · 1px 선 · radius 8, 포커스 시 잉크 선. 비로그인 트리거와 공유한다 */
 export const COMMENT_FIELD_BOX =
   "flex h-11 items-center gap-1.5 rounded-md border border-hairline-strong bg-canvas pl-3 pr-1 transition-colors duration-150 ease-otb";
 

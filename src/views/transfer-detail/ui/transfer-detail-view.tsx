@@ -9,6 +9,7 @@ import {
   TransferCrest,
   routeLabels,
   destinationClubs,
+  playerName,
 } from "@/entities/transfer";
 import { WatchToggle } from "@/features/watch-transfer";
 import { ROUTES } from "@/shared/config";
@@ -89,7 +90,7 @@ function RouteCell({
               key={c.code}
               className="flex min-w-0 items-center gap-2 text-[14px] font-medium leading-[1.3] tracking-[-0.3px] text-ink"
             >
-              <TransferCrest club={c} size={24} className="shrink-0" />
+              <TransferCrest club={c} size={24} priority className="shrink-0" />
               {/* 정식명이 좁은 칸에서 한 줄을 넘으면 자르지 않고 두 줄로 흘린다 — 잘린 구단 이름은 어느 구단인지 알 수 없다 */}
               <span className="line-clamp-2">{c.name}</span>
             </li>
@@ -98,7 +99,7 @@ function RouteCell({
       ) : (
         <>
           <div className="mt-2 flex items-center gap-2 text-[14px] font-medium leading-[1.3] tracking-[-0.3px] text-ink">
-            <TransferCrest club={club} size={24} className="shrink-0" />
+            <TransferCrest club={club} size={24} priority className="shrink-0" />
             {/* 경로 카드만 정식명이다 — 목록 행·칩은 약칭(`TransferClub` 주석) */}
             <span className="truncate">{text}</span>
           </div>
@@ -111,7 +112,7 @@ function RouteCell({
 }
 
 /**
- * 정보줄(handoff §5-3) — `DAVID ALABA · CB/LB · 1992년생 · 🇦🇹 AUT`.
+ * 정보줄 — `DAVID ALABA · CB/LB · 1992년생 · 🇦🇹 AUT`.
  *
  * **있는 항목만** ` · `로 잇는다("틀린 칸보다 빈 칸"). 영문 대문자 이름은 **h1이 한국어일 때만**
  * 싣는다 — 한국어 표기가 없어 h1이 이미 영문이면 같은 이름을 두 번 적게 된다. 그래서 이름 외에
@@ -158,7 +159,7 @@ function InfoLine({ deal }: { deal: TransferDeal }) {
  * 이적 상세 — 선수 · 경로 · 이적료 · `댓글 | 보도 타임라인` 탭 + 관심 토글.
  *
  * 하단 탭바를 렌더하지 않는다(서브헤더 화면이다). 공유는 `SubHeader`가 갖는다.
- * 확률 카드·알림 CTA·원화 환산은 두지 않는다(계획서 §0·§0-1).
+ * 확률 카드·알림 CTA·원화 환산은 두지 않는다(확률은 보류이고, 하드코딩 환율은 거짓 숫자다).
  *
  * ⚠ **두 탭 패널을 모두 렌더하고 `hidden`으로만 가린다** — 색인 대상 화면이라 비활성 탭을 조건부
  *   렌더로 빼면 크롤러가 그 패널을 보지 못한다(`nextjs.md` "탭으로 갈라도 HTML에는 전부 남긴다").
@@ -209,7 +210,7 @@ export function TransferDetailView({
    * `null`이면 닫혀 있다. 뷰가 소유한다(`Dialog`가 `absolute`라 — `SignInDialog` 주석).
    */
   const [signInAction, setSignInAction] = useState<string | null>(null);
-  /** 댓글이 기본 선택이다(handoff §5-7) */
+  /** 댓글이 기본 선택이다 */
   const [tab, setTab] = useState<DetailTabKey>("comments");
   // ⚠ **서버 시각이 우선이다** — `useNowMs()`는 세션당 한 번 고정된다(`data-and-state.md`).
   //   ⚠ `??`는 단축평가라 훅을 뒤에 두면 조건부 호출이 된다 → 먼저 무조건 부른다.
@@ -271,7 +272,7 @@ export function TransferDetailView({
             <header>
               <div className="flex items-center gap-2">
                 <StatusBadge stage={deal.stage} />
-                {/* nowrap + flex-none — 뱃지가 길어져도 시각이 줄 바꿈되지 않는다(handoff §5-1) */}
+                {/* nowrap + flex-none — 뱃지가 길어져도 시각이 줄 바꿈되지 않는다 */}
                 <span className="ml-auto flex-none whitespace-nowrap font-mono text-[11px] tabular-nums text-ink-mute-2">
                   업데이트{" "}
                   <time dateTime={deal.latestReportedAt}>
@@ -282,12 +283,12 @@ export function TransferDetailView({
 
               {/* 한국어 표기는 운영 사전에 있을 때만 — 없으면 영문명이 곧 제목이다 */}
               <h1 className="mt-3 text-pretty text-[28px] font-medium leading-[1.15] tracking-[-1px] text-ink">
-                {deal.playerKo ?? deal.player}
+                {playerName(deal)}
               </h1>
               <InfoLine deal={deal} />
             </header>
 
-            {/* 경로 카드(handoff §5-4) — 3열 `1fr 32px 1fr`, To 칸만 canvas-soft, 가운데 칸 좌우 헤어라인 */}
+            {/* 경로 카드 — 3열 `1fr 32px 1fr`, To 칸만 canvas-soft, 가운데 칸 좌우 헤어라인 */}
             <section
               aria-label="이적 경로"
               className="mt-3 grid grid-cols-[1fr_32px_1fr] overflow-hidden rounded-lg border border-hairline"
@@ -299,7 +300,7 @@ export function TransferDetailView({
               >
                 <Icon as={ArrowRight} size={16} />
               </div>
-              <RouteCell label="TO" club={deal.toClub ?? deal.suitors[0] ?? null} clubs={destinationClubs(deal)} text={routeLabels(deal, { full: true }).to} className="bg-canvas-soft" />
+              <RouteCell label="TO" club={destinationClubs(deal)[0] ?? null} clubs={destinationClubs(deal)} text={routeLabels(deal, { full: true }).to} className="bg-canvas-soft" />
             </section>
 
             <FeeCard deal={deal} />
@@ -311,7 +312,7 @@ export function TransferDetailView({
                 {
                   key: "comments",
                   label: "댓글",
-                  // 댓글 + 답글 합계(handoff). 상한에 잘렸으면 `+`를 붙인다 — 받은 것만 센 숫자다
+                  // 댓글 + 답글 합계. 상한에 잘렸으면 `+`를 붙인다 — 받은 것만 센 숫자다
                   count: commentList
                     ? `${formatCount(commentList.comments.length)}${commentList.truncated ? "+" : ""}`
                     : null,
@@ -368,7 +369,7 @@ export function TransferDetailView({
       </main>
 
       {/*
-        하단 고정 바 — `<main>`의 형제. z-60은 핸드오프의 스케일
+        하단 고정 바 — `<main>`의 형제. z-60은 앱의 z 스케일
         (서브헤더 20 < 하단바 60~70 < 오버레이 80). 이 화면의 CTA는 관심 토글 하나뿐이고 에메랄드
         (활성 시 `primary`)는 `buttonClassName`이 갖는다 — 이 슬라이스에서 새로 칠하지 않는다.
         ⚠ 딜이 그려졌을 때만 둔다 — 로딩·에러·없음 화면에 눌러도 대상이 없는 버튼을 남기지 않는다.

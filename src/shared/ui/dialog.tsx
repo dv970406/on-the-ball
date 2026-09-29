@@ -12,11 +12,11 @@ import { cn, useFocusTrap } from "@/shared/lib";
  *   (`code-quality.md`: 동작은 의미 기반 prop으로).
  */
 const CONFIRM_TONE = {
-  /** 기본 — 되돌릴 수 있는 확인(작성 이탈 등) */
+  /** 기본 — 되돌릴 수 있는 확인 */
   ink: "border-ink bg-ink text-white",
   /** 사용자가 원해서 누르는 진행 — 이 다이얼로그의 컬러 이벤트다 */
   primary: "border-primary bg-primary text-on-primary",
-  /** 파괴적 — 삭제·차단 */
+  /** 파괴적 — 삭제 */
   danger: "border-crimson bg-crimson text-white",
 } as const satisfies Record<string, string>;
 
@@ -42,7 +42,7 @@ interface DialogProps {
    */
   confirmDisabled?: boolean;
   /**
-   * 기본은 `alertdialog` — 되돌릴 수 없는 확인(삭제·차단·작성 이탈)이 이 컴포넌트의 원래 자리다.
+   * 기본은 `alertdialog` — 되돌릴 수 없는 확인(댓글 삭제 등)이 이 컴포넌트의 원래 자리다.
    *
    * ⚠ **`alertdialog`는 `alert` 시맨틱을 물려받아 내용을 assertive하게 끼어들어 읽는다.**
    *   ARIA 1.2가 이 롤에 두는 조건은 "긴급하거나 데이터를 잃는" 알림인데, 사용자가 방금 스스로
@@ -52,7 +52,7 @@ interface DialogProps {
 }
 
 /**
- * 확인 다이얼로그 (프로토타입 `.cm-dialog`) — 되돌릴 수 없는 확인과 로그인 안내가 함께 쓴다.
+ * 확인 다이얼로그 — 되돌릴 수 없는 확인과 로그인 안내가 함께 쓴다.
  *
  * ⚠ 기본 role은 `alertdialog`(사용자의 응답을 기다리는 중단성 대화)이고,
  *   긴급하지도 파괴적이지도 않은 자리는 `role="dialog"`를 넘긴다 — 아래 prop 주석 참고.

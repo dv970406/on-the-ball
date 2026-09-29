@@ -16,7 +16,7 @@ interface ClubRouteProps {
 }
 
 /**
- * `로고 약칭 → 로고 약칭` — 행선지만 `font-medium text-ink`로 강조한다(handoff §4-8 경로 줄).
+ * `로고 약칭 → 로고 약칭` — 행선지만 `font-medium text-ink`로 강조한다.
  * ⚠ **약칭이다**(정식명은 상세 경로 카드만) — 좁은 폭에 두 구단을 놓는 자리에서 정식명은 잘리고,
  *   잘린 구단 이름은 어느 구단인지 알 수 없다(`Team.shortName`과 같은 판단).
  * ⚠ 빈 칸의 문구는 `routeLabels`가 정한다 — 자유계약의 출발은 `FA`, 아직 정해지지 않은 행선지는 `미정`.

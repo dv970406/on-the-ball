@@ -15,6 +15,8 @@ interface TransferCrestProps {
   club: TransferClub | null;
   /** px. 목록 행 16 · 미니 카드 28 · 상세 경로 카드 24 · 캐러셀 40 */
   size: number;
+  /** 첫 화면에 보이는 자리면 `true`(`Crest`의 같은 prop) */
+  priority?: boolean;
   className?: string;
 }
 
@@ -22,13 +24,14 @@ interface TransferCrestProps {
  * 이적 구단 엠블럼 — 메커니즘(이미지 + 하이드레이션 전 실패 감지 + 모노그램 폴백)은
  * `@/shared/ui`의 `Crest`가 갖고, 여기는 **코드로 경로를 조립하는 도메인 지식뿐**이다.
  */
-export function TransferCrest({ club, size, className }: TransferCrestProps) {
+export function TransferCrest({ club, size, priority, className }: TransferCrestProps) {
   if (club === null) return <Crest src={null} label="—" size={size} className={className} />;
   return (
     <Crest
       src={`${CREST_DIR}/${club.code}.png`}
       label={club.shortName}
       size={size}
+      priority={priority}
       className={className}
     />
   );

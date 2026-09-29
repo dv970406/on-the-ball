@@ -1,6 +1,6 @@
 import { TRANSFER_LEAGUES, type TransferLeague } from "@/entities/transfer";
 
-/** 리그 필터가 없을 때의 표기 — 도구줄 버튼과 시트 첫 항목이 같은 글자를 써야 한다(handoff 9장) */
+/** 리그 필터가 없을 때의 표기 — 도구줄 버튼과 시트 첫 항목이 같은 글자를 써야 한다 */
 export const ALL_LEAGUES_LABEL = "전체 리그";
 
 export interface LeagueOption {

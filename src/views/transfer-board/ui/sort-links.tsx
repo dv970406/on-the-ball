@@ -10,7 +10,7 @@ const SORTS = ["latest", "fee"] as const satisfies readonly TransferSort[];
 const _SORTS_EXHAUSTIVE: Exclude<TransferSort, (typeof SORTS)[number]> extends never ? true : never =
   true;
 
-/** 카피는 handoff 9장 그대로(`확률`은 보류 — 계획서 §0) */
+/** 정렬 라벨 — `확률`은 보류라 없다 */
 const SORT_LABEL: Record<TransferSort, string> = { latest: "최신", fee: "이적료" };
 
 interface SortLinksProps {

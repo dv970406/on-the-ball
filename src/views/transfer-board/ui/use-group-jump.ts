@@ -18,8 +18,8 @@ const JUMP_TIMEOUT_MS = 1000;
  * 구간 점프 칩의 **DOM 메커니즘** — 섹션으로 스크롤하고, 지금 보이는 구간을 관찰해 활성 칩을 정한다.
  * 도메인을 모르는 순수 메커니즘이라 `model/`이 아니라 컴포넌트 옆에 둔다(`code-quality.md`).
  *
- * 활성 판정은 **IntersectionObserver**다 — 프로토타입은 누른 칩을 영영 켜 두었는데(`jumped`),
- * 사용자가 손으로 스크롤해 다른 구간에 들어가도 표시가 따라오지 않았다. 관찰 띠는 스크롤
+ * 활성 판정은 **IntersectionObserver**다 — 누른 칩을 그대로 켜 두는 방식은
+ * 사용자가 손으로 스크롤해 다른 구간에 들어가도 표시가 따라오지 않는다. 관찰 띠는 스크롤
  * 영역 상단(앱바 아래)부터 40% 지점까지이고, 그 띠에 걸린 **첫 구간**이 현재 구간이다.
  *
  * ⚠ **바닥에 닿았으면 띠에 걸린 마지막 구간**이다. 뒤쪽 구간이 짧으면 띠까지 올라오지 못해
@@ -29,8 +29,8 @@ const JUMP_TIMEOUT_MS = 1000;
  *   누른 순간 그 칩을 켜고, 스크롤이 멈춘 뒤(`SETTLE_MS`) 다시 판정한다 — 그때 누른 구간이
  *   띠 안에 있으면 그것을 유지한다(클램프 때문에 다른 구간이 띠의 첫 자리를 차지해도).
  * ⚠ 스크롤 컨테이너는 `TabScrollArea`의 `<main>`이고 앱바는 그 안의 sticky `<header>`다 —
- *   `closest("main")`·`:scope > header`로 거슬러 찾는다(위젯에 prop을 새로 열지 않는다,
- *   `MatchListView`와 같은 판단). 오프셋은 그 헤더의 실제 높이다(safe-area가 섞여 상수로 못 둔다).
+ *   `closest("main")`·`:scope > header`로 거슬러 찾는다(위젯에 prop을 새로 열지 않는다).
+ *   오프셋은 그 헤더의 실제 높이다(safe-area가 섞여 상수로 못 둔다).
  * ⚠ `prefers-reduced-motion`이면 `behavior: "auto"`다.
  */
 export function useGroupJump(groupKeys: readonly TransferGroupKey[]) {

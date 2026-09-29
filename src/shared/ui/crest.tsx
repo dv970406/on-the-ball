@@ -10,6 +10,12 @@ interface CrestProps {
   label: string;
   /** px. */
   size: number;
+  /**
+   * 첫 화면에 보이는 자리(캐러셀 첫 카드·상세 경로 카드)면 `true` — 지연 로드를 끈다.
+   * 기본은 지연이다(목록 200행의 엠블럼을 전부 즉시 받지 않게). 사전 스캐너가 발견하지 못하는
+   * `loading="lazy"`는 뷰포트 안 이미지도 레이아웃 뒤에야 받기 시작한다.
+   */
+  priority?: boolean;
   className?: string;
 }
 
@@ -29,7 +35,7 @@ interface CrestProps {
  *   ① `src`가 애초에 `null`이다(호출부가 코드를 못 붙였을 때).
  *   ② 파일이 있어야 하는데 404다(승격팀처럼 자산이 아직 커밋되지 않았을 때).
  */
-export function Crest({ src, label, size, className }: CrestProps) {
+export function Crest({ src, label, size, priority = false, className }: CrestProps) {
   /**
    * ⚠ **boolean이 아니라 "실패한 경로"를 기억한다.** 목록이 리페치로 재배열되면 같은
    *   컴포넌트 인스턴스에 **다른 대상**이 들어오는데, boolean이면 그 대상까지 모노그램으로
@@ -64,7 +70,7 @@ export function Crest({ src, label, size, className }: CrestProps) {
           "inline-flex shrink-0 items-center justify-center rounded-sm border border-hairline-cool bg-canvas-soft font-semibold leading-none text-ink-mute",
           className,
         )}
-        // 크기는 호출부가 정하는 런타임 값이라 클래스로 확정할 수 없다(`VsBadge`가 선례)
+        // 크기는 호출부가 정하는 런타임 값이라 클래스로 확정할 수 없다(`styling.md`의 동적 값 규칙)
         style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }}
       >
         {[...label].slice(0, 2).join("")}
@@ -81,7 +87,7 @@ export function Crest({ src, label, size, className }: CrestProps) {
       alt=""
       width={size}
       height={size}
-      loading="lazy"
+      loading={priority ? "eager" : "lazy"}
       onError={() => setFailedSrc(src)}
       className={cn("shrink-0 object-contain", className)}
       style={{ width: size, height: size }}

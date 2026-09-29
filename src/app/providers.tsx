@@ -28,8 +28,8 @@ export function AppProviders({ children }: { children: ReactNode }) {
       <AuthProvider>
         {children}
         {/*
-          토스트는 라우트 전환을 넘어 살아남아야 한다 —
-          "글을 올렸어요"는 등록 후 **목록으로 이동한 뒤** 떠야 하므로 화면이 아니라 여기에 둔다.
+          토스트는 라우트 전환을 넘어 살아남아야 한다 — 화면을 떠나는 동작 뒤에 뜨는 문구는 그 화면이
+          언마운트된 뒤에야 보이므로 화면이 아니라 여기(앱의 유일한 라이브 리전)에 둔다.
         */}
         <ToastViewport />
       </AuthProvider>

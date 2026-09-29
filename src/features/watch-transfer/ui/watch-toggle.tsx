@@ -22,7 +22,7 @@ const LABEL_ADD = "관심 목록에 담기";
 const LABEL_REMOVE = "관심 목록에서 빼기";
 
 /**
- * 상세 하단의 관심 토글 — 블록 버튼 하나(계획서 §3-5). 관심 중이면 `primary`(에메랄드 채움),
+ * 상세 하단의 관심 토글 — 블록 버튼 하나. 관심 중이면 `primary`(에메랄드 채움),
  * 아니면 `secondary`. **이 화면의 CTA**라 에메랄드 자리는 `buttonClassName primary`(기존 자리)다.
  *
  * ⚠ **세션 `status`를 3분기한다.** `loading`을 비로그인과 같이 다루면 콜드 로드 직후 로그인한

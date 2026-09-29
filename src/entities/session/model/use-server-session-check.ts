@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { isAuthApiError } from "@supabase/supabase-js";
-import { getBrowserSupabase } from "@/shared/api";
 import { useSessionStore } from "./session-store";
 
 /**
@@ -35,18 +33,25 @@ export function useServerSessionCheck() {
 
   useEffect(() => {
     if (!userId) return;
-    const supabase = getBrowserSupabase();
-    if (!supabase) return;
 
     let cancelled = false;
-    supabase.auth.getUser().then(({ error }) => {
-      if (cancelled || !error) return;
-      const rejectedByServer =
-        isAuthApiError(error) && (error.status === 401 || error.status === 403);
-      if (!rejectedByServer) return;
-      console.error("[auth] 서버가 세션을 거부했습니다 — 로컬 세션을 정리합니다:", error);
-      supabase.auth.signOut({ scope: "local" });
-    });
+    // supabase-js는 동적으로 불러온다 — 사유는 `use-session-sync.ts`(초기 JS에서 뺀다)
+    Promise.all([import("@/shared/api"), import("@supabase/supabase-js")])
+      .then(([{ getBrowserSupabase }, { isAuthApiError }]) => {
+        if (cancelled) return;
+        const supabase = getBrowserSupabase();
+        if (!supabase) return;
+
+        return supabase.auth.getUser().then(({ error }) => {
+          if (cancelled || !error) return;
+          const rejectedByServer =
+            isAuthApiError(error) && (error.status === 401 || error.status === 403);
+          if (!rejectedByServer) return;
+          console.error("[auth] 서버가 세션을 거부했습니다 — 로컬 세션을 정리합니다:", error);
+          supabase.auth.signOut({ scope: "local" });
+        });
+      })
+      .catch((e) => console.error("[auth] 서버 세션 확인 실패:", e));
 
     return () => {
       cancelled = true;

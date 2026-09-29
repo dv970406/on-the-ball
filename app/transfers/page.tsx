@@ -12,6 +12,7 @@ import { buildDealListItem } from "@/entities/transfer/api/mappers";
 import { parseTransferClub, parseTransferLeague, parseTransferSort } from "@/entities/transfer/lib/league";
 import type { TransferDealListItem } from "@/entities/transfer/model/types";
 import { TransferBoardView } from "@/views/transfer-board";
+import { firstParam } from "@/shared/lib/search-params";
 
 const TITLE = "이적시장";
 const DESCRIPTION = "프리미어리그·유럽 5대 리그 이적 소식을 단계별로 모아 봅니다.";
@@ -112,9 +113,9 @@ export default async function Page(props: PageProps<"/transfers">) {
   //   훅을 쓰면 프리렌더가 CSR로 떨어진다(nextjs.md에서 금지).
   const { league: rawLeague, sort: rawSort, club: rawClub } = await props.searchParams;
   // 모르는 리그·정렬·구단은 전체·최신으로 폴백한다 — 파라미터 오염이 404를 양산하면 안 된다
-  const league = parseTransferLeague(typeof rawLeague === "string" ? rawLeague : undefined);
-  const sort = parseTransferSort(typeof rawSort === "string" ? rawSort : undefined);
-  const club = parseTransferClub(typeof rawClub === "string" ? rawClub : undefined);
+  const league = parseTransferLeague(firstParam(rawLeague) ?? undefined);
+  const sort = parseTransferSort(firstParam(rawSort) ?? undefined);
+  const club = parseTransferClub(firstParam(rawClub) ?? undefined);
 
   const { deals, userId, nowMs, scopeStartIso } = await fetchTransferBoard();
   return (

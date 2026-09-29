@@ -14,7 +14,7 @@ import { cn, formatCount } from "@/shared/lib";
 import type { BoardGroup } from "../model/use-transfer-board";
 import { groupSectionId } from "./use-group-jump";
 
-/** 미니 카드 가로 트랙으로 그리는 구간 — 나머지는 목록 행(handoff §4-6) */
+/** 미니 카드 가로 트랙으로 그리는 구간 — 나머지는 목록 행 */
 const CAROUSEL_GROUPS: ReadonlySet<TransferGroupKey> = new Set(["official", "hwg"]);
 /** 목록 구간이 한 번에 펼치는 행 수 — "더 보기"마다 이만큼 더 보인다 */
 const PAGE = 20;
@@ -28,7 +28,7 @@ interface BoardSectionsProps {
 }
 
 /**
- * 보드의 구간들(handoff §4-6 ~ §4-8).
+ * 보드의 구간들.
  *
  * 긴 구간은 **접는다, 자르지 않는다.** 행은 전부 HTML에 두고 뒷장은 `hidden`으로 가린 뒤 "더 보기"로 펼친다 —
  * 색인 화면의 본문 SSR·구간 점프·뒤로가기 스크롤 복원이 무한 스크롤이나 서버 페이지네이션 없이 그대로다.

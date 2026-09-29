@@ -48,7 +48,7 @@ export interface DuplicateGuard {
  *
  * ⚠ **`isPending`을 prop으로 내려받는 컴포넌트에 가드를 두지 않는다.** 부모가 리렌더되기
  *   전까지 자식은 낡은 값을 다시 읽을 뿐이라, 자식이 아무리 setState해도 해제 신호가 오지 않는다.
- *   가드는 **뮤테이션을 소유·조립하는 쪽**에 둔다(`PostForm`이 아니라 `PostWriteView`).
+ *   가드는 **뮤테이션을 소유·조립하는 쪽**에 둔다(`comment-form.tsx`가 아니라 `views/transfer-detail/model/use-comment-composer`).
  *
  * ```ts
  * const guard = useDuplicateGuard(mutation);
@@ -70,7 +70,7 @@ export interface DuplicateGuard {
  *
  * ⚠ 여러 행을 동시에 다루는 화면(목록의 항목별 삭제)은 boolean 하나로 부족하다 —
  *   가드가 키를 받아야 한다. 그 변형은 렌더 표시용 상태를 함께 갖기 때문에 **형태가 달라**
- *   이 훅에 합치지 않는다(필요해지면 id 집합을 기억하는 별도 훅을 둔다 —
+ *   이 훅에 합치지 않는다 — 그 형태는 `useItemGuard`가 따로 갖는다(`run(id, task)`·`isBusy(id)`,
  *   `docs/conventions/data-and-state.md`).
  */
 export function useDuplicateGuard({ status, submittedAt }: GuardedMutation): DuplicateGuard {

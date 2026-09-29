@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { SignInView } from "@/views/sign-in";
 // ⚠ 배럴(@/features/sign-in)이 아니라 직접 경로 — 배럴은 "use client" 훅을 포함한다
 import { hasPkceVerifier } from "@/features/sign-in/lib/pkce-verifier";
+// ⚠ 배럴(@/shared/lib)이 아니라 직접 경로 — 배럴은 "use client" 훅을 포함한다
+import { firstParam } from "@/shared/lib/search-params";
 
 export const metadata: Metadata = {
   title: "로그인",
@@ -25,19 +27,17 @@ export const metadata: Metadata = {
  */
 export default async function Page(props: PageProps<"/sign-in">) {
   const [params, jar] = await Promise.all([props.searchParams, cookies()]);
-  const first = (value: string | string[] | undefined) =>
-    (Array.isArray(value) ? value[0] : value) ?? null;
 
   return (
     <SignInView
-      hasCode={first(params.code) !== null}
+      hasCode={firstParam(params.code) !== null}
       // 교환이 성립할 수 없는 복귀(다른 브라우저·새로고침 등)를 상한 없이 즉시 판정한다
       canExchange={hasPkceVerifier(jar.getAll().map((cookie) => cookie.name))}
       // ⚠ **둘 다 내린다.** `error`는 상위 분류(access_denied·server_error)라 뭉뚱그려져 있고,
       //   재시도로 절대 안 풀리는 실패(identity_already_exists 등)는 `error_code`에만 있다.
-      errorKind={first(params.error)}
-      errorCode={first(params.error_code)}
-      errorDescription={first(params.error_description)}
+      errorKind={firstParam(params.error)}
+      errorCode={firstParam(params.error_code)}
+      errorDescription={firstParam(params.error_description)}
     />
   );
 }

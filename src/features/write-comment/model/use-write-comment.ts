@@ -62,7 +62,7 @@ export interface WriteCommentInput {
  *   제출 즉시 비워야 한다(`use-comment-composer`).
  * ⚠ 무효화는 **그 딜의 모든 사용자 스코프**를 잡는다(`commentKeys.deal`) — 로그인 직후 옛 스코프가
  *   비활성 캐시로 남아 있으면 되돌아왔을 때 방금 쓴 댓글이 빠진 목록이 한 프레임 보인다.
- * ⚠ 성공 토스트는 **루트 댓글에만** 낸다(handoff §5-1-1) — 답글은 입력칸이 닫히고 그 자리에 답글이
+ * ⚠ 성공 토스트는 **루트 댓글에만** 낸다 — 답글은 입력칸이 닫히고 그 자리에 답글이
  *   붙는 것이 곧 성공 표시다. 실패는 언제나 토스트로 보낸다(앱의 유일한 알림 채널).
  */
 export function useWriteComment(dealId: number) {

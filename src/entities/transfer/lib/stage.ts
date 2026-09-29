@@ -43,7 +43,7 @@ export const GROUP_LABEL: Record<TransferGroupKey, string> = {
 
 /**
  * 단계 → 상태 뱃지 톤. `합의 임박`(medical·personal_terms·agreement)과 `협상 중`(offer·talks)이
- * 여러 단계를 한 톤으로 접는다 — 화면이 단계 9개를 구분해 보여줄 이유가 없다(handoff §3).
+ * 여러 단계를 한 톤으로 접는다 — 화면이 단계 9개를 구분해 보여줄 이유가 없다.
  */
 export const STAGE_STATUS: Record<TransferStage, TransferStatus | null> = {
   official: "official",
@@ -59,7 +59,7 @@ export const STAGE_STATUS: Record<TransferStage, TransferStatus | null> = {
   unknown: null,
 };
 
-/** 상태 뱃지 라벨 — 카피는 handoff 9장 그대로 */
+/** 상태 뱃지 라벨 */
 export const STATUS_LABEL: Record<TransferStatus, string> = {
   official: "오피셜",
   hwg: "합의 완료",

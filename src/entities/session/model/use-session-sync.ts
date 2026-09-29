@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { getBrowserSupabase } from "@/shared/api";
 import { rememberAuthProvider } from "../lib/last-auth-provider";
 import { clearSignOutIntent } from "../lib/sign-out-intent";
 import { useSessionStore } from "./session-store";
@@ -32,27 +31,41 @@ export function useSessionSync() {
    * ⚠ **이벤트 이름으로 리싱크를 판정하지 않는다.** auth-js 2.110은 저장된 세션을 복원할 때마다
    *   (`_recoverAndRefresh`) `SIGNED_IN`을 발행하고, 다른 탭이 열릴 때도 BroadcastChannel로 같은
    *   이벤트가 온다. 이름만 보면 로그인 사용자는 **페이지를 열 때마다** 서버가 그려 준 데이터를
-   *   전량 버리고 다시 조회한다(실측: 랭킹 화면에서 하이드레이션 직후 3건).
+   *   전량 버리고 다시 조회한다(실측: 하이드레이션 직후 3건).
    * ⚠ 첫 이벤트는 기준만 세우고 리싱크하지 않는다 — 그때의 캐시는 비어 있거나 **같은 쿠키
    *   세션으로 SSR한** 값이다. OAuth 복귀도 전체 페이지 로드라 캐시가 새로 시작한다.
    */
   const cacheUserIdRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
-    const supabase = getBrowserSupabase();
-    if (!supabase) {
-      // env 미설정 — loading에 갇히면 모든 화면이 영원히 스켈레톤이 된다. guest로 확정.
-      applySession(null);
-      return;
-    }
+    let cancelled = false;
+    let subscription: { unsubscribe: () => void } | undefined;
 
-    // ⚠ 콜백을 async로 만들지 않는다.
-    //   @supabase/auth-js 2.110에서 async 오버로드는 @deprecated이며,
-    //   TOKEN_REFRESHED 처리 중 중첩 리프레시가 나면 데드락된다.
-    //   콜백 안에서 supabase.auth.*를 다시 호출하는 것도 같은 이유로 금지.
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    /**
+     * ⚠ supabase-js를 **동적으로** 불러온다. 이 훅은 루트 layout(`AppProviders`)에 실려 모든 라우트의
+     *   초기 JS에 들어가는데, 정적으로 import하면 supabase-js 전체(realtime 포함, gzip 약 69KB)가
+     *   404·에러 화면처럼 조회가 하나도 없는 라우트에서도 하이드레이션 **전에** 내려간다.
+     *   조회가 있는 라우트는 쿼리 훅이 같은 모듈을 정적으로 갖고 있어 이 import가 곧바로 풀린다(왕복이
+     *   늘지 않는다). 구독이 마이크로태스크 하나 늦어질 뿐이고, `onAuthStateChange`는 구독 즉시
+     *   INITIAL_SESSION을 내므로 놓치는 이벤트가 없다. 배럴 경로 그대로다(deep import 규칙).
+     */
+    import("@/shared/api")
+      .then(({ getBrowserSupabase }) => {
+        if (cancelled) return;
+        const supabase = getBrowserSupabase();
+        if (!supabase) {
+          // env 미설정 — loading에 갇히면 모든 화면이 영원히 스켈레톤이 된다. guest로 확정.
+          applySession(null);
+          return;
+        }
+
+        // ⚠ 콜백을 async로 만들지 않는다.
+        //   @supabase/auth-js 2.110에서 async 오버로드는 @deprecated이며,
+        //   TOKEN_REFRESHED 처리 중 중첩 리프레시가 나면 데드락된다.
+        //   콜백 안에서 supabase.auth.*를 다시 호출하는 것도 같은 이유로 금지.
+        ({
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange((event, session) => {
       applySession(session);
 
       // 이번 세션이 어느 프로바이더로 섰는지 남긴다 — 로그인 화면의 "최근 사용" 배지가 읽는다.
@@ -66,7 +79,7 @@ export function useSessionSync() {
       // 로그아웃하면 신호가 남고, 그대로 두면 다음 세션 만료가 "직접 로그아웃"으로 오인된다.
       if (event === "SIGNED_IN") clearSignOutIntent();
 
-      // 로그인·로그아웃 시 개인화된 데이터(isLiked, 내 글 여부)를 전량 리싱크한다 —
+      // 로그인·로그아웃 시 개인화된 데이터(`isWatched`·댓글의 내 표·`나` 뱃지)를 전량 리싱크한다 —
       // 단 **유저가 실제로 바뀐 경우에만**(이 ref의 주석). TOKEN_REFRESHED·INITIAL_SESSION도
       // 유저가 바뀐 게 아니므로 제외 — 무효화하면 토큰 갱신마다 화면 전체가 리페치된다.
       // USER_UPDATED는 같은 유저라도 프로필 메타데이터가 바뀐 것이라 그대로 리싱크한다.
@@ -80,9 +93,18 @@ export function useSessionSync() {
       ) {
         setResyncNonce((n) => n + 1);
       }
-    });
+        }));
+      })
+      .catch((e) => {
+        // 청크를 못 받았다(오프라인 등) — env 미설정과 같은 취급. loading에 가두지 않는다
+        console.error("[auth] supabase 클라이언트 로드 실패:", e);
+        applySession(null);
+      });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription?.unsubscribe();
+    };
   }, [applySession]);
 
   /**
@@ -90,7 +112,7 @@ export function useSessionSync() {
    *
    * ⚠ invalidateQueries만으로는 부족하다. 기본 refetchType이 "active"라
    *   **언마운트된(비활성) 쿼리는 stale 표시만 되고 데이터가 그대로 남는다.**
-   *   그래서 A로 보던 글 상세를 떠났다가 B로 로그인하면 A의 isLiked가 한 프레임 노출됐다.
+   *   그래서 A로 보던 상세를 떠났다가 B로 로그인하면 A의 개인화 값(관심 표시·내 표)이 한 프레임 노출됐다.
    *   비활성 캐시는 지우고(다시 열 때 새로 받는다), 활성 캐시만 무효화해
    *   화면 깜빡임 없이 리페치한다.
    * ⚠ 활성 쿼리는 리페치가 끝날 때까지 옛 데이터를 들고 있으므로, 유저별 데이터를

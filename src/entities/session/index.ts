@@ -4,8 +4,10 @@
 //    금지되는 것은 서버에서 이 모듈의 export를 **함수로 호출**하는 것이다
 //    (클라이언트 참조라 "Attempted to call X() from the server"가 난다).
 //    서버에서 순수 함수가 필요하면 "@/entities/session/lib/auth-error-message"를 직접 쓴다.
-// ⚠ `SessionStatus`·`SessionUser`는 올리지 않는다 — 소비처가 이 슬라이스 안뿐이다
+// ⚠ `SessionUser`는 올리지 않는다 — 소비처가 이 슬라이스 안뿐이다
 //   (`check:conventions`는 상대 경로 소비를 "현역"으로 세어 이 유형을 못 잡는다).
+// `SessionStatus`는 상태를 prop으로 받아 3분기하는 컴포넌트(댓글 섹션)가 쓴다 — 유니온을 다시 적으면 상태가 늘 때 컴파일이 잡지 못한다
+export type { SessionStatus } from "./model/types";
 export { useSessionStore } from "./model/session-store";
 export { AuthProvider } from "./model/auth-provider";
 export { AuthRequired, GuestOnly } from "./model/guards";

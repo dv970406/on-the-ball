@@ -22,7 +22,7 @@ export default function NotFound() {
         title={NOT_FOUND_TITLE}
         description="주소가 바뀌었거나 삭제된 화면이에요."
         action={
-          <Link href={ROUTES.home} className={buttonClassName({ size: "sm" })}>
+          <Link href={ROUTES.transferList} className={buttonClassName({ size: "sm" })}>
             홈으로
           </Link>
         }

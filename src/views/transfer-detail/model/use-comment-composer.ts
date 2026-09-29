@@ -21,8 +21,8 @@ export interface ReplyTarget {
   nickname: string;
 }
 
-interface UseCommentComposerOptions {
-  /** 성공 후(목록 리페치까지 끝난 뒤) — 루트 입력칸은 정렬을 최신순으로 바꾼다(handoff §5-1-1) */
+export interface UseCommentComposerOptions {
+  /** 성공 후(목록 리페치까지 끝난 뒤) — 루트 입력칸은 정렬을 최신순으로 바꾼다 */
   onPosted?: () => void;
   /**
    * 칸을 연 `답글` 버튼이 사라졌을 때(그 댓글이 지워졌다) 포커스를 받을 자리 — 없으면 `<body>`로 떨어진다.
@@ -163,7 +163,7 @@ export function useCommentComposer(
   };
 
   /**
-   * `답글` 버튼 — 같은 댓글이면 닫고(handoff: 다시 탭하면 닫힘), 다른 댓글이면 그리로 옮긴다.
+   * `답글` 버튼 — 같은 댓글이면 닫고(다시 탭하면 닫힘), 다른 댓글이면 그리로 옮긴다.
    * `trigger`는 누른 버튼이다(닫힐 때 포커스를 돌려받는다).
    */
   const openReply = (target: ReplyTarget, trigger: HTMLElement | null) => {
@@ -186,7 +186,7 @@ export function useCommentComposer(
   };
 
   /**
-   * ⚠ **한글 조합 중의 Enter는 제출이 아니다**(handoff §5-1-1). 조합을 끝내려고 누른 Enter가
+   * ⚠ **한글 조합 중의 Enter는 제출이 아니다.** 조합을 끝내려고 누른 Enter가
    *   폼의 암묵적 제출을 일으키면 마지막 글자가 빠진 채 등록된다. 사파리는 조합을 끝낸 뒤의
    *   keydown에 `isComposing: false` + `keyCode 229`를 싣는다 — 둘 다 본다.
    */
@@ -209,7 +209,7 @@ export function useCommentComposer(
 
     /**
      * 빈 값·길이 판정은 전부 features의 `validateComment`가 소유한다.
-     * ⚠ 빈 값은 여기까지 오지 않는다 — handoff대로 `등록`이 꺼지고, 꺼진 제출 버튼은 Enter의 암묵적
+     * ⚠ 빈 값은 여기까지 오지 않는다 — 빈 값이면 `등록`이 꺼지고, 꺼진 제출 버튼은 Enter의 암묵적
      *   제출도 막는다. 빈 값 분기는 버튼을 거치지 않는 제출(`requestSubmit` 등)의 최후 방어선이다.
      * ⚠ 길이 초과는 조용히 return하지 않는다 — 눌리기는 하는데 아무 일도 안 일어나면 고장으로 읽힌다.
      * ⚠ **검증 실패에서는 잠그지 않는다** — 잠그면 mutate가 없어 `isPending`이 돌지 않고
@@ -332,7 +332,7 @@ export function useCommentComposer(
       /** 입력칸 아래 문구 — 로컬 검증 문구 ?? 서버 에러 문구. `id`는 위 `aria-describedby`가 가리킨다 */
       message: shownError ? { id: errorId, text: shownError } : null,
       /**
-       * 빈 값이면 `등록`이 꺼진다(handoff). isPending은 무효화 리페치가 끝날 때까지 유지된다.
+       * 빈 값이면 `등록`이 꺼진다. isPending은 무효화 리페치가 끝날 때까지 유지된다.
        * ⚠ 여기서 보는 것은 **버튼을 켤지**뿐이다 — 제출 가능 여부의 판정은 `validateComment`가 갖는다.
        */
       canSubmit: !writeComment.isPending && hasVisibleChar(content),

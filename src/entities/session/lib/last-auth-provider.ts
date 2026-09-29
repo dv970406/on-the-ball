@@ -23,7 +23,7 @@ const STORAGE_KEY = "otb.auth.last-provider";
 /**
  * ⚠ 저장값을 **읽을 때도 쓸 때도** 대조한다. `app_metadata.provider`는 소셜 둘로 한정되지
  *   않고(로컬 테스트 계정의 `email`이 그렇다), 저장소 값은 사용자가 직접 고칠 수 있다.
- *   `isPostCategory`와 같은 형태 — 런타임 배열이 그대로 입력 검증이 된다.
+ *   `parseTransferLeague`와 같은 형태 — 런타임 배열이 그대로 입력 검증이 된다.
  */
 function isOAuthProvider(value: unknown): value is OAuthProvider {
   return (

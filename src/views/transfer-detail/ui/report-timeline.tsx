@@ -20,7 +20,7 @@ interface ReportTimelineProps {
 }
 
 /**
- * 보도 타임라인 탭의 내용(handoff §5-7) — 최신순, 항목마다 Tier · 보도 주체 · 매체 · 시간 / 요지 / 원문 보기.
+ * 보도 타임라인 탭의 내용 — 최신순, 항목마다 Tier · 보도 주체 · 매체 · 시간 / 요지 / 원문 보기.
  *
  * - 요지는 한국어 요약(없으면 영문 발췌 — 매퍼가 고른다)이고 두 줄에서 자른다. 없으면 그 행을 생략한다.
  * - 원문 주소는 `originalUrl`(원저자 주소 우선 — 매퍼가 정한다). 없으면 링크를 그리지 않는다.
@@ -28,7 +28,7 @@ interface ReportTimelineProps {
  * - 좌측 7px 점은 컨트롤이 아니라 **레일의 표시 요소**라 `rounded-full`이 알약 규칙의 대상이 아니다
  *   (`styling.md` "대상이 아닌 것"). 첫 항목(최신)만 잉크다.
  *
- * ⚠ **제목 줄(`보도 타임라인 · N REPORTS`)이 없다** — 탭이 제목과 건수를 대신한다(handoff 두 번째 판).
+ * ⚠ **제목 줄(`보도 타임라인 · N REPORTS`)이 없다** — 탭이 제목과 건수를 대신한다.
  *   패널의 접근성 이름도 탭이 준다(`aria-labelledby` — 뷰가 패널을 감싼다).
  */
 export function ReportTimeline({ reports, error, onRetry, nowMs }: ReportTimelineProps) {

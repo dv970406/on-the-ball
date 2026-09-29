@@ -12,7 +12,7 @@ import { env } from "./env";
  *
  * ⚠ `app/opengraph-image.png`는 하위 라우트로 자동 상속되지만, 그 세그먼트의
  *   `generateMetadata`가 `openGraph`를 직접 반환하는 순간 **통째로 대체되어 이미지가 빠진다**
- *   (실측 — 글 상세만 이미지 없는 카드로 나갔다). `twitter`도 마찬가지다.
+ *   (실측 — 상세만 이미지 없는 카드로 나갔다). `twitter`도 마찬가지다.
  * ⚠ **글마다 다른 이미지는 만들지 않는다.** `ImageResponse`(satori)는 woff2를 읽지 못하는데
  *   이 프로젝트의 Pretendard는 woff2 동적 서브셋뿐이라, 한글 제목을 그리려면 한글 TTF를
  *   통째로 리포에 넣어야 한다. 카드의 제목·설명은 이미 리소스마다 다르므로 이미지만 공통으로 둔다.

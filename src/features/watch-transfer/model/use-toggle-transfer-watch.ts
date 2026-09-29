@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query";
-import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
+import { requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
 import { useToast } from "@/shared/lib";
 import { useSessionStore } from "@/entities/session";
 import { transferKeys, type TransferDeal, type TransferDealListItem } from "@/entities/transfer";
@@ -14,7 +14,7 @@ export interface ToggleWatchVariables {
 
 /**
  * 롤백용 스냅샷 — 목록은 범위·유저 조합마다, 상세는 유저마다 키가 달라 **여러 개**다. 전부 담는다.
- * (그래서 setQueryData가 아니라 setQueriesData를 쓴다 — `useTogglePostLike`와 같은 형태)
+ * (그래서 setQueryData가 아니라 setQueriesData를 쓴다)
  */
 interface WatchSnapshot {
   lists: [QueryKey, TransferDealListItem[] | undefined][];
@@ -36,11 +36,11 @@ function toggled<T extends Pick<TransferDeal, "id" | "isWatched">>(deal: T, deal
  *   `to authenticated`)가 한다. 비로그인은 `WatchToggle`이 로그인 안내로 보낸다.
  * ⚠ 이미 담긴 딜을 다시 담는 것(23505)은 **성공으로 흡수한다** — 목표 상태에 이미 도달했으므로
  *   멱등이 맞다. 그대로 흘리면 `toDbErrorMessage`가 닉네임 문구("이미 사용 중인 값이에요.")로
- *   접어 엉뚱한 말이 나간다(`useBlockUser`와 같은 판단).
+ *   접어 엉뚱한 말이 나간다(`api-and-db.md`의 "설명과 흡수" 표).
  *
  * 낙관적 업데이트: onMutate(취소+스냅샷) → onError(롤백) → onSettled(재동기화).
  * ⚠ **목록은 `refetchType: "none"`** — `onMutate`가 이미 정답(`isWatched`)을 그려 놨는데 활성
- *   리페치를 걸면 토글 한 번에 딜 100행 + 임베딩 조회가 나간다. stale로만 찍어 두면 다음
+ *   리페치를 걸면 토글 한 번에 목록 상한(`TRANSFER_DEAL_LIMIT`)만큼의 딜 행 + 임베딩 조회가 나간다. stale로만 찍어 두면 다음
  *   마운트(뒤로가기·탭 전환)에 최신화된다. 상세는 한 건이라 즉시 리페치한다.
  * ⚠ 무효화 Promise를 **반환하지 않는다** — 반환하면 리페치가 끝날 때까지 `isPending`이 유지되는데
  *   화면은 이미 정답을 보여주고 있어 연타만 막혀 반응이 둔해진다(`data-and-state.md` 표).
@@ -66,7 +66,7 @@ export function useToggleTransferWatch() {
         //   0행을 실패로 승격하지 않는다(멱등).
         if (error) {
           console.error("[transfer-watch] 관심 해제 실패:", error);
-          throw new Error(toDbErrorMessage(error));
+          throw new Error(await toWriteErrorMessage(supabase, error));
         }
         return;
       }
@@ -76,7 +76,7 @@ export function useToggleTransferWatch() {
         .insert({ user_id: user.id, deal_id: dealId });
       if (error && error.code !== "23505") {
         console.error("[transfer-watch] 관심 등록 실패:", error);
-        throw new Error(toDbErrorMessage(error));
+        throw new Error(await toWriteErrorMessage(supabase, error));
       }
     },
 
@@ -112,7 +112,7 @@ export function useToggleTransferWatch() {
       snapshot?.lists.forEach(([key, value]) => queryClient.setQueryData(key, value));
       snapshot?.details.forEach(([key, value]) => queryClient.setQueryData(key, value));
       // 롤백은 버튼을 조용히 되돌릴 뿐이라, 알리지 않으면 **눌린 적이 없는 것처럼 보인다** →
-      // 앱의 유일한 알림 채널로 보낸다(`useTogglePostLike`와 같은 이유)
+      // 앱의 유일한 알림 채널로 보낸다(`code-quality.md` — 뮤테이션 실패는 `onError`에서 토스트)
       toast(error.message);
     },
 

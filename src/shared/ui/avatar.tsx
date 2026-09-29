@@ -1,4 +1,3 @@
-import type { CSSProperties, ReactNode } from "react";
 // ⚠ 배럴이 아니라 직접 경로다 — 서버 렌더 여지를 남긴다(사유는 empty-state.tsx에).
 import { cn } from "@/shared/lib/cn";
 
@@ -9,9 +8,6 @@ interface AvatarProps {
   src?: string | null;
   size?: number;
   className?: string;
-  /** 그라데이션 등 커스텀 배경용 */
-  style?: CSSProperties;
-  children?: ReactNode;
 }
 
 /**
@@ -22,7 +18,7 @@ interface AvatarProps {
  *   빌드 시점 상수라 env로 갈리는 값을 담기 어렵다. 이미 업로드 시점에 512px·webp로
  *   줄여 올리므로 최적화로 얻을 것도 거의 없다.
  */
-export function Avatar({ label, src, size = 28, className, style, children }: AvatarProps) {
+export function Avatar({ label, src, size = 28, className }: AvatarProps) {
   return (
     // ⚠ 장식이다 — 이름은 늘 옆에 글자로 있다. 가리지 않으면 이니셜이 이름 앞에서 한 번 더 읽힌다
     <span
@@ -31,7 +27,7 @@ export function Avatar({ label, src, size = 28, className, style, children }: Av
         "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-hairline-cool bg-canvas-soft text-xs font-medium text-ink",
         className,
       )}
-      style={{ width: size, height: size, ...style }}
+      style={{ width: size, height: size }}
     >
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element -- 위 주석 참고
@@ -44,7 +40,7 @@ export function Avatar({ label, src, size = 28, className, style, children }: Av
           loading="lazy"
         />
       ) : (
-        (children ?? label?.charAt(0))
+        label?.charAt(0)
       )}
     </span>
   );

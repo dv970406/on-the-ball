@@ -38,7 +38,7 @@ export default function AppError({
               다시 시도
             </Button>
             <Link
-              href={ROUTES.home}
+              href={ROUTES.transferList}
               className={buttonClassName({ variant: "secondary", size: "sm" })}
             >
               홈으로

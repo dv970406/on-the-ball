@@ -1,10 +1,8 @@
 "use client";
 
 import { useRef } from "react";
-import type { ReactNode, Ref } from "react";
-import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { cn, useFocusTrap } from "@/shared/lib";
-import { Icon } from "./icon";
 import { useExitTransition } from "./use-exit-transition";
 import { useSheetDrag } from "./use-sheet-drag";
 
@@ -136,17 +134,6 @@ export function Sheet({ open, onClose, label, children }: SheetProps) {
 }
 
 interface SheetItemProps {
-  /**
-   * 이 항목에 포커스를 옮겨야 할 때만 쓴다(React 19는 ref가 일반 prop이다).
-   * 선례: 시트가 단계를 바꾸면 포커스를 쥔 항목이 언마운트되어 `activeElement`가 `<body>`로
-   * 떨어지고 — 트랩은 유지되지만 — 화면이 바뀐 사실이 스크린리더에 전달되지 않는다.
-   */
-  ref?: Ref<HTMLButtonElement>;
-  icon?: LucideIcon;
-  /** 파괴적 액션 — crimson */
-  danger?: boolean;
-  /** 지금은 누를 수 없는 항목 — 세션 복원 중처럼 **판단을 미뤄야 할 때** 쓴다 */
-  disabled?: boolean;
   onClick?: () => void;
   children: ReactNode;
 }
@@ -154,32 +141,24 @@ interface SheetItemProps {
 /**
  * 시트 항목 — 구분선 없이 여백으로 나눈다(edge-to-edge 시트에서 헤어라인은 화면을 가로지른다).
  *
- * ⚠ 비활성은 `aria-disabled`가 아니라 **HTML `disabled`** 다.
+ * ⚠ 비활성 항목이 필요해지면 `aria-disabled`가 아니라 **HTML `disabled`** 로 만든다.
  *   `aria-disabled` + `pointer-events-none`은 **키보드 포커스를 막지 못해**
- *   "포커스는 가는데 Enter를 눌러도 무반응"인 요소가 된다. 게다가 useFocusTrap의
- *   FOCUSABLE 셀렉터가 `button:not([disabled])`라 aria-disabled는 걸러지지 않아,
- *   **시트를 열면 초기 포커스가 비활성 항목에 놓였다**(실측). disabled면 둘 다 해소된다.
- *
- * ⚠ 대신 항목이 전부 `disabled`면 시트에 포커스 가능한 것이 하나도 남지 않는다.
- *   그 상태를 떠받치는 것이 그래버 닫기 버튼이다 — 없애면 초기 포커스가 갈 곳을 잃고
- *   Tab이 죽는다. 항목을 한꺼번에 `disabled`로 만드는 화면이 있으면 그 버튼을 지우지 말 것.
+ *   "포커스는 가는데 Enter를 눌러도 무반응"인 요소가 되고, `useFocusTrap`의 FOCUSABLE
+ *   셀렉터가 `button:not([disabled])`라 시트를 열면 초기 포커스가 그 항목에 놓인다(실측).
+ *   그리고 항목이 전부 비활성이면 시트에 포커스 가능한 것이 그래버 닫기 버튼뿐이 된다 —
+ *   그 버튼을 지우지 말 것(`Sheet` 주석).
  */
-export function SheetItem({ ref, icon, danger, disabled, onClick, children }: SheetItemProps) {
+export function SheetItem({ onClick, children }: SheetItemProps) {
   return (
     <button
-      ref={ref}
       type="button"
-      disabled={disabled}
       onClick={onClick}
       className={cn(
         "flex min-h-13 w-full items-center gap-3 px-5 py-3.5 text-left",
-        "text-[15px] font-medium",
+        "text-[15px] font-medium text-ink",
         "transition-colors duration-150 ease-otb active:bg-canvas-soft",
-        danger ? "text-crimson" : "text-ink",
-        "disabled:opacity-40",
       )}
     >
-      {icon && <Icon as={icon} size={20} />}
       {children}
     </button>
   );

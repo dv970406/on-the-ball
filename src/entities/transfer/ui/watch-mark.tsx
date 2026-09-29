@@ -4,10 +4,10 @@ import { cn } from "@/shared/lib/cn";
 import { Icon } from "@/shared/ui";
 
 /**
- * 관심 표시 — 18px 에메랄드 원 + `Bell` 11. **선수 이름 앞**에 붙는다(handoff §3 `Watch`).
+ * 관심 표시 — 18px 에메랄드 원 + `Bell` 11. **선수 이름 앞**에 붙는다.
  *
  * ⚠ 표시일 뿐 토글이 아니다 — 토글은 상세의 `WatchToggle`(`features/watch-transfer`)뿐이다.
- * ⚠ 에메랄드 자리다("내 관심"은 handoff의 고정 색 의미). 글자가 없어 "색이 정보를 혼자 지지
+ * ⚠ 에메랄드 자리다("내 관심"의 고정 색이다). 글자가 없어 "색이 정보를 혼자 지지
  *   않는다"는 **형태(종 아이콘)** 가 지고, sr-only 텍스트가 스크린리더에 같은 뜻을 준다.
  * ⚠ 원(`rounded-full`)은 컨트롤이 아니라 표시 요소 — `styling.md` "대상이 아닌 것".
  */

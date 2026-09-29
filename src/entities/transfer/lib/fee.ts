@@ -73,8 +73,8 @@ export function feeDelta(
 
 /**
  * 보도 범위 — 그 딜의 보도 이적료 최소–최대(`€58–95M`). 같으면 한 값(`€95M`), 없으면 `null`.
- * ⚠ handoff의 `min(prev,fee)–(fee+add)` 공식을 쓰지 않는다 — 하락 딜에서 `€58–58M`로 퇴화한다
- *   (계획서 §0-1). 파생기가 같은 통화 보도의 min/max를 저장한다.
+ * ⚠ `min(prev,fee)–(fee+add)` 공식을 쓰지 않는다 — 하락 딜에서 `€58–58M`로 퇴화한다.
+ *   파생기가 같은 통화 보도의 min/max를 저장한다.
  */
 export function formatFeeRange(
   deal: Pick<TransferDeal, "feeLowAmount" | "feeHighAmount" | "feeCurrency">,

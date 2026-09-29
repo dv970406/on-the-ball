@@ -37,6 +37,8 @@ const DEEP_IMPORT_ALLOWED = new Set([
   "@/shared/lib/text",
   // 쿼리 키 조각 — `api/keys.ts`는 서버 소비자라 "use client"를 담은 배럴을 거칠 수 없다
   "@/shared/lib/query-scope",
+  // searchParams 첫 값 — 서버 page 셋이 같은 판정으로 읽는다
+  "@/shared/lib/search-params",
   "@/entities/transfer/api/list-query",
   // 댓글 조립 — 상세 SSR이 클라이언트 훅과 같은 select·정렬·상한으로 댓글을 프리페치한다
   "@/entities/comment/api/list-query",
@@ -44,6 +46,9 @@ const DEEP_IMPORT_ALLOWED = new Set([
   "@/entities/transfer/lib/league",
   // 단계 → 상태 뱃지 톤·라벨 — 상세 SSR이 화면과 같은 매핑으로 상태 문구를 그린다
   "@/entities/transfer/lib/stage",
+  // 경로 문구·선수 표시명 — 상세 SSR의 og description·`<title>`이 화면과 같은 말을 한다
+  "@/entities/transfer/lib/route-label",
+  "@/entities/transfer/lib/player-name",
   "@/entities/session/lib/auth-error-message",
   "@/features/sign-in/lib/pkce-verifier",
 ]);
@@ -57,7 +62,11 @@ const DEEP_IMPORT_ALLOWED_ENTITY_SUFFIX = ["model/types", "api/mappers", "api/ke
  * 여기 있는데 현역이 돼도 실패한다(그래야 목록이 죽지 않는다).
  */
 const DOCUMENTED_UNUSED = new Map([
-  // 지금은 없다 — 호출부 없이 남길 export가 생기면 [이름, 사유]로 여기 적는다.
+  // 호출부 없이 남길 export가 생기면 [이름, 사유]로 여기 적는다.
+  [
+    "getBrowserSupabase",
+    "세션 훅(`use-session-sync`·`use-server-session-check`)이 **동적 import**(`import(\"@/shared/api\")`)로만 쓴다 — 초기 JS에서 supabase-js를 빼기 위해서다. 이 검사는 정적 import만 센다",
+  ],
 ]);
 
 /**

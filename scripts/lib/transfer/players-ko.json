@@ -1,6 +1,6 @@
 {
   "_comment": [
-    "선수 표기 사전 — 키는 derive-deals.mjs의 normalizePlayer(추출된 영문명) 결과다(NFD → 결합문자 제거 → 소문자 → 비영숫자 제거 → 공백 하나).",
+    "선수 표기 사전 — 키는 player-key.mjs의 normalizePlayer(추출된 영문명) 결과다(NFD → 결합문자 제거 → 소문자 → 비영숫자 제거 → 공백 하나).",
     "값: ko(한국어 표기, 필수) · position(≤20자, 'RW/LW' 형태) · birthYear(1950~2015) · nationality(ISO 3자리 대문자). 모르는 값은 적지 않는다.",
     "없는 선수는 화면이 영문명으로 그린다 — 파생이 실패하지 않고 경고로 찍는다(엠블럼·팀 표기와 같은 운영 모델).",
     "형식은 scripts/test-transfer-extract.mjs가 검사한다."

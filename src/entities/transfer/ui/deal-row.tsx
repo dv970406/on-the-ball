@@ -12,6 +12,7 @@ import { FeeValue } from "./fee-value";
 import { StatusBadge } from "./status-badge";
 import { CredibilityBadge } from "./credibility-badge";
 import { WatchMark } from "./watch-mark";
+import { playerName } from "../lib/player-name";
 
 interface DealRowProps {
   deal: TransferDealListItem;
@@ -28,7 +29,7 @@ interface DealRowProps {
 }
 
 /**
- * 목록 행(진행 중 · 루머 · 결렬·부인) — handoff §4-8. 링크로 감싼 리스트 행이라 `li` + `Link`다
+ * 목록 행(진행 중 · 루머 · 결렬·부인) — 링크로 감싼 리스트 행이라 `li` + `Link`다
  * 
  *
  * 레이아웃: grid `minmax(0,1fr) auto` — 좌: 이름·경로 / 우: 이적료·변동폭 / 3행(meta)은 전폭.
@@ -36,7 +37,7 @@ interface DealRowProps {
  *
  * ⚠ **디바이더는 같은 구간의 행 사이에만** — `[&+&]:before:…`(형제 선택자)라 구간 첫 행 위·
  *   마지막 행 아래에는 없다. 좌우 `inset-x-3`로 행 패딩 안에서 끝난다.
- * ⚠ 결렬 변형: 행 `bg-[#f3f3f3] grayscale`(`@theme` 동결이라 arbitrary hex — 계획서 §0-1),
+ * ⚠ 결렬 변형: 행 `bg-[#f3f3f3] grayscale`(`@theme` 동결이라 arbitrary hex),
  *   이름·경로·이적료 `opacity-60`, meta `opacity-85`, 변동폭 자리에 `무산`, 출처 대신 최신
  *   보도 요지 1줄. **이름에는 취소선이 없다** — 행선지 약칭·이적료에만(`ClubRoute`가 진다).
  * ⚠ 이 행의 에메랄드는 `WatchMark`(관심)뿐이다 — 관심 딜에만 뜬다.
@@ -44,7 +45,7 @@ interface DealRowProps {
  */
 export function DealRow({ deal, nowMs, hidden }: DealRowProps) {
   const dead = isDeadStage(deal.stage);
-  const name = deal.playerKo ?? deal.player;
+  const name = playerName(deal);
   const report = deal.latestReport;
 
   return (

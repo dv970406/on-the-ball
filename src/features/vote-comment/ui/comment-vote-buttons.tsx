@@ -57,10 +57,10 @@ function VoteButton({
 }
 
 /**
- * 댓글의 좋아요·싫어요(handoff §5-1-3). 같은 버튼을 다시 누르면 거두고, 반대 버튼을 누르면 옮긴다.
+ * 댓글의 좋아요·싫어요. 같은 버튼을 다시 누르면 거두고, 반대 버튼을 누르면 옮긴다.
  *
- * - 좋아요 활성은 `primary-deep`(상승·확정의 색), 싫어요 활성은 `crimson`(하락·무산의 색) — 핸드오프의
- *   색 의미 표와 같다. 에메랄드 자리는 styling.md 표에 등재돼 있다(상태 표시라 CTA 셈 밖이다).
+ * - 좋아요 활성은 `primary-deep`(상승·확정의 색), 싫어요 활성은 `crimson`(하락·무산의 색) — 이적료
+ *   변동폭(`FeeDelta`)과 같은 색 의미다. 에메랄드 자리는 styling.md 표에 등재돼 있다(상태 표시라 CTA 셈 밖이다).
  * - 숫자는 트리거가 관리하는 합계이고 **내 표가 이미 들어 있다**(낙관적 갱신이 함께 고친다).
  * - 세션 `status`를 3분기한다 — `loading`을 비로그인처럼 다루면 복원 중인 로그인 사용자가 안내를 본다.
  *
@@ -92,7 +92,7 @@ export function CommentVoteButtons({ dealId, comment, onSignInRequired }: Commen
   };
 
   return (
-    // 두 버튼 사이 2px(handoff `.tmc-acts`)
+    // 두 버튼 사이 2px
     <span className="flex gap-0.5">
       <VoteButton
         icon={ThumbsUp}

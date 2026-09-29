@@ -13,11 +13,11 @@ interface LeagueSheetProps {
 }
 
 /**
- * 리그 선택 시트(handoff §6) — 프로젝트 `Sheet`/`SheetItem`(edge-to-edge, 그래버)이다.
+ * 리그 선택 시트 — 프로젝트 `Sheet`/`SheetItem`(edge-to-edge, 그래버)이다.
  *
- * ⚠ 우측 `지출 €NM`은 생략했다(계획서 §0). 리그명 + 체크만.
+ * ⚠ 리그명 + 체크만 그린다 — 리그별 지출 합계 같은 부가 수치는 두지 않는다.
  * ⚠ 선택 표시는 16px 체크 + `bg-canvas-soft`이고, 비선택은 같은 폭의 빈칸이라 라벨이 한 줄에
- *   선다. `SheetItem`의 `icon`은 20px 고정이라 쓰지 않고 children 앞에 직접 둔다.
+ *   선다. `SheetItem`에는 아이콘 슬롯이 없어 children 앞에 직접 둔다.
  *   배경은 `SheetItem`이 투명이라 감싼 요소에 준다(컴포넌트에 prop을 새로 열지 않는다).
  * ⚠ 체크 아이콘은 `aria-hidden`이라 선택 항목에 sr-only "(선택됨)"을 함께 둔다.
  */

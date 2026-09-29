@@ -104,7 +104,7 @@
 - `TRANSFER_DEAL_LIMIT` — 목록 상한(`api/mappers.ts` — SSR과 공유해야 해서 `"use client"`가 아닌 파일에 있다). **화면이 잘림을 안내해야 한다** — 조용히 자르면 그 뒤 항목은 URL을 아는 사람 말고는 도달할 방법이 없다.
 - **`pickRecentRumors(deals, nowMs)`** — "최근 3일 소식" 캐러셀 대상(믿을 만한 출처 · 3일 이내). 믿을 만한 출처는 🎖️ 매체와 🌕·🌖 기자다(`isTopCredibility` — 화면 뱃지와 같은 등급이라 표시와 채택 기준이 갈리지 않는다). ⚠ **최신 보도의 출처로 판정한다** — 목록 select의 최신 보도 임베딩(`limit 1`)만 보므로, 최신 보도의 등급이 낮으면 그 앞의 믿을 만한 보도가 있어도 그 딜은 빠진다(딜마다 보도 전체를 싣는 비용을 들이지 않기로 한 트레이드오프). 결렬 딜도 포함한다. ⚠ `nowMs`를 인자로 받는다(`formatRelativeTime`과 같은 이유) — 매퍼에 넣으면 순수·서버 안전이 깨지고 같은 행이 호출 시점마다 달라진다. 서버 시각이 있으면 그 값을 넘긴다.
 - **`FeeValue`** — 이적료 칸의 값. 금액이면 `€95M`(mono), 자유계약이 **확인된** 딜이면 `FA(자유 계약)`, 아니면 `미공개`(흐리게). ⚠ **빈 이적료를 FA로 추정하지 않는다** — 판정은 `feeLabel`이 단독으로 갖고 근거는 파생기의 `is_free_agent`다(`api-and-db.md`). 이적료 칸을 새로 그릴 때 `formatFee(...) ?? "—"`를 직접 짜지 말 것.
-- **`formatFee({amount, currency})`** — 이적료 표기(`€95M`). **`formatFeeRange(deal)`** 은 그 딜의 보도 이적료 최소–최대(`€58–95M`, 같으면 한 값). ⚠ handoff의 `min(prev,fee)–(fee+add)` 공식을 쓰지 않는다 — 하락 딜에서 `€58–58M`로 퇴화한다. 직전 보도 대비 변동폭은 `FeeDelta`가 그린다 — 통화 변환은 하지 않는다(파생기가 `prevFeeAmount`에 같은 통화 값만 넣는다).
+- **`formatFee({amount, currency})`** — 이적료 표기(`€95M`). **`formatFeeRange(deal)`** 은 그 딜의 보도 이적료 최소–최대(`€58–95M`, 같으면 한 값). ⚠ `min(prev,fee)–(fee+add)` 공식을 쓰지 않는다 — 하락 딜에서 `€58–58M`로 퇴화한다. 직전 보도 대비 변동폭은 `FeeDelta`가 그린다 — 통화 변환은 하지 않는다(파생기가 `prevFeeAmount`에 같은 통화 값만 넣는다).
 - **`reporterName(report)`** — 보도 주체의 한국어 표기(기자는 전체 이름 "벤 제이콥스", 매체는 매체명 "BBC"). 캐러셀·목록·타임라인이 **이것 하나**를 쓴다 — 소스 등록용 영어 라벨을 화면에 따로 그리면 같은 기자가 화면마다 "Fabrizio Romano"·"파브리지오 로마노"로 갈린다. ⚠ **단일 소스는 `scripts/lib/transfer/reporters.json`** 이다(파이프라인이 TS를 못 읽어 JSON이 원본이다). 우선순위는 `bylines → sources → journalists → attributed_to 원문 → source_id`다.
 - **`TRANSFER_LEAGUES`** — 리그 시트의 노출 순서(5대 리그). `TransferLeague` 유니온과 `as const satisfies` + 망라성 가드로 서로 대조한다 — DB `transfer_club.league`가 enum이 아니라 `text + check`라 생성 타입에서 못 뽑아 손으로 적었기 때문이다.
 - **`dealInLeague(deal, league)` / `dealHasClub(deal, code)` / `parseTransferLeague(value)` / `parseTransferSort(value)` / `parseTransferClub(value)`** — 리그 필터(출발 **또는** 도착 일치, `null`은 전체) · 구단 필터(출발·행선지·관심 구단 어느 자리든) · URL `?league=`·`?sort=`·`?club=` 해석. 구단은 형식만 검사하고 보드에 없는 코드는 뷰가 전체로 폴백한다(창이 지나 사라진 구단의 공유 링크). ⚠ **모르는 리그는 `null`(전체로 폴백), 모르는 정렬은 `latest`로 폴백** — 파라미터 오염이 404를 양산하면 안 된다(`nextjs.md`의 필터 절). 링크를 만드는 곳과 URL을 해석하는 곳이 갈리면 조용히 어긋나므로 **역방향 판정을 호출부가 직접 짜지 말 것**. 서버에서는 `@/entities/transfer/lib/league` 직접 경로.
@@ -117,8 +117,8 @@
 - `DealRow` / `DealMiniCard` / `RumorCard` / `StatusBadge` / `FeeDelta` / `TransferCrest` — 목록 행 · 미니 카드 · 캐러셀 카드 · 상태 뱃지 · 변동폭 · 구단 엠블럼(`Crest`의 얇은 래퍼 — 코드로 경로를 조립하는 도메인 지식만 갖는다). ⚠ `CrestStack`(엠블럼 겹치기)은 배럴에 없다 — 슬라이스 밖 소비자가 0이다.
   ⚠ **엠블럼을 직접 `<img>`로 그리지 말 것** — 폴백이 두 갈래인데 둘 다 필요하다: 코드가 비었을 때와, **파일이 없어 404일 때**(새 구단이 생기면 반드시 겪는다). 메커니즘은 `@/shared/ui`의 `Crest`가 갖는다.
 - ⚠ **한국어로는 "이적시장"·"딜"로 부른다.** URL(`/transfers`)·테이블(`transfer_deal`)·식별자(`transfer`)는 그대로 두고 화면·주석의 한국어만 통일한다.
-- ⚠ **`TransferClub`·`STAGE_GROUP`·`STAGE_STATUS`·`STATUS_LABEL`·`isDeadStage`·`feeDelta`·`ClubRoute`·`WatchMark`는 배럴에 없다** — 슬라이스 밖 소비자가 0이라 올리지 않았다. `check:conventions`는 상대 경로 소비를 현역으로 세어 이 유형을 잡지 못하므로 손으로 지킨다.
-- 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/keys`·`api/list-query`·`lib/league`·`lib/stage`를 직접 import.
+- ⚠ **`TransferClub`·`STAGE_GROUP`·`isDeadStage`·`feeDelta`·`ClubRoute`·`WatchMark`는 배럴에 없다** — 슬라이스 밖 소비자가 0이라 올리지 않았다. `STAGE_STATUS`·`STATUS_LABEL`도 배럴에는 없지만 서버 page가 `lib/stage` 직접 경로로 쓴다(og description). `check:conventions`는 상대 경로 소비를 현역으로 세어 이 유형을 잡지 못하므로 손으로 지킨다.
+- 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/keys`·`api/list-query`·`lib/league`·`lib/stage`·`lib/route-label`·`lib/player-name`을 직접 import.
 
 ## `@/entities/comment`
 - `useCommentListQuery({ dealId, userId, enabled, initialData, initialDataUpdatedAt, placeholderData })` / `commentKeys` — 딜의 댓글(최신 `COMMENT_LIST_LIMIT`건, 화면에는 오래된 순). ⚠ **userId로 스코프된다**(내 표 `my_vote` 임베딩이 "내 행만"). 쓰기 뒤 무효화는 사용자 무관 prefix `commentKeys.deal(dealId)`로 잡고, 표의 낙관적 갱신은 **내 키**(`commentKeys.list(dealId, userId)`)만 고친다. ⚠ `initialDataUpdatedAt`에 서버가 읽은 시각을 넣는다 — 빼면 뒤로가기가 되살린 옛 서버 페이로드가 신선한 것으로 앉는다. 서버가 **다른 사용자**로 그린 목록은 `initialData`가 아니라 내 표를 지운 `placeholderData`로 넘긴다(`withoutMyVotes`).
@@ -138,7 +138,7 @@
 - ⚠ 세 슬라이스 모두 비로그인 안내를 직접 띄우지 않는다 — `onSignInRequired`로 올리고 **뷰가 `SignInDialog` 한 벌**을 문구만 바꿔 쓴다.
 
 ## `@/features/watch-transfer`
-- `WatchToggle({ dealId, watched, variant, onSignInRequired })` — 상세 하단의 관심 토글 하나(`block` 변형). 조회는 `@/entities/transfer`다.
+- `WatchToggle({ dealId, watched, onSignInRequired })` — 상세 하단의 관심 토글 하나. 조회는 `@/entities/transfer`다.
 - ⚠ **훅(`useToggleTransferWatch`)은 배럴에 없다** — 토글은 상세 하나뿐이라 슬라이스 밖 호출부가 0이다(목록 행의 관심 표시는 표시일 뿐 토글이 아니다 — `WatchMark`는 `entities/transfer` 내부에서만 쓰인다).
 - ⚠ 세션 `status`를 **3분기**한다(`loading`을 비로그인과 같이 다루면 콜드 로드 직후 로그인 사용자가 안내를 본다).
 - ⚠ **비로그인에게도 버튼을 그대로 연결한다** — 눌러야 로그인 안내가 뜬다. 안내는 **뷰가 소유한다**(`onSignInRequired` 콜백). 컨트롤을 죽이고 옆에 "로그인하고 …하기" 링크를 다는 형태로 되돌리지 말 것: 사용자가 실제로 누르는 것은 컨트롤이라 **눌러도 아무 반응이 없는 UI**가 된다.
@@ -180,7 +180,7 @@
 - `chipClassName(selected)` — 칩의 클래스만. **`rounded-sm`(6px)** 이다 — 칩이라고 알약이 아니다(`styling.md`). 이동이면 `<Link>`에, 선택이면 `button`에 이 클래스를 입힌다(`Link` 안에 `button`을 넣지 않는다). 분리 사유는 `Button`↔`buttonClassName`과 같다.
 - `Dialog` / `Sheet`(+`SheetItem`) — 확인 대화상자 / 하단 시트. 포커스 가둠은 `@/shared/lib`의 `useFocusTrap`.
   - `Sheet`는 화면 하단에 붙는 **edge-to-edge** 시트다(`styling.md`). "닫기" 행을 두지 않는다.
-  - ⚠ 닫기 수단은 스크림 탭 · Escape · 스와이프인데 **셋 다 포인터이거나 물리 키보드다.** 그래서 그래버가 `button aria-label="닫기"`를 겸한다 — 시트 안 항목이 전부 `disabled`면 **활성 컨트롤이 0개**가 되고, 그때 스크린리더·키보드의 유일한 탈출구가 이 버튼이다. `div`로 되돌리지 말 것.
+  - ⚠ 닫기 수단은 스크림 탭 · Escape · 스와이프인데 **셋 다 포인터이거나 물리 키보드다.** 그래서 그래버가 `button aria-label="닫기"`를 겸한다 — 시트 안 항목이 전부 비활성인 메뉴가 생기면 **활성 컨트롤이 0개**가 되고, 그때 스크린리더·키보드의 유일한 탈출구가 이 버튼이다. `div`로 되돌리지 말 것.
   - ⚠ 진입·퇴장 애니메이션은 **바깥 요소**, 드래그 오프셋은 **안쪽 래퍼**가 갖는다. 한 요소에 겹치면 CSS animation이 캐스케이드에서 inline style을 이겨 드래그가 통째로 무시된다. 새 오버레이에 드래그를 붙일 때 같은 함정을 밟지 말 것.
   - ⚠ 시트 위에 시트를 겹치지 않는다 — `useFocusTrap`이 이중이 되어 Escape·Tab 가둠이 둘이 되고 `aria-modal` 노드도 둘이 된다. 한 시트의 **children만 바꾼다**(한 상태로 `"none" | "menu" | …`를 갖는다).
 - **`SignInDialog`** — "로그인이 필요해요" 안내. **로그인이 필요한 액션을 비로그인이 눌렀을 때 `router.push(signInWithNext(...))`로 곧바로 화면을 갈아치우지 않는다** — 무엇 때문에 화면을 잃는지 모른 채 이동하게 되고, 되돌아올 길도 없다. 문구는 `action`(`"관심 목록에 담으려면"`처럼 **`~하려면`으로 끝나는 구절**) 하나만 받고 나머지 문장은 컴포넌트가 갖는다.

@@ -57,11 +57,11 @@ shared ← entities ← features ← widgets ← views
 **서버 소비자는 `generateMetadata`와 서버 컴포넌트(page·layout)다.**
 
 - `@/shared/api` — 클라이언트 안전 모듈만 노출. 서버 전용은 **직접 경로**로 import: `@/shared/api/supabase-server`(`next/headers` 의존) · `@/shared/api/supabase-anon`(Next Data Cache 의존).
-- `@/shared/lib` — `"use client"` 훅을 포함한다(목록은 `reuse.md`). **서버에서는 순수 함수를 직접 경로로 import**: `@/shared/lib/cn`·`format`·`post-id`·`text`·`query-scope`. 이 직접 경로 나열이 곧 `shared/lib`의 화이트리스트이고 **단일 소스는 `src/shared/lib/index.ts` 말미의 주석**이다.
+- `@/shared/lib` — `"use client"` 훅을 포함한다(목록은 `reuse.md`). **서버에서는 순수 함수를 직접 경로로 import**: `@/shared/lib/cn`·`format`·`post-id`·`text`·`query-scope`·`search-params`. 이 직접 경로 나열이 곧 `shared/lib`의 화이트리스트이고 **단일 소스는 `src/shared/lib/index.ts` 말미의 주석**이다.
   - `@/shared/ui`도 같다 — 배럴이 클라이언트 컴포넌트를 담으므로, 서버 page가 **렌더가 아니라 값으로** 써야 하는 서버 안전 모듈이 생기면 직접 경로로 가져가고 그 경로를 `check:conventions`의 `DEEP_IMPORT_ALLOWED`에 함께 적는다.
   - ⚠ **`"use client"`를 붙이지 않은 `shared/ui` 컴포넌트도 서버 소비자다.** 배럴을 거치면 서버 렌더 여지를 잃는다 — `empty-state`·`avatar`·`pill`·`skeleton`과 클래스 함수들(`button-class`·`chip-class`)이 `@/shared/lib/cn` 직접 경로를 쓰는 이유다(사유는 `empty-state.tsx` 주석에).
 - `@/entities/profile` — `"use client"` 쿼리 훅 포함. **서버는 `model/types`·`api/mappers`·`api/keys`를 직접 import**(이 세 접미사는 모든 엔티티에 공통으로 열려 있다).
-- `@/entities/transfer` — `"use client"` 쿼리 훅·UI 포함. **서버는 `model/types`·`api/mappers`·`api/keys`·`api/list-query`·`lib/league`·`lib/stage`를 직접 import** — `app/transfers/page.tsx`가 리그·정렬 파싱(`lib/league`)을, `app/transfers/[id]/page.tsx`가 상태 뱃지 라벨(`lib/stage`)을 og description에 쓴다.
+- `@/entities/transfer` — `"use client"` 쿼리 훅·UI 포함. **서버는 `model/types`·`api/mappers`·`api/keys`·`api/list-query`·`lib/league`·`lib/stage`·`lib/route-label`·`lib/player-name`을 직접 import** — `app/transfers/page.tsx`가 리그·정렬 파싱(`lib/league`)을, `app/transfers/[id]/page.tsx`가 상태 뱃지 라벨(`lib/stage`)·경로 문구(`lib/route-label`)·선수 표시명(`lib/player-name`)을 `<title>`·og description에 쓴다.
 - `@/entities/comment` — `"use client"` 쿼리 훅 포함. **서버는 `model/types`·`api/mappers`·`api/list-query`를 직접 import** — `app/transfers/[id]/page.tsx`가 댓글을 클라이언트 훅과 같은 조립(`buildCommentListQuery`)·자르기(`buildCommentList`)로 프리페치한다.
 - `@/entities/session` — 배럴이 zustand 스토어·Provider·가드를 재export(전부 클라이언트). 순수 함수 `toAuthErrorMessage`는 `lib/auth-error-message`에, 쿼리 키는 `api/keys`에 따로 있다.
 - `@/features/sign-in` — 배럴이 `"use client"` 훅(`useOAuthSignIn`)을 포함한다. **서버가 쓰는 순수 함수 `hasPkceVerifier`는 `@/features/sign-in/lib/pkce-verifier` 직접 경로**로 가져간다(`app/(auth)/sign-in/page.tsx`가 선례). features 레이어에도 같은 예외가 성립한다는 뜻이다 — 배럴이 클라이언트 훅을 담고 있으면 서버 소비자는 직접 경로를 쓴다.

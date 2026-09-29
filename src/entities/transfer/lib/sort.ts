@@ -35,7 +35,7 @@ export interface TransferGroup<T> {
 
 /**
  * 정렬된 딜을 구간으로 나눈다 — 구간 순서는 `GROUP_ORDER`로 고정, **빈 구간은 뺀다**
- * (handoff §4-6 "빈 구간은 렌더하지 않는다"). 구간 안의 순서는 입력 순서 그대로다 →
+ * (빈 구간은 렌더하지 않는다). 구간 안의 순서는 입력 순서 그대로다 →
  * `sortDeals` **뒤에** 부른다.
  * ⚠ 구간 점프 칩은 빈 구간도 그린다(0건 disabled) — 그쪽은 `GROUP_ORDER`·`GROUP_LABEL`을 직접 돈다.
  */

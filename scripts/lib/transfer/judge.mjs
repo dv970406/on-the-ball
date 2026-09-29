@@ -29,6 +29,8 @@ import { COLLECTOR_UA } from "./sources.mjs";
 import { DEAD, RANK, isRoundupItem } from "./story.mjs";
 import { lookupKo } from "./wikidata.mjs";
 import { loadGlossary } from "./names-ko.mjs";
+import { clampCp } from "../sync-db.mjs";
+import { normalizePlayer } from "./player-key.mjs";
 
 /** 사용자가 고른 모델 — Haiku 4.5는 공식 이적 보도를 "무관"으로 버린 적이 있다 */
 export const JUDGE_MODEL = "claude-sonnet-5";
@@ -102,7 +104,7 @@ export function extractArticleText(html) {
   // articleBody가 HTML째 들어오는 매체가 있다 — 태그를 걷어 글자만 보낸다
   const text = (longest != null ? (/<[a-z][^>]*>/iu.test(longest) ? cheerio.load(longest.replace(/<\/(?:p|h\d|li)>/giu, "$& ")).root().text() : longest) : null) ??
     $("article p, main p, [itemprop=articleBody] p").map((_, p) => $(p).text().trim()).get().filter((t) => t.length > 40).join("\n");
-  return clampCp(String(text).replace(/\s+/gu, " ").trim(), ARTICLE_MAX_CHARS);
+  return ellipsize(String(text).replace(/\s+/gu, " ").trim(), ARTICLE_MAX_CHARS);
 }
 
 /** 기사 본문 받기 — 실패하면 빈 문자열(저장된 글만으로 판정한다). 던지지 않는다 */
@@ -118,10 +120,14 @@ export async function fetchArticleText(url, fetchImpl = fetch) {
 
 // ── 요청 조립 ──────────────────────────────────────────────────────────
 
-/** 코드포인트 단위 자르기 — `.slice()`는 이모지를 반쪽으로 자른다 */
-function clampCp(text, max) {
-  const cps = [...text];
-  return cps.length > max ? `${cps.slice(0, max).join("")}…` : text;
+/**
+ * 모델에 보낼 글의 말줄임 — 잘렸음을 `…`로 알린다(자르기는 `sync-db.mjs`의 `clampCp`).
+ * ⚠ **DB에 저장하는 값에는 쓰지 않는다** — `…`가 붙어 상한보다 한 글자 길어진다. 근거 인용이
+ *   300자를 넘으면 301코드포인트가 되어 CHECK(`transfer_news_verdict_evidence_len`)에 걸렸다.
+ */
+function ellipsize(text, max) {
+  const cut = clampCp(text, max);
+  return cut === text ? text : `${cut}…`;
 }
 
 /** 링크 주소를 걷는다 — 모델은 링크를 열 수 없고 열 도구도 주지 않는다 */
@@ -136,7 +142,7 @@ export function stripLinks(body) {
 
 /** 모델에 보내는 글 — 저장된 글(링크를 걷고 자른 것) + 받은 기사 본문. 근거·구단·선수 대조도 이 글과 한다 */
 export function composeText(storedBody, article = "") {
-  const stored = clampCp(stripLinks(storedBody), BODY_MAX_CHARS);
+  const stored = ellipsize(stripLinks(storedBody), BODY_MAX_CHARS);
   return article ? `${stored}\n\n[기사 본문]\n${stripLinks(article)}` : stored;
 }
 
@@ -421,7 +427,7 @@ export async function runJudgements(supabase, needs, { apiKey, names, limit = JU
     const label = n.player ?? judged.player ?? "?";
     if (judged.kind === "move") {
       out.move += 1;
-      const key = n.playerKey ?? normalizePlayerKey(judged.player);
+      const key = n.playerKey ?? normalizePlayer(judged.player);
       if (!n.playerKey) out.extractedPlayers += 1;
       const clubs = await resolveClubs(judged, book, { lookup, cacheRows: clubCache, nowMs });
       for (const [raw, ok] of [[judged.from, clubs.from], [judged.to, clubs.to]]) if (raw && !detectClubs(raw).length) out[ok ? "clubsVerified" : "clubsRejected"] += 1;
@@ -474,13 +480,3 @@ export async function runJudgements(supabase, needs, { apiKey, names, limit = JU
   return out;
 }
 
-/** 선수 키 — `derive-deals.mjs`의 `normalizePlayer`와 같은 계산(순환 import를 피해 따로 둔다) */
-export function normalizePlayerKey(name) {
-  return String(name)
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}

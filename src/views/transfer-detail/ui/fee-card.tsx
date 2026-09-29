@@ -3,10 +3,10 @@
 import { FeeDelta, FeeValue, type TransferDeal, formatFee, formatFeeRange } from "@/entities/transfer";
 import { cn } from "@/shared/lib";
 
-/** 값이 없는 칸 — 전부 같은 글자(`—`)로 말한다(handoff §5 "없는 값은 —") */
+/** 값이 없는 칸 — 전부 같은 글자(`—`)로 말한다 */
 const EMPTY = "—";
 
-/** KV 칸의 라벨 — 프로토타입 `.tm-lbl`(mono 10 uppercase ink-mute-2) */
+/** KV 칸의 라벨 — mono 10 uppercase ink-mute-2 */
 const labelClassName = "font-mono text-[10px] uppercase tracking-[0.5px] text-ink-mute-2";
 
 interface FeeCardProps {
@@ -14,13 +14,13 @@ interface FeeCardProps {
 }
 
 /**
- * 이적료 카드(handoff §5-5) — 큰 값 + 옵션 부제 + 2×2 KV.
+ * 이적료 카드 — 큰 값 + 옵션 부제 + 2×2 KV.
  *
- * - **원화 환산은 없다**(계획서 §0-1 — 하드코딩 환율은 거짓 숫자). 주급은 원문 표기 그대로다.
- * - 결렬 딜도 값은 그대로 그린다(계획서 §3-7) — 뱃지만 결렬이다.
+ * - **원화 환산은 없다**(하드코딩 환율은 거짓 숫자다). 주급은 원문 표기 그대로다.
+ * - 결렬 딜도 값은 그대로 그린다 — 뱃지만 결렬이다.
  * - 이적료 자체가 없으면 부제를 그리지 않는다 — "옵션 없음"은 이적료가 있을 때만 뜻이 있다.
  *
- * ⚠ 이 KV의 모든 칸은 **라벨 위 · 값 아래**다(handoff). 칸 구분은 헤어라인이고 그림자는 없다.
+ * ⚠ 이 KV의 모든 칸은 **라벨 위 · 값 아래**다. 칸 구분은 헤어라인이고 그림자는 없다.
  * ⚠ 숫자는 전부 `font-mono tabular-nums` — `FeeDelta`는 안에서 그 클래스를 갖는다.
  */
 export function FeeCard({ deal }: FeeCardProps) {
@@ -37,7 +37,7 @@ export function FeeCard({ deal }: FeeCardProps) {
   // 금액 칸 둘이 빠지면 계약·주급이 첫 줄이 된다 — 선 규칙이 칸 번호로 정해지므로 번호를 당긴다
   const offset = hasFee ? 2 : 0;
 
-  /** 2×2 KV — 짝수 칸은 왼쪽 선, 3·4번째 칸은 위쪽 선(프로토타입 `.tm-kvg` 규칙) */
+  /** 2×2 KV — 짝수 칸은 왼쪽 선, 3·4번째 칸은 위쪽 선 */
   const cell = (index: number) =>
     cn(
       "p-[11px_14px]",

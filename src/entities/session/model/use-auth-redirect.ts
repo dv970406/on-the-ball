@@ -61,7 +61,7 @@ export function useRedirectGuestToSignIn(status: SessionStatus) {
  *   `startsWith("/")` 계열로는 `/\evil.com`도 `//evil.com`도 못 막는다(둘 다 실제로 뚫렸다).
  *
  * ⚠ **`?next=`를 `useSearchParams`로 읽지 않는다.** 그건 프리렌더를 CSR로 떨어뜨리는데,
- *   이 훅을 쓰는 가드가 `(auth)` 레이아웃에 얹혀 있어서 그 폴백이 인증 화면 3개의 **본문
+ *   이 훅을 쓰는 가드가 `(auth)` 레이아웃에 얹혀 있어서 그 폴백이 인증 화면(`(auth)` 그룹)의 **본문
  *   전체를 삼켰다**(빌드 산출물이 빈 body + BAILOUT였다). 덕분에 `<Suspense>` 경계도 필요 없다.
  *
  * ⚠ 그렇다고 `@/shared/lib`의 `useNextParam`으로 바꾸지도 **않는다.** 그건 값을 **렌더 중에**

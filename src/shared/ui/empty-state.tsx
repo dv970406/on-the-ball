@@ -15,10 +15,6 @@ interface EmptyStateProps {
   action?: ReactNode;
   /** 오류 재시도 핸들러 — action이 없을 때 "다시 시도" 버튼을 자동 렌더 */
   onRetry?: () => void;
-  /** 재시도 버튼 라벨 (기본 "다시 시도") */
-  retryLabel?: string;
-  /** 재시도 버튼 톤 (기본 "dark") */
-  retryVariant?: "dark" | "secondary";
   className?: string;
 }
 
@@ -29,16 +25,14 @@ export function EmptyState({
   description,
   action,
   onRetry,
-  retryLabel = "다시 시도",
-  retryVariant = "dark",
   className,
 }: EmptyStateProps) {
   // action 우선, 없으면 onRetry로 재시도 버튼 구성
   const footer =
     action ??
     (onRetry ? (
-      <Button variant={retryVariant} size="sm" onClick={onRetry}>
-        {retryLabel}
+      <Button variant="dark" size="sm" onClick={onRetry}>
+        다시 시도
       </Button>
     ) : null);
 

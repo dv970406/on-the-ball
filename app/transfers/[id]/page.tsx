@@ -12,6 +12,8 @@ import { createSupabaseServerClient } from "@/shared/api/supabase-server";
 import { buildDealQuery, buildReportsQuery } from "@/entities/transfer/api/list-query";
 import { buildDeal, buildReport } from "@/entities/transfer/api/mappers";
 import { STAGE_STATUS, STATUS_LABEL } from "@/entities/transfer/lib/stage";
+import { routeLabels } from "@/entities/transfer/lib/route-label";
+import { playerName } from "@/entities/transfer/lib/player-name";
 import type { TransferDeal, TransferReport } from "@/entities/transfer/model/types";
 import { buildCommentListQuery } from "@/entities/comment/api/list-query";
 import { buildCommentList } from "@/entities/comment/api/mappers";
@@ -23,8 +25,6 @@ const FALLBACK_METADATA: Metadata = { title: "이적 상세" };
 const NOT_FOUND_METADATA: Metadata = { title: NOT_FOUND_TITLE };
 const META_TITLE_MAX = 60;
 const META_DESCRIPTION_MAX = 120;
-/** 방향을 못 읽은 구단 — 화면(`ClubRoute`)과 같은 말 */
-const UNKNOWN_CLUB_LABEL = "미확인";
 
 type DealHead =
   | {
@@ -59,7 +59,7 @@ type DealHead =
  *
  * ⚠ **쿠키 클라이언트다.** `transfer_deal_watch(user_id)` 임베딩이 "내 행만"이라 응답이
  *   사용자별이다 → 익명 Data Cache 갈림(`hasSessionCookie()`)을 두지 않는다. 대가로 이 라우트는
- *   동적(`ƒ`)이고, 그건 다른 상세(글·경기)와 같다.
+ *   동적(`ƒ`)이다.
  */
 const fetchDealHead = cache(async (dealId: number): Promise<DealHead> => {
   const nowMs = Date.now();
@@ -123,7 +123,10 @@ function describe(head: Extract<DealHead, { state: "found" }>): string {
 
   const { deal } = head;
   const status = STAGE_STATUS[deal.stage];
-  const route = `${deal.fromClub?.name ?? UNKNOWN_CLUB_LABEL} → ${deal.toClub?.name ?? UNKNOWN_CLUB_LABEL}`;
+  // 화면(경로 카드·`ClubRoute`)과 **같은 문구**다 — 빈 칸의 말(`FA`·`미확인`·`미정`·`외 N`)까지 `routeLabels`가 정한다.
+  // 전에는 여기서 `미확인`을 따로 들어 자유계약·행선지 미정·관심 구단 여럿이 화면과 다르게 나갔다.
+  const labels = routeLabels(deal, { full: true });
+  const route = `${labels.from} → ${labels.to}`;
   return clamp(status === null ? route : `${route} · ${STATUS_LABEL[status]}`, META_DESCRIPTION_MAX);
 }
 
@@ -138,7 +141,7 @@ export async function generateMetadata(props: PageProps<"/transfers/[id]">): Pro
 
   const { deal } = head;
   // ⚠ 클램프한다 — `player`는 DB가 길이를 넓게 허용하고, 화면 제목(`h1`)과 같은 값이다
-  const title = clamp(`${deal.playerKo ?? deal.player} 이적`, META_TITLE_MAX);
+  const title = clamp(`${playerName(deal)} 이적`, META_TITLE_MAX);
   const description = describe(head);
 
   return {

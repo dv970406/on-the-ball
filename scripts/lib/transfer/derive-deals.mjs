@@ -32,6 +32,7 @@ import { extractTransfer } from "./extract.mjs";
 import { JUDGE_RETRY_MS, SUMMARY_RETRY_WINDOW_MS } from "./judge.mjs";
 import { createNameBook, loadGlossary, loadNameBook, loadPlayerDictionary, lookupAndCache, missingNames } from "./names-ko.mjs";
 import { RANK, RENEWAL, cleanBody, isDead, isRoundup, isRoundupItem, mentionRe, sentencesOf } from "./story.mjs";
+import { normalizePlayer } from "./player-key.mjs";
 
 /** 이적 관련성 하한 — 그 아래는 경기 리뷰·부상 소식이 단계 규칙에 스친 것이다 */
 export const MIN_RELEVANCE = 0.3;
@@ -69,16 +70,8 @@ export function boardScopeStartMs(nowMs, windows) {
 }
 export const derivationStartMs = (nowMs, windows) => boardScopeStartMs(nowMs, windows) - SCOPE_SLACK_MS;
 
-/** 선수명 정규형 — 딜 키와 사전(`players-ko.json`) 키가 이걸로 만들어진다 */
-export function normalizePlayer(name) {
-  return String(name)
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+// 선수 키의 정규형 — `player-key.mjs`가 단독으로 갖는다(judge와 공유). 여기서 다시 내보내 호출부의 경로를 유지한다
+export { normalizePlayer };
 /** ⚠ 16자리 소문자 hex — `transfer_deal.deal_key`의 CHECK와 한 쌍이다. 영구 계약(관심이 이 딜의 id를 본다) */
 export const dealKey = (normalized) => createHash("sha1").update(normalized).digest("hex").slice(0, 16);
 

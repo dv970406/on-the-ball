@@ -9,7 +9,7 @@ const FOCUSABLE =
  * 모달·시트용 포커스 트랩 + Escape 닫힘 + 트리거로 포커스 복귀.
  *
  * ⚠ native `<dialog showModal>`을 쓰지 않는 이유: top-layer로 올라가 루트 layout의
- *   430px 모바일 프레임 **바깥**에 그려진다. 프로토타입의 시트·다이얼로그는 프레임 안쪽에
+ *   430px 모바일 프레임 **바깥**에 그려진다. 이 앱의 시트·다이얼로그는 프레임 안쪽에
  *   absolute로 얹히는 물건이라 형태가 달라진다.
  *
  * ⚠ Escape는 keydown에서 잡는다(keyup이면 다른 핸들러가 먼저 먹는다).
@@ -85,7 +85,7 @@ export function useFocusTrap(
     document.addEventListener("keydown", onKeyDown, true);
     return () => {
       document.removeEventListener("keydown", onKeyDown, true);
-      // 트리거가 아직 문서에 있을 때만 되돌린다(글 삭제처럼 트리거째 사라지는 경우가 있다)
+      // 트리거가 아직 문서에 있을 때만 되돌린다(댓글 삭제처럼 트리거째 사라지는 경우가 있다)
       if (trigger?.isConnected) trigger.focus();
     };
   }, [containerRef, active]);

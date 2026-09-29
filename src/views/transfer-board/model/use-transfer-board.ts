@@ -53,7 +53,7 @@ export type GroupCounts = Record<TransferGroupKey, number>;
  * ⚠ 리그·정렬·구단은 **여기서** 계산한다 — 쿼리 키에 넣지 않는다. 서버가 범위 안 딜 전체를 내리고
  *   뷰가 같은 데이터로 필터·정렬한다(사유는 `transferKeys` 주석 — 필터 객체가 키와 어긋나면
  *   `initialData`가 캐시에 닿지 못한다).
- * ⚠ 캐러셀은 리그 필터 **밖**이다 — "무엇이 새로 왔는가"라 필터를 타지 않는다(계획서 §0-1).
+ * ⚠ 캐러셀은 리그 필터 **밖**이다 — "무엇이 새로 왔는가"라 필터를 타지 않는다.
  */
 export function useTransferBoard({
   initialDeals,

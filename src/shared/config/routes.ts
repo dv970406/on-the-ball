@@ -56,7 +56,7 @@ export function signInWithNext(next: string) {
  * 경로에 `?next=`를 붙인다. 이미 없으면 그대로 둔다.
  *
  * `GuestOnly`가 목적지를 단독으로 정하므로 **URL의 next가 유일한 보존 수단**이다 —
- * 여기서 끊기면 "글쓰기를 누르고 로그인했는데 목록으로 떨어지는" 증상이 된다.
+ * 여기서 끊기면 "관심 담기를 누르고 로그인했는데 목록으로 떨어지는" 증상이 된다.
  * 소셜 로그인은 프로바이더로 나갔다 돌아오므로 `redirectTo`에도 이 형태를 실어 보낸다
  * (features/sign-in의 useOAuthSignIn).
  */

@@ -21,11 +21,46 @@ import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
  */
 
 /**
- * 한 사이트맵 파일의 URL 상한은 50,000개다(sitemaps.org).
- * ⚠ 딜이 이 수를 넘으면 조용히 잘리는 게 아니라 **넘긴 딜이 사이트맵에서 사라진다** →
- *   그때는 `generateSitemaps`로 쪼개 사이트맵 인덱스를 만든다(Next 공식 API).
+ * 한 번에 받는 행 수 — PostgREST `max_rows`(`supabase/config.toml`)와 같은 값이다.
+ * ⚠ 이보다 크게 `.limit()`을 걸어도 응답은 **조용히** 이 수에서 잘린다(`api-and-db.md`의 PostgREST 절).
+ *   전에는 `.limit(10_000)` 하나로 받아 딜이 1,000건을 넘는 순간부터 그 뒤 딜이 경고 없이 빠지는
+ *   구조였다 → 이 크기로 페이지를 넘긴다(`offset`·`limit`이 URL에 실려 페이지마다 Data Cache 키가 다르다).
  */
-const URL_LIMIT = 10_000;
+const PAGE_SIZE = 1_000;
+
+/**
+ * 한 사이트맵 파일의 URL 상한 — sitemaps.org의 50,000.
+ * ⚠ 딜이 이 수를 넘으면 **넘긴 딜이 사이트맵에서 사라진다** → 그때는 `generateSitemaps`로 쪼개
+ *   사이트맵 인덱스를 만든다(Next 공식 API). 닿으면 경고를 남겨 그 시점을 놓치지 않게 한다.
+ */
+const URL_LIMIT = 50_000;
+
+interface DealRow {
+  id: number;
+  latest_reported_at: string;
+}
+
+/** 딜을 `PAGE_SIZE`씩 넘기며 전부 받는다 — 페이지가 덜 차면 끝이다 */
+async function fetchDealPages(
+  supabase: NonNullable<ReturnType<typeof createSupabaseAnonClient>>,
+): Promise<DealRow[]> {
+  const rows: DealRow[] = [];
+  for (let from = 0; from < URL_LIMIT; from += PAGE_SIZE) {
+    const to = Math.min(from + PAGE_SIZE, URL_LIMIT) - 1;
+    const { data, error } = await supabase
+      .from("transfer_deal")
+      // 상세도 보드도 `latest_reported_at`(최신 보도 시각)이 lastModified다 — 아래 주석 참고.
+      // ⚠ 범위 필터를 걸지 않는다 — 상세 URL은 창이 지나도 살아 있다(`/transfers/[id]`).
+      .select("id, latest_reported_at")
+      .order("id", { ascending: false })
+      .range(from, to);
+    if (error) throw error;
+    rows.push(...data);
+    if (data.length < to - from + 1) return rows;
+  }
+  console.warn(`[sitemap] 딜이 ${URL_LIMIT}건을 넘었다 — generateSitemaps로 쪼갤 때다`);
+  return rows;
+}
 
 /** 값이 있을 때만 `lastModified`를 싣는다 */
 function withLastModified(url: string, lastModified: Date | undefined) {
@@ -60,24 +95,16 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
     const supabase = createSupabaseAnonClient();
     if (!supabase) return statics;
 
-    const transfers = await supabase
-      .from("transfer_deal")
-      // 상세도 보드도 `latest_reported_at`(최신 보도 시각)이 lastModified다 — 아래 주석 참고.
-      // ⚠ 범위 필터를 걸지 않는다 — 상세 URL은 창이 지나도 살아 있다(`/transfers/[id]`).
-      .select("id, latest_reported_at")
-      .order("id", { ascending: false })
-      .limit(URL_LIMIT);
+    const rows = await fetchDealPages(supabase);
 
     // 미래 시각을 lastmod로 싣지 않기 위한 기준 — 데이터를 읽은 시각이다
     const nowMs = Date.now();
     // ⚠ 미래 시각을 싣지 않는다 — 수집기가 10분 여유로 거르지만 CHECK 상한은 +1일이다
-    const deals = (transfers.data ?? []).filter(
-      (deal) => Date.parse(deal.latest_reported_at) <= nowMs,
-    );
+    const deals = rows.filter((deal) => Date.parse(deal.latest_reported_at) <= nowMs);
 
     return [
       ...staticEntries(latest(deals.map((deal) => new Date(deal.latest_reported_at)))),
-      ...(transfers.data ?? []).map((deal) => ({
+      ...rows.map((deal) => ({
         url: absoluteUrl(ROUTES.transfer(deal.id)),
         // ⚠ `updated_at`(파생 시각)이 아니라 `latest_reported_at`이다 — `updated_at`은 파생 컬럼
         //   **아무것이나** 바뀐 시각이라(한국어 표기가 새로 붙어도 움직인다) 보도가 새로 나온

@@ -8,7 +8,7 @@ import type { Comment } from "../model/types";
 
 interface CommentItemProps {
   comment: Comment;
-  /** 답글이면 아바타 24px · 위아래 여백이 줄고 구분선이 없다(handoff §5-1-4) */
+  /** 답글이면 아바타 24px · 위아래 여백이 줄고 구분선이 없다 */
   reply?: boolean;
   /** 내가 쓴 댓글 — `나` 뱃지 */
   isMine?: boolean;
@@ -19,12 +19,12 @@ interface CommentItemProps {
   nowMs: number | null;
   /** 좋아요·싫어요·답글·삭제 줄 — 쓰기 동작은 features가 갖고 뷰가 조립해 넘긴다 */
   actions?: ReactNode;
-  /** 답글 목록과 답글 입력칸 — 본문 칸 **안쪽**에 붙는다(handoff §5-1-4) */
+  /** 답글 목록과 답글 입력칸 — 본문 칸 **안쪽**에 붙는다 */
   children?: ReactNode;
 }
 
 /**
- * 댓글 한 개(handoff §5-1-3) — 독립 콘텐츠라 `article`이고 `header`·`footer`를 동반한다.
+ * 댓글 한 개 — 독립 콘텐츠라 `article`이고 `header`·`footer`를 동반한다.
  * 답글은 루트의 `article` **안에** 중첩된다(HTML 명세가 드는 중첩 article의 예가 댓글이다).
  *
  * ⚠ `"use client"`를 붙이지 않는다 — 상호작용은 `actions`로 받은 컨트롤이 갖고 이 컴포넌트는
@@ -64,7 +64,7 @@ export function CommentItem({ comment, reply, isMine, nowMs, actions, children }
 
         {/*
           평문이다(마크다운이 아니다). ⚠ `keep-all` + `anywhere` — 한국어는 어절 단위로 끊고,
-          띄어쓰기 없는 긴 URL·영문은 칸을 넘지 않게 아무 데서나 끊는다(handoff §5-1-3).
+          띄어쓰기 없는 긴 URL·영문은 칸을 넘지 않게 아무 데서나 끊는다.
           ⚠ 화면 한도(300그래핌)는 클라이언트만 강제하므로 우회 삽입된 긴 값도 이 규칙이 칸 안에 가둔다.
         */}
         <p className="mt-1 whitespace-pre-line break-keep text-[14px] leading-[1.55] text-ink-secondary wrap-anywhere">

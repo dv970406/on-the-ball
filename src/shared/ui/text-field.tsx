@@ -29,7 +29,7 @@ export function TextField({ label, error, hint, className, ...inputProps }: Text
         aria-invalid={error ? true : undefined}
         aria-describedby={error || hint ? describedById : undefined}
         className={cn(
-          // 높이 50px·좌우 14px — 프로토타입 `.cm-input`과 같은 치수
+          // 높이 50px·좌우 14px
           "h-[50px] w-full rounded-sm border bg-canvas px-3.5 text-[15px] text-ink transition-colors duration-150 ease-otb",
           "placeholder:text-ink-faint focus:outline-none",
           // 에메랄드는 뷰포트당 1개 규칙에 걸리므로 포커스는 잉크 래더로 표현한다.

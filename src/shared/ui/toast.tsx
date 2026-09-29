@@ -5,13 +5,13 @@ import { usePathname } from "next/navigation";
 import { cn, useToastStore } from "@/shared/lib";
 import { hasBottomBar } from "@/shared/config";
 
-/** 자동 소멸까지 — 프로토타입과 동일 */
+/** 자동 소멸까지 */
 const TOAST_DURATION_MS = 1800;
 
 /**
  * 토스트 표시 영역 — 루트(AppProviders)에 하나만 둔다.
  *
- * ⚠ 위치 기준은 430px 프레임이 **아니다.** `providers.tsx`에서 프레임 div의 *형제*로
+ * ⚠ 위치 기준은 430px 프레임이 **아니다.** 루트 layout(`app/layout.tsx`)의 프레임 div와 *형제*로
  *   렌더되므로 absolute의 기준은 초기 컨테이닝 블록(뷰포트)이다. 프레임이
  *   `mx-auto h-dvh`라 좌표가 결과적으로 일치한다 — 프레임 정렬을 바꾸면 여기도 봐야 한다.
  *
@@ -48,7 +48,7 @@ export function ToastViewport() {
       role="status"
       aria-live="polite"
       className={cn(
-        // 빈 상태에서도 남아 있으므로 탭을 가로채지 않게 한다(아래 탭바·FAB가 이 영역에 있다)
+        // 빈 상태에서도 남아 있으므로 탭을 가로채지 않게 한다(아래 탭바·하단 고정 바가 이 영역에 있다)
         "pointer-events-none absolute left-1/2 z-[95]",
         // ⚠ translate 표준 유틸이 아니라 arbitrary property다 — 같은 요소에 animation이 있으면
         //   `translate` 개별 프로퍼티가 `transform`과 합성되어 조용히 어긋난다(styling.md).

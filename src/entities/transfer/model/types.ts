@@ -106,7 +106,7 @@ export interface TransferDeal {
   id: TransferDealRow["id"];
   /** 추출된 영문 선수명 */
   player: TransferDealRow["player"];
-  /** 한국어 표기 — 운영 사전(`players-ko.json`)에 있을 때만. 표시명은 `playerKo ?? player` */
+  /** 한국어 표기 — 운영 사전(`players-ko.json`)에 있을 때만. 표시명은 `lib/player-name.ts`의 `playerName`이 단독으로 정한다 */
   playerKo: TransferDealRow["player_ko"];
   position: TransferDealRow["position"];
   birthYear: TransferDealRow["birth_year"];
@@ -159,7 +159,7 @@ export interface TransferDeal {
  * ⚠ `latestReport`는 목록 select의 임베딩(`order published_at desc limit 1`)이라 상세에는 없다 —
  *   상세는 타임라인 전체(`useTransferReportsQuery`)를 따로 받는다.
  * ⚠ `null`일 수 있다 — 딜은 보도에서 파생되므로 원칙적으로 항상 있지만, 재파생이 `deal_id`를
- *   되돌린 뒤 딜 행이 남는 창이 있다(계획서 §2-2 "삭제하지 않는다").
+ *   되돌린 뒤 딜 행이 남는 창이 있다(딜은 삭제하지 않고 다시 파생한다 — `api-and-db.md`).
  */
 export interface TransferDealListItem extends TransferDeal {
   latestReport: TransferReport | null;

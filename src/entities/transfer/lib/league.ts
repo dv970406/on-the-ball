@@ -22,7 +22,7 @@ export function parseTransferSort(value: string | undefined): TransferSort {
 }
 
 /**
- * 리그 필터 — **출발 또는 도착** 구단의 리그가 일치하면 포함(handoff §6). `null`은 전체.
+ * 리그 필터 — **출발 또는 도착** 구단의 리그가 일치하면 포함. `null`은 전체.
  * ⚠ 구단이 `null`(미확인)이거나 5대 리그 밖(`league` null)이면 그 쪽으로는 일치하지 않는다.
  */
 export function dealInLeague(

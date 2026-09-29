@@ -16,7 +16,7 @@
 - 토큰으로 표현할 수 없는 특수값은 arbitrary를 쓴다 — `@theme` 블록은 동결이다.
   - arbitrary **value**: `border-[1.5px]`, `tracking-[-0.6px]`, `bg-[linear-gradient(...)]`
   - arbitrary **property**: `[clip-path:polygon(...)]`, `[transform:...]`, `[transition:...]`
-- ⚠ **`bg-linear-*` 그라데이션 유틸은 `in oklab` 보간이다.** 프로토타입의 sRGB `linear-gradient(...)`를 그대로 옮길 땐 `bg-[linear-gradient(...)]` arbitrary를 쓴다(중간색이 달라진다).
+- ⚠ **`bg-linear-*` 그라데이션 유틸은 `in oklab` 보간이다.** sRGB `linear-gradient(...)`를 그대로 옮길 땐 `bg-[linear-gradient(...)]` arbitrary를 쓴다(중간색이 달라진다).
 - ⚠ **`[vertical-align:...]`·`[font-family:...]` arbitrary property는 생성되지 않는다(실측)** — Tailwind가 이미 그 이름의 표준 유틸(`align-*`·`font-*`)을 갖고 있으면 arbitrary property 형태를 스캐너가 인식하지 못한다. 대신 그 표준 유틸에 arbitrary **value**를 준다: `align-[-1px]`·`font-['Apple_Color_Emoji','Segoe_UI_Emoji','Noto_Color_Emoji',sans-serif]`(이적시장 상세의 국기 이모지 폰트 스택이 선례 — `views/transfer-detail/ui/transfer-detail-view.tsx`).
 - ⚠ 벤더 prefix는 자동 생성되지 않는다(browserslist 미설정 → Lightning CSS 기본 타깃). 구형 사파리 지원이 필요한 속성은 `[-webkit-clip-path:...]`처럼 병기한다.
 
@@ -174,7 +174,7 @@ function cardClassName(peek: boolean) {
 
 ### 알약(`rounded-full`) 예외
 
-프로토타입 치수를 그대로 옮긴 자리를 여기 적는다. **이 목록에 없으면 `rounded-sm`이다.**
+알약으로 두기로 한 컨트롤을 여기 적는다. **이 목록에 없으면 `rounded-sm`이다.**
 
 | 자리 | 파일 |
 |---|---|
@@ -189,7 +189,7 @@ function cardClassName(peek: boolean) {
 |---|---|---|
 | `size-11`/`size-9` 원형 아이콘 **버튼** | 버튼 라운드가 아니라 **원형 히트 영역** | `sub-header` · `profile-view`(사진 변경) |
 | 원형 아이콘 **컨테이너**(클릭 불가) | 히트 영역도 아닌 순수 장식 | `shared/ui/empty-state.tsx` |
-| 아바타·`Pill`(과 그 도트)·워드마크의 볼 | 컨트롤이 아닌 **표시 요소** | `avatar` · `pill` · `wordmark` · `profile-view`의 아바타 스켈레톤·업로드 스피너 |
+| 아바타·`Pill`·워드마크의 볼 | 컨트롤이 아닌 **표시 요소** | `avatar` · `pill` · `wordmark` · `profile-view`의 아바타 스켈레톤·업로드 스피너 |
 | 바텀시트 **그래버**(36×4px 바) | 누르는 컨트롤이 아니라 **드래그 어포던스** — 아래로 끌면 시트가 따라 내려간다 | `shared/ui/sheet.tsx` |
 | 이적시장 **상태 뱃지**·**관심 표시 원**·**결렬 X 원·부인 빗금 원**·**보도 타임라인 점** | 누르는 컨트롤이 아니라 상태·경로·시간순을 그리는 표시 요소다 | `entities/transfer/ui/status-badge.tsx` · `watch-mark.tsx` · `club-route.tsx` · `views/transfer-detail/ui/report-timeline.tsx` |
 
@@ -250,7 +250,7 @@ resting 상태의 카드·목록·헤더는 **여전히 flat + 1px 헤어라인*
 ### 바텀시트는 화면 하단에 **붙는다**(edge-to-edge)
 
 `Sheet`는 좌·우·하단 여백 0으로 화면 하단에 붙고 **상단 모서리만** 둥글다(`rounded-t-[20px]`).
-한때 프로토타입 `.cm-sheet`를 그대로 옮겨 `inset-x-2 bottom-2 rounded-xl`로 떠 있는 카드였는데,
+한때 `inset-x-2 bottom-2 rounded-xl`로 떠 있는 카드였는데,
 그 형태는 맨 아래에 "닫기" 행을 요구한다 — 여백이 있으면 스크림을 눌러 닫는다는 것이 읽히지 않아서다.
 
 - 하단 여백 대신 **`pb-[max(8px,env(safe-area-inset-bottom))]`** 로 홈 인디케이터를 피한다
@@ -259,7 +259,7 @@ resting 상태의 카드·목록·헤더는 **여전히 flat + 1px 헤어라인*
   어포던스 거짓말이다.
 - ⚠ **그 밴드는 `button aria-label="닫기"`여야 한다.** 스크림 탭·Escape·스와이프 셋은 전부
   포인터이거나 물리 키보드라 **터치 스크린리더에 닿는 것이 하나도 없다**(스크림·그래버는
-  `aria-hidden`이고 `aria-modal`이 바깥을 가린다). 항목이 전부 `disabled`인 메뉴라면
+  `aria-hidden`이고 `aria-modal`이 바깥을 가린다). 항목이 전부 비활성인 메뉴가 생기면
   **시트 안 활성 컨트롤이 0개**가 되는데, 그때 이 버튼이 유일한 탈출구다.
   높이도 44px(`py-5` + 바 4px)로 잡는다 — 짚어야 끌 수 있는 띠라 히트 영역 기준을 지킨다.
 - 항목 사이에 **헤어라인을 긋지 않는다.** 좌우 여백이 없어 구분선이 화면을 가로지르는 선이 된다.

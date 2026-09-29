@@ -48,7 +48,7 @@ function seoulParts(date: Date): SeoulParts {
 /**
  * ISO 시각을 "8분 전" 형태로 표기. 7일 이후는 "N월 N일", 해가 다르면 "N년 N월 N일".
  *
- * ⚠ **`nowMs`를 인자로 받는 것이 규약이다** — `isHotPost(post, nowMs)`와 같은 형태이고,
+ * ⚠ **`nowMs`를 인자로 받는 것이 규약이다** — `pickRecentRumors(deals, nowMs)`·`openTransferWindow(nowMs)`와 같은 형태이고,
  *   같은 이유다: 렌더는 순수해야 하는데 함수 안에서 시계를 읽으면 서버 렌더와
  *   하이드레이션이 **다른 값**을 만든다. 지배 변수는 SSR↔하이드레이션 지연이 아니라
  *   **사용자 기기의 시계 오차**다(서버는 NTP 동기 시각, 브라우저는 기기 시각).

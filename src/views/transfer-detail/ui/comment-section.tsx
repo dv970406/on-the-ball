@@ -1,6 +1,6 @@
 "use client";
 
-import { type RefObject, useState } from "react";
+import { type ReactNode, type RefObject, useMemo, useState } from "react";
 import {
   COMMENT_LIST_LIMIT,
   CommentItem,
@@ -10,13 +10,15 @@ import {
   type CommentList,
   type CommentSort,
 } from "@/entities/comment";
+import type { SessionStatus } from "@/entities/session";
 import { CommentVoteButtons } from "@/features/vote-comment";
 import { cn, formatCount } from "@/shared/lib";
 import { EmptyState, Skeleton, StaleBanner } from "@/shared/ui";
+import { ReplyComposerProvider, useReplyField, useReplyTarget } from "../model/reply-composer";
 import { useCommentComposer } from "../model/use-comment-composer";
 import { CommentForm, CommentSignInField } from "./comment-form";
 
-type SessionStatus = "loading" | "authenticated" | "guest";
+type Thread = ReturnType<typeof buildCommentThreads>[number];
 
 interface CommentSectionProps {
   dealId: number;
@@ -49,17 +51,22 @@ const SORT_OPTIONS: { key: CommentSort; label: string }[] = [
   { key: "latest", label: "최신순" },
 ];
 
+const PLACEHOLDER = "이 이적, 어떻게 봐요?";
+
 /** 표·답글·삭제 줄의 텍스트 버튼 — 32px, 히트 영역은 위아래로 넓혀 44px, 가로는 최소 폭 44px */
 const ACTION_BUTTON =
   "relative inline-flex h-8 min-w-11 items-center justify-center whitespace-nowrap rounded-sm px-2 text-[12px] text-ink-mute after:absolute after:inset-x-0 after:-inset-y-1.5 after:content-[''] disabled:opacity-40";
 
 /**
- * 상세의 댓글 탭(handoff §5-1) — 입력칸 · 정렬 · 목록(답글 1단계) · 빈 상태.
+ * 상세의 댓글 탭 — 입력칸 · 정렬 · 목록(답글 1단계) · 빈 상태.
  *
  * ⚠ **정렬은 받아 온 목록에서 뷰가 한다**(`sortThreads`) — 쿼리 키에 정렬을 넣으면 서버 프리페치와
  *   키가 갈려 `initialData`가 캐시에 닿지 못한다(보드의 리그·정렬과 같은 이유).
  * ⚠ 에러 화면은 **보여줄 댓글이 없을 때만** 띄운다 — 댓글 작성·삭제가 매번 무효화를 걸어 리페치
  *   실패 경로가 자주 열린다. 데이터가 있으면 배너로만 알린다(`data-and-state.md`).
+ * ⚠ **입력값 state를 이 컴포넌트에 두지 않는다.** 루트 입력칸은 `RootComposer`가, 답글 칸은
+ *   `ReplyComposerProvider`가 훅을 든다 — 여기 두면 글자마다 댓글 목록 전체(최대 200개 + 표 버튼 400개)가
+ *   다시 그려졌다(INP). 스레드 계산도 목록·정렬이 바뀔 때만 한다.
  */
 export function CommentSection({
   dealId,
@@ -76,21 +83,11 @@ export function CommentSection({
   focusFallbackRef,
 }: CommentSectionProps) {
   const [sort, setSort] = useState<CommentSort>("top");
-  // 루트 입력칸 — 등록하면 새 댓글이 맨 위에 오도록 최신순으로 바꾼다(handoff §5-1-1)
-  const root = useCommentComposer(dealId, { onPosted: () => setSort("latest") });
-  // 답글 입력칸 — **섹션이 한 벌** 든다. 한 번에 한 곳만 열리고, 칸을 닫아도 실패 롤백이 도착한다.
-  // 대상이 목록에서 사라지면 칸을 닫는 판정도 이 훅이 갖는다(`watch`).
-  const reply = useCommentComposer(dealId, {
-    fallbackFocusRef: focusFallbackRef,
-    watch: {
-      comments: list?.comments,
-      isPlaceholder,
-      confirmedIds: confirmedDeletes,
-      signedIn: status === "authenticated",
-    },
-  });
 
-  const threads = list ? sortThreads(buildCommentThreads(list.comments), sort) : undefined;
+  const threads = useMemo(
+    () => (list ? sortThreads(buildCommentThreads(list.comments), sort) : undefined),
+    [list, sort],
+  );
 
   /** 표·답글·삭제 줄 — 답글에는 `답글` 버튼이 없다(깊이 1 — DB 트리거도 같은 제한) */
   const actions = (comment: Comment) => {
@@ -104,25 +101,7 @@ export function CommentSection({
           onSignInRequired={() => onSignInRequired("좋아요·싫어요를 남기려면")}
         />
         {canReply && (
-          <button
-            type="button"
-            className={ACTION_BUTTON}
-            aria-expanded={reply.reply.target?.commentId === comment.id}
-            onClick={(e) => {
-              if (status === "loading") return;
-              if (status === "guest") {
-                onSignInRequired("답글을 달려면");
-                return;
-              }
-              // 누른 버튼을 넘긴다 — 칸이 닫히면 포커스를 여기로 돌려준다
-              reply.reply.open(
-                { commentId: comment.id, nickname: comment.authorNickname },
-                e.currentTarget,
-              );
-            }}
-          >
-            답글
-          </button>
+          <ReplyButton comment={comment} status={status} onSignInRequired={onSignInRequired} />
         )}
         {comment.userId === userId && (
           <button
@@ -140,25 +119,19 @@ export function CommentSection({
 
   return (
     <div className="pt-3.5">
-      {status === "guest" ? (
-        <CommentSignInField
-          placeholder="이 이적, 어떻게 봐요?"
-          onClick={() => onSignInRequired("댓글을 쓰려면")}
-        />
-      ) : (
-        <CommentForm
-          field={root.field}
-          label="댓글 입력"
-          placeholder="이 이적, 어떻게 봐요?"
-          disabled={status === "loading"}
-        />
-      )}
+      <RootComposer
+        dealId={dealId}
+        status={status}
+        onSignInRequired={onSignInRequired}
+        // 등록하면 새 댓글이 맨 위에 오도록 최신순으로 바꾼다
+        onPosted={() => setSort("latest")}
+      />
 
       {/*
         정렬 — 목록을 제자리에서 다시 늘어놓는 선택 토글이라 `aria-pressed`다(이동이 아니므로
         `aria-current`가 아니고, 화살표 키 모델을 구현하지 않으므로 `radiogroup`도 아니다).
       */}
-      {/* gap 16 — 핸드오프는 14인데, 두 버튼의 히트 영역(좌우 8px씩)이 겹치지 않게 2px 넓혔다 */}
+      {/* gap 16 — 두 버튼의 히트 영역(좌우 8px씩)이 겹치지 않는 간격 */}
       <div className="flex gap-4 pb-1 pt-4">
         {SORT_OPTIONS.map((option) => (
           <button
@@ -203,13 +176,25 @@ export function CommentSection({
         </p>
       )}
 
-      {threads && threads.length > 0 && (
-        <ul>
-          {threads.map(({ comment, replies }) => {
-            const replying =
-              reply.reply.target?.commentId === comment.id && status === "authenticated";
-            return (
-              // 구분선은 항목 사이에만 — 정렬 바로 아래 첫 항목에는 없다(handoff §5-1-3)
+      {/*
+        답글 칸은 **섹션이 한 벌** 든다 — 한 번에 한 곳만 열리고, 칸을 닫아도 실패 롤백이 도착한다.
+        대상이 목록에서 사라지면 칸을 닫는 판정도 그 훅이 갖는다(`watch`). 목록이 비어 있어도 마운트해
+        둔다 — 답글을 쓰던 댓글이 지워져 목록이 비면 "삭제됐어요" 안내가 그 훅에서 나온다.
+      */}
+      <ReplyComposerProvider
+        dealId={dealId}
+        fallbackFocusRef={focusFallbackRef}
+        watch={{
+          comments: list?.comments,
+          isPlaceholder,
+          confirmedIds: confirmedDeletes,
+          signedIn: status === "authenticated",
+        }}
+      >
+        {threads && threads.length > 0 && (
+          <ul>
+            {threads.map(({ comment, replies }) => (
+              // 구분선은 항목 사이에만 — 정렬 바로 아래 첫 항목에는 없다
               <li key={comment.id} className="border-t border-hairline-cool first:border-t-0">
                 <CommentItem
                   comment={comment}
@@ -217,41 +202,144 @@ export function CommentSection({
                   nowMs={nowMs}
                   actions={actions(comment)}
                 >
-                  {(replies.length > 0 || replying) && (
-                    // 답글은 본문 칸 안쪽 · 왼쪽 1px 레일(handoff §5-1-4)
-                    <div className="mt-1 border-l border-hairline-cool pl-3">
-                      {replies.length > 0 && (
-                        <ul>
-                          {replies.map((r) => (
-                            <li key={r.id}>
-                              <CommentItem
-                                comment={r}
-                                reply
-                                isMine={r.userId === userId}
-                                nowMs={nowMs}
-                                actions={actions(r)}
-                              />
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      {replying && (
-                        <CommentForm
-                          field={reply.field}
-                          label={`${comment.authorNickname}님에게 답글 입력`}
-                          placeholder={`${comment.authorNickname}님에게 답글`}
-                          onCancel={reply.reply.close}
-                          className="mb-1.5 mt-2"
-                        />
-                      )}
-                    </div>
-                  )}
+                  <ReplyArea
+                    comment={comment}
+                    replies={replies}
+                    status={status}
+                    userId={userId}
+                    nowMs={nowMs}
+                    actions={actions}
+                  />
                 </CommentItem>
               </li>
-            );
-          })}
+            ))}
+          </ul>
+        )}
+      </ReplyComposerProvider>
+    </div>
+  );
+}
+
+/**
+ * 루트 입력칸 — 입력값 state를 **여기** 가둔다(글자마다 이 컴포넌트만 다시 그린다).
+ * ⚠ 비로그인·복원 중에도 훅을 마운트해 둔다 — 로그인이 확정된 뒤에 만들면 그 사이 진행 중이던
+ *   뮤테이션의 옵저버(실패 롤백)가 사라진다. 그리는 것만 세션으로 가른다.
+ */
+function RootComposer({
+  dealId,
+  status,
+  onSignInRequired,
+  onPosted,
+}: {
+  dealId: number;
+  status: SessionStatus;
+  onSignInRequired: (action: string) => void;
+  onPosted: () => void;
+}) {
+  const root = useCommentComposer(dealId, { onPosted });
+
+  if (status === "guest") {
+    return (
+      <CommentSignInField
+        placeholder={PLACEHOLDER}
+        onClick={() => onSignInRequired("댓글을 쓰려면")}
+      />
+    );
+  }
+  return (
+    <CommentForm
+      field={root.field}
+      label="댓글 입력"
+      placeholder={PLACEHOLDER}
+      disabled={status === "loading"}
+    />
+  );
+}
+
+/** `답글` 버튼 — 답글 대상만 컨텍스트로 읽는다(칸을 여닫을 때만 다시 그려진다) */
+function ReplyButton({
+  comment,
+  status,
+  onSignInRequired,
+}: {
+  comment: Comment;
+  status: SessionStatus;
+  onSignInRequired: (action: string) => void;
+}) {
+  const { targetId, open } = useReplyTarget();
+  return (
+    <button
+      type="button"
+      className={ACTION_BUTTON}
+      aria-expanded={targetId === comment.id}
+      onClick={(e) => {
+        if (status === "loading") return;
+        if (status === "guest") {
+          onSignInRequired("답글을 달려면");
+          return;
+        }
+        // 누른 버튼을 넘긴다 — 칸이 닫히면 포커스를 여기로 돌려준다
+        open({ commentId: comment.id, nickname: comment.authorNickname }, e.currentTarget);
+      }}
+    >
+      답글
+    </button>
+  );
+}
+
+/** 답글 목록과 답글 입력칸 — 본문 칸 안쪽 · 왼쪽 1px 레일. 둘 다 없으면 아무것도 그리지 않는다 */
+function ReplyArea({
+  comment,
+  replies,
+  status,
+  userId,
+  nowMs,
+  actions,
+}: {
+  comment: Comment;
+  replies: Thread["replies"];
+  status: SessionStatus;
+  userId: string | undefined;
+  nowMs: number | null;
+  actions: (comment: Comment) => ReactNode;
+}) {
+  const { targetId } = useReplyTarget();
+  const replying = targetId === comment.id && status === "authenticated";
+  if (replies.length === 0 && !replying) return null;
+
+  return (
+    <div className="mt-1 border-l border-hairline-cool pl-3">
+      {replies.length > 0 && (
+        <ul>
+          {replies.map((r) => (
+            <li key={r.id}>
+              <CommentItem
+                comment={r}
+                reply
+                isMine={r.userId === userId}
+                nowMs={nowMs}
+                actions={actions(r)}
+              />
+            </li>
+          ))}
         </ul>
       )}
+      {replying && <ReplyForm nickname={comment.authorNickname} />}
     </div>
+  );
+}
+
+/** 답글 입력칸 — 입력값(`field`)은 이 컴포넌트만 읽는다(글자마다 여기만 다시 그려진다) */
+function ReplyForm({ nickname }: { nickname: string }) {
+  const field = useReplyField();
+  const { close } = useReplyTarget();
+  return (
+    <CommentForm
+      field={field}
+      label={`${nickname}님에게 답글 입력`}
+      placeholder={`${nickname}님에게 답글`}
+      onCancel={close}
+      className="mb-1.5 mt-2"
+    />
   );
 }
