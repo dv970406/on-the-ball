@@ -439,8 +439,9 @@ export async function runJudgements(supabase, needs, { apiKey, names, limit = JU
         out.warnings.push("판정 API 한도 초과 — 남은 행은 다음 실행으로 넘긴다");
         break;
       }
-      // 계정 사용 한도(400 "usage limits")도 남은 행이 전부 같은 결과다 — 곧바로 거부될 호출을 이어 보내지 않는다
-      if (e instanceof Anthropic.APIError && e.status === 400 && /usage limit/iu.test(e.message)) {
+      // 계정 사용 한도(400 "usage limits")·크레딧 소진(400 "credit balance is too low")도 남은 행이 전부 같은 결과다 —
+      // 곧바로 거부될 호출을 이어 보내지 않는다. 크레딧 소진을 빠뜨렸더니 한 실행이 546건을 전부 부르고 전부 거부당했다.
+      if (e instanceof Anthropic.APIError && e.status === 400 && /usage limit|credit balance/iu.test(e.message)) {
         out.failed += 1;
         out.warnings.push(`판정 API 계정 사용 한도에 닿았다 — 남은 ${batch.length - i - 1}건은 다음 실행으로 넘긴다: ${e.message.slice(0, 160)}`);
         break;

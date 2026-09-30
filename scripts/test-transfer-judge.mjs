@@ -294,6 +294,11 @@ const noLookup = async () => ({ wikidataId: null, nameKo: null });
   const db = fakeDb();
   const r = await runJudgements(db, [1, 2, 3].map((id) => ({ id, playerKey: "david alaba", player: "David Alaba", body: BODY })), { names, corrections: {}, lookup: noLookup, client });
   check("사용 한도 — 첫 거부에서 멈추고 나머지를 부르지 않는다", calls === 1 && db.writes.length === 0 && r.warnings.some((w) => w.includes("사용 한도")));
+  // 크레딧 소진도 같은 취급이다(문구만 다르다)
+  let creditCalls = 0;
+  const broke = { messages: { create: async () => { creditCalls += 1; throw new Anthropic.BadRequestError(400, { type: "error", error: { type: "invalid_request_error", message: "Your credit balance is too low to access the Anthropic API." } }, "Your credit balance is too low to access the Anthropic API.", new Headers()); } } };
+  const r2 = await runJudgements(fakeDb(), [1, 2, 3].map((id) => ({ id, playerKey: "david alaba", player: "David Alaba", body: BODY })), { names, corrections: {}, lookup: noLookup, client: broke });
+  check("크레딧 소진 — 첫 거부에서 멈춘다", creditCalls === 1 && r2.warnings.some((w) => w.includes("사용 한도")));
 }
 
 console.log(`\nLLM 판정 ${pass}/${pass + fail} 통과`);
