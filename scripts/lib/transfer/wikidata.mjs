@@ -138,6 +138,42 @@ export function toHits(search) {
     .map((s) => ({ id: s.id, texts: [s.label, s.match?.text].filter((t) => typeof t === "string") }));
 }
 
+/** 시각 한정자(P580 시작 · P582 종료)의 값 — "+2023-08-12T00:00:00Z". 값이 없는 한정자(somevalue)도 "있다"로 본다 */
+const qualifierTime = (claim, prop) => {
+  const q = claim?.qualifiers?.[prop]?.[0];
+  return q ? (q.datavalue?.value?.time ?? "") : null;
+};
+
+/**
+ * 현 소속 구단 — 소속팀(P54) 중 **종료일(P582)이 없는 축구 클럽**(국가대표팀·여자팀·유스팀은 P31이 다르다) 가운데 시작일(P580)이
+ * 가장 늦은 것. 임대 중이면 임대 구단이 뽑힌다(시작이 더 늦다). 우선 순위(rank=preferred)가 있으면 그것이 먼저다.
+ * 종료일 없는 클럽 항목이 하나도 없으면 `null` — 기록이 들쭉날쭉한 항목에서 옛 소속을 지어내지 않는다.
+ * @param {object} playerEntity wbgetentities의 선수 항목(claims 포함)
+ * @param {Record<string, object>} teams P54가 가리키는 항목들(labels·claims)
+ * @returns {{ wikidataId: string, nameEn: string | null, nameKo: string | null } | null}
+ */
+export function pickCurrentClub(playerEntity, teams) {
+  const open = (playerEntity?.claims?.P54 ?? [])
+    .filter((c) => c?.rank !== "deprecated" && typeof c?.mainsnak?.datavalue?.value?.id === "string" && qualifierTime(c, "P582") === null)
+    .map((c) => ({ id: c.mainsnak.datavalue.value.id, start: qualifierTime(c, "P580") ?? "", preferred: c.rank === "preferred" }))
+    .filter((c) => claimIds(teams[c.id], "P31").includes(FOOTBALL_CLUB));
+  if (!open.length) return null;
+  open.sort((a, b) => Number(b.preferred) - Number(a.preferred) || b.start.localeCompare(a.start));
+  const team = teams[open[0].id];
+  const en = team?.labels?.en?.value;
+  return { wikidataId: open[0].id, nameEn: typeof en === "string" ? en.trim() : null, nameKo: koLabel(team) };
+}
+
+/** 선수 항목 id → 현 소속 구단(`pickCurrentClub`). 네트워크·HTTP 오류는 던진다(호출부가 캐시하지 않는다) */
+export async function currentClubOf(playerId, fetchImpl = fetch) {
+  const got = await getJson({ action: "wbgetentities", ids: playerId, props: "claims" }, fetchImpl);
+  const player = got.entities?.[playerId];
+  const ids = [...new Set((player?.claims?.P54 ?? []).filter((c) => qualifierTime(c, "P582") === null).map((c) => c?.mainsnak?.datavalue?.value?.id).filter((id) => typeof id === "string"))].slice(0, 20);
+  if (!ids.length) return null;
+  const teams = await getJson({ action: "wbgetentities", ids: ids.join("|"), props: "labels|claims", languages: "en|ko" }, fetchImpl);
+  return pickCurrentClub(player, teams.entities ?? {});
+}
+
 async function getJson(params, fetchImpl) {
   const url = `${API}?${new URLSearchParams({ format: "json", ...params })}`;
   const res = await fetchImpl(url, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(TIMEOUT_MS) });

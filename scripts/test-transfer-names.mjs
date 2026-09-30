@@ -3,8 +3,8 @@
  *
  *   node scripts/test-transfer-names.mjs
  */
-import { RECHECK_MS, createNameBook, missingNames, shortClubName } from "./lib/transfer/names-ko.mjs";
-import { koLabel, lookupKo, normalizeName, pickEntity, toHits } from "./lib/transfer/wikidata.mjs";
+import { CLUB_RECHECK_MS, RECHECK_MS, canonicalClubName, createNameBook, missingNames, shortClubName } from "./lib/transfer/names-ko.mjs";
+import { koLabel, lookupKo, normalizeName, pickCurrentClub, pickEntity, toHits } from "./lib/transfer/wikidata.mjs";
 
 let pass = 0;
 let fail = 0;
@@ -136,6 +136,29 @@ const need = missingNames([
 ], book, NOW);
 check("딜의 선수·구단 중 빠진 것만, 중복 없이",
   eq(need, [{ kind: "player", key: "john doe", name: "John Doe" }, { kind: "club", key: "Kolkheti 1913", name: "Kolkheti 1913" }]), JSON.stringify(need));
+
+// ── 현 소속 구단(P54) — 종료일 없는 축구 클럽 중 시작이 가장 늦은 것 ────────────────────
+const team = (id, en, ko, p31 = "Q476028") => ({ labels: { en: { value: en }, ko: { value: ko } }, claims: { P31: [claim(p31)] } });
+const p54 = (id, { start, end, rank } = {}) => ({
+  rank: rank ?? "normal",
+  mainsnak: { datavalue: { value: { id } } },
+  qualifiers: { ...(start ? { P580: [{ datavalue: { value: { time: start } } }] } : {}), ...(end === undefined ? {} : { P582: [end ? { datavalue: { value: { time: end } } } : {}] }) },
+});
+const TEAMS = { Q10: team("Q10", "Tottenham Hotspur F.C.", "토트넘 홋스퍼 FC"), Q11: team("Q11", "FC Bayern Munich", "FC 바이에른 뮌헨"), Q12: team("Q12", "England national football team", "잉글랜드 축구 국가대표팀", "Q6979593"), Q13: team("Q13", "Loan Town", "론 타운") };
+const kane = { claims: { P54: [p54("Q10", { start: "+2009-01-01T00:00:00Z", end: "+2023-08-12T00:00:00Z" }), p54("Q11", { start: "+2023-08-12T00:00:00Z" }), p54("Q12", { start: "+2015-03-27T00:00:00Z" })] } };
+check("현 소속 — 종료된 소속·국가대표팀을 빼고 남은 클럽", eq(pickCurrentClub(kane, TEAMS), { wikidataId: "Q11", nameEn: "FC Bayern Munich", nameKo: "FC 바이에른 뮌헨" }));
+check("현 소속 — 임대 중이면 시작이 더 늦은 임대 구단", pickCurrentClub({ claims: { P54: [p54("Q11", { start: "+2023-08-12T00:00:00Z" }), p54("Q13", { start: "+2026-01-10T00:00:00Z" })] } }, TEAMS)?.wikidataId === "Q13");
+check("현 소속 — 값 없는 종료일(somevalue)도 끝난 소속이다", pickCurrentClub({ claims: { P54: [p54("Q11", { start: "+2023-08-12T00:00:00Z", end: null })] } }, TEAMS) === null);
+check("현 소속 — 종료일 없는 클럽이 하나도 없으면 null(지어내지 않는다)", pickCurrentClub({ claims: { P54: [p54("Q10", { end: "+2023-08-12T00:00:00Z" })] } }, TEAMS) === null && pickCurrentClub({ claims: {} }, TEAMS) === null);
+check("현 소속 — 우선 순위(preferred)가 시작일보다 먼저다", pickCurrentClub({ claims: { P54: [p54("Q11", { start: "+2020-01-01T00:00:00Z", rank: "preferred" }), p54("Q13", { start: "+2026-01-10T00:00:00Z" })] } }, TEAMS)?.wikidataId === "Q11");
+check("정규명 — 위키데이터 레이블이 구단 사전 별칭으로 풀리면 정규명, 아니면 레이블 그대로", canonicalClubName("FC Bayern Munich") === "Bayern Munich" && canonicalClubName("Kolkheti 1913") === "Kolkheti 1913");
+const clubBook = createNameBook({ cache: [
+  { kind: "player_club", key: "harry kane", name_en: "Bayern Munich", name_ko: null, wikidata_id: "Q11", checked_at: new Date(NOW - 86_400_000).toISOString() },
+  { kind: "player_club", key: "finn jeltsch", name_en: "Finn Jeltsch", name_ko: null, wikidata_id: null, checked_at: new Date(NOW - 86_400_000).toISOString() },
+  { kind: "player_club", key: "old man", name_en: "Old Club", name_ko: null, wikidata_id: "Q99", checked_at: new Date(NOW - CLUB_RECHECK_MS - 1).toISOString() },
+] });
+check("사전 — 현 소속은 찾은 행만 값이고, 못 찾은 행·없는 행은 null", clubBook.currentClub("harry kane") === "Bayern Munich" && clubBook.currentClub("finn jeltsch") === null && clubBook.currentClub("nobody") === null);
+check("사전 — 조회 대상: 없는 행·재확인 주기가 지난 행(찾았어도 소속은 바뀐다), 최근 행은 아니다", clubBook.needsClubLookup("nobody", NOW) && clubBook.needsClubLookup("old man", NOW) && !clubBook.needsClubLookup("harry kane", NOW) && !clubBook.needsClubLookup("finn jeltsch", NOW));
 
 console.log(`\n이름 사전 ${pass}/${pass + fail} 통과`);
 if (fail) process.exit(1);

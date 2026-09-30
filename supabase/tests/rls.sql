@@ -1376,6 +1376,12 @@ insert into public.transfer_name_ko (kind, key, name_en) values ('coach', 'x', '
 rollback to s;
 
 savepoint s;
+\echo '[t 기대] 현 소속 캐시(player_club — 20260930000002): key는 선수 키, name_en은 구단 정규명, wikidata_id는 구단 항목'
+insert into public.transfer_name_ko (kind, key, name_en, wikidata_id) values ('player_club', 'rlstest player', 'Rlstest Club', 'Q2');
+select count(*) = 1 from public.transfer_name_ko where kind = 'player_club' and key = 'rlstest player' and name_ko is null;
+rollback to s;
+
+savepoint s;
 \echo '[❌차단] 출처 없는 한국어 표기 — 사람이 고친 값은 JSON에 둔다(여기는 위키데이터 캐시다)'
 insert into public.transfer_name_ko (kind, key, name_en, name_ko) values ('club', 'rlstest club', 'Rlstest Club', '알엘에스');
 rollback to s;

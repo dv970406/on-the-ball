@@ -141,10 +141,34 @@ const CASES = [
     want: "official",
   },
   {
-    name: "규칙의 결렬은 LLM 단계가 협상이라고 해도 그대로다(완료·확정만 뒤집는다)",
+    name: "단계 — 그 선수에 대한 LLM 판정이 있으면 규칙 단계(결렬)가 아니라 판정의 단계(협상)다(판정자는 전문을, 규칙은 발췌를 읽는다)",
     rows: [row("John Doe deal with Chelsea has collapsed. Chelsea agree deal for John Doe.", { stage: "collapsed", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_stage: "talks", summary_ko: "요약" })],
     expect: (r) => r.deals[0].stage,
-    want: "collapsed",
+    want: "talks",
+  },
+  {
+    name: "단계 — 재계약 합의 제목을 규칙이 agreement로 읽어도 판정이 부인이면 부인이다(운영: 케인 '합의 임박')",
+    rows: [row("John Doe makes feelings clear on Chelsea return as agreement 'close'. John Doe moved to Bayern from Chelsea three years ago.", { stage: "agreement", players: [], verdict: "move", verdict_player: "john doe", verdict_player_name: "John Doe", verdict_at: "2026-09-24T00:00:00Z", verdict_from: "Bayern Munich", verdict_stage: "denied", summary_ko: "요약" })],
+    expect: (r) => [r.deals[0]?.stage, r.deals[0]?.from_club_code, r.deals[0]?.to_club_code],
+    want: ["denied", "bayern-munchen", null],
+  },
+  {
+    name: "방향 — 같은 구단이 양쪽에 오면 표가 많은 쪽만 믿는다(LLM 출발 8표 vs 규칙의 약한 행선지 문형 'at X' 1표 → 출발)",
+    rows: [row("John Doe is settled at Bayern and has no plans to leave.", { stage: "rumour", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_from: "Bayern Munich", verdict_stage: "denied", summary_ko: "요약" })],
+    expect: (r) => [r.deals[0]?.from_club_code, r.deals[0]?.to_club_code],
+    want: ["bayern-munchen", null],
+  },
+  {
+    name: "방향 — 동률이면 둘 다 버린다(전과 같다)",
+    rows: [row("John Doe signs for Chelsea. John Doe's parent club Chelsea want him back.", { stage: "rumour" })],
+    expect: (r) => r.deals[0] ? [r.deals[0].from_club_code, r.deals[0].to_club_code] : r.skipped,
+    want: { "구단 미확인": 1 },
+  },
+  {
+    name: "단계 — 판정이 아직 없는 행은 규칙 단계다(판정이 오면 다음 파생이 바꾼다)",
+    rows: [row("Chelsea agree deal for John Doe from Benfica.", { stage: "agreement" })],
+    expect: (r) => r.deals[0].stage,
+    want: "agreement",
   },
   {
     name: "공식 발표는 그 뒤 어떤 보도도 뒤집지 않는다",
@@ -358,6 +382,18 @@ const CASES = [
   },
 ];
 
+// ── 출발 구단 폴백 — 보도가 소속을 말하지 않으면 현 소속 캐시(player_club)를 쓴다 ──
+const clubCache = (club) => [{ kind: "player_club", key: "john doe", name_en: club, name_ko: null, wikidata_id: "Q9", checked_at: "2026-09-24T00:00:00Z" }];
+const withClub = (rows, cache) => deriveDeals(rows, { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: DICT, cache }) });
+const FALLBACK = {
+  used: withClub([row("Chelsea want John Doe and he could join Chelsea in January.", { stage: "rumour" })], clubCache("Bayern Munich")),
+  sameAsTo: withClub([row("Chelsea want John Doe and he could join Chelsea in January.", { stage: "rumour" })], clubCache("Chelsea")),
+  free: withClub([row("Chelsea are keen on free agent John Doe.", { stage: "rumour" })], clubCache("Bayern Munich")),
+  notFound: withClub([row("Chelsea are keen on John Doe and could make a bid in January.", { stage: "rumour" })], [{ kind: "player_club", key: "john doe", name_en: "John Doe", name_ko: null, wikidata_id: null, checked_at: "2026-09-24T00:00:00Z" }]),
+  stale: withClub([row("Chelsea are keen on John Doe and could make a bid in January.", { stage: "rumour" })], [{ kind: "player_club", key: "john doe", name_en: "John Doe", name_ko: null, wikidata_id: null, checked_at: "2026-08-01T00:00:00Z" }]),
+  reported: withClub([row("John Doe could join Chelsea from Bayern in January.", { stage: "rumour" })], clubCache("Benfica")),
+};
+
 // ── 검증 게이트 — 확인된 선수의 딜만 만든다 ──
 const gated = (rows, cache = []) =>
   deriveDeals(rows, { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: DICT, cache }), requireVerified: true });
@@ -404,7 +440,7 @@ const VERDICT = {
   unnamedOutside: judged([row("Galatasaray agree deal to sign a striker from Al Hilal.", { stage: "agreement", players: [] })]),
   unnamedJudged: judged([row("Johan Manzambi addresses rumours after €70m Aston Villa transfer from Freiburg.", { stage: "rumour", players: [], verdict: "move", verdict_player: "john doe", verdict_player_name: "John Doe", verdict_at: "2026-09-24T00:00:00Z", verdict_from: "SC Freiburg", verdict_to: "Aston Villa", verdict_stage: "official" })]),
   unnamedNotMove: judged([row("Aston Villa announce record revenues.", { stage: "official", players: [], verdict: "not_move", verdict_player: null, verdict_at: "2026-09-24T00:00:00Z" })]),
-  // 규칙이 그 선수의 단계를 못 읽은 문장은 LLM 단계를 쓴다
+  // 판정이 있는 행은 LLM 단계다(다선수 기사에서 규칙이 그 선수의 단계를 못 읽는 경우가 대표적)
   llmStage: judged([row("Chelsea have been told the price for John Doe by Benfica, with Jane Roe also mentioned.", { stage: "offer", players: ["John Doe", "Jane Roe"], verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_to: "Chelsea", verdict_stage: "talks" })]),
   // 관심 구단이 여럿 — 행선지 밖 구단이 suitor_codes로 모인다
   suitorsOnly: judged([row("Arsenal and Brighton are monitoring Sturm Graz midfielder John Doe.", { stage: "rumour", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", summary_ko: "요약", verdict_from: "Sturm Graz", verdict_to: null, verdict_suitors: ["Arsenal", "Brighton"] })]),
@@ -477,11 +513,16 @@ const UNIT = [
   { name: "선수 없음 — 5대 리그 구단이 언급된 보도는 선수까지 LLM에 묻는다(playerKey null · 언급 구단 동봉)", got: [VERDICT.unnamed.judgeNeeds.length, VERDICT.unnamed.judgeNeeds[0]?.playerKey, VERDICT.unnamed.judgeNeeds[0]?.clubs.sort(), VERDICT.unnamed.skipped["선수 없음(판정 대기)"]], want: [1, null, ["Aston Villa", "SC Freiburg"], 1] },
   { name: "선수 없음 — 5대 리그 구단이 없으면 묻지 않는다", got: [VERDICT.unnamedOutside.judgeNeeds.length, VERDICT.unnamedOutside.skipped["선수 없음"]], want: [0, 1] },
   { name: "선수 없음 — 관문을 켜지 않으면 그냥 건너뛴다(기존 동작)", got: derive([row("Chelsea sign someone from Benfica.", { players: [] })]).skipped["선수 없음"], want: 1 },
-  { name: "선수 없음 — LLM이 읽은 선수(verdict_player_name)로 딜이 묶이고 LLM 단계·구단을 쓴다", got: pick(VERDICT.unnamedJudged.deals[0] ?? {}, ["player", "from_club_code", "to_club_code", "stage"]), want: { player: "John Doe", from_club_code: "sc-freiburg", to_club_code: "aston-villa", stage: "rumour" } },
+  { name: "선수 없음 — LLM이 읽은 선수(verdict_player_name)로 딜이 묶이고 LLM 단계·구단을 쓴다", got: pick(VERDICT.unnamedJudged.deals[0] ?? {}, ["player", "from_club_code", "to_club_code", "stage"]), want: { player: "John Doe", from_club_code: "sc-freiburg", to_club_code: "aston-villa", stage: "official" } },
   { name: "선수 없음 — 이동 아님으로 판정된 보도는 다시 묻지 않는다", got: [VERDICT.unnamedNotMove.judgeNeeds.length, VERDICT.unnamedNotMove.deals.length], want: [0, 0] },
   { name: "단계 — 다선수 기사에서 규칙이 그 선수의 단계를 못 읽으면 LLM 단계(talks)를 쓴다", got: [VERDICT.llmStage.deals[0]?.stage, VERDICT.llmStage.skipped["그 선수의 단계 없음"] ?? 0], want: ["talks", 0] },
   { name: "관심 구단 — 행선지는 최신 보도(2배)의 브라이턴, 나머지가 표 순으로 suitorCodes에 모이고 구단 행도 만든다", got: [VERDICT.suitors.deals[0]?.to_club_code, VERDICT.suitors.deals[0]?.suitorCodes, VERDICT.suitors.clubs.map((c) => c.code).sort()], want: ["brighton-hove", ["aston-villa", "arsenal"], ["arsenal", "aston-villa", "brighton-hove", "sturm-graz"]] },
   { name: "관심 구단 — 행선지 없이 관심 구단만 있는 루머(비5대 리그 소속, 5대 리그 구단들이 관심)도 딜이고 이름 조회 대상에 관심 구단이 든다", got: [VERDICT.suitorsOnly.deals[0]?.to_club_code ?? null, VERDICT.suitorsOnly.deals[0]?.suitorCodes, VERDICT.suitorsOnly.nameNeeds[0]?.suitorCanonicals], want: [null, ["arsenal", "brighton-hove"], ["Arsenal", "Brighton"]] },
+  { name: "폴백 — 보도에 소속이 없으면 현 소속 캐시가 출발 구단이다(행선지는 그대로)", got: [FALLBACK.used.deals[0]?.from_club_code, FALLBACK.used.deals[0]?.to_club_code, FALLBACK.used.fromFallback, FALLBACK.used.clubNeeds.length], want: ["bayern-munchen", "chelsea", 1, 0] },
+  { name: "폴백 — 현 소속이 행선지와 같으면(이미 옮긴 뒤의 기록) 쓰지 않는다", got: [FALLBACK.sameAsTo.deals[0]?.from_club_code ?? null, FALLBACK.sameAsTo.deals[0]?.to_club_code, FALLBACK.sameAsTo.fromFallback], want: [null, "chelsea", 0] },
+  { name: "폴백 — 자유계약이면 소속이 없으니 쓰지 않는다", got: [FALLBACK.free.deals[0]?.from_club_code ?? null, FALLBACK.free.fromFallback, FALLBACK.free.clubNeeds.length], want: [null, 0, 0] },
+  { name: "폴백 — 캐시가 없거나 못 찾은 채 오래됐으면 조회 대상이고, 최근에 못 찾았으면 다시 묻지 않는다", got: [FALLBACK.notFound.clubNeeds.length, FALLBACK.stale.clubNeeds.map((n) => n.playerKey)], want: [0, ["john doe"]] },
+  { name: "폴백 — 보도가 소속을 말하면 그쪽이 먼저다(캐시의 벤피카가 아니라 보도의 바이에른)", got: [FALLBACK.reported.deals[0]?.from_club_code, FALLBACK.reported.fromFallback], want: ["bayern-munchen", 0] },
   { name: "게이트 — 사전에도 캐시에도 없는 선수는 딜을 만들지 않고 이름 조회 대상으로 넘긴다", got: [GATE.unknown.deals.length, GATE.unknown.nameNeeds.map((x) => x.playerKey), GATE.unknown.skipped["미확인 선수"], GATE.unknown.clubs.length], want: [0, ["jane roe"], 1, 0] },
   { name: "게이트 — 위키데이터에서 찾은 선수(한국어 표기 없음)는 연다", got: GATE.cached.deals.length, want: 1 },
   { name: "게이트 — 찾아봤지만 없던 이름은 막는다", got: GATE.notFound.deals.length, want: 0 },

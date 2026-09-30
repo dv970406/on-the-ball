@@ -14,13 +14,18 @@
  */
 import { readFileSync } from "node:fs";
 import { clubDisplay } from "./club-display.mjs";
-import { lookupKo } from "./wikidata.mjs";
+import { detectClubs, isKnownClub } from "./clubs.mjs";
+import { currentClubOf, lookupKo } from "./wikidata.mjs";
 
 export const NAME_TABLE = "transfer_name_ko";
 /** 찾지 못한 이름을 다시 찾기까지 — 위키데이터에 표기가 새로 생긴다 */
 export const RECHECK_MS = 30 * 86_400_000;
 /** 한 번 실행의 조회 상한 — 백필이 한 시간에 몰리지 않게 한다(이름 하나에 요청 두 번). 남은 이름은 다음 실행이 찾는다 */
 export const LOOKUP_MAX_PER_RUN = 60;
+/** 현 소속(P54) 재확인 주기 — 창이 열리면 소속이 바뀌므로 이름 표기(30일)보다 짧다 */
+export const CLUB_RECHECK_MS = 14 * 86_400_000;
+/** 실행당 현 소속 조회 상한 — 출발 구단이 빈 딜의 선수만 대상이라 많지 않다 */
+export const CLUB_LOOKUP_MAX_PER_RUN = 20;
 
 function readJson(rel) {
   const url = new URL(rel, import.meta.url);
@@ -70,6 +75,19 @@ export function createNameBook({ players = {}, clubs = {}, cache = [] } = {}) {
     isVerifiedClub: (canonical) => Boolean(cached.get(`club:${canonical}`)?.wikidata_id),
     /** 캐시 행 그대로(있으면) — 캐시에 덧쓸 때 기존 값을 보존하는 데 쓴다 */
     entry: (kind, key) => cached.get(`${kind}:${key}`) ?? null,
+    /**
+     * 현 소속 구단(정규 영문명) — 자동 캐시(위키데이터 P54, `kind = 'player_club'`). 기사가 소속을 말하지 않을 때 파생이
+     * 출발 구단으로 쓴다. 찾지 못한 행(wikidata_id null)은 없는 것이다.
+     */
+    currentClub: (key) => {
+      const row = cached.get(`player_club:${key}`);
+      return row?.wikidata_id ? row.name_en : null;
+    },
+    /** 현 소속을 지금 찾아야 하는가 — 캐시가 없거나 `CLUB_RECHECK_MS`가 지났다(찾지 못한 행도 그때 다시 본다) */
+    needsClubLookup: (key, nowMs) => {
+      const row = cached.get(`player_club:${key}`);
+      return !row || nowMs - Date.parse(row.checked_at) >= CLUB_RECHECK_MS;
+    },
     /** 사람이 적은 선수 정보(포지션·생년·국적) — 자동 캐시에는 없다 */
     playerInfo: (key) => players[key] ?? null,
     /** 구단 표기 — `{ name, short }`. 프리셋 구단은 프리셋, 아니면 사람 → 캐시. 없으면 `null`(영문 그대로) */
@@ -137,6 +155,56 @@ export function missingNames(deals, book, nowMs) {
     }
   }
   return [...out.values()];
+}
+
+/** 위키데이터 구단 레이블 → 구단 사전의 정규명(별칭이 하나로 풀리면), 아니면 레이블 그대로(사전 밖 구단 — LLM 경로와 같은 취급) */
+export function canonicalClubName(label) {
+  const hits = detectClubs(label);
+  return hits.length === 1 ? hits[0] : label.trim();
+}
+
+/**
+ * 선수의 현 소속 구단을 위키데이터(P54)에서 찾아 캐시에 쓴다 — 출발 구단 폴백의 원천(`derive-deals.mjs`).
+ * `kind = 'player_club'`, key = 선수 키, name_en = 구단 정규 영문명, wikidata_id = 구단 항목. 찾지 못한 선수도 쓴다
+ * (wikidata_id null · name_en은 선수 이름으로 자리를 채운다 — 매시 다시 찾지 않게, `CLUB_RECHECK_MS` 뒤 재확인).
+ * 사전 밖 구단은 구단 캐시 행(`kind = 'club'`)도 함께 써서 화면이 한국어로 그린다. 항목 id가 없는 선수(사람 사전만)는 먼저 찾는다.
+ * ⚠ 네트워크·HTTP 오류가 난 선수는 쓰지 않는다 — 다음 실행이 다시 찾는다.
+ * @param {{ playerKey: string, player: string, wikidataId: string | null }[]} needs
+ */
+export async function lookupCurrentClubs(supabase, needs, { fetchImpl = fetch, limit = CLUB_LOOKUP_MAX_PER_RUN, book } = {}) {
+  const out = { tried: 0, found: 0, notFound: 0, failed: 0, warnings: [] };
+  const rows = [];
+  const now = new Date().toISOString();
+  for (const n of needs.slice(0, limit)) {
+    out.tried += 1;
+    try {
+      const qid = n.wikidataId ?? (await lookupKo(n.player, "player", fetchImpl)).wikidataId;
+      const club = qid ? await currentClubOf(qid, fetchImpl) : null;
+      if (club?.nameEn) {
+        const canonical = canonicalClubName(club.nameEn);
+        rows.push({ kind: "player_club", key: n.playerKey, name_en: canonical.slice(0, 120), name_ko: null, wikidata_id: club.wikidataId, source: "wikidata", checked_at: now });
+        if (!isKnownClub(canonical) && !clubDisplay(canonical).league && !book?.entry("club", canonical)?.wikidata_id) {
+          rows.push({ kind: "club", key: canonical, name_en: canonical.slice(0, 120), name_ko: club.nameKo, wikidata_id: club.wikidataId, source: "wikidata", checked_at: now });
+        }
+        out.found += 1;
+      } else {
+        rows.push({ kind: "player_club", key: n.playerKey, name_en: n.player.slice(0, 120), name_ko: null, wikidata_id: null, source: "wikidata", checked_at: now });
+        out.notFound += 1;
+      }
+    } catch (e) {
+      out.failed += 1;
+      out.warnings.push(`현 소속 조회 실패(${n.player}): ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  if (needs.length > limit) out.warnings.push(`현 소속 조회 상한(${limit}) — 남은 ${needs.length - limit}명은 다음 실행이 찾는다`);
+  if (rows.length) {
+    const { error } = await supabase.from(NAME_TABLE).upsert(rows, { onConflict: "kind,key" });
+    if (error) {
+      out.warnings.push(`현 소속 캐시 저장 실패: ${error.message}`);
+      out.found = 0;
+    }
+  }
+  return out;
 }
 
 /**

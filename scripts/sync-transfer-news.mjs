@@ -173,10 +173,11 @@ async function derive({ dryRun: summaryOnly, rejudge: again = false }) {
     const stages = Object.entries(s.stages).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(" · ") || "—";
     console.log(`\n딜 파생${summaryOnly ? "(드라이런)" : ""}: 딜 ${s.deals} · 구단 ${s.clubs} · 연결된 보도 ${s.linkedRows}건`);
     console.log(`  단계: ${stages}`);
-    console.log(`  방향 채움 ${s.withDirection}(한쪽이라도 ${s.withAnyClub}) · 이적료 채움 ${s.withFee}`);
+    console.log(`  방향 채움 ${s.withDirection}(한쪽이라도 ${s.withAnyClub}, 출발은 현 소속 폴백 ${s.fromFallback}건) · 이적료 채움 ${s.withFee}`);
     const skipped = Object.entries(r.skipped).map(([k, v]) => `${k} ${v}`).join(" · ");
     if (skipped) console.log(`  건너뜀: ${skipped}`);
     if (r.lookup) console.log(`  이름 사전(위키데이터): 조회 ${r.lookup.tried} · 찾음 ${r.lookup.found} · 없음 ${r.lookup.notFound} · 실패 ${r.lookup.failed}`);
+    if (r.clubLookup) console.log(`  현 소속(위키데이터 P54): 조회 ${r.clubLookup.tried} · 찾음 ${r.clubLookup.found} · 없음 ${r.clubLookup.notFound} · 실패 ${r.clubLookup.failed}`);
     const j = r.judged;
     if (j && "read" in j) {
       console.log(`  LLM 판정·요약 · ${JUDGE_MODEL}: 대상 ${j.read} · 이동 ${j.move}(요약 ${j.summarized}, 요약 버림 ${j.summaryInvalid}) · 아님 ${j.notMove} · 판정 불가 ${j.invalid} · 실패 ${j.failed} · 기사 본문 ${j.articles}(못 받음 ${j.articleMissing})`);

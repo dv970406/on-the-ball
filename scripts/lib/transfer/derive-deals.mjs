@@ -30,7 +30,7 @@ import { contractText, parseContract } from "./contract.mjs";
 import { DEST, FORMER, FROM, LEFT_FREE, SUITOR_FROM, addVotes, collectVotes, topVote } from "./direction.mjs";
 import { extractTransfer } from "./extract.mjs";
 import { JUDGE_RETRY_MS, SUMMARY_RETRY_WINDOW_MS } from "./judge.mjs";
-import { createNameBook, loadGlossary, loadNameBook, loadPlayerDictionary, lookupAndCache, missingNames } from "./names-ko.mjs";
+import { createNameBook, loadGlossary, loadNameBook, loadPlayerDictionary, lookupAndCache, lookupCurrentClubs, missingNames } from "./names-ko.mjs";
 import { RANK, RENEWAL, cleanBody, isDead, isRoundup, isRoundupItem, mentionRe, sentencesOf } from "./story.mjs";
 import { normalizePlayer } from "./player-key.mjs";
 
@@ -215,26 +215,29 @@ function displayName(rows, key) {
 }
 
 /**
- * 그 선수에게 해당하는 단계 — 추출기가 그 선수만 잡은 행이 아니면 선수가 나오는 문장만으로 다시 판정한다
- * (곁들여 나온 선수가 기사 주인공의 단계를 받는 것을 막는다). 규칙이 못 읽으면 그 선수에 대한 LLM 판정의 단계를 쓴다.
+ * 그 선수에게 해당하는 단계.
+ *
+ * **그 선수에 대한 LLM 판정이 있으면 그 판정의 단계다.** 판정자는 기사 전문을 읽고(매체 RSS는 본문을 받아 보낸다),
+ * 규칙은 저장된 발췌(제목 + 두 줄)의 낱말을 읽는다 — 재계약 합의("agreement 'close'")를 합의 단계로, 영입 문의를 제안으로,
+ * 무산된 이적의 회고를 루머로 읽은 규칙 단계가 화면에 그대로 갔다(운영: 보드 딜 51개 중 17개). 특히 규칙이 선수를 못 뽑아
+ * 선수가 판정에서만 온 행은 규칙의 행 단계가 "그 선수의 단계"인 적이 없다.
+ *
+ * 판정이 아직 없는 행(판정 대기·판정 불가)만 규칙이 정한다 — 추출기가 그 선수만 잡은 행이 아니면 선수가 나오는 문장만으로
+ * 다시 판정한다(곁들여 나온 선수가 기사 주인공의 단계를 받는 것을 막는다). 판정이 오면 다음 파생이 그 단계로 바꾼다.
  */
 function stageFor(r, key, mentions, memo) {
-  // 규칙이 "죽었다"고 읽었는데 LLM은 완료·확정이라 하면 LLM을 따른다 — "rejected offers from X to join Y"처럼 다른 구단의 제안을
-  // 거절하고 이적을 완료한 문장에서 규칙의 거절 문형이 결렬로 읽힌다(끝난 이적이 결렬일 수는 없다)
   const llm = verdictOf(r, key) === "move" ? r.verdict_stage : null;
-  const settled = (st) => isDead(st) && (llm === "official" || llm === "here_we_go") ? llm : st;
-  if (playersOf(r).every((p) => mentions.test(p))) return settled(r.stage);
+  if (llm && llm !== "unknown") return llm;
+  if (playersOf(r).every((p) => mentions.test(p))) return r.stage;
   let best = "unknown";
   let dead = null;
   for (const s of memo.sentences(r).filter((x) => mentions.test(x))) {
     const st = memo.extract(s).stage;
-    if (st === "collapsed") return settled("collapsed");
+    if (st === "collapsed") return "collapsed";
     if (st === "denied") dead = "denied";
     if (RANK.indexOf(st) > RANK.indexOf(best)) best = st;
   }
-  if (dead) return settled(dead);
-  if (best === "unknown" && verdictOf(r, key) === "move" && r.verdict_stage && r.verdict_stage !== "unknown") return r.verdict_stage;
-  return best;
+  return dead ?? best;
 }
 
 /** 그 행에서 그 선수의 이적료 — 행의 `fee_*`가 아니라 **선수가 나오는 문장**에서 다시 읽는다(다선수 기사에서 남의 금액이 섞인다) */
@@ -309,9 +312,17 @@ function resolveDirection(items, player, key) {
   const fromClub = freeClub ?? topVote(from);
   const destClub = topVote(dest);
   const isFree = Boolean(freeClub) || anyFreeAgent;
-  // 같은 구단이 양쪽에 오면 어느 쪽도 믿지 않는다
-  const origin = fromClub && fromClub !== destClub ? fromClub : null;
-  const destination = destClub && destClub !== fromClub ? destClub : null;
+  let origin = fromClub;
+  let destination = destClub;
+  // 같은 구단이 양쪽에 오면 **표가 많은 쪽만** 믿는다 — 동률이면 둘 다 버린다. 둘 다 버렸더니 LLM이 읽은 출발 구단(8표)이
+  // 규칙의 약한 행선지 문형("at Bayern" 1표) 하나에 지워져 케인의 출발이 "미확인"이 됐다(운영).
+  if (fromClub && fromClub === destClub) {
+    const fromVotes = (free.get(fromClub) ?? 0) + (from.get(fromClub) ?? 0);
+    const destVotes = dest.get(destClub) ?? 0;
+    if (fromVotes > destVotes) destination = null;
+    else if (destVotes > fromVotes) origin = null;
+    else origin = destination = null;
+  }
   // 소속을 못 읽었으면 전 소속이 출발 구단이다 — 자유 계약("former Real Madrid defender")도 그 구단을 떠나온 것이다
   const formerClub = origin ? null : topVote(former);
   return { from: origin ?? (formerClub && formerClub !== destination ? formerClub : null), to: destination, isFree };
@@ -403,6 +414,9 @@ export function deriveDeals(rows, opts) {
   const unconfirmed = [];
   const nameNeeds = [];
   const judgeNeeds = [];
+  /** 현 소속을 찾아야 할 선수 — 출발 구단이 빈 딜(`lookupCurrentClubs`) */
+  const clubNeeds = [];
+  let fromFallback = 0;
   const mentionedClubs = (sentences) => new Set(sentences.flatMap((s) => memo.extract(s).clubs));
 
   /*
@@ -452,6 +466,19 @@ export function deriveDeals(rows, opts) {
     if (!items.length) continue;
 
     const dir = resolveDirection(items, player, key);
+    /*
+     * 출발 구단 폴백 — 보도가 소속을 말하지 않으면 사전의 현 소속(위키데이터 P54 캐시 — `names.currentClub`)을 쓴다.
+     * 유명 선수의 출발이 "미확인"으로 뜨는 것은 기사가 소속을 굳이 적지 않아서다(케인 — 운영). 자유계약은 소속이 없고,
+     * 행선지와 같은 구단은 이미 옮긴 뒤의 기록이라 쓰지 않는다. 보도가 소속을 말하면(규칙·LLM 표) 그쪽이 먼저다.
+     */
+    let usedFallback = false;
+    if (!dir.from && !dir.isFree) {
+      const current = names.currentClub(key);
+      if (current && current !== dir.to) {
+        dir.from = current;
+        usedFallback = true;
+      }
+    }
     // 재계약·첫 프로 계약 표현이 있고 **옮긴다는 표현이 하나도 없으면** 이적이 아니다("first professional contract" 공지,
     // "Napoli reach agreement to extend X contract"처럼 소속 구단이 행선지로 읽히는 재계약)
     const story = items.flatMap((it) => it.storySentences);
@@ -500,6 +527,11 @@ export function deriveDeals(rows, opts) {
       skip("미확인 선수");
       continue;
     }
+    // 출발 구단이 비었으면(폴백도 없었다) 현 소속을 찾을 대상이다 — 확인된 선수만(항목 id가 있으면 함께 넘긴다)
+    if (!dir.from && !dir.isFree && names.needsClubLookup(key, opts.nowMs)) {
+      clubNeeds.push({ playerKey: key, player, wikidataId: names.entry("player", key)?.wikidata_id ?? null });
+    }
+    if (usedFallback) fromFallback += 1;
     /*
      * LLM 판정 관문 — 새 딜은 "이동" 판정이 한 건 이상 있어야 연다. 아직 묻지 않은(또는 다시 물어야 하는) 보도는
      * `judgeNeeds`로 넘긴다(호출부가 묻고 같은 실행에서 다시 파생한다). 이미 있는 딜은 판정이 없어도 둔다 — 판정이
@@ -576,7 +608,7 @@ export function deriveDeals(rows, opts) {
   if (unverified.length) warnings.push(`확인되지 않은 선수 ${unverified.length}명 — 보드에 올리지 않았다(선수가 맞으면 players-ko.json에 넣는다): ${unverified.join(", ")}`);
   if (missingKo.length) warnings.push(`한국어 표기가 없는 선수 ${missingKo.length}명(사람 사전·위키데이터 모두 없음) — 영문명으로 그려진다: ${missingKo.join(", ")}`);
   deals.sort((a, b) => b.latest_reported_at.localeCompare(a.latest_reported_at));
-  return { deals, clubs: [...clubs.values()], assignments, nameNeeds, judgeNeeds, warnings, skipped, startMs };
+  return { deals, clubs: [...clubs.values()], assignments, nameNeeds, judgeNeeds, clubNeeds, fromFallback, warnings, skipped, startMs };
 }
 
 /** 요약(로그·드라이런) */
@@ -590,6 +622,7 @@ export function summarize(derived) {
     stages,
     withDirection: pct(derived.deals.filter((d) => d.from_club_code && d.to_club_code).length),
     withAnyClub: pct(derived.deals.filter((d) => d.from_club_code || d.to_club_code).length),
+    fromFallback: derived.fromFallback ?? 0,
     withFee: pct(derived.deals.filter((d) => d.fee_amount != null).length),
     linkedRows: derived.assignments.size,
     clubs: derived.clubs.length,
@@ -862,6 +895,22 @@ export async function runDerivation(supabase, opts = {}) {
   if (!opts.dryRun && opts.lookupNames !== false) await lookupMissing();
 
   /*
+   * 출발 구단 폴백 — 보도가 소속을 말하지 않는 딜의 선수는 현 소속을 위키데이터(P54)에서 찾아 캐시하고 **다시 파생**한다
+   * (같은 실행에서 출발 구단이 채워진다). 이름 조회와 같은 모델이다 — 드라이런은 찾지 않고, 실패는 경고다.
+   */
+  let clubLookup = null;
+  const lookupClubs = async () => {
+    if (!derived.clubNeeds.length) return;
+    const r = await lookupCurrentClubs(supabase, derived.clubNeeds, { fetchImpl: opts.fetchImpl, book: names });
+    clubLookup = clubLookup ? { ...r, tried: clubLookup.tried + r.tried, found: clubLookup.found + r.found, notFound: clubLookup.notFound + r.notFound, failed: clubLookup.failed + r.failed, warnings: [...clubLookup.warnings, ...r.warnings] } : r;
+    if (r.found > 0) {
+      names = await loadNameBook(supabase);
+      derived = derive(Boolean(opts.rejudge));
+    }
+  };
+  if (!opts.dryRun && opts.lookupNames !== false) await lookupClubs();
+
+  /*
    * LLM 판정 — 5대 리그 구단이 걸린 후보 중 물어야 할 것만 묻는다(확인된 선수의 딜에 든 보도 + 규칙이 선수를 못 뽑은 보도).
    * 이름 조회 **뒤**에 돈다(조회로 확인된 선수의 보도도 같은 실행에서 판정받게). 결과를 메모리의 행에 입혀 **다시 파생**하고,
    * 모델이 새로 읽은 선수·확인한 구단이 있으면 이름 사전을 다시 읽고 한 번 더 찾는다(그 선수가 같은 실행에서 확인되게).
@@ -875,18 +924,22 @@ export async function runDerivation(supabase, opts = {}) {
     if (judged.namesWritten) names = await loadNameBook(supabase);
     if (judged.updates.length) {
       derived = derive();
-      if (opts.lookupNames !== false) await lookupMissing();
+      if (opts.lookupNames !== false) {
+        await lookupMissing();
+        await lookupClubs();
+      }
     }
   }
 
   const write = opts.dryRun ? null : await writeDeals(supabase, derived, rows, { log });
   return {
     summary: summarize(derived),
-    warnings: [...derived.warnings, ...(lookup?.warnings ?? []), ...(judged?.warnings ?? [])],
+    warnings: [...derived.warnings, ...(lookup?.warnings ?? []), ...(clubLookup?.warnings ?? []), ...(judged?.warnings ?? [])],
     skipped: derived.skipped,
     deals: derived.deals,
     write,
     lookup,
+    clubLookup,
     judged,
   };
 }
