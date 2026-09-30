@@ -2,6 +2,8 @@
  * 항목 단위 귀속 판정 + 여러 소스에 걸친 묶음 키.
  */
 import { createHash } from "node:crypto";
+import { citedOutlet } from "./roundup.mjs";
+import { ITEM_MARK } from "./story.mjs";
 
 /**
  * 이 항목의 저자를 어디까지 믿을 수 있는가.
@@ -44,11 +46,35 @@ export function resolveAttribution(def, item) {
     }
 
     case "rss":
-      return { attribution: "outlet", attributedTo: item.authorHandle, tier: def.tier };
+      // 가십 칼럼에서 나눈 항목 행 — 보도 주체는 칼럼 매체가 아니라 **칼럼이 인용한 신문**이다(`roundup.mjs`).
+      // 칼럼(BBC Sport 피드)의 `outlet`을 물려받으면 타블로이드 이적설이 "BBC 🎖️"로 그려진다.
+      // 괄호를 되읽지 못한 항목만 칼럼 매체로 남긴다(등급은 소스 id로 매겨진다).
+      if (typeof item.externalId === "string" && item.externalId.includes(ITEM_MARK)) {
+        const outlet = citedOutlet(item.text);
+        if (outlet) return { attribution: "cited", attributedTo: outlet, tier: 2 };
+      }
+      return { attribution: "outlet", attributedTo: cleanByline(item.authorHandle), tier: def.tier };
 
     default:
       return null;
   }
+}
+
+/**
+ * RSS byline을 **등재 표기와 맞는 이름 하나**로 다듬는다(`reporters.json`의 `bylines`가 정확 일치라서).
+ * - 가디언은 "Jacob Steinberg in Prague"·"David Hytner at the Fortuna Arena"처럼 발신지를 붙이고 단독 기사에 "Exclusive by "를
+ *   앞세운다 — 그대로 두면 같은 기자의 글이 기사마다 다른 저자로 갈려 등재 등급이 닿지 않는다(운영 실측).
+ * - 공동 byline("Bobby Vincent, Jake Stokes"·"Reuters and Guardian sport")은 **첫 이름**으로 귀속한다 — 취재원은 앞에 적힌 기자의 것이다.
+ * 이름이 아닌 값("Press Association"·매체명)은 그대로 통과한다 — 등재되지 않았으면 화면이 소스 표기로 떨어질 뿐이다.
+ */
+export function cleanByline(byline) {
+  if (typeof byline !== "string") return byline ?? null;
+  const first = byline
+    .replace(/^Exclusive by\s+/iu, "")
+    .split(/\s*,\s*|\s+and\s+/u)[0];
+  // 발신지는 "in Prague"·"at the Fortuna Arena"처럼 대문자 지명(관사 the 허용)으로 시작한다 — 이름 속 소문자 in·van은 걸리지 않는다
+  const cleaned = first.replace(/\s+(?:at|in)\s+(?:the\s+)?[A-Z].*$/u, "").trim();
+  return cleaned || null;
 }
 
 /**

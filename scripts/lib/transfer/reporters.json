@@ -9,7 +9,13 @@
     "credibility: 공신력 등급 — 화면이 출처 옆에 🎖️ 또는 달 5단계(🌑 1 ~ 🌕 5)로 그린다. 🎖️는 오피셜에 육박하는 매체에만 쓰고, 그 밖의 매체와 기자는 모두 달로 매긴다.",
     "  outlets(소스 id → \"medal\" | 1~5)가 먼저, 없으면 journalists(보도 주체 표기 → 1~5). 둘 다 없으면 표시하지 않는다.",
     "  ⚠ 매체는 소스 id로 매긴다 — 'BBC'라는 표기를 BBC Sport와 BBC 이적 가십(타블로이드 루머 모음)이 함께 쓴다.",
-    "  '최근 3일 소식' 캐러셀은 🎖️ 매체와 🌕·🌖(4~5) 기자의 보도만 싣는다. 형식은 test-transfer-extract.mjs가 검사한다."
+    "  '최근 3일 소식' 캐러셀은 🎖️ 매체와 🌕·🌖(4~5) 기자의 보도만 싣는다. 형식은 test-transfer-extract.mjs가 검사한다.",
+    "cited: 가십 칼럼(BBC 이적 가십·스카이 신문 요약)이 인용한 신문 → { ko, credibility }. 항목 행은 attribution = 'cited'이고 attributed_to가 칼럼이 적은 신문 표기(원문 그대로)다.",
+    "  키는 그 표기를 **소문자로 접고 앞의 'the'와 영숫자 아닌 글자를 걷은 것**이다(TeamTalk·Teamtalk → teamtalk, The Sun → sun, L'Equipe → lequipe) — 접는 규칙은 entities/transfer/lib/reporter.ts의 citedKey 하나가 갖는다.",
+    "  credibility는 1~5뿐이다(🎖️ 없음 — 칼럼이 옮겨 적은 글이라 원 보도를 직접 읽은 것이 아니다). 비우면 ko 표기로 credibility.journalists를 찾는다(기자를 인용한 항목). 등재되지 않은 신문은 원문 표기 그대로 그리고 등급은 표시하지 않는다.",
+    "등급의 근거: 커뮤니티 티어표(레딧 구단별 가이드 → 에펨코리아 2023 번역 · The False 9 2020 · r/RealMadrid 2025 · ITK+ 기자 244명 명단)와 Football Transfer League의 매체별 적중률(2006~)을 겹쳐 매겼다.",
+    "  기자는 ITK+ 티어를 기준으로 0·1티어 → 5, 1.5 → 4, 2 → 3, 3 → 2로 옮기고, 다른 표와 갈리면 다수를 따른다(디 마르지오·로마노는 ITK+ 1.5지만 나머지 표 전부 1티어라 5).",
+    "  매체는 적중률 구간으로 매긴다 — 40%↑ 4, 30%대 3~4(정론지), 20%대 2(타블로이드), 15% 아래 1(어그리게이터). 🎖️는 BBC·The Athletic처럼 어느 표에서나 1티어인 매체만."
   ],
   "journalists": {
     "fabrizioromano": "파브리지오 로마노",
@@ -108,9 +114,9 @@
   "credibility": {
     "outlets": {
       "rss:bbc-football": "medal",
-      "rss:sky-transfers": "medal",
+      "rss:sky-transfers": 4,
       "bsky:theathletic": "medal",
-      "rss:guardian-football": "medal",
+      "rss:guardian-football": 4,
       "rss:bbc-gossip": 2,
       "rss:telegraph-football": 4,
       "rss:men-manutd": 3,
@@ -124,8 +130,8 @@
       "rss:chronicle-nufc": 3,
       "rss:birmingham-villa": 3,
       "rss:standard-football": 3,
-      "rss:football-italia": 3,
-      "rss:gffn": 3,
+      "rss:football-italia": 2,
+      "rss:gffn": 2,
       "rss:mirror-football": 2,
       "rss:sempreinter": 2,
       "rss:sempremilan": 2
@@ -133,15 +139,15 @@
     "journalists": {
       "데이비드 온스테인": 5,
       "파브리지오 로마노": 5,
-      "니자르 킨셀라": 4,
-      "미겔 딜레이니": 4,
-      "사미 목벨": 4,
+      "니자르 킨셀라": 3,
+      "미겔 딜레이니": 2,
+      "사미 목벨": 3,
       "벤 제이콥스": 3,
       "알래스데어 골드": 5,
       "잔루카 디 마르지오": 5,
       "크리스 워": 4,
-      "제이컵 탠스웰": 4,
-      "패트릭 보일랜드": 4,
+      "제이컵 탠스웰": 5,
+      "패트릭 보일랜드": 5,
       "잭 피트브룩": 4,
       "이언 도일": 4,
       "데이비드 린치": 4,
@@ -150,10 +156,38 @@
       "존 타운리": 3,
       "제임스 벤지": 3,
       "앤디 미튼": 3,
-      "기옘 발라게": 3,
+      "기옘 발라게": 2,
       "새뮤얼 럭허스트": 3,
-      "사이먼 바이코프스키": 3,
-      "조 토머스": 3
+      "사이먼 바이코프스키": 5,
+      "조 토머스": 3,
+      "제이컵 스타인버그": 4,
+      "데이비드 하이트너": 5,
+      "제이미 잭슨": 3,
+      "에드 애런스": 3,
+      "존 크로스": 4,
+      "사이먼 멀록": 3,
+      "댄 킬패트릭": 4,
+      "사이먼 콜링스": 3,
+      "폴 고스트": 4,
+      "타이론 마셜": 2,
+      "제임스 더커": 4,
+      "마이크 맥그래스": 3,
+      "크리스 배스컴": 4,
+      "루크 에드워즈": 4,
+      "샘 딘": 3,
+      "제러미 윌슨": 3,
+      "존 퍼시": 5,
+      "애슐리 프리스": 5,
+      "마테오 모레토": 5,
+      "다비드 메디나": 4,
+      "플로리안 플레텐베르크": 5,
+      "크리스티안 팔크": 3,
+      "알프레도 페둘라": 4,
+      "제라르 로메로": 4,
+      "사이먼 스톤": 5,
+      "제임스 피어스": 5,
+      "폴 조이스": 5,
+      "크레이그 호프": 4
     }
   },
   "bylines": {
@@ -164,6 +198,250 @@
     "Samuel Luckhurst": "새뮤얼 럭허스트",
     "Simon Bajkowski": "사이먼 바이코프스키",
     "Joe Thomas": "조 토머스",
-    "Matt Law": "맷 로"
+    "Matt Law": "맷 로",
+    "Jacob Steinberg": "제이컵 스타인버그",
+    "David Hytner": "데이비드 하이트너",
+    "Jamie Jackson": "제이미 잭슨",
+    "Ed Aarons": "에드 애런스",
+    "John Cross": "존 크로스",
+    "Simon Mullock": "사이먼 멀록",
+    "Dan Kilpatrick": "댄 킬패트릭",
+    "Simon Collings": "사이먼 콜링스",
+    "Paul Gorst": "폴 고스트",
+    "Tyrone Marshall": "타이론 마셜",
+    "James Ducker": "제임스 더커",
+    "Mike McGrath": "마이크 맥그래스",
+    "Chris Bascombe": "크리스 배스컴",
+    "Luke Edwards": "루크 에드워즈",
+    "Sam Dean": "샘 딘",
+    "Jeremy Wilson": "제러미 윌슨",
+    "John Percy": "존 퍼시",
+    "Ashley Preece": "애슐리 프리스"
+  },
+  "cited": {
+    "teamtalk": {
+      "ko": "팀토크",
+      "credibility": 1
+    },
+    "caughtoffside": {
+      "ko": "커트오프사이드",
+      "credibility": 1
+    },
+    "footballinsider": {
+      "ko": "풋볼 인사이더",
+      "credibility": 1
+    },
+    "footballtransfers": {
+      "ko": "풋볼 트랜스퍼스",
+      "credibility": 1
+    },
+    "fichajes": {
+      "ko": "피차헤스",
+      "credibility": 1
+    },
+    "elnacional": {
+      "ko": "엘 나시오날",
+      "credibility": 1
+    },
+    "dailystar": {
+      "ko": "데일리 스타",
+      "credibility": 1
+    },
+    "sun": {
+      "ko": "더 선",
+      "credibility": 2
+    },
+    "scottishsun": {
+      "ko": "스코티시 선",
+      "credibility": 2
+    },
+    "mail": {
+      "ko": "데일리 메일",
+      "credibility": 2
+    },
+    "dailymail": {
+      "ko": "데일리 메일",
+      "credibility": 2
+    },
+    "dailymirror": {
+      "ko": "미러",
+      "credibility": 2
+    },
+    "dailyrecord": {
+      "ko": "데일리 레코드",
+      "credibility": 3
+    },
+    "sundaymail": {
+      "ko": "선데이 메일",
+      "credibility": 2
+    },
+    "herald": {
+      "ko": "더 헤럴드",
+      "credibility": 3
+    },
+    "glasgowtimes": {
+      "ko": "글래스고 타임스",
+      "credibility": 2
+    },
+    "national": {
+      "ko": "더 내셔널",
+      "credibility": 2
+    },
+    "scotsman": {
+      "ko": "더 스코츠맨",
+      "credibility": 3
+    },
+    "edinburgheveningnews": {
+      "ko": "에든버러 이브닝 뉴스",
+      "credibility": 2
+    },
+    "courier": {
+      "ko": "더 쿠리어",
+      "credibility": 2
+    },
+    "pressjournal": {
+      "ko": "프레스 앤드 저널",
+      "credibility": 2
+    },
+    "rangersreview": {
+      "ko": "레인저스 리뷰",
+      "credibility": 2
+    },
+    "talksport": {
+      "ko": "토크스포츠",
+      "credibility": 2
+    },
+    "sport": {
+      "ko": "스포르트",
+      "credibility": 2
+    },
+    "mundodeportivo": {
+      "ko": "문도 데포르티보",
+      "credibility": 2
+    },
+    "as": {
+      "ko": "아스",
+      "credibility": 3
+    },
+    "marca": {
+      "ko": "마르카",
+      "credibility": 3
+    },
+    "bild": {
+      "ko": "빌트",
+      "credibility": 3
+    },
+    "lequipe": {
+      "ko": "레키프",
+      "credibility": 3
+    },
+    "footmercato": {
+      "ko": "풋 메르카토",
+      "credibility": 2
+    },
+    "gazzetta": {
+      "ko": "가제타 델로 스포르트",
+      "credibility": 3
+    },
+    "gazzettadellosport": {
+      "ko": "가제타 델로 스포르트",
+      "credibility": 3
+    },
+    "lagazzetadellosport": {
+      "ko": "가제타 델로 스포르트",
+      "credibility": 3
+    },
+    "tuttosport": {
+      "ko": "투토스포르트",
+      "credibility": 2
+    },
+    "tuttomercatoweb": {
+      "ko": "투토메르카토웹",
+      "credibility": 3
+    },
+    "espn": {
+      "ko": "ESPN",
+      "credibility": 3
+    },
+    "isport": {
+      "ko": "i 스포츠",
+      "credibility": 3
+    },
+    "telegraph": {
+      "ko": "텔레그래프",
+      "credibility": 4
+    },
+    "sundaytelegraph": {
+      "ko": "선데이 텔레그래프",
+      "credibility": 4
+    },
+    "times": {
+      "ko": "더 타임스",
+      "credibility": 4
+    },
+    "guardian": {
+      "ko": "가디언",
+      "credibility": 4
+    },
+    "athletic": {
+      "ko": "디 애슬레틱",
+      "credibility": 4
+    },
+    "skysports": {
+      "ko": "스카이스포츠",
+      "credibility": 4
+    },
+    "bbc": {
+      "ko": "BBC",
+      "credibility": 4
+    },
+    "gianlucadimarzio": {
+      "ko": "잔루카 디 마르지오"
+    },
+    "fabrizioromano": {
+      "ko": "파브리지오 로마노"
+    },
+    "davidornstein": {
+      "ko": "데이비드 온스테인"
+    },
+    "matteomoretto": {
+      "ko": "마테오 모레토"
+    },
+    "davidmedina": {
+      "ko": "다비드 메디나"
+    },
+    "florianplettenberg": {
+      "ko": "플로리안 플레텐베르크"
+    },
+    "christianfalk": {
+      "ko": "크리스티안 팔크"
+    },
+    "alfredopedulla": {
+      "ko": "알프레도 페둘라"
+    },
+    "gerardromero": {
+      "ko": "제라르 로메로"
+    },
+    "simonstone": {
+      "ko": "사이먼 스톤"
+    },
+    "jamespearce": {
+      "ko": "제임스 피어스"
+    },
+    "pauljoyce": {
+      "ko": "폴 조이스"
+    },
+    "craighope": {
+      "ko": "크레이그 호프"
+    },
+    "samimokbel": {
+      "ko": "사미 목벨"
+    },
+    "mattlaw": {
+      "ko": "맷 로"
+    },
+    "johncross": {
+      "ko": "존 크로스"
+    }
   }
 }

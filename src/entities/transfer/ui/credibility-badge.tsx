@@ -23,7 +23,7 @@ const MOON_LABEL: Record<1 | 2 | 3 | 4 | 5, string> = {
 const MEDAL_LABEL = "공신력 높은 매체";
 
 interface CredibilityBadgeProps {
-  report: Pick<TransferReport, "sourceId" | "attributedTo">;
+  report: Pick<TransferReport, "sourceId" | "attribution" | "attributedTo">;
   className?: string;
 }
 

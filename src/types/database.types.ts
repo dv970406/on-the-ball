@@ -464,7 +464,11 @@ export type Database = {
       random_nickname: { Args: never; Returns: string }
     }
     Enums: {
-      transfer_attribution: "verified_author" | "linked_mirror" | "outlet"
+      transfer_attribution:
+        | "verified_author"
+        | "linked_mirror"
+        | "outlet"
+        | "cited"
       transfer_stage:
         | "rumour"
         | "talks"
@@ -605,7 +609,12 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      transfer_attribution: ["verified_author", "linked_mirror", "outlet"],
+      transfer_attribution: [
+        "verified_author",
+        "linked_mirror",
+        "outlet",
+        "cited",
+      ],
       transfer_stage: [
         "rumour",
         "talks",

@@ -325,7 +325,9 @@ export async function reprocessAll(supabase, opts = {}) {
         stats.unknownSource++;
         continue;
       }
-      const derived = derive(def, { authorHandle: row.author_handle, provenanceUrl: row.provenance_url, text: row.body });
+      // ⚠ `externalId`를 함께 준다 — 가십 항목 행(`#item-`)의 귀속은 본문 끝의 인용 매체라, 빠뜨리면 재처리가
+      //   항목 행을 전부 칼럼 매체(`outlet`)로 되돌린다(`attribution.mjs`).
+      const derived = derive(def, { externalId: row.external_id, authorHandle: row.author_handle, provenanceUrl: row.provenance_url, text: row.body });
       /*
        * ⚠ 규칙이 좁아져 귀속을 잃은 행은 **지우지 않지만 실패로 알린다.** 그 행은 옛 저자 표기를
        *   단 채 공개 상태로 남아 "확증 못 한 항목은 행이 없다"는 불변식을 깬다 — 지우는 것은

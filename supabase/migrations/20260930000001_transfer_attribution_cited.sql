@@ -1,0 +1,14 @@
+-- 귀속 `cited`(인용) — 가십 칼럼(BBC 이적 가십 · 스카이 신문 요약)에서 나눈 항목 행의 귀속.
+--
+-- 칼럼은 다른 신문의 이적설을 한 문단씩 옮겨 적은 글이라, 항목의 보도 주체는 칼럼 매체가 아니라 **칼럼이 인용한
+-- 신문**이다. 항목 행을 칼럼과 같은 `outlet`으로 두었더니 팀토크·문도 데포르티보의 이적설이 화면에 "BBC 🎖️"로
+-- 그려졌다(운영 실측 — 항목 행 244건 중 151건이 BBC Sport 피드 소속이었다). `attributed_to`에는 칼럼이 적은
+-- 신문 표기를 원문 그대로 둔다("TeamTalk"·"Sport") — 한국어 표기·공신력은 `scripts/lib/transfer/reporters.json`의
+-- `cited`가 화면에서 푼다(저장값을 표기에 묶지 않는다).
+--
+-- ⚠ enum 값은 지울 수 없다(`api-and-db.md`). 되돌릴 일이 없는 구분이라 더한다.
+-- ⚠ `add value`한 값은 같은 트랜잭션에서 쓸 수 없다 — 백필은 `sync-transfer-news.mjs --reprocess`가 한다
+--   (귀속은 추출 컬럼이라 재처리가 다시 쓴다).
+-- ⚠ 기존 CHECK(`attribution = 'outlet' or attributed_to is not null`)가 그대로 걸린다 — 인용 귀속은 인용 매체가
+--   반드시 있어야 한다("누구의 보도인지"가 이 등급의 정의다).
+alter type public.transfer_attribution add value 'cited';

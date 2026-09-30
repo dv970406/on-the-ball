@@ -14,6 +14,8 @@
  * ⚠ 항목은 **다시 받지 않는다** — 칼럼마다 한 번 받아 나눈다(항목 행이 하나라도 있으면 끝난 칼럼이다).
  * ⚠ 항목 끝에 출처 신문을 괄호로 남긴다("(Telegraph)") — 칼럼이 인용한 원 보도의 주체라, 요약·판정이 누구의
  *   주장인지 읽을 수 있다. 괄호 안 한 낱말은 선수 이름 추출에 걸리지 않는다(회귀 테스트).
+ *   그리고 **귀속이 그 신문이다**(`citedOutlet` → `attribution.mjs`의 `cited`). 칼럼 매체로 귀속하면 타블로이드
+ *   이적설이 BBC 🎖️로 그려진다(운영에서 실제로 그랬다).
  */
 import * as cheerio from "cheerio";
 import { createHash } from "node:crypto";
@@ -21,6 +23,17 @@ import { ITEM_MARK } from "./story.mjs";
 
 /** 항목 행의 external_id — 본문으로 만든다(칼럼이 문단 순서를 바꿔도 같은 항목은 같은 키다) */
 export const itemExternalId = (parentId, text) => `${parentId}${ITEM_MARK}${createHash("sha1").update(text).digest("hex").slice(0, 12)}`;
+
+/**
+ * 항목 본문 끝의 인용 매체 — `parseRoundupItems`가 `"문단 (신문)"`으로 남긴 괄호를 되읽는다(원문 표기 그대로).
+ * 저장된 항목 행을 재처리할 때도 이 함수가 본문에서 귀속을 되찾는다. 괄호가 없으면 `null`.
+ */
+export function citedOutlet(text) {
+  // 스카이가 신문 이름 안에 언어 표기를 넣은 항목("(Marca (Spanish))")은 괄호가 겹친다 — 바깥 괄호를 받고 안쪽 언어 표기를 뗀다
+  const m = /\(((?:[^()]|\([^()]*\)){2,80})\)\s*$/u.exec(String(text).trim());
+  const outlet = m?.[1].replace(/\s*\([^()]*\)\s*$/u, "").trim();
+  return outlet ? outlet : null;
+}
 
 /** 한 문단이 항목이 되기 위한 최소 길이 — 사진 설명·관련 기사 링크 제목을 거른다 */
 const MIN_ITEM_CHARS = 40;
@@ -50,7 +63,8 @@ function bbcItem(text) {
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 function skyItem($, p) {
-  const outlet = flat($(p).children("em").last().text());
+  // 기울임 안에 언어 표기가 든 것("Marca (Spanish)")은 신문 이름만 남긴다 — 그대로 두면 항목 끝의 괄호가 겹친다
+  const outlet = flat($(p).children("em").last().text()).replace(/\s*\([^()]*\)\s*$/u, "").trim();
   if (!outlet) return null;
   const m = new RegExp(`^(.*\\S)\\s*[-–—]\\s*${escapeRe(outlet)}\\s*(?:\\([^()]{1,30}\\))?\\s*\\.?$`, "u").exec(flat($(p).text()));
   return m ? { text: m[1].trim(), outlet } : null;

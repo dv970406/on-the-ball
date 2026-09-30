@@ -4,9 +4,9 @@
  *
  *   node scripts/test-transfer-sources.mjs
  */
-import { resolveAttribution } from "./lib/transfer/attribution.mjs";
+import { cleanByline, resolveAttribution } from "./lib/transfer/attribution.mjs";
 import { bylineOf, canonicalGuid, parseTelegram, stripHtml } from "./lib/transfer/sources.mjs";
-import { itemExternalId, parseRoundupItems } from "./lib/transfer/roundup.mjs";
+import { citedOutlet, itemExternalId, parseRoundupItems } from "./lib/transfer/roundup.mjs";
 
 let pass = 0;
 let fail = 0;
@@ -45,6 +45,14 @@ check("byline — Atom author.name", bylineOf({ author: { name: "Lee Ryder" } })
 check("byline — 메일 주소뿐이면 이름이 아니다", bylineOf({ author: "newsdesk@example.com" }) === null);
 check("byline — 없으면 null", bylineOf({}) === null);
 
+// ── RSS byline 정리 — 발신지·공동 저자·Exclusive 접두어를 걷어 등재 표기와 맞춘다 ────────────
+check("byline 정리 — 가디언 발신지를 걷는다", cleanByline("Jacob Steinberg in Prague") === "Jacob Steinberg" && cleanByline("David Hytner at the Fortuna Arena") === "David Hytner");
+check("byline 정리 — Exclusive by 접두어", cleanByline("Exclusive by Nick Ames in Copenhagen") === "Nick Ames");
+check("byline 정리 — 공동 byline은 첫 이름", cleanByline("Bobby Vincent, Jake Stokes") === "Bobby Vincent" && cleanByline("Reuters and Guardian sport") === "Reuters");
+check("byline 정리 — 이름 안의 소문자 in·van은 건드리지 않는다", cleanByline("Jim van Wijk") === "Jim van Wijk" && cleanByline("Tashan Deniran-Alleyne") === "Tashan Deniran-Alleyne");
+check("byline 정리 — null은 null", cleanByline(null) === null);
+check("RSS 귀속 — 정리된 byline이 attributed_to다", resolveAttribution({ kind: "rss", tier: 2 }, { externalId: "g1", authorHandle: "Jacob Steinberg at Anfield", text: "…" })?.attributedTo === "Jacob Steinberg");
+
 // ── Bluesky 본인 확인 — 배지가 없어도 확인 근거가 기록돼 있으면 귀속한다 ─────────────
 const manual = { kind: "bluesky", tier: 2, defaultAttribution: "verified_author", verification: { issuerHandle: null, method: "byline-links" } };
 check("수동 확인 계정 — 본인 글로 귀속", resolveAttribution(manual, { authorHandle: "leeryder.bsky.social" })?.attribution === "verified_author");
@@ -65,16 +73,27 @@ check("가십 — BBC 문단을 항목으로 나누고 출처 신문을 괄호�
   "Bayern Munich are interested in Barcelona forward Jack Roe, 28. (Sport)",
   "Newcastle are keeping an eye on Rennes defender Tom Poe, 20. (Marca)",
 ]), JSON.stringify(bbcItems));
-const skyBody = "The top stories... <h3>PREMIER LEAGUE</h3><p><strong>Chelsea</strong> have made <strong>John Doe</strong> their top target for January - <em>Daily Mirror</em></p><ul><li><a href=\"x\">Transfer Centre LIVE!</a></li></ul><p><strong>Arsenal</strong> are monitoring <strong>Jack Roe</strong> ahead of the winter window - <em>The Sun</em></p><p>Barcelona are closely monitoring Tom Poe's situation at Chelsea - <em>Sport </em>(Spanish).</p>";
+const skyBody = "The top stories... <h3>PREMIER LEAGUE</h3><p><strong>Chelsea</strong> have made <strong>John Doe</strong> their top target for January - <em>Daily Mirror</em></p><ul><li><a href=\"x\">Transfer Centre LIVE!</a></li></ul><p><strong>Arsenal</strong> are monitoring <strong>Jack Roe</strong> ahead of the winter window - <em>The Sun</em></p><p>Barcelona are closely monitoring Tom Poe's situation at Chelsea - <em>Sport </em>(Spanish).</p><p>Raul Roe rejected interest from Liverpool and Chelsea this summer - <em>Marca (Spanish)</em></p>";
 const skyColumn = `<html><head><script type="application/ld+json">${JSON.stringify({ "@type": "NewsArticle", articleBody: skyBody })}</script></head><body></body></html>`;
 const skyItems = parseRoundupItems(skyColumn);
 check("가십 — 스카이 articleBody의 HTML 문단을 항목으로 나눈다", JSON.stringify(skyItems) === JSON.stringify([
   "Chelsea have made John Doe their top target for January (Daily Mirror)",
   "Arsenal are monitoring Jack Roe ahead of the winter window (The Sun)",
   "Barcelona are closely monitoring Tom Poe's situation at Chelsea (Sport)",
+  "Raul Roe rejected interest from Liverpool and Chelsea this summer (Marca)",
 ]), JSON.stringify(skyItems));
 check("가십 — 칼럼이 아닌 기사에서는 항목이 없다", parseRoundupItems("<article><p>Chelsea have completed the signing of John Doe from Benfica for a fee of £40m.</p></article>").length === 0);
 check("가십 — 항목 키는 칼럼 키 + 본문 해시(같은 본문은 같은 키)", itemExternalId("abc", "x y z") === itemExternalId("abc", "x y z") && itemExternalId("abc", "x y z").startsWith("abc#item-") && itemExternalId("abc", "x") !== itemExternalId("abc", "y"));
+
+// ── 가십 항목의 귀속 — 칼럼 매체가 아니라 칼럼이 인용한 신문이다(BBC Sport 피드의 항목이 "BBC 🎖️"로 그려졌다) ──
+check("가십 — 항목 끝의 괄호에서 인용 매체를 되읽는다(원문 표기 그대로)", citedOutlet(bbcItems[0]) === "Mail" && citedOutlet("… (Mundo Deportivo) ") === "Mundo Deportivo" && citedOutlet("… (Sport)") === "Sport");
+check("가십 — 괄호가 없으면 인용 매체가 없다", citedOutlet("Chelsea have completed the signing of John Doe.") === null);
+check("가십 — 괄호가 겹친 표기는 바깥 괄호를 받고 언어 표기를 뗀다(운영 #12136)", citedOutlet("Raul Asencio rejected interest from Liverpool (Marca (Spanish))") === "Marca");
+const rssDef = { kind: "rss", tier: 1 };
+const cited = resolveAttribution(rssDef, { externalId: itemExternalId("col", bbcItems[0]), authorHandle: null, text: bbcItems[0] });
+check("가십 — 항목 행은 cited로 인용 매체에 귀속된다(칼럼 소스의 등급을 물려받지 않는다)", cited?.attribution === "cited" && cited.attributedTo === "Mail" && cited.tier === 2);
+check("가십 — 칼럼 행·일반 기사는 그대로 매체 귀속이다", resolveAttribution(rssDef, { externalId: "col", authorHandle: "Susy Campanale", text: "… (Mail)" })?.attribution === "outlet");
+check("가십 — 괄호를 되읽지 못한 항목만 칼럼 매체로 남는다", resolveAttribution(rssDef, { externalId: "col#item-x", authorHandle: null, text: "no tail" })?.attribution === "outlet");
 
 console.log(`\n수집 어댑터 ${pass}/${pass + fail} 통과`);
 if (fail) process.exit(1);

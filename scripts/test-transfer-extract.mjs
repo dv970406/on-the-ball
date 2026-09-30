@@ -334,8 +334,17 @@ for (const [wrong, right] of Object.entries(glossary.corrections ?? {})) {
     if (v !== "medal" && !(Number.isInteger(v) && v >= 1 && v <= 5)) bad(`reporters.json credibility.outlets["${id}"]: "medal" 또는 1~5`);
   }
   for (const [name, v] of Object.entries(cred.journalists ?? {})) {
-    if (!names.has(name)) bad(`reporters.json credibility.journalists["${name}"]: journalists·sources에 없는 보도 주체 표기다(아무 보도에도 붙지 않는다)`);
+    if (!names.has(name) && !Object.values(rep.cited ?? {}).some((c) => c.ko === name)) bad(`reporters.json credibility.journalists["${name}"]: journalists·sources·cited에 없는 보도 주체 표기다(아무 보도에도 붙지 않는다)`);
     if (!(Number.isInteger(v) && v >= 1 && v <= 5)) bad(`reporters.json credibility.journalists["${name}"]: 1~5`);
+  }
+  // cited — 가십 칼럼이 인용한 신문. 키는 접힌 표기(소문자·앞의 the와 영숫자 아닌 글자 제거 — 규칙은 reporter.ts의 citedKey),
+  // 등급은 1~5뿐이다(칼럼이 옮겨 적은 글이라 🎖️는 없다). 등급을 비우면 ko 표기가 credibility.journalists에 있어야 한다.
+  for (const [key, c] of Object.entries(rep.cited ?? {})) {
+    if (!/^[a-z0-9]+$/.test(key)) bad(`reporters.json cited["${key}"]: 키는 접힌 표기(소문자·영숫자만)여야 한다`);
+    if (!c || typeof c.ko !== "string" || !c.ko.trim()) bad(`reporters.json cited["${key}"]: ko 표기가 비었다`);
+    else if (c.credibility === undefined) {
+      if (!(c.ko in (cred.journalists ?? {}))) bad(`reporters.json cited["${key}"]: 등급이 없으면 ko("${c.ko}")가 credibility.journalists에 있어야 한다`);
+    } else if (!(Number.isInteger(c.credibility) && c.credibility >= 1 && c.credibility <= 5)) bad(`reporters.json cited["${key}"]: credibility는 1~5("medal" 없음)`);
   }
 }
 

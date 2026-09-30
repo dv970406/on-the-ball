@@ -34,7 +34,7 @@ const DEAL_COLUMNS =
  *   `body`도 42501이다(`api-and-db.md` 이적 소식 절) — 그래서 컬럼을 나열한다.
  */
 const REPORT_COLUMNS =
-  "id, deal_id, source_id, attributed_to, tier, stage, fee_amount, fee_currency, fee_text, published_at, url, provenance_url, body_excerpt, summary_ko";
+  "id, deal_id, source_id, attribution, attributed_to, tier, stage, fee_amount, fee_currency, fee_text, published_at, url, provenance_url, body_excerpt, summary_ko";
 
 /**
  * PostgREST select 문자열의 단일 소스 — 스키마가 바뀌면 여기 한 곳만 고친다.
@@ -92,6 +92,7 @@ export type ReportSelectRow = Pick<
   | "id"
   | "deal_id"
   | "source_id"
+  | "attribution"
   | "attributed_to"
   | "tier"
   | "stage"
@@ -110,6 +111,7 @@ export function buildReport(row: ReportSelectRow): TransferReport {
     id: row.id,
     dealId: row.deal_id,
     sourceId: row.source_id,
+    attribution: row.attribution,
     attributedTo: row.attributed_to,
     tier: row.tier,
     stage: row.stage,

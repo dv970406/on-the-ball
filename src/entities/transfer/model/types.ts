@@ -74,7 +74,12 @@ export interface TransferReport {
   dealId: TransferNewsRow["deal_id"];
   /** 소스 id(`tg:romano`·`rss:bbc-football`…) — 보도 주체·매체 표기는 `lib/reporter.ts`가 푼다 */
   sourceId: TransferNewsRow["source_id"];
-  /** 계정·핸들(`fabrizioromano`) — 확증된 저자. 없으면 매체 피드다 */
+  /**
+   * 귀속 등급 — 화면은 `cited`(가십 칼럼이 인용한 신문의 보도)만 가른다. 그때 보도 주체는 소스(칼럼 매체)가
+   * 아니라 `attributedTo`의 신문이다(`lib/reporter.ts`). 나머지 값은 수집기의 판정 기록이라 화면이 읽지 않는다.
+   */
+  attribution: TransferNewsRow["attribution"];
+  /** 계정·핸들(`fabrizioromano`) — 확증된 저자, `cited`면 칼럼이 적은 신문 표기(원문 그대로). 없으면 매체 피드다 */
   attributedTo: TransferNewsRow["attributed_to"];
   /** 수집기의 소스 등급 1·2(귀속·미러 판정에 쓴다). 화면의 출처 표시는 이 값이 아니라 `credibilityOf`다 */
   tier: TransferNewsRow["tier"];

@@ -566,6 +566,19 @@ insert into public.transfer_news (source_id, external_id, body, published_at, at
 values ('rss:rlstest-a', 'anon', 'Anon', now(), 'outlet', 2, 'rumour', 0);
 rollback to s;
 
+savepoint s;
+\echo '[❌차단] 인용 귀속(cited)인데 인용 매체가 비어 있다 — 가십 항목은 "어느 신문의 보도인지"가 정의라 CHECK가 거부한다(writer가 service_role이라 이 CHECK가 방어다)'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, attributed_to, tier, stage, relevance)
+values ('rss:rlstest-a', 'x1#item-abc', 'Chelsea want John Doe. (TeamTalk)', now() - interval '1 hour', 'cited', null, 2, 'rumour', 0.5);
+rollback to s;
+
+savepoint s;
+\echo '[t 기대] 인용 매체가 있으면 cited 항목 행이 저장된다(enum 값 cited — 20260930000001)'
+insert into public.transfer_news (source_id, external_id, body, published_at, attribution, attributed_to, tier, stage, relevance)
+values ('rss:rlstest-a', 'x1#item-abc', 'Chelsea want John Doe. (TeamTalk)', now() - interval '1 hour', 'cited', 'TeamTalk', 2, 'rumour', 0.5);
+select count(*) = 1 from public.transfer_news where source_id = 'rss:rlstest-a' and attribution = 'cited' and attributed_to = 'TeamTalk';
+rollback to s;
+
 \echo ''
 \echo '-- 35b. 읽기는 비로그인에게도 열린다 (개인화가 없는 공개 보도다) --'
 

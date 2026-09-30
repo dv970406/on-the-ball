@@ -220,7 +220,9 @@ enum이면 양쪽에 라벨 → 부호 변환이 한 벌씩 생긴다. 라벨이
   (`issuerHandle`), 없으면 사람이 확인한 근거(`method`)를 적는다: `byline-links`(링크한 기사의 기자란이 본인 이름) ·
   `domain-handle`(본인 도메인 핸들) · `profile-review`(소개·활동 대조). `--verify`는 `method` 계정에 배지를 요구하지 않는다.
 - **매체 RSS는 기사마다 기자 이름(byline)을 읽는다**(`bylineOf` — `dc:creator`·`author`). 매체가 보증한 기자명이라
-  그대로 귀속 근거가 된다. `reporters.json`의 `bylines`에 등재된 기자면 **매체보다 기자가 먼저다** — 보도 주체 표기도
+  그대로 귀속 근거가 된다. ⚠ 귀속 직전에 **이름 하나로 다듬는다**(`attribution.mjs`의 `cleanByline` — 가디언의 발신지
+  "in Prague"·"Exclusive by" 접두어를 걷고 공동 byline은 첫 이름). `bylines` 표기가 정확 일치라, 안 다듬으면 같은 기자의
+  글이 기사마다 다른 저자로 갈려 등재 등급이 닿지 않는다(운영 실측). `reporters.json`의 `bylines`에 등재된 기자면 **매체보다 기자가 먼저다** — 보도 주체 표기도
   공신력 등급도(football.london의 골드 기사 = 골드 🌕). 등재되지 않은 기자의 기사는 매체 등급이다.
 - ⚠ 새 소스는 **실제 어댑터로 받아 본 뒤** 등록한다 — 게시량·보관 시간(`retentionHours` → 수집 주기 상한)·byline 유무를
   잰다. 멈춘 피드(최신 항목이 며칠 전)는 `enabled: false`와 사유를 남긴다(Telegraph가 그 예다).
@@ -244,6 +246,11 @@ BBC 이적 가십·스카이 신문 요약("Papers: …")은 여러 신문의 �
   - ⚠ **판정할 때 기사를 받지 않는다**(`wantsArticle`) — URL이 칼럼 전체라 남의 이적설까지 판정에 싣게 된다.
 - **항목 = 출처 신문 표기로 끝나는 문단**이다(BBC `(Telegraph), external` · 스카이 ` - <em>Daily Mirror</em>`). 칼럼 머리말·
   관련 기사 링크·광고 문구는 그 표기가 없다. 항목 끝에 신문 이름을 괄호로 남긴다 — 칼럼이 인용한 원 보도의 주체다.
+- ⚠ **항목 행의 귀속은 칼럼 매체가 아니라 그 신문이다** — `attribution = 'cited'`, `attributed_to` = 칼럼이 적은 신문 표기
+  (원문 그대로 "TeamTalk"·"Sport" — `roundup.mjs`의 `citedOutlet`이 괄호를 되읽는다). 칼럼의 `outlet`을 물려받으면 소스가
+  BBC Sport 피드인 항목이 전부 "BBC 🎖️"로 그려진다(운영에서 실제로 그랬다 — 항목 244건 중 151건). 한국어 표기·등급은
+  `reporters.json`의 `cited`가 화면에서 푼다(등급은 1~5뿐, 🎖️ 없음). 괄호를 되읽지 못한 항목만 칼럼 매체로 남는다.
+  ⚠ 재처리(`--reprocess`)가 이 귀속을 다시 쓰므로 **`derive`에 `externalId`를 함께 넘겨야** 항목 행을 알아본다.
 - **칼럼마다 한 번 받는다** — 최근 `MAX_ITEM_AGE_DAYS`일의 칼럼 중 항목 행이 없는 것만, 최신부터 실행당
   `ROUNDUP_MAX_PER_RUN`편. 받지 못한 칼럼은 경고이고 다음 실행이 다시 받는다(칼럼 행이 남아 잃는 것이 없다).
   ⚠ 구조가 바뀌어 항목이 0개가 되면 그 칼럼을 매 실행 다시 받는다 — 경고가 계속 찍히면 파서부터 본다.
