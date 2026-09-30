@@ -26,7 +26,7 @@ import { detectClubs } from "./clubs.mjs";
 import { personName } from "./extract.mjs";
 import { NAME_TABLE, cacheLlmNames } from "./names-ko.mjs";
 import { COLLECTOR_UA } from "./sources.mjs";
-import { DEAD, RANK, isRoundupItem } from "./story.mjs";
+import { DEAD, RANK, RENEWAL, isRoundupItem } from "./story.mjs";
 import { lookupKo } from "./wikidata.mjs";
 import { loadGlossary } from "./names-ko.mjs";
 import { clampCp } from "../sync-db.mjs";
@@ -290,7 +290,8 @@ export function parseJudgement(raw, sentText, { corrections, player = null } = {
   if (!obj.move) return { kind: "not_move", evidence: quoted ? clampCp(evidence, EVIDENCE_MAX_CHARS) : null };
   // "이동이다"는 원문에 실제로 있는 근거가 있어야 받는다 — 지어낸 근거로 딜을 열지 않는다
   if (!evidence) return { kind: "invalid", reason: "이동이라면서 근거가 없다" };
-  if (!quoted) return { kind: "invalid", reason: "근거가 원문에 없다" };
+  // 어떤 구절이 거부됐는지 남긴다 — 근거 불일치가 판정의 5%쯤 나오는데(감사) 구절을 봐야 원인을 가른다
+  if (!quoted) return { kind: "invalid", reason: "근거가 원문에 없다", quote: clampCp(evidence, 120) };
   // 선수 — 규칙이 뽑아 물은 이름이 있으면 그대로, 없으면 모델이 읽은 이름(원문에 있고 사람 이름처럼 생겨야 한다 — "Argentine international"은 이름이 아니다)
   const found = player ?? personName(mentionIn(obj.player, sentText));
   // 이동이라는데 선수를 특정할 수 없는 글("South American star"·"£60m full-back")은 **영영 딜이 될 수 없다** — 판정 불가로 두면 24시간마다
@@ -301,12 +302,19 @@ export function parseJudgement(raw, sentText, { corrections, player = null } = {
   if (from && to && normalizeQuote(from) === normalizeQuote(to)) from = to = null; // 같은 구단이 양쪽에 오면 어느 쪽도 믿지 않는다
   let suitors = [...new Set((Array.isArray(obj.suitors) ? obj.suitors : []).map((s) => mentionIn(s, sentText)).filter((s) => s && s !== from && s !== to))].slice(0, SUITORS_MAX);
   ({ to, suitors } = normalizeDestination({ to, suitors }, sentText));
+  // 재계약 가드 — 근거가 **지금 구단과의 계약**(new contract·extension)이고 행선지가 없는데 단계가 진전(협상·합의·완료)이면 그 진전은
+  // 재계약의 것이다. 모델이 같은 기사를 어떤 날은 "부인", 어떤 날은 "합의"로 읽어 케인의 재계약이 다시 "합의 임박"이 됐다(운영 재판정).
+  // 이적설 부인·루머로 읽은 판정(rumour·denied·collapsed)은 그대로 둔다 — 재계약이 복귀설을 끝낸다는 보도는 부인이 맞다.
+  const stage = JUDGE_STAGES.includes(obj.stage) ? obj.stage : null;
+  if (!to && stage && !DEAD.includes(stage) && stage !== "rumour" && RENEWAL.test(evidence)) {
+    return { kind: "not_move", evidence: clampCp(evidence, EVIDENCE_MAX_CHARS), renewal: true };
+  }
   const s = judgeSummary(obj.summary_ko, corrections);
   return {
     kind: "move",
     player: found,
     playerKo: isKoName(obj.player_ko) ? obj.player_ko.trim() : null,
-    stage: JUDGE_STAGES.includes(obj.stage) ? obj.stage : null,
+    stage,
     evidence: clampCp(evidence, EVIDENCE_MAX_CHARS),
     from,
     to,
@@ -327,16 +335,29 @@ export function isEnumeratedWith(text, to, suitors) {
   return suitors.some((s) => new RegExp(`${e(to)}${LIST_JOIN}${e(s)}|${e(s)}${LIST_JOIN}${e(to)}`, "u").test(t));
 }
 
+/** 그 구단이 "여럿 중 하나"로 언급됐다는 표지 — 이름이 하나뿐이어도 관심 구단은 여럿이다 */
+const PLURAL_CUE = /\b(?:among|one of|also|other (?:clubs|sides|teams)|several|a host of|number of|clubs (?:are|were|have)|sides (?:are|were|have))\b/iu;
+
+/**
+ * 이름이 적힌 관심 구단이 하나여도 원문이 **다른 관심 구단들**을 암시하면 행선지로 올리지 않는다 —
+ * "Besiktas were among the sides interested"·"who is also attracting interest from Barcelona"가 행선지로 확정됐다(재측정).
+ * 그 구단이 나오는 문장만 본다.
+ */
+export function hintsOtherSuitors(text, suitor) {
+  const name = normalizeQuote(suitor);
+  return String(text).split(/(?<=[.!?])\s+|\n+/u).some((s) => normalizeQuote(s).includes(name) && PLURAL_CUE.test(s));
+}
+
 /**
  * 행선지 정규화 — 지시문("관심 구단이 하나뿐이면 to, 여럿이면 to는 null")을 모델이 **양방향으로** 어긴다
  * (감사 111건: 하나뿐인데 suitors에만 둔 것 7건, 여럿인데 첫 구단을 to로 확정한 것 2건). 지시문으로는 안 잡혀 코드가 정규화한다.
- * - to가 없고 suitors가 하나뿐이면 그 구단이 행선지다.
+ * - to가 없고 suitors가 하나뿐이면 그 구단이 행선지다 — 단 원문이 다른 관심 구단을 암시하면(`hintsOtherSuitors`) 올리지 않는다.
  * - to가 suitors 중 하나와 같은 나열에 묶여 있으면 관심 구단 중 하나일 뿐이다 → suitors 맨 앞으로 내린다.
  *   "Chelsea are monitoring X but may face competition from United and Liverpool"처럼 to가 나열 밖이면(주된 구단) 그대로 둔다.
  * @param {{ to: string | null, suitors: string[] }} m 원문 표기(mentionIn을 지난 값)
  */
 export function normalizeDestination({ to, suitors }, sentText) {
-  if (!to && suitors.length === 1) return { to: suitors[0], suitors: [] };
+  if (!to && suitors.length === 1 && !hintsOtherSuitors(sentText, suitors[0])) return { to: suitors[0], suitors: [] };
   if (to && suitors.length && isEnumeratedWith(sentText, to, suitors)) return { to: null, suitors: [to, ...suitors].slice(0, SUITORS_MAX) };
   return { to, suitors };
 }
@@ -486,7 +507,7 @@ export async function runJudgements(supabase, needs, { apiKey, names, limit = JU
       Object.assign(update, { verdict: "not_move", verdict_evidence: judged.evidence, summary_ko: null });
     } else {
       out.invalid += 1;
-      out.warnings.push(`#${n.id} 판정 불가(${label}): ${judged.reason} — ${JUDGE_RETRY_MS / 3_600_000}시간 뒤 다시 묻는다`);
+      out.warnings.push(`#${n.id} 판정 불가(${label}): ${judged.reason}${judged.quote ? ` — "${judged.quote}"` : ""} — ${JUDGE_RETRY_MS / 3_600_000}시간 뒤 다시 묻는다`);
     }
     const { error } = await supabase.from("transfer_news").update(update).eq("id", n.id);
     if (error) {

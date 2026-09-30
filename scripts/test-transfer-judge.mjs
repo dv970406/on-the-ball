@@ -50,8 +50,21 @@ const ALABA = { ...NO_FIX, player: "David Alaba" };
   check("행선지 — 'as well as' 나열도 같다", eq(normalizeDestination({ to: "Arsenal", suitors: ["Real Madrid"] }, "Arsenal, as well as Real Madrid, have made contact with Haaland's representatives."), { to: null, suitors: ["Arsenal", "Real Madrid"] }));
   check("행선지 — 나열 밖의 주된 구단은 그대로 둔다(competition from …)", eq(normalizeDestination({ to: "Chelsea", suitors: ["Manchester United", "Liverpool"] }, "Chelsea are monitoring Tyrick Mitchell but may face competition from Manchester United and Liverpool."), { to: "Chelsea", suitors: ["Manchester United", "Liverpool"] }));
   check("행선지 — to가 없고 관심 구단이 하나뿐이면 그 구단이 행선지다", eq(normalizeDestination({ to: null, suitors: ["Liverpool"] }, "Liverpool have some interest in Lamine Camara."), { to: "Liverpool", suitors: [] }));
+  check("행선지 — 하나뿐이어도 '여럿 중 하나'로 언급됐으면 올리지 않는다(among the sides · also attracting)",
+    eq(normalizeDestination({ to: null, suitors: ["Besiktas"] }, "Besiktas were among the sides interested in signing Willock in the summer."), { to: null, suitors: ["Besiktas"] }) &&
+    eq(normalizeDestination({ to: null, suitors: ["Barcelona"] }, "The same three Premier League clubs are keeping an eye on Alessandro Bastoni, who is also attracting interest from Barcelona."), { to: null, suitors: ["Barcelona"] }));
   check("행선지 — to도 없고 관심 구단이 여럿이면 그대로", eq(normalizeDestination({ to: null, suitors: ["Real Madrid", "Barcelona"] }, "Real Madrid and Barcelona are ready to pounce."), { to: null, suitors: ["Real Madrid", "Barcelona"] }));
   check("행선지 — 공백만으로 이어진 이름은 나열이 아니다", !isEnumeratedWith("Chelsea Liverpool", "Chelsea", ["Liverpool"]));
+}
+
+// ── 재계약 가드 — 지금 구단과의 계약 합의를 이적 단계로 읽지 않는다(케인) ──────────────
+{
+  const KANE = "Harry Kane makes feelings clear on Tottenham return as agreement 'close'. Kane is now on the verge of agreeing a new contract to extend his time with Bayern, which would see rumours of a potential return to Tottenham come to an end.";
+  const opt = { ...NO_FIX, player: "Harry Kane" };
+  const r = parseJudgement(J({ move: true, stage: "agreement", evidence: "Kane is now on the verge of agreeing a new contract to extend his time with Bayern", summary_ko: "요약." }), KANE, opt);
+  check("재계약 — 근거가 재계약이고 행선지 없는 '합의'는 이동 아님(재계약)", r.kind === "not_move" && r.renewal === true);
+  check("재계약 — 같은 근거라도 부인으로 읽은 판정은 그대로(복귀설을 끝내는 보도)", parseJudgement(J({ move: true, stage: "denied", from: "Bayern", suitors: ["Tottenham"], evidence: "Kane is now on the verge of agreeing a new contract to extend his time with Bayern", summary_ko: "요약." }), KANE, opt).kind === "move");
+  check("재계약 — 행선지가 있으면 가드가 걸리지 않는다(이적하며 새 계약)", parseJudgement(J({ move: true, stage: "agreement", to: "Tottenham", evidence: "rumours of a potential return to Tottenham come to an end", summary_ko: "요약." }), KANE, opt).kind === "move");
 }
 
 // ── 해석 ────────────────────────────────────────────────────────────────
@@ -63,7 +76,7 @@ const BODY = "Udinese have reached a verbal agreement with David Alaba! Austrian
 check("코드 블록으로 감싸도 읽는다", parseJudgement('```json\n' + J({ move: true, evidence: "Austrian star", summary_ko: "요약." }) + "\n```", BODY, ALABA).kind === "move");
 check("근거의 공백·따옴표·대소문자 차이는 접는다", parseJudgement(J({ move: true, evidence: "Udinese have  reached a VERBAL agreement", summary_ko: "요약." }), BODY, ALABA).kind === "move");
 check("⚠ 이동이라면서 원문에 없는 근거 → 판정 불가(지어낸 근거로 딜을 열지 않는다)",
-  eq(parseJudgement(J({ move: true, evidence: "Alaba completes his medical at Udinese", summary_ko: "요약." }), BODY, ALABA), { kind: "invalid", reason: "근거가 원문에 없다" }));
+  eq(parseJudgement(J({ move: true, evidence: "Alaba completes his medical at Udinese", summary_ko: "요약." }), BODY, ALABA), { kind: "invalid", reason: "근거가 원문에 없다", quote: "Alaba completes his medical at Udinese" }));
 check("⚠ 이동이라면서 근거가 비었다 → 판정 불가", parseJudgement(J({ move: true, evidence: "", summary_ko: "요약." }), BODY, ALABA).kind === "invalid");
 check("이동 아님은 근거가 없어도 받는다", eq(parseJudgement(J({ move: false, evidence: "" }), BODY, ALABA), { kind: "not_move", evidence: null }));
 check("이동 아님의 근거가 원문에 없으면 근거만 버린다", eq(parseJudgement(J({ move: false, evidence: "지어낸 말" }), BODY, ALABA), { kind: "not_move", evidence: null }));
