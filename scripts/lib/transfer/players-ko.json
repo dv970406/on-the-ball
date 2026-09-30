@@ -141,5 +141,11 @@
     "position": "RB",
     "birthYear": 1998,
     "nationality": "ENG"
+  },
+  "manu kone": {
+    "ko": "마누 코네",
+    "position": "CM",
+    "birthYear": 2001,
+    "nationality": "FRA"
   }
 }

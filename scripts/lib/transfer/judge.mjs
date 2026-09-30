@@ -154,6 +154,7 @@ export function buildSystem(terms = loadGlossary().terms) {
 [player] <선수>가 비어 있으면, 원문이 이동을 다루는 선수 **한 명**의 이름을 원문 표기 그대로 적는다(감독·코치·임원·에이전트는 선수가 아니다). <선수>가 있으면 그 이름을 그대로 옮긴다. 선수를 특정할 수 없으면 null이고 move는 false다.
 
 [move] 구단 이동이다(true): 이적·임대·자유계약 이적, 영입 관심·루머·제안·협상·합의·개인 조건·메디컬·공식 발표, 진행 중인 이적의 무산·결렬, 그리고 **루머에 대한 부인**(구단이 팔 생각이 없다·선수가 떠날 생각이 없다·기자가 관심설을 부인 — 이적설에 대한 소식이므로 true, stage는 denied).
+다음도 true다: 입단 테스트 뒤 **계약을 맺었다·서명했다**는 보도(official) · 가족·에이전트·대리인의 발언으로 전하는 이적 가능성과 관심 구단(rumour) · 친정 복귀설·복귀 가능성(rumour) · 유스·10대 선수의 구단 이동.
 구단 이동이 아니다(false):
 - 지금 소속 구단과의 재계약·계약 연장·첫 프로 계약
 - 인터뷰·발언·의견·비교·칭찬(누구를 닮았다, 누구와 의견이 같다)
@@ -166,7 +167,9 @@ export function buildSystem(terms = loadGlossary().terms) {
 
 [stage] 보도가 말하는 이동 단계 하나. rumour(관심·주시·연결) · talks(협상·접촉·논의) · offer(제안·입찰 제출) · agreement(구단 간 합의) · personal_terms(개인 조건 합의) · medical(메디컬 진행) · here_we_go(확정, 공식 발표 전) · official(공식 발표·완료) · collapsed(진행 중이던 협상·제안·합의가 깨짐·제안 거절) · denied(관심·연결 루머를 구단·선수·기자가 부인, 매각 거부, 이적 생각 없음). move가 false면 null.
 
-[from / to / suitors] 원문에 적힌 구단명을 글자 그대로 옮긴다(번역·줄임·정규화하지 않는다). from은 <선수>의 현재 소속 구단(자유계약이면 직전 소속). to는 선수가 **실제로 가려는·간 구단**(협상·제안·합의·완료의 상대, 또는 관심을 보인 구단이 하나뿐일 때 그 구단)이다. 관심만 보인 구단이 여럿이면 to는 null이고 그 구단들을 전부 suitors에 언급 순으로 적는다(최대 ${SUITORS_MAX}) — 그중 하나를 골라 to에 넣지 않는다. to가 있으면서 다른 관심 구단도 있으면 그것들은 suitors다. 원문에 없으면 null·[].
+[from / to / suitors] 원문에 적힌 구단명을 글자 그대로 옮긴다(번역·줄임·정규화하지 않는다). from은 <선수>의 현재 소속 구단(자유계약이면 직전 소속, 임대 중이면 임대로 뛰는 구단). to는 선수가 **실제로 가려는·간 구단**(협상·제안·합의·완료의 상대, 또는 관심을 보인 구단이 하나뿐일 때 그 구단)이다. 관심만 보인 구단이 여럿이면 to는 null이고 그 구단들을 전부 suitors에 언급 순으로 적는다(최대 ${SUITORS_MAX}) — 그중 하나를 골라 to에 넣지 않는다. to가 있으면서 다른 관심 구단도 있으면 그것들은 suitors다. 원문에 없으면 null·[].
+예: "Bayern are keen on X" → to Bayern, suitors [] · "Tottenham, Newcastle and Chelsea are interested in X" → to null, suitors 셋 · "Chelsea are monitoring X but face competition from United and Liverpool" → to Chelsea, suitors [United, Liverpool].
+suitors에는 **이 글이 지금 관심을 보인다고 말하는 구단만** 적는다 — 과거에 무산된 이적의 상대나 다른 루머의 구단은 넣지 않는다.
 
 [evidence] move 판단의 근거가 된 원문 구절 하나를 글자 그대로 옮긴다(25단어 이내). false이고 마땅한 구절이 없으면 "".
 
@@ -290,11 +293,14 @@ export function parseJudgement(raw, sentText, { corrections, player = null } = {
   if (!quoted) return { kind: "invalid", reason: "근거가 원문에 없다" };
   // 선수 — 규칙이 뽑아 물은 이름이 있으면 그대로, 없으면 모델이 읽은 이름(원문에 있고 사람 이름처럼 생겨야 한다 — "Argentine international"은 이름이 아니다)
   const found = player ?? personName(mentionIn(obj.player, sentText));
-  if (!found) return { kind: "invalid", reason: "이동이라면서 선수를 특정하지 못했다" };
+  // 이동이라는데 선수를 특정할 수 없는 글("South American star"·"£60m full-back")은 **영영 딜이 될 수 없다** — 판정 불가로 두면 24시간마다
+  // 같은 글에 다시 물어 비용만 반복된다(감사: 판정 불가 18건 중 8건). 후보가 아니라는 뜻으로 not_move에 접고 표시만 남긴다.
+  if (!found) return { kind: "not_move", evidence: clampCp(evidence, EVIDENCE_MAX_CHARS), unnamed: true };
   let from = mentionIn(obj.from, sentText);
   let to = mentionIn(obj.to, sentText);
   if (from && to && normalizeQuote(from) === normalizeQuote(to)) from = to = null; // 같은 구단이 양쪽에 오면 어느 쪽도 믿지 않는다
-  const suitors = [...new Set((Array.isArray(obj.suitors) ? obj.suitors : []).map((s) => mentionIn(s, sentText)).filter((s) => s && s !== from && s !== to))].slice(0, SUITORS_MAX);
+  let suitors = [...new Set((Array.isArray(obj.suitors) ? obj.suitors : []).map((s) => mentionIn(s, sentText)).filter((s) => s && s !== from && s !== to))].slice(0, SUITORS_MAX);
+  ({ to, suitors } = normalizeDestination({ to, suitors }, sentText));
   const s = judgeSummary(obj.summary_ko, corrections);
   return {
     kind: "move",
@@ -308,6 +314,31 @@ export function parseJudgement(raw, sentText, { corrections, player = null } = {
     summary: s.text ?? null,
     summaryIssue: s.reason ?? null,
   };
+}
+
+/** 나열의 이음말 — "A, B and C"·"A as well as B"·"A, alongside B". 쉼표나 접속사 중 하나는 있어야 나열이다(공백만으로는 아니다) */
+const LIST_JOIN = String.raw`(?:,\s*(?:(?:and|or|&|as well as|alongside|plus|along with)\s+)?|\s+(?:and|or|&|as well as|alongside|plus|along with)\s+)(?:the\s+)?`;
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** to가 원문에서 suitors 중 하나와 같은 나열에 묶여 있는가 — "Tottenham, Newcastle and Chelsea are interested"의 Tottenham */
+export function isEnumeratedWith(text, to, suitors) {
+  const t = normalizeQuote(text);
+  const e = (s) => escapeRe(normalizeQuote(s));
+  return suitors.some((s) => new RegExp(`${e(to)}${LIST_JOIN}${e(s)}|${e(s)}${LIST_JOIN}${e(to)}`, "u").test(t));
+}
+
+/**
+ * 행선지 정규화 — 지시문("관심 구단이 하나뿐이면 to, 여럿이면 to는 null")을 모델이 **양방향으로** 어긴다
+ * (감사 111건: 하나뿐인데 suitors에만 둔 것 7건, 여럿인데 첫 구단을 to로 확정한 것 2건). 지시문으로는 안 잡혀 코드가 정규화한다.
+ * - to가 없고 suitors가 하나뿐이면 그 구단이 행선지다.
+ * - to가 suitors 중 하나와 같은 나열에 묶여 있으면 관심 구단 중 하나일 뿐이다 → suitors 맨 앞으로 내린다.
+ *   "Chelsea are monitoring X but may face competition from United and Liverpool"처럼 to가 나열 밖이면(주된 구단) 그대로 둔다.
+ * @param {{ to: string | null, suitors: string[] }} m 원문 표기(mentionIn을 지난 값)
+ */
+export function normalizeDestination({ to, suitors }, sentText) {
+  if (!to && suitors.length === 1) return { to: suitors[0], suitors: [] };
+  if (to && suitors.length && isEnumeratedWith(sentText, to, suitors)) return { to: null, suitors: [to, ...suitors].slice(0, SUITORS_MAX) };
+  return { to, suitors };
 }
 
 /**
@@ -366,7 +397,7 @@ export async function runJudgements(supabase, needs, { apiKey, names, limit = JU
   const system = buildSystem();
   const fixes = corrections ?? loadGlossary().corrections;
   const out = {
-    read: needs.length, move: 0, notMove: 0, invalid: 0, summarized: 0, summaryInvalid: 0, failed: 0, extractedPlayers: 0,
+    read: needs.length, move: 0, notMove: 0, unnamed: 0, invalid: 0, summarized: 0, summaryInvalid: 0, failed: 0, extractedPlayers: 0,
     clubsVerified: 0, clubsRejected: 0, namesWritten: 0,
     articles: 0, articleMissing: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, warnings: [], updates: [],
   };
@@ -450,6 +481,7 @@ export async function runJudgements(supabase, needs, { apiKey, names, limit = JU
       }
     } else if (judged.kind === "not_move") {
       out.notMove += 1;
+      if (judged.unnamed) out.unnamed += 1; // 이적 글이지만 선수를 특정할 수 없다 — 딜 후보가 아니라 not_move로 접는다(다시 묻지 않는다)
       Object.assign(update, { verdict: "not_move", verdict_evidence: judged.evidence, summary_ko: null });
     } else {
       out.invalid += 1;

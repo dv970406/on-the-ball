@@ -164,6 +164,9 @@ const isTopLeague = (canonical) => Boolean(canonical && clubDisplay(canonical).l
 const MOVE_WORDS = /\b(?:join(?:s|ed|ing)?|move(?:s|d)?\s+to|transfer(?:s|red)?\s+(?:to|from)|switch(?:es|ed)?\s+to|sign(?:s|ed|ing)?\s+for|leav(?:e|es|ing)|left(?!-)|depart(?:s|ed|ure)?|arriv(?:e|es|ed|al)|loan(?:ed)?\s+(?:to|from))\b/iu;
 /** "from Man City" — 대문자로 시작하는 출발 구단. "interest from X"(데려가려는 구단)는 옮긴다는 표현이 아니다 */
 const FROM_CLUB = new RegExp(String.raw`${SUITOR_FROM}\bfrom\s+\p{Lu}`, "u");
+// ⚠ 영입 관심 표현("on X's radar"·"interest from X")은 옮긴다는 표현으로 치지 않는다 — 재계약 협상 기사에 으레 붙는 배경이라,
+//   치면 재계약이 딜이 된다(회귀 테스트). 대가로 "X is on Arsenal's radar but Liverpool want to extend his contract" 같은
+//   이적설이 재계약으로 접힌다(감사에서 1건) — 재계약 오탐이 더 잦아 이쪽을 택했다.
 const MOVE = { test: (s) => MOVE_WORDS.test(s) || FROM_CLUB.test(s) };
 
 /**
@@ -190,10 +193,14 @@ function groupByPlayer(rows, names) {
     groups.get(k).push(r);
   }
   const multi = [...groups.keys()].filter((k) => tokens(k).length >= 2);
+  // 두 묶음이 말하는 구단이 하나도 겹치지 않으면 다른 사람이다 — 도르트문트의 유망주 "Inacio"가 스포르팅의 "Goncalo Inacio" 딜에
+  // 합쳐져 "곤살루 이나시우 도르트문트 → 유벤투스"가 됐다(운영). 어느 쪽이든 구단을 하나도 못 읽었으면 판단할 수 없어 합친다.
+  const clubsOf = (rs) => new Set(rs.flatMap((r) => [...(r.clubs ?? []), r.verdict_from, r.verdict_to, ...(r.verdict_suitors ?? [])].filter(Boolean)));
+  const sharesClub = (a, b) => { const x = clubsOf(a), y = clubsOf(b); return !x.size || !y.size || [...x].some((c) => y.has(c)); };
   for (const k of [...groups.keys()]) {
     if (tokens(k).length !== 1) continue;
     const known = Boolean(names.playerInfo(k));
-    const owners = multi.filter((m) => tokens(m).at(-1) === k || (known && tokens(m)[0] === k));
+    const owners = multi.filter((m) => (tokens(m).at(-1) === k || (known && tokens(m)[0] === k)) && sharesClub(groups.get(k), groups.get(m)));
     if (owners.length !== 1) continue;
     groups.get(owners[0]).push(...groups.get(k));
     groups.delete(k);
@@ -293,6 +300,9 @@ const JUDGE_VOTE = 4;
  */
 function resolveDirection(items, player, key) {
   const free = new Map(), from = new Map(), dest = new Map(), former = new Map();
+  // 행선지의 **확실한** 표(강한 규칙 문형 · LLM 판정) — 판정이 있는 딜에서는 약한 문형만으로 행선지를 정하지 않는다
+  const firmDest = new Map();
+  let judgedAny = false;
   const last = items.at(-1);
   let anyFreeAgent = false;
   for (const it of items) {
@@ -300,12 +310,17 @@ function resolveDirection(items, player, key) {
     addVotes(free, collectVotes(it.sentences, LEFT_FREE, player, w));
     addVotes(from, collectVotes(it.sentences, FROM, player, w));
     addVotes(dest, collectVotes(it.sentences, DEST, player, w));
+    addVotes(firmDest, collectVotes(it.sentences, DEST.filter((p) => p.strong), player, w));
     // 전 소속("former West Ham striker")은 이름 없이 쓰이는 일이 많아 단독 선수 기사 전체에서 읽는다
     addVotes(former, collectVotes(it.storySentences, FORMER, player, w));
     if (it.sentences.some((s) => FREE_AGENT_RE.test(s))) anyFreeAgent = true;
     if (verdictOf(it.row, key) === "move") {
+      judgedAny = true;
       if (it.row.verdict_from) addVotes(from, new Map([[it.row.verdict_from, JUDGE_VOTE * w]]));
-      if (it.row.verdict_to) addVotes(dest, new Map([[it.row.verdict_to, JUDGE_VOTE * w]]));
+      if (it.row.verdict_to) {
+        addVotes(dest, new Map([[it.row.verdict_to, JUDGE_VOTE * w]]));
+        addVotes(firmDest, new Map([[it.row.verdict_to, JUDGE_VOTE * w]]));
+      }
     }
   }
   const freeClub = topVote(free);
@@ -323,6 +338,9 @@ function resolveDirection(items, player, key) {
     else if (destVotes > fromVotes) origin = null;
     else origin = destination = null;
   }
+  // 판정(LLM)이 있는 딜에서 행선지가 규칙의 **약한 문형**("on loan at Juventus"·"to Bayern" 배경 언급)에서만 왔으면 믿지 않는다 —
+  // 판정자가 "행선지 없음"이라 한 보도에 그 한 표가 얹혀 임대 구단·배경 구단이 행선지가 됐다(감사: 볼테마데 → 유벤투스 등 3건).
+  if (judgedAny && destination && !firmDest.has(destination)) destination = null;
   // 소속을 못 읽었으면 전 소속이 출발 구단이다 — 자유 계약("former Real Madrid defender")도 그 구단을 떠나온 것이다
   const formerClub = origin ? null : topVote(former);
   return { from: origin ?? (formerClub && formerClub !== destination ? formerClub : null), to: destination, isFree };
@@ -523,7 +541,7 @@ export function deriveDeals(rows, opts) {
      * (사람이 보고 `players-ko.json`에 넣으면 열린다).
      */
     if (opts.requireVerified && !names.isVerifiedPlayer(key)) {
-      unverified.push(player);
+      unverified.push({ player, stage });
       skip("미확인 선수");
       continue;
     }
@@ -605,7 +623,10 @@ export function deriveDeals(rows, opts) {
   }
 
   if (unconfirmed.length) warnings.push(`이동 판정(LLM)을 받지 못한 새 딜 ${unconfirmed.length}건 — 보드에 올리지 않았다: ${unconfirmed.join(", ")}`);
-  if (unverified.length) warnings.push(`확인되지 않은 선수 ${unverified.length}명 — 보드에 올리지 않았다(선수가 맞으면 players-ko.json에 넣는다): ${unverified.join(", ")}`);
+  if (unverified.length) warnings.push(`확인되지 않은 선수 ${unverified.length}명 — 보드에 올리지 않았다(선수가 맞으면 players-ko.json에 넣는다): ${unverified.map((u) => u.player).join(", ")}`);
+  // 유스·10대 이적은 위키데이터에 항목이 없어 관문에 막히는데, 완료·확정 보도는 실제 이적이다(감사: 놓친 8건 중 5건) — 사람이 먼저 봐야 할 것을 따로 알린다
+  const doneUnverified = unverified.filter((u) => u.stage === "official" || u.stage === "here_we_go");
+  if (doneUnverified.length) warnings.push(`⚠ 그중 완료·확정 보도인데 확인되지 않은 선수 ${doneUnverified.length}명 — 실제 이적이라 사전 등재가 급하다: ${doneUnverified.map((u) => u.player).join(", ")}`);
   if (missingKo.length) warnings.push(`한국어 표기가 없는 선수 ${missingKo.length}명(사람 사전·위키데이터 모두 없음) — 영문명으로 그려진다: ${missingKo.join(", ")}`);
   deals.sort((a, b) => b.latest_reported_at.localeCompare(a.latest_reported_at));
   return { deals, clubs: [...clubs.values()], assignments, nameNeeds, judgeNeeds, clubNeeds, fromFallback, warnings, skipped, startMs };
@@ -654,7 +675,7 @@ async function loadRows(supabase, startMs) {
   for (;;) {
     const { data, error } = await supabase
       .from(NEWS)
-      .select("id, source_id, external_id, url, stage, players, body, published_at, relevance, deal_id, verdict, verdict_player, verdict_player_name, verdict_at, verdict_from, verdict_to, verdict_suitors, verdict_stage, summary_ko")
+      .select("id, source_id, external_id, url, stage, players, clubs, body, published_at, relevance, deal_id, verdict, verdict_player, verdict_player_name, verdict_at, verdict_from, verdict_to, verdict_suitors, verdict_stage, summary_ko")
       .gte("published_at", new Date(startMs).toISOString())
       .or(`deal_id.not.is.null,and(stage.neq.unknown,relevance.gte.${MIN_RELEVANCE})`)
       .gt("id", lastId)

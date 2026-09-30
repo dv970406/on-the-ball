@@ -394,6 +394,24 @@ const FALLBACK = {
   reported: withClub([row("John Doe could join Chelsea from Bayern in January.", { stage: "rumour" })], clubCache("Benfica")),
 };
 
+// ── 판정이 있는 딜에서는 규칙의 약한 행선지 문형만으로 행선지를 정하지 않는다 ──
+const FIRM = {
+  weakOnly: derive([row("Newcastle United striker John Doe, on loan at Juventus this season, is attracting interest from Bayern Munich.", { stage: "rumour", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_from: "Newcastle United", verdict_to: null, verdict_suitors: ["Bayern Munich"], verdict_stage: "rumour", summary_ko: "요약" })]),
+  strongRule: derive([row("John Doe signs for Juventus.", { stage: "official", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_from: "Newcastle United", verdict_to: null, verdict_suitors: [], verdict_stage: "official", summary_ko: "요약" })]),
+  unjudged: derive([row("Newcastle United striker John Doe, on loan at Juventus this season, is attracting interest from Bayern Munich.", { stage: "rumour" })]),
+};
+// ── 한 토큰 이름 병합 — 구단이 겹칠 때만 ──
+const MERGE = {
+  disjoint: derive([
+    row("Goncalo Inacio could join AC Milan from Sporting in January.", { players: ["Goncalo Inacio"], stage: "rumour", clubs: ["Sporting CP", "AC Milan"] }),
+    row("Inacio could join Juventus from Borussia Dortmund.", { players: ["Inacio"], stage: "talks", clubs: ["Juventus", "Borussia Dortmund"] }),
+  ]),
+  overlapping: derive([
+    row("Alexander Isak could join Liverpool from Newcastle.", { players: ["Alexander Isak"], stage: "rumour", clubs: ["Newcastle United", "Liverpool"] }),
+    row("Liverpool make a £120m bid for Isak.", { players: ["Isak"], stage: "offer", clubs: ["Liverpool"] }),
+  ]),
+};
+
 // ── 검증 게이트 — 확인된 선수의 딜만 만든다 ──
 const gated = (rows, cache = []) =>
   deriveDeals(rows, { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: DICT, cache }), requireVerified: true });
@@ -523,6 +541,11 @@ const UNIT = [
   { name: "폴백 — 자유계약이면 소속이 없으니 쓰지 않는다", got: [FALLBACK.free.deals[0]?.from_club_code ?? null, FALLBACK.free.fromFallback, FALLBACK.free.clubNeeds.length], want: [null, 0, 0] },
   { name: "폴백 — 캐시가 없거나 못 찾은 채 오래됐으면 조회 대상이고, 최근에 못 찾았으면 다시 묻지 않는다", got: [FALLBACK.notFound.clubNeeds.length, FALLBACK.stale.clubNeeds.map((n) => n.playerKey)], want: [0, ["john doe"]] },
   { name: "폴백 — 보도가 소속을 말하면 그쪽이 먼저다(캐시의 벤피카가 아니라 보도의 바이에른)", got: [FALLBACK.reported.deals[0]?.from_club_code, FALLBACK.reported.fromFallback], want: ["bayern-munchen", 0] },
+  { name: "행선지 보호 — 판정이 '행선지 없음'인 딜에 규칙의 약한 문형(on loan at Juventus)만 있으면 행선지를 비운다", got: [FIRM.weakOnly.deals[0]?.to_club_code ?? null, FIRM.weakOnly.deals[0]?.suitorCodes], want: [null, ["bayern-munchen"]] },
+  { name: "행선지 보호 — 규칙의 강한 문형(signs for)은 판정이 있어도 행선지다", got: FIRM.strongRule.deals[0]?.to_club_code, want: "juventus" },
+  { name: "행선지 보호 — 판정이 없는 딜은 전처럼 약한 문형도 센다", got: FIRM.unjudged.deals[0]?.to_club_code, want: "juventus" },
+  { name: "병합 — 구단이 하나도 안 겹치는 한 토큰 이름은 다른 사람이다(도르트문트의 Inacio ≠ 스포르팅의 Goncalo Inacio)", got: MERGE.disjoint.deals.map((d) => [d.player, d.report_count]).sort(), want: [["Goncalo Inacio", 1], ["Inacio", 1]] }, // 한 토큰 딜은 운영에서 확인 관문(위키데이터는 한 토큰을 찾지 않는다)이 막는다
+  { name: "병합 — 구단이 겹치면 전처럼 합친다(Isak → Alexander Isak)", got: MERGE.overlapping.deals.map((d) => [d.player, d.report_count]), want: [["Alexander Isak", 2]] },
   { name: "게이트 — 사전에도 캐시에도 없는 선수는 딜을 만들지 않고 이름 조회 대상으로 넘긴다", got: [GATE.unknown.deals.length, GATE.unknown.nameNeeds.map((x) => x.playerKey), GATE.unknown.skipped["미확인 선수"], GATE.unknown.clubs.length], want: [0, ["jane roe"], 1, 0] },
   { name: "게이트 — 위키데이터에서 찾은 선수(한국어 표기 없음)는 연다", got: GATE.cached.deals.length, want: 1 },
   { name: "게이트 — 찾아봤지만 없던 이름은 막는다", got: GATE.notFound.deals.length, want: 0 },

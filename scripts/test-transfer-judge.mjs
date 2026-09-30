@@ -5,7 +5,7 @@
  *   node scripts/test-transfer-judge.mjs
  */
 import { createNameBook } from "./lib/transfer/names-ko.mjs";
-import {
+import { isEnumeratedWith, normalizeDestination,
   ARTICLE_MAX_CHARS,
   BODY_MAX_CHARS,
   EVIDENCE_MAX_CHARS,
@@ -43,6 +43,17 @@ const NO_FIX = { corrections: {} };
 const J = (o) => JSON.stringify({ player: null, player_ko: null, stage: null, from: null, to: null, suitors: [], summary_ko: null, ...o });
 const ALABA = { ...NO_FIX, player: "David Alaba" };
 
+// ── 행선지 정규화 — 지시문을 모델이 양방향으로 어긴다(감사) ──────────────────
+{
+  const T1 = "Tottenham, Newcastle and Chelsea are interested in Giorgio Scalvini.";
+  check("행선지 — to가 관심 구단들과 같은 나열이면 suitors 맨 앞으로 내린다", eq(normalizeDestination({ to: "Tottenham", suitors: ["Newcastle", "Chelsea"] }, T1), { to: null, suitors: ["Tottenham", "Newcastle", "Chelsea"] }));
+  check("행선지 — 'as well as' 나열도 같다", eq(normalizeDestination({ to: "Arsenal", suitors: ["Real Madrid"] }, "Arsenal, as well as Real Madrid, have made contact with Haaland's representatives."), { to: null, suitors: ["Arsenal", "Real Madrid"] }));
+  check("행선지 — 나열 밖의 주된 구단은 그대로 둔다(competition from …)", eq(normalizeDestination({ to: "Chelsea", suitors: ["Manchester United", "Liverpool"] }, "Chelsea are monitoring Tyrick Mitchell but may face competition from Manchester United and Liverpool."), { to: "Chelsea", suitors: ["Manchester United", "Liverpool"] }));
+  check("행선지 — to가 없고 관심 구단이 하나뿐이면 그 구단이 행선지다", eq(normalizeDestination({ to: null, suitors: ["Liverpool"] }, "Liverpool have some interest in Lamine Camara."), { to: "Liverpool", suitors: [] }));
+  check("행선지 — to도 없고 관심 구단이 여럿이면 그대로", eq(normalizeDestination({ to: null, suitors: ["Real Madrid", "Barcelona"] }, "Real Madrid and Barcelona are ready to pounce."), { to: null, suitors: ["Real Madrid", "Barcelona"] }));
+  check("행선지 — 공백만으로 이어진 이름은 나열이 아니다", !isEnumeratedWith("Chelsea Liverpool", "Chelsea", ["Liverpool"]));
+}
+
 // ── 해석 ────────────────────────────────────────────────────────────────
 const BODY = "Udinese have reached a verbal agreement with David Alaba! Austrian star leaves Real Madrid as a free agent.";
 {
@@ -79,10 +90,11 @@ const MANZAMBI = "Johan Manzambi addresses rumours after €70m Aston Villa tran
   const r = parseJudgement(J({ move: true, player: "Johan Manzambi", from: "Freiburg", to: "Aston Villa", stage: "official", evidence: "his move from Freiburg to Aston Villa", summary_ko: "요약." }), MANZAMBI, NO_FIX);
   check("선수 — <선수>가 비면 모델이 읽은 이름을 받는다(원문에 있다)", r.kind === "move" && r.player === "Johan Manzambi" && r.from === "Freiburg" && r.to === "Aston Villa" && r.stage === "official");
   check("선수 — 규칙이 뽑아 물은 이름이 있으면 모델의 이름을 무시한다", parseJudgement(J({ move: true, player: "Someone Else", evidence: "his move from Freiburg", summary_ko: "요약." }), MANZAMBI, { ...NO_FIX, player: "Johan Manzambi" }).player === "Johan Manzambi");
-  check("⚠ 선수 — 원문에 없는 이름은 받지 않는다 → 판정 불가", parseJudgement(J({ move: true, player: "Erling Haaland", evidence: "his move from Freiburg", summary_ko: "요약." }), MANZAMBI, NO_FIX).kind === "invalid");
-  check("⚠ 선수 — 이동이라면서 선수가 null이면 판정 불가", parseJudgement(J({ move: true, player: null, evidence: "his move from Freiburg", summary_ko: "요약." }), MANZAMBI, NO_FIX).kind === "invalid");
+  const unnamed = (r) => r.kind === "not_move" && r.unnamed === true;
+  check("⚠ 선수 — 원문에 없는 이름은 받지 않는다 → 이동 아님(선수 미특정, 다시 묻지 않는다)", unnamed(parseJudgement(J({ move: true, player: "Erling Haaland", evidence: "his move from Freiburg", summary_ko: "요약." }), MANZAMBI, NO_FIX)));
+  check("⚠ 선수 — 이동이라면서 선수가 null이면 이동 아님(선수 미특정)", unnamed(parseJudgement(J({ move: true, player: null, evidence: "his move from Freiburg", summary_ko: "요약." }), MANZAMBI, NO_FIX)));
   const ARG = "Fabrizio Romano denies rumours of Barcelona being interested in Argentine international. Left-Back Target named.";
-  check("⚠ 선수 — 국적·역할어 덩어리는 이름이 아니다(Argentine international · Left-Back Target) → 판정 불가", parseJudgement(J({ move: true, player: "Argentine international", evidence: "denies rumours", summary_ko: "요약." }), ARG, NO_FIX).kind === "invalid" && parseJudgement(J({ move: true, player: "Left-Back Target", evidence: "denies rumours", summary_ko: "요약." }), ARG, NO_FIX).kind === "invalid");
+  check("⚠ 선수 — 국적·역할어 덩어리는 이름이 아니다(Argentine international · Left-Back Target) → 이동 아님(선수 미특정)", unnamed(parseJudgement(J({ move: true, player: "Argentine international", evidence: "denies rumours", summary_ko: "요약." }), ARG, NO_FIX)) && unnamed(parseJudgement(J({ move: true, player: "Left-Back Target", evidence: "denies rumours", summary_ko: "요약." }), ARG, NO_FIX)));
   check("선수 — 수식어가 붙은 이름은 다듬어 받는다(Brazilian wonderkid Endrick → Endrick, 사전에 있는 한 토큰)", parseJudgement(J({ move: true, player: "Brazilian wonderkid Endrick", evidence: "Real Madrid star", summary_ko: "요약." }), "Real Madrid star Brazilian wonderkid Endrick is wanted by Milan.", NO_FIX).player === "Endrick");
 }
 check("단계 — 목록 밖 값은 null", parseJudgement(J({ move: true, stage: "done", evidence: "Austrian star", summary_ko: "요약." }), BODY, ALABA).stage === null && JUDGE_STAGES.includes("here_we_go") && !JUDGE_STAGES.includes("unknown"));
@@ -219,7 +231,7 @@ const noLookup = async () => ({ wikidataId: null, nameKo: null });
       ["South American star", J({ move: true, player: null, evidence: "agreement to sign a South American star", summary_ko: "요약." })],
     ]),
   });
-  check("집계 — 이동 3(요약 2 · 버림 1) · 아님 1 · 판정 불가 2 · 실패 1 · 모델이 읽은 선수 1", eq([r.move, r.summarized, r.summaryInvalid, r.notMove, r.invalid, r.failed, r.extractedPlayers], [3, 2, 1, 1, 2, 1, 1]), JSON.stringify(r));
+  check("집계 — 이동 3(요약 2 · 버림 1) · 아님 2(그중 선수 미특정 1) · 판정 불가 1 · 실패 1 · 모델이 읽은 선수 1", eq([r.move, r.summarized, r.summaryInvalid, r.notMove, r.unnamed, r.invalid, r.failed, r.extractedPlayers], [3, 2, 1, 2, 1, 1, 1, 1]), JSON.stringify(r));
   check("집계 — 캐시 읽은 토큰을 센다", r.cacheReadTokens === 42 && r.inputTokens === 60);
   check("저장 — 이동·아님·판정 불가는 쓰고, 일시 실패는 쓰지 않는다(다음 실행이 다시 묻는다)", eq(db.writes.map((w) => w.id), [1, 2, 3, 5, 6, 7]));
   const w1 = db.writes[0];
@@ -229,11 +241,11 @@ const noLookup = async () => ({ wikidataId: null, nameKo: null });
   check("저장 — 판정 불가는 값 없이 선수·시각만(요약은 건드리지 않는다)", db.writes[2].verdict === null && db.writes[2].verdict_player === "joao pedro" && db.writes[2].verdict_at && !("summary_ko" in db.writes[2]));
   check("저장 — 요약이 버려졌는데 옛 요약이 있으면 둔다(영문으로 되돌리지 않는다)", db.writes[3].verdict === "move" && !("summary_ko" in db.writes[3]));
   check("저장 — 선수 없는 보도는 모델이 읽은 선수를 정규형 키와 원문 표기로 남긴다", db.writes[4].verdict === "move" && db.writes[4].verdict_player === "johan manzambi" && db.writes[4].verdict_player_name === "Johan Manzambi" && db.writes[4].verdict_to === "Aston Villa");
-  check("저장 — 선수 없는 보도에서 선수를 못 특정하면 판정 불가(선수 null)", db.writes[5].verdict === null && db.writes[5].verdict_player === null);
+  check("저장 — 선수 없는 보도에서 선수를 못 특정하면 이동 아님으로 접는다(선수 null · 근거는 남긴다 · 다시 묻지 않는다)", db.writes[5].verdict === "not_move" && db.writes[5].verdict_player === null && db.writes[5].verdict_evidence === "agreement to sign a South American star");
   check("저장 — 사전 밖 구단(Freiburg는 사전에 있다)·기사 본문은 DB에 쓰지 않는다", db.writes[4].verdict_from === "SC Freiburg" && db.writes.every((w) => !("body" in w)));
   check("음역 — 표기가 없는 선수의 한글 표기를 이름 캐시에 llm 출처로 쓴다", r.namesWritten === 1 && db.upserts.some((u) => u.table === "transfer_name_ko" && u.rows[0].key === "johan manzambi" && u.rows[0].name_ko === "요한 만잠비" && u.rows[0].source === "llm"));
-  check("updates — 파생이 메모리에 입힐 값을 돌려준다", eq(r.updates.map((u) => [u.id, u.verdict, u.verdict_to ?? null]), [[1, "move", "Udinese"], [2, "not_move", null], [3, null, null], [5, "move", "Udinese"], [6, "move", "Aston Villa"], [7, null, null]]));
-  check("경고 — 요약 버림·판정 불가는 사유를 남긴다", r.warnings.some((w) => w.includes("#5 요약 버림") && w.includes("한글이 없다")) && r.warnings.some((w) => w.includes("#7 판정 불가") && w.includes("선수를 특정하지 못했다")));
+  check("updates — 파생이 메모리에 입힐 값을 돌려준다", eq(r.updates.map((u) => [u.id, u.verdict, u.verdict_to ?? null]), [[1, "move", "Udinese"], [2, "not_move", null], [3, null, null], [5, "move", "Udinese"], [6, "move", "Aston Villa"], [7, "not_move", null]]));
+  check("경고 — 요약 버림·판정 불가는 사유를 남긴다", r.warnings.some((w) => w.includes("#5 요약 버림") && w.includes("한글이 없다")) && r.warnings.some((w) => w.includes("#3 판정 불가") && w.includes("근거가 원문에 없다")));
 }
 {
   // 위키데이터로 확인한 사전 밖 구단은 캐시에 남고 판정에 실린다
@@ -245,7 +257,7 @@ const noLookup = async () => ({ wikidataId: null, nameKo: null });
     client: fakeClient([["Weinhandl", J({ move: true, from: "Sturm Graz", to: "Arsenal", suitors: ["Brighton", "Aston Villa"], stage: "rumour", evidence: "monitoring Sturm Graz midfielder Luca Weinhandl", summary_ko: "요약." })]]),
   });
   check("구단 확인 — 사전 밖 출발 구단을 위키데이터로 확인해 받고 캐시에 쓴다", db.writes[0].verdict_from === "Sturm Graz" && r.clubsVerified === 1 && db.upserts.some((u) => u.rows.some((x) => x.kind === "club" && x.key === "Sturm Graz" && x.wikidata_id === "Q1")));
-  check("관심 구단 — 정규명으로 저장된다", eq(db.writes[0].verdict_suitors, ["Brighton", "Aston Villa"]) && db.writes[0].verdict_to === "Arsenal");
+  check("관심 구단 — 정규명으로 저장되고, 나열된 세 구단이 다 관심 구단이라 to는 비고 아스날은 suitors 맨 앞이다", eq(db.writes[0].verdict_suitors, ["Arsenal", "Brighton", "Aston Villa"]) && db.writes[0].verdict_to === null);
 }
 {
   const db = fakeDb();

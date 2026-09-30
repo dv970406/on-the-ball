@@ -216,14 +216,17 @@ export async function lookupCurrentClubs(supabase, needs, { fetchImpl = fetch, l
  */
 export async function lookupAndCache(supabase, names, { fetchImpl = fetch, limit = LOOKUP_MAX_PER_RUN, book } = {}) {
   // verified: 항목을 찾았다(한국어 표기가 없어도) — 검증 게이트가 열리므로 다시 파생할 이유가 된다
-  const out = { tried: 0, found: 0, notFound: 0, verified: 0, failed: 0, warnings: [] };
+  const out = { tried: 0, found: 0, notFound: 0, verified: 0, failed: 0, summariesFixed: 0, warnings: [] };
   const rows = [];
+  /** 판정자의 음역이 위키데이터 표기로 바뀐 선수 — 요약 속 옛 표기를 함께 고친다(`fixSummaryNames`) */
+  const renamed = [];
   for (const n of names.slice(0, limit)) {
     out.tried += 1;
     try {
       const r = await lookupKo(n.name, n.kind, fetchImpl);
       const prev = book?.entry(n.kind, n.key);
       const keepLlm = !r.nameKo && prev?.source === "llm" && prev.name_ko;
+      if (n.kind === "player" && r.nameKo && prev?.source === "llm" && prev.name_ko && prev.name_ko !== r.nameKo) renamed.push({ key: n.key, from: prev.name_ko, to: r.nameKo });
       rows.push({ kind: n.kind, key: n.key, name_en: n.name.slice(0, 120), name_ko: r.nameKo ?? (keepLlm ? prev.name_ko : null), wikidata_id: r.wikidataId, source: keepLlm ? "llm" : "wikidata", checked_at: new Date().toISOString() });
       out[r.nameKo ? "found" : "notFound"] += 1;
       if (r.wikidataId) out.verified += 1;
@@ -239,7 +242,30 @@ export async function lookupAndCache(supabase, names, { fetchImpl = fetch, limit
       out.warnings.push(`이름 사전 저장 실패: ${error.message}`);
       out.found = 0;
       out.verified = 0;
+    } else {
+      out.summariesFixed = await fixSummaryNames(supabase, renamed);
     }
   }
   return out;
+}
+
+/**
+ * 요약 속 옛 음역을 새 표기로 바꾼다. 판정자는 표기를 모르는 선수를 스스로 음역해 요약에 쓰고(`source = 'llm'`), 그 표기는
+ * 나중에 위키데이터가 찾아 준 표기로 덮이는데 **요약은 그대로 남아** 딜 제목("코디 가크포")과 요약("코디 학포")이 갈렸다
+ * (감사: 96건 중 4건). 그 선수로 판정된 보도의 요약에서만 바꾼다 — 요약은 추출 컬럼이라 다시 써도 된다.
+ * @param {{ key: string, from: string, to: string }[]} renamed
+ */
+export async function fixSummaryNames(supabase, renamed) {
+  let fixed = 0;
+  for (const { key, from, to } of renamed) {
+    const { data, error } = await supabase.from("transfer_news").select("id, summary_ko").eq("verdict_player", key).ilike("summary_ko", `%${from}%`);
+    if (error || !data?.length) continue;
+    for (const r of data) {
+      const next = r.summary_ko.split(from).join(to);
+      if (next === r.summary_ko || [...next].length > 160) continue;
+      const { error: e2 } = await supabase.from("transfer_news").update({ summary_ko: next }).eq("id", r.id);
+      if (!e2) fixed += 1;
+    }
+  }
+  return fixed;
 }
