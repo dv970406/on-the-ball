@@ -53,6 +53,7 @@ const ALABA = { ...NO_FIX, player: "David Alaba" };
   check("행선지 — 하나뿐이어도 '여럿 중 하나'로 언급됐으면 올리지 않는다(among the sides · also attracting)",
     eq(normalizeDestination({ to: null, suitors: ["Besiktas"] }, "Besiktas were among the sides interested in signing Willock in the summer."), { to: null, suitors: ["Besiktas"] }) &&
     eq(normalizeDestination({ to: null, suitors: ["Barcelona"] }, "The same three Premier League clubs are keeping an eye on Alessandro Bastoni, who is also attracting interest from Barcelona."), { to: null, suitors: ["Barcelona"] }));
+  check("행선지 — 이름 없는 구단 무리와 함께 나온 하나는 올리지 않는다(Championship clubs and Celtic)", eq(normalizeDestination({ to: null, suitors: ["Celtic"] }, "Championship clubs and Celtic are eyeing a move for Liverpool defender Luke Chambers."), { to: null, suitors: ["Celtic"] }));
   check("행선지 — to도 없고 관심 구단이 여럿이면 그대로", eq(normalizeDestination({ to: null, suitors: ["Real Madrid", "Barcelona"] }, "Real Madrid and Barcelona are ready to pounce."), { to: null, suitors: ["Real Madrid", "Barcelona"] }));
   check("행선지 — 공백만으로 이어진 이름은 나열이 아니다", !isEnumeratedWith("Chelsea Liverpool", "Chelsea", ["Liverpool"]));
 }

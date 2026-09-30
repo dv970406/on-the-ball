@@ -393,8 +393,8 @@ export function isEnumeratedWith(text, to, suitors) {
   return suitors.some((s) => new RegExp(`${e(to)}${LIST_JOIN}${e(s)}|${e(s)}${LIST_JOIN}${e(to)}`, "u").test(t));
 }
 
-/** 그 구단이 "여럿 중 하나"로 언급됐다는 표지 — 이름이 하나뿐이어도 관심 구단은 여럿이다 */
-const PLURAL_CUE = /\b(?:among|one of|also|other (?:clubs|sides|teams)|several|a host of|number of|clubs (?:are|were|have)|sides (?:are|were|have))\b/iu;
+/** 그 구단이 "여럿 중 하나"로 언급됐다는 표지 — 이름이 하나뿐이어도 관심 구단은 여럿이다("Championship clubs and Celtic are eyeing …") */
+const PLURAL_CUE = /\b(?:among|one of|also|several|a host of|number of|clubs|sides|teams)\b/iu;
 /**
  * 같은 뜻의 **엄격한** 표지 — 모델이 직접 적은 행선지를 내릴 때 쓴다. 잘못 내리면 맞는 행선지를 잃으므로 "also"처럼 다른 뜻으로도
  * 쓰이는 낱말은 빼고("Bayern are also eyeing X"의 also는 다른 선수 얘기다), 구단·팀을 가리키는 복수 표현만 남긴다.
@@ -417,8 +417,8 @@ export function loneOtherClub(text, from) {
   if (!origin) return null; // 출발 구단을 모르면 남은 하나가 출발인지 행선지인지 알 수 없다
   const others = detectClubs(text).filter((c) => c !== origin);
   if (others.length !== 1) return null;
-  // 이름 없는 구단 무리("Championship clubs"·"several sides")가 함께 나오면 관심 구단이 여럿이다 — 하나로 확정하지 않는다
-  if (/\b(?:former|ex-)/iu.test(text) || PLURAL_CUE.test(text) || /\b(?:clubs|sides|teams)\b/iu.test(text) || !SUITOR_CUE.test(text)) return null;
+  // 이름 없는 구단 무리("Championship clubs"·"several sides")가 함께 나오면 관심 구단이 여럿이다(`PLURAL_CUE`) — 하나로 확정하지 않는다
+  if (/\b(?:former|ex-)/iu.test(text) || PLURAL_CUE.test(text) || !SUITOR_CUE.test(text)) return null;
   const sentences = text.split(/(?<=[.!?])\s+|\n+/u);
   if (collectVotes(sentences, FROM, null, 1).has(others[0])) return null; // "joined from X" — 떠나온 구단이다
   return others[0];
