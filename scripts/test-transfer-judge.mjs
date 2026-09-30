@@ -5,7 +5,7 @@
  *   node scripts/test-transfer-judge.mjs
  */
 import { createNameBook } from "./lib/transfer/names-ko.mjs";
-import { isEnumeratedWith, normalizeDestination,
+import { evidenceIn, isEnumeratedWith, loneOtherClub, normalizeDestination,
   ARTICLE_MAX_CHARS,
   BODY_MAX_CHARS,
   EVIDENCE_MAX_CHARS,
@@ -55,6 +55,32 @@ const ALABA = { ...NO_FIX, player: "David Alaba" };
     eq(normalizeDestination({ to: null, suitors: ["Barcelona"] }, "The same three Premier League clubs are keeping an eye on Alessandro Bastoni, who is also attracting interest from Barcelona."), { to: null, suitors: ["Barcelona"] }));
   check("행선지 — to도 없고 관심 구단이 여럿이면 그대로", eq(normalizeDestination({ to: null, suitors: ["Real Madrid", "Barcelona"] }, "Real Madrid and Barcelona are ready to pounce."), { to: null, suitors: ["Real Madrid", "Barcelona"] }));
   check("행선지 — 공백만으로 이어진 이름은 나열이 아니다", !isEnumeratedWith("Chelsea Liverpool", "Chelsea", ["Liverpool"]));
+}
+
+// ── 근거 대조 — 줄인 인용은 받고, 지어낸 인용은 받지 않는다 ──────────────────────
+{
+  const AMP = "Leeds United have no plans to sell Wales defender Ethan Ampadu, 26, despite links with his former club Chelsea. (Football Insider)";
+  check("근거 — 나이 표기를 뺀 인용을 받는다", evidenceIn(AMP, "Leeds United have no plans to sell Wales defender Ethan Ampadu, despite links with his former club Chelsea"));
+  const ALA = "🚨⚪️⚫️ EXCLUSIVE: Udinese have reached a verbal agreement with David Alaba! Austrian star, a dream signing for the Italian club. Formal steps needed ahead of the here we go.";
+  check("근거 — '...'로 가운데를 건너뛴 인용을 받는다(조각이 순서대로 있다)", evidenceIn(ALA, "Udinese have reached a verbal agreement with David Alaba! ... Formal steps needed ahead of the here we go"));
+  check("근거 — 말줄임표(…)도 같다", evidenceIn(ALA, "Udinese have reached a verbal agreement with David Alaba… Formal steps needed ahead"));
+  check("근거 — 조각의 순서가 뒤바뀌면 받지 않는다", !evidenceIn(ALA, "Formal steps needed ahead ... Udinese have reached a verbal agreement"));
+  check("근거 — 낱말 하나를 바꾼 인용은 받지 않는다(he ↔ they)", !evidenceIn("Falk suggesting they could well return in a year's time.", "he could well return in a year's time"));
+  check("근거 — 원문에 없는 낱말이 끼면 받지 않는다", !evidenceIn(AMP, "Leeds United have agreed to sell Wales defender Ethan Ampadu"));
+  check("근거 — 멀리 떨어진 낱말을 이어 붙인 인용은 받지 않는다(건너뛰기 한도)", !evidenceIn("Chelsea are keen. Many weeks later and after a long saga involving several other clubs and agents, Arsenal finally sign John Doe.", "Chelsea sign John Doe"));
+  check("근거 — 한두 낱말짜리 조각은 받지 않는다", !evidenceIn(ALA, "Udinese ... Alaba"));
+  check("이름 대조는 그대로 통째 일치다(건너뛰어 맞추지 않는다)", parseJudgement(J({ move: true, from: "Real Madrid", evidence: "Sociedad and Atletico Madrid are keen", summary_ko: "요약." }), "Real Sociedad and Atletico Madrid are keen on John Doe.", { ...NO_FIX, player: "John Doe" }).from === null);
+}
+
+// ── 행선지 후처리 — 모델이 비워 보낸 행선지 · '여럿 중 하나'로 확정한 행선지 ──────────
+{
+  check("행선지 — 하나만 적었어도 원문이 '여러 구단 중 하나'라 하면 관심 구단으로 내린다", eq(normalizeDestination({ to: "Manchester United", suitors: [] }, "Manchester United are one of the clubs interested in Real Madrid forward Endrick."), { to: null, suitors: ["Manchester United"] }) && eq(normalizeDestination({ to: "Real Madrid", suitors: [] }, "Real Madrid and several Premier League clubs are tracking Jarrad Branthwaite."), { to: null, suitors: ["Real Madrid"] }));
+  check("행선지 — also는 내리는 표지가 아니다(다른 선수 얘기일 수 있다)", eq(normalizeDestination({ to: "Bayern Munich", suitors: [] }, "Bayern Munich are also eyeing a move for French defender Jules Kounde."), { to: "Bayern Munich", suitors: [] }));
+  check("행선지 — 짧은 글에 출발 말고 구단이 하나뿐이고 영입 관심 글이면 그 구단", loneOtherClub("Tottenham are interested in Galatasaray striker Mauro Icardi, 33.", "Galatasaray") === "Tottenham Hotspur" && loneOtherClub("AS Roma are expected to double their asking price for Chelsea target Manu Kone, 25, to £86m in January.", "AS Roma") === "Chelsea");
+  check("행선지 — 떠나온 구단(joined from X)·전 소속(former X)은 행선지가 아니다", loneOtherClub("Benfica forward John Doe, who joined from Porto last year, is a target for a move.", "Benfica") === null && loneOtherClub("Former Chelsea winger John Doe wants to leave Juventus and is a target.", "Juventus") === null);
+  check("행선지 — 구단이 둘 이상이거나 긴 기사면 짐작하지 않는다", loneOtherClub("Arsenal and Tottenham are monitoring Bayer Leverkusen's Ibrahim Maza.", "Bayer Leverkusen") === null && loneOtherClub(`Tottenham are interested in Galatasaray striker Mauro Icardi.\n\n[기사 본문]\n…`, "Galatasaray") === null);
+  check("행선지 — 이름 없는 구단 무리가 함께 나오면 하나로 확정하지 않는다(Championship clubs)", loneOtherClub("Celtic and Championship clubs want to sign Liverpool defender Luke Chambers on loan.", "Liverpool") === null);
+  check("행선지 — 출발 구단을 모르면 짐작하지 않는다", loneOtherClub("Tottenham are interested in Mauro Icardi.", null) === null);
 }
 
 // ── 재계약 가드 — 지금 구단과의 계약 합의를 이적 단계로 읽지 않는다(케인) ──────────────

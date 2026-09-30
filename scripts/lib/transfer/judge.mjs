@@ -23,6 +23,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import * as cheerio from "cheerio";
 import { detectClubs } from "./clubs.mjs";
+import { FROM, collectVotes } from "./direction.mjs";
 import { personName } from "./extract.mjs";
 import { NAME_TABLE, cacheLlmNames } from "./names-ko.mjs";
 import { COLLECTOR_UA } from "./sources.mjs";
@@ -238,6 +239,61 @@ export function normalizeQuote(s) {
 
 const quotedIn = (text, quote) => quote !== "" && normalizeQuote(text).includes(normalizeQuote(quote));
 
+/** 대조용 낱말 — 앞뒤 문장부호를 걷는다("kone,"와 "kone"은 같은 낱말이다). 통화 기호·퍼센트는 남긴다 */
+const wordsOf = (s) => normalizeQuote(s).split(" ").map((w) => w.replace(/^[^\p{L}\p{N}£€$]+|[^\p{L}\p{N}%]+$/gu, "")).filter(Boolean);
+/** 조각 안에서 건너뛸 수 있는 낱말 수(한 번에 · 조각 전체) — 나이 표기(", 26,")나 수식어("20-year-old Austrian international") 정도 */
+const GAP_MAX = 6;
+const GAP_TOTAL = 8;
+/** 조각 하나로 치는 최소 낱말 수 — 한두 낱말은 어디서든 맞는다 */
+const FRAGMENT_MIN_WORDS = 3;
+
+/** `words`가 `text`의 `from` 뒤에서 **순서대로**(낱말 사이 건너뛰기는 한도 안에서) 나오면 끝 위치, 아니면 -1 */
+function matchFragment(text, words, from) {
+  for (let start = from; start < text.length; start += 1) {
+    if (text[start] !== words[0]) continue;
+    let pos = start;
+    let skipped = 0;
+    let ok = true;
+    for (let i = 1; i < words.length && ok; i += 1) {
+      let next = -1;
+      for (let j = pos + 1; j <= pos + 1 + GAP_MAX && j < text.length; j += 1) if (text[j] === words[i]) { next = j; break; }
+      if (next < 0) ok = false;
+      else {
+        skipped += next - pos - 1;
+        pos = next;
+        if (skipped > GAP_TOTAL) ok = false;
+      }
+    }
+    if (ok) return pos + 1;
+  }
+  return -1;
+}
+
+/**
+ * 근거 인용이 원문에 있는가 — 통째 일치, 또는 **줄인 인용**.
+ *
+ * 근거를 25단어로 제한한 탓에 모델이 인용을 줄인다 — 나이 표기를 빼거나("Ethan Ampadu, despite" ← "Ethan Ampadu, 26, despite")
+ * 가운데를 "..."로 건너뛴다. 통째 일치만 받았더니 판정의 5.5%가 "근거가 원문에 없다"로 버려졌고(감사 183건 중 10건, 9건이 줄인 인용),
+ * 버려진 행은 딜에서 빠진 채 24시간마다 다시 물렸다(운영에서 알라바·미첼·토모리의 판정이 그렇게 비워졌다).
+ *
+ * 받는 조건 — 인용을 "..."로 나눈 조각들이 원문에 **순서대로** 있고, 조각 안의 낱말도 순서대로(건너뛰기 한 번에 `GAP_MAX`,
+ * 조각 전체 `GAP_TOTAL` 낱말까지) 있어야 한다. 인용의 모든 낱말이 원문에 그 순서로 있으므로 "지어낸 근거로 딜을 열지 않는다"는 그대로다.
+ * ⚠ 이름 대조(`mentionIn`)에는 쓰지 않는다 — "Real … Madrid"를 건너뛰어 맞추면 없는 구단이 생긴다.
+ */
+export function evidenceIn(text, quote) {
+  if (quote === "") return false;
+  if (quotedIn(text, quote)) return true;
+  const textWords = wordsOf(text);
+  const fragments = normalizeQuote(quote).split("...").map(wordsOf).filter((f) => f.length);
+  if (!fragments.length || fragments.some((f) => f.length < FRAGMENT_MIN_WORDS)) return false;
+  let at = 0;
+  for (const f of fragments) {
+    at = matchFragment(textWords, f, at);
+    if (at < 0) return false;
+  }
+  return true;
+}
+
 /** 모델이 적은 이름(구단·선수)이 원문에 있으면 다듬어 돌려준다, 없으면 null */
 export function mentionIn(mention, sentText) {
   if (typeof mention !== "string") return null;
@@ -286,7 +342,7 @@ export function parseJudgement(raw, sentText, { corrections, player = null } = {
   }
   if (typeof obj?.move !== "boolean") return { kind: "invalid", reason: "move가 true/false가 아니다" };
   const evidence = typeof obj.evidence === "string" ? obj.evidence.trim().replace(/^["'“”‘’]+|["'“”‘’]+$/gu, "").trim() : "";
-  const quoted = quotedIn(sentText, evidence);
+  const quoted = evidenceIn(sentText, evidence);
   if (!obj.move) return { kind: "not_move", evidence: quoted ? clampCp(evidence, EVIDENCE_MAX_CHARS) : null };
   // "이동이다"는 원문에 실제로 있는 근거가 있어야 받는다 — 지어낸 근거로 딜을 열지 않는다
   if (!evidence) return { kind: "invalid", reason: "이동이라면서 근거가 없다" };
@@ -302,6 +358,8 @@ export function parseJudgement(raw, sentText, { corrections, player = null } = {
   if (from && to && normalizeQuote(from) === normalizeQuote(to)) from = to = null; // 같은 구단이 양쪽에 오면 어느 쪽도 믿지 않는다
   let suitors = [...new Set((Array.isArray(obj.suitors) ? obj.suitors : []).map((s) => mentionIn(s, sentText)).filter((s) => s && s !== from && s !== to))].slice(0, SUITORS_MAX);
   ({ to, suitors } = normalizeDestination({ to, suitors }, sentText));
+  // 모델이 행선지도 관심 구단도 비웠지만 짧은 글에 출발 구단 말고 구단이 하나뿐이면 그 구단이 행선지다
+  if (!to && !suitors.length) to = loneOtherClub(sentText, from);
   // 재계약 가드 — 근거가 **지금 구단과의 계약**(new contract·extension)이고 행선지가 없는데 단계가 진전(협상·합의·완료)이면 그 진전은
   // 재계약의 것이다. 모델이 같은 기사를 어떤 날은 "부인", 어떤 날은 "합의"로 읽어 케인의 재계약이 다시 "합의 임박"이 됐다(운영 재판정).
   // 이적설 부인·루머로 읽은 판정(rumour·denied·collapsed)은 그대로 둔다 — 재계약이 복귀설을 끝낸다는 보도는 부인이 맞다.
@@ -337,6 +395,34 @@ export function isEnumeratedWith(text, to, suitors) {
 
 /** 그 구단이 "여럿 중 하나"로 언급됐다는 표지 — 이름이 하나뿐이어도 관심 구단은 여럿이다 */
 const PLURAL_CUE = /\b(?:among|one of|also|other (?:clubs|sides|teams)|several|a host of|number of|clubs (?:are|were|have)|sides (?:are|were|have))\b/iu;
+/**
+ * 같은 뜻의 **엄격한** 표지 — 모델이 직접 적은 행선지를 내릴 때 쓴다. 잘못 내리면 맞는 행선지를 잃으므로 "also"처럼 다른 뜻으로도
+ * 쓰이는 낱말은 빼고("Bayern are also eyeing X"의 also는 다른 선수 얘기다), 구단·팀을 가리키는 복수 표현만 남긴다.
+ */
+const STRICT_PLURAL_CUE = /\b(?:among (?:the |those |several |many )?(?:clubs|sides|teams|suitors|those)|one of (?:the |several |many |a number of |[a-z]+ )?(?:clubs|sides|teams|suitors)|other (?:clubs|sides|teams|suitors)|several (?:[\w-]+ ){0,3}(?:clubs|sides|teams|suitors)|a (?:host|number) of (?:[\w-]+ ){0,3}(?:clubs|sides|teams|suitors))\b/iu;
+const sentencesWith = (text, name) => String(text).split(/(?<=[.!?])\s+|\n+/u).filter((s) => normalizeQuote(s).includes(normalizeQuote(name)));
+/** 영입 관심·행선지를 말하는 낱말 — 구단이 그냥 언급된 것과 가른다 */
+const SUITOR_CUE = /\b(?:interest(?:ed)?|target(?:s|ed|ing)?|keen|monitor(?:ing|ed)?|tracking|eyeing|eye|wants?|bid|offer|approach(?:ed)?|linked|swoop|pursu(?:e|it|ing)|sign(?:ing)?|move for|radar)\b/iu;
+/** 한 문장짜리 글로 치는 길이 — 가십 항목·트윗. 긴 기사는 구단이 여럿 스쳐 가서 "하나뿐"이 뜻을 잃는다 */
+const LONE_CLUB_MAX_CHARS = 350;
+
+/**
+ * 모델이 행선지도 관심 구단도 비워 보냈는데, 짧은 글에 출발 구단 말고 **구단이 하나뿐**이고 영입 관심을 말하는 글이면 그 구단이
+ * 행선지다(감사: 이카르디 → 토트넘, 코네 → 첼시). 전 소속("former X"·"from X")으로 나온 구단, 복수 표지가 있는 글은 받지 않는다.
+ * @returns 정규 영문명 또는 null
+ */
+export function loneOtherClub(text, from) {
+  if ([...text].length > LONE_CLUB_MAX_CHARS || text.includes("[기사 본문]")) return null;
+  const origin = from ? (detectClubs(from)[0] ?? null) : null;
+  if (!origin) return null; // 출발 구단을 모르면 남은 하나가 출발인지 행선지인지 알 수 없다
+  const others = detectClubs(text).filter((c) => c !== origin);
+  if (others.length !== 1) return null;
+  // 이름 없는 구단 무리("Championship clubs"·"several sides")가 함께 나오면 관심 구단이 여럿이다 — 하나로 확정하지 않는다
+  if (/\b(?:former|ex-)/iu.test(text) || PLURAL_CUE.test(text) || /\b(?:clubs|sides|teams)\b/iu.test(text) || !SUITOR_CUE.test(text)) return null;
+  const sentences = text.split(/(?<=[.!?])\s+|\n+/u);
+  if (collectVotes(sentences, FROM, null, 1).has(others[0])) return null; // "joined from X" — 떠나온 구단이다
+  return others[0];
+}
 
 /**
  * 이름이 적힌 관심 구단이 하나여도 원문이 **다른 관심 구단들**을 암시하면 행선지로 올리지 않는다 —
@@ -354,10 +440,13 @@ export function hintsOtherSuitors(text, suitor) {
  * - to가 없고 suitors가 하나뿐이면 그 구단이 행선지다 — 단 원문이 다른 관심 구단을 암시하면(`hintsOtherSuitors`) 올리지 않는다.
  * - to가 suitors 중 하나와 같은 나열에 묶여 있으면 관심 구단 중 하나일 뿐이다 → suitors 맨 앞으로 내린다.
  *   "Chelsea are monitoring X but may face competition from United and Liverpool"처럼 to가 나열 밖이면(주된 구단) 그대로 둔다.
+ * - to 하나만 있고 원문이 그 구단을 "여러 구단 중 하나"(`STRICT_PLURAL_CUE`)로 말하면 관심 구단으로 내린다.
  * @param {{ to: string | null, suitors: string[] }} m 원문 표기(mentionIn을 지난 값)
  */
 export function normalizeDestination({ to, suitors }, sentText) {
   if (!to && suitors.length === 1 && !hintsOtherSuitors(sentText, suitors[0])) return { to: suitors[0], suitors: [] };
+  // 모델이 하나만 적어 행선지로 확정했어도 원문이 "여러 구단 중 하나"라 하면 관심 구단이다(감사: 브랜스웨이트 → 레알, 엔드릭 → 맨유)
+  if (to && !suitors.length && sentencesWith(sentText, to).some((s) => STRICT_PLURAL_CUE.test(s))) return { to: null, suitors: [to] };
   if (to && suitors.length && isEnumeratedWith(sentText, to, suitors)) return { to: null, suitors: [to, ...suitors].slice(0, SUITORS_MAX) };
   return { to, suitors };
 }
