@@ -18,7 +18,13 @@
   ⚠ `Number()`로 직접 검증하지 말 것 — `1e3`·`0x10`·`1.0`을 받아들여 `/transfers/2`·`/transfers/002`·`/transfers/2.0`이 전부 같은 리소스의 별칭 URL이 된다(전에 proxy와 판정이 갈려 가드가 뚫린 적도 있다).
 - ⚠ **`useSearchParams`는 프리렌더를 CSR로 떨어뜨린다.** `<Suspense>`로 감싸는 게 정석이지만, **경계가 children까지 감싸면 페이지 본문 전체가 빈 껍데기가 된다** — 인증 화면이 실제로 그렇게 됐다(서버 HTML에 `BAILOUT_TO_CLIENT_SIDE_RENDERING`만 남았다).
   effect 안에서만 쿼리 값이 필요하다면 **`useSearchParams`를 쓰지 말고** `@/shared/lib`의 `useNextParam`처럼 `useSyncExternalStore`로 읽는다. 그러면 경계 자체가 필요 없다.
-  렌더에 필요한 쿼리 값은 **서버 page가 `searchParams` prop으로 읽어** 내린다(`app/transfers/page.tsx`의 `?league=`·`?sort=`).
+  렌더에 필요한 쿼리 값은 **서버 page가 `searchParams` prop으로 읽어** 내린다(`app/(auth)/sign-in/page.tsx`의 복귀 파라미터).
+  - ⚠ **예외: 화면 안에서 주소만 바꾸는 필터**(`history.pushState` — 아래 필터 절)는 `useSearchParams`로 읽는다
+    (`views/transfer-board`의 `useBoardFilters`). 서버 prop은 첫 렌더 뒤로 따라오지 않고, 브라우저 주소를 직접 구독하면
+    **Next가 직접 한 이동을 놓친다** — 필터가 걸린 보드에서 탭바의 목록 링크를 누르면 Next가 캐시된 화면을 재사용해
+    주소만 바뀌고 필터된 목록이 남았다(실측). 조건은 **동적 라우트(`ƒ`)이고 Suspense로 감싸지 않는 것**이다 — 그러면
+    서버 첫 렌더에서도 값이 있고, 라우트가 정적이 되면 빌드가 실패한다(조용히 CSR로 떨어지지 않는다).
+    `scripts/check-conventions.mjs`의 `SEARCH_PARAMS_ALLOWED`에 사유와 함께 적는다.
 - 로그인 후 복귀 경로(`?next=`)는 **`safeNextPath`로만 검증한다**(`@/shared/config`). 직접 문자열 검사를 짜지 말 것 — 아래 오픈 리다이렉트 항목 참고.
 
 ## 에러 안전망 (파일 컨벤션)
@@ -45,6 +51,16 @@
 - `generateMetadata`와 `Page`가 같은 데이터를 쓰면 **React `cache()`로 감싸 요청당 1회**만 돌게 한다. 소비자가 하나뿐이면 감싸지 않아도 되지만, **`generateMetadata`를 나중에 동적으로 바꾸는 순간 조회가 2번이 된다** — 그때 함께 감싼다.
 - **`notFound()`는 `Page`(세그먼트 렌더)에서만 효과가 있다.** `generateMetadata`에서 부르면 메타데이터 생성만 중단되고 응답은 200으로 나간다(실측 확인).
 - 조회 실패와 "없음"을 구분한다 — 일시 장애로 멀쩡한 리소스를 404로 단정하면 안 된다.
+
+### 함수 리전은 DB와 같은 서울(`icn1`)이다
+
+`vercel.json`의 `regions`가 정한다(JSON이라 사유를 여기 둔다). 지정하지 않으면 새 프로젝트 기본값인
+미국 동부(`iad1`)에서 서버 렌더가 돌아, **모든 서버 조회가 서울 Supabase까지 태평양을 왕복한다** — 조회가
+없는 동적 라우트도 첫 바이트가 340ms였다(실측). 로그인 요청은 proxy·page의 `getUser()`와 조회마다 그 왕복이
+하나씩 더 붙는다.
+
+- ⚠ Supabase 리전을 옮기면 이 값도 **함께** 옮긴다. 둘이 갈리면 빌드도 화면도 멀쩡하고 느려지기만 한다.
+- Hobby 플랜은 리전을 하나만 고를 수 있다 — 여럿을 적으면 배포가 빌드 전에 실패한다.
 
 ### 익명 조회는 캐시한다 — 크롤러는 로그인하지 않는다
 
@@ -146,7 +162,7 @@ Router Cache는 **URL로만 키가 잡히고 세션은 키에 들어가지 않�
 
 | 화면 | 서버가 조립하는 것 |
 |---|---|
-| `app/transfers/page.tsx` | 이적 딜 목록(범위 안 전부, 리그·정렬은 뷰가 계산) (+ `userId` · **서버 시각** · `scopeStartIso`) |
+| `app/transfers/page.tsx` | 이적 딜 목록(범위 안 전부 — 필터와 무관하다. 리그·정렬·구단은 뷰가 주소에서 읽어 계산한다) (+ `userId` · **서버 시각** · `scopeStartIso`) |
 | `app/transfers/[id]/page.tsx` | 딜 + 보도 타임라인 전체 + 댓글(최신 `COMMENT_LIST_LIMIT`건 — 탭 두 개를 모두 그린다) (+ `userId` · **서버 시각**) |
 
 - ⚠ **`initialData`에는 서버가 읽은 시각을 함께 준다**(`initialDataUpdatedAt: () => serverToClientTime(serverNowMs)` —
@@ -237,9 +253,15 @@ Router Cache는 **URL로만 키가 잡히고 세션은 키에 들어가지 않�
 path로 둘 수 있는 것은 **닫힌 유한 분류**(DB enum 같은)뿐이다 — 조합이 터지지 않기 때문이다.
 열린 조합 패싯을 path로 만들면 크롤 트랩이 된다 → **닫힌 큐레이션 분류 = path / 열린 조합 패싯 = query.**
 
-- **필터는 `<Link>`로 이동한다.** 색인 대상 분류라면 크롤러가 그 페이지를 발견하는 유일한 경로가
-  앵커다 — `<button>` + 로컬 state면 그 URL은 **존재하지 않는 것과 같다.** 생 `<a>`로 두면 누를
-  때마다 전체 페이지가 리로드된다.
+- **필터는 앵커로 이동한다.** 색인 대상 분류라면 크롤러가 그 페이지를 발견하는 유일한 경로가
+  앵커다 — `<button>` + 로컬 state면 그 URL은 **존재하지 않는 것과 같다.** 생 `<a>`를 가로채지 않고
+  두면 누를 때마다 전체 페이지가 리로드된다.
+- ⚠ **query 필터는 서버를 부르지 않는다.** 목록은 범위 안 전체를 SSR로 한 번 내리고 필터·정렬을 뷰가
+  계산하므로, 필터를 바꾼다고 서버가 새로 줄 것이 없다. `<Link>`·`router.push`면 동적 라우트라 클릭마다
+  서버 렌더 왕복을 기다린 뒤에야 화면이 바뀐다 → `href`를 가진 앵커로 두고 **일반 클릭만** 가로채
+  `window.history.pushState`로 주소만 바꾼다(`views/transfer-board`의 `BoardLink`·`navigateBoard`).
+  Next가 이 메서드를 감싸 라우터 기록에 반영하므로 뒤로가기·상세 왕복에도 필터가 남는다. 수정 키 클릭(새 탭)은
+  가로채지 않는다. **path 분류는 `<Link>`로 남긴다** — 서버가 그 분류의 `<title>`·H1을 새로 그려야 한다.
 - 선택 상태는 `aria-pressed`가 아니라 **`aria-current="page"`** 다(링크의 상태 표현).
 - **기본값에는 파라미터를 붙이지 않는다** — `?sort=latest`라는 중복 URL을 만들지 않는다.
 - **모르는 값의 처리가 갈린다**: path의 모르는 **슬러그는 404**(존재하지 않는 분류다), query의

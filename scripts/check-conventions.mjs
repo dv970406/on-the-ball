@@ -37,13 +37,11 @@ const DEEP_IMPORT_ALLOWED = new Set([
   "@/shared/lib/text",
   // 쿼리 키 조각 — `api/keys.ts`는 서버 소비자라 "use client"를 담은 배럴을 거칠 수 없다
   "@/shared/lib/query-scope",
-  // searchParams 첫 값 — 서버 page 셋이 같은 판정으로 읽는다
+  // searchParams 첫 값 — 서버 page들이 같은 판정으로 읽는다
   "@/shared/lib/search-params",
   "@/entities/transfer/api/list-query",
   // 댓글 조립 — 상세 SSR이 클라이언트 훅과 같은 select·정렬·상한으로 댓글을 프리페치한다
   "@/entities/comment/api/list-query",
-  // 리그 필터·정렬 파싱 — SSR 페이지가 `?league=`·`?sort=`를 클라이언트 훅과 같은 판정으로 읽는다
-  "@/entities/transfer/lib/league",
   // 단계 → 상태 뱃지 톤·라벨 — 상세 SSR이 화면과 같은 매핑으로 상태 문구를 그린다
   "@/entities/transfer/lib/stage",
   // 경로 문구·선수 표시명 — 상세 SSR의 og description·`<title>`이 화면과 같은 말을 한다
@@ -79,6 +77,23 @@ const DOCUMENTED_UNUSED = new Map([
  *   사라져도 실패한다(그래야 목록이 죽지 않는다). 다른 화이트리스트와 같은 장치다.
  */
 const ROUTE_HANDLER_ALLOWED = new Map([]);
+
+/**
+ * `useSearchParams` 금지의 **예외 목록**. 사유를 하나하나 적는다.
+ *
+ * 금지의 근거는 "정적 프리렌더가 Suspense 경계까지 CSR로 떨어져 서버 HTML이 빈 껍데기가 된다"인데,
+ * 아래 파일은 **동적 라우트(`ƒ`)에서만** 쓰이고 Suspense로 감싸지 않는다. 동적 라우트에서는 서버 첫 렌더에서도
+ * 값이 있고, 라우트가 정적이 되면 Suspense가 없어 **빌드가 실패한다**(Next 16 문서) — 조용히 망가질 길이 없다.
+ *
+ * ⚠ **양방향으로 본다** — 목록 밖에서 쓰면 실패하고, 목록에 있는데 그 파일이 더는 쓰지 않아도 실패한다.
+ */
+const SEARCH_PARAMS_ALLOWED = new Map([
+  [
+    "src/views/transfer-board/model/use-board-filters.ts",
+    "이적 보드 필터는 화면 안에서 주소만 바꾼다(`history.pushState`). Next가 직접 한 이동(탭바의 목록 링크)까지 " +
+      "따라가려면 Next 라우터의 주소를 읽어야 하고, 그 통로가 이 훅뿐이다. `/transfers`는 쿠키를 읽는 동적 라우트다",
+  ],
+]);
 
 /** styling.md가 못박은 예외 위치. 여기 없는 파일에 나타나면 실패한다. */
 const STYLE_ALLOWED = {
@@ -399,8 +414,11 @@ for (const f of files) {
 for (const f of files) {
   const r = rel(f);
   const c = code.get(f);
-  if (/\buseSearchParams\b/.test(c))
-    fail("banned-api", `${r}: useSearchParams — 프리렌더가 CSR로 떨어진다. useNextParam을 쓴다`);
+  if (/\buseSearchParams\b/.test(c) && !SEARCH_PARAMS_ALLOWED.has(r))
+    fail(
+      "banned-api",
+      `${r}: useSearchParams — 프리렌더가 CSR로 떨어진다. useNextParam을 쓴다(예외는 SEARCH_PARAMS_ALLOWED에 사유를 적는다)`,
+    );
   if (/\)\s*:\s*CSSProperties/.test(c))
     fail("banned-api", `${r}: CSSProperties를 반환하는 헬퍼 — className 문자열을 반환한다`);
   if (r.startsWith("src/") && /^\s*export\s+default\b/m.test(c))
@@ -422,6 +440,11 @@ for (const r of routeFiles) {
         "예외는 ROUTE_HANDLER_ALLOWED에 사유를 적는다",
     );
   }
+}
+for (const r of SEARCH_PARAMS_ALLOWED.keys()) {
+  const f = files.find((x) => rel(x) === r);
+  if (!f || !/\buseSearchParams\b/.test(code.get(f)))
+    fail("banned-api", `${r}가 SEARCH_PARAMS_ALLOWED에 있는데 useSearchParams를 쓰지 않는다 — 목록을 정리한다`);
 }
 for (const r of ROUTE_HANDLER_ALLOWED.keys()) {
   if (!routeFiles.includes(r)) {

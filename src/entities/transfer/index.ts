@@ -31,7 +31,7 @@ export { GROUP_LABEL, GROUP_ORDER } from "./lib/stage";
 export { groupDeals, sortDeals } from "./lib/sort";
 // ⚠ 캐러셀 판정(T1 · 3일 이내)의 단일 소스 — 서버 프리페치와 뷰가 같은 함수를 부른다
 export { pickRecentRumors } from "./lib/rumors";
-// ⚠ URL 파라미터 해석과 리그 필터 — 서버 page와 시트가 같은 판정을 써야 한다
+// ⚠ URL 파라미터 해석과 리그·구단 필터 — 링크가 만드는 주소와 보드가 읽는 주소가 같은 판정을 써야 한다
 export { dealHasClub, dealInLeague, parseTransferClub, parseTransferLeague, parseTransferSort } from "./lib/league";
 // ⚠ 루머 구간의 접기 — 식은 루머·열기 상위 판정을 뷰가 다시 짜지 않는다
 export { splitHotRumors } from "./lib/rumor-heat";

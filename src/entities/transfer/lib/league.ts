@@ -5,7 +5,7 @@ import { TRANSFER_LEAGUES } from "../model/types";
  * URL `?league=` → 리그. 모르는 값·없음은 `null`(= 전체 리그).
  * ⚠ **모르는 값에 404를 내지 않는다** — 정렬과 같은 "파라미터 오염이 404를 양산하면 안 된다"
  *   쪽이다(`nextjs.md`). 리그는 path가 아니라 query라 색인 착지점이 아니다.
- * ⚠ 판정을 호출부(서버 page·시트)가 각자 짜지 않는다 — `parsePostSort`와 같은 이유.
+ * ⚠ 판정을 호출부(보드 뷰의 주소 해석)가 각자 짜지 않는다 — 링크가 만드는 값과 해석이 갈리면 조용히 어긋난다.
  */
 export function parseTransferLeague(value: string | undefined): TransferLeague | null {
   if (!value) return null;

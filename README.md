@@ -15,7 +15,7 @@
 
 | 영역 | 내용 |
 |---|---|
-| 이적시장 | 프리미어리그·유럽 5대 리그 이적 딜 보드(`/transfers`)와 딜 상세(`/transfers/[id]`, 보도 타임라인). 기자·매체 보도를 매시 수집해(`scripts/sync-transfer-news.mjs`, GitHub Actions) **딜을 파생**하고, 딜에 붙은 보도만 LLM이 한국어로 한두 문장 요약한다. 리그·정렬은 쿼리 파라미터 + canonical. `/`는 이 보드로 리다이렉트된다 |
+| 이적시장 | 프리미어리그·유럽 5대 리그 이적 딜 보드(`/transfers`)와 딜 상세(`/transfers/[id]`, 보도 타임라인). 기자·매체 보도를 매시 수집해(`scripts/sync-transfer-news.mjs`, GitHub Actions) **딜을 파생**하고, 딜에 붙은 보도만 LLM이 한국어로 한두 문장 요약한다. 리그·정렬·구단 필터는 쿼리 파라미터 + canonical이고, 첫 화면만 SSR이며 필터 전환은 서버를 부르지 않는다(주소만 바꾼다). `/`는 이 보드로 리다이렉트된다 |
 | 관심 딜 | 로그인 사용자가 딜을 관심 목록에 담는다(낙관적 업데이트, 복합 PK로 멱등) |
 | 인증 | **카카오 · 구글 소셜 로그인**(로그인 = 가입) · 로그아웃. 에러는 한국어로 매핑 |
 | 프로필 | 닉네임(가입 시 랜덤 배정 → 본인이 변경) · 프로필 사진 업로드 · **로그인 수단 연결** |
@@ -166,6 +166,7 @@ supabase migration list --linked    # ③ Local/Remote 열이 일치하는지 �
 | Framework | Next.js (자동 감지) |
 | Build Command | **기본 `next build`** — ⚠ `build:prod`를 쓰면 안 됩니다(`.env.prod`는 저장소에 없습니다) |
 | Install Command | 자동 (`pnpm-lock.yaml`) |
+| Function Region | **서울(`icn1`)** — `vercel.json`이 정합니다. Supabase 리전과 같아야 서버 조회가 태평양을 왕복하지 않습니다(`docs/conventions/nextjs.md`) |
 
 **환경변수는 아래 표가 전부입니다.** 앱에서 `process.env`를 읽는 곳은 `src/shared/config/env.ts` 하나이고,
 운영 스크립트는 `scripts/lib/sync-db.mjs`가 읽습니다(Vercel이 아니라 GitHub Actions 시크릿으로 받습니다).

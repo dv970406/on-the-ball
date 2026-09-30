@@ -8,11 +8,8 @@ import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
 //   select 문자열·정렬·상한을 클라이언트 훅과 **공유해야** 같은 목록이 나온다.
 import { buildDealListQuery } from "@/entities/transfer/api/list-query";
 import { buildDealListItem } from "@/entities/transfer/api/mappers";
-// URL 파라미터 해석 — 시트·정렬 링크가 만드는 값과 같은 판정이어야 한다
-import { parseTransferClub, parseTransferLeague, parseTransferSort } from "@/entities/transfer/lib/league";
 import type { TransferDealListItem } from "@/entities/transfer/model/types";
 import { TransferBoardView } from "@/views/transfer-board";
-import { firstParam } from "@/shared/lib/search-params";
 
 const TITLE = "이적시장";
 const DESCRIPTION = "프리미어리그·유럽 5대 리그 이적 소식을 단계별로 모아 봅니다.";
@@ -108,15 +105,14 @@ const fetchTransferBoard = cache(async (): Promise<TransferBoard> => {
   }
 });
 
-export default async function Page(props: PageProps<"/transfers">) {
-  // ⚠ `useSearchParams`(클라이언트 훅)가 아니라 **서버 컴포넌트의 prop**이다 —
-  //   훅을 쓰면 프리렌더가 CSR로 떨어진다(nextjs.md에서 금지).
-  const { league: rawLeague, sort: rawSort, club: rawClub } = await props.searchParams;
-  // 모르는 리그·정렬·구단은 전체·최신으로 폴백한다 — 파라미터 오염이 404를 양산하면 안 된다
-  const league = parseTransferLeague(firstParam(rawLeague) ?? undefined);
-  const sort = parseTransferSort(firstParam(rawSort) ?? undefined);
-  const club = parseTransferClub(firstParam(rawClub) ?? undefined);
-
+/**
+ * ⚠ 필터(`?league=`·`?sort=`·`?club=`)를 여기서 읽지 않는다 — 뷰가 **주소에서 직접** 읽는다(`useBoardFilters`). 서버는
+ *   필터와 무관하게 범위 안 딜 전체를 내리고, 공유 링크·새로고침의 첫 렌더도 뷰가 같은 주소로 계산한다. 화면 안에서
+ *   필터를 바꾸면 서버를 부르지 않는다.
+ * ⚠ 그 훅이 `useSearchParams`라 이 라우트는 **동적(`ƒ`)이어야 한다** — 지금은 `hasSessionCookie()`가 쿠키를 읽어
+ *   동적이다. 쿠키를 읽지 않게 바꾸면 빌드가 Suspense 누락으로 실패한다(경계를 씌워 덮지 말고 `connection()`을 부른다).
+ */
+export default async function Page() {
   const { deals, userId, nowMs, scopeStartIso } = await fetchTransferBoard();
   return (
     <TransferBoardView
@@ -124,9 +120,6 @@ export default async function Page(props: PageProps<"/transfers">) {
       initialUserId={userId}
       serverNowMs={nowMs}
       scopeStartIso={scopeStartIso}
-      league={league}
-      sort={sort}
-      club={club}
     />
   );
 }

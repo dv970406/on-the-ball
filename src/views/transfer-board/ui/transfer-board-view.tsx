@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   TRANSFER_DEAL_LIMIT,
   type TransferDealListItem,
   type TransferLeague,
-  type TransferSort,
 } from "@/entities/transfer";
 import { openTransferWindow, trackedTransferWindow } from "@/shared/config";
 import { cn, formatCount, useNowMs } from "@/shared/lib";
@@ -16,6 +14,7 @@ import { AuthStatus } from "@/widgets/auth-status";
 import { BottomTabBar } from "@/widgets/bottom-tab-bar";
 import { TabScrollArea } from "@/widgets/tab-scroll-area";
 import { boardHref } from "../lib/board-href";
+import { navigateBoard, useBoardFilters } from "../model/use-board-filters";
 import { useTransferBoard } from "../model/use-transfer-board";
 import { BoardHeader } from "./board-header";
 import { BoardSections } from "./board-sections";
@@ -40,11 +39,6 @@ interface TransferBoardViewProps {
   serverNowMs?: number;
   /** 보드 범위 시작(분 단위 ISO) — 서버가 쿼리 키·조회 조건에 쓴 값 그대로다 */
   scopeStartIso: string;
-  /** `null` = 전체 리그. **URL이 소유한다** — 로컬 state가 아니다 */
-  league: TransferLeague | null;
-  sort: TransferSort;
-  /** `null` = 전체 구단. 구단 코드(`?club=`) — 보드에 없는 구단은 모델이 전체로 폴백한다 */
-  club: string | null;
 }
 
 /**
@@ -56,6 +50,8 @@ interface TransferBoardViewProps {
  * ⚠ 이동·정렬·필터가 **각각 다른 형태**(밑줄 탭 · 텍스트 링크 · 칩)인 것이 규약이다 — 셋이 같은 칩 모양으로
  *   세 줄 쌓여 있을 때 전부 필터로 읽혔다.
  *
+ * ⚠ **첫 화면만 SSR이고 필터·정렬은 서버를 부르지 않는다** — 서버는 범위 안 딜 전체를 한 번 내리고, 필터를 바꾸면
+ *   주소만 바꿔(`navigateBoard`) 같은 목록으로 다시 계산한다. 서버가 새로 줄 것이 없는 이동에 서버 렌더를 기다리지 않는다.
  * ⚠ `SignInDialog`를 두지 않는다 — 보드에는 로그인이 필요한 액션이 없다(관심 토글은 상세에만).
  * ⚠ 이 슬라이스는 에메랄드·`rounded-full`·`shadow-`를 새로 쓰지 않는다 — 엔티티 컴포넌트가
  *   이미 갖는 자리(관심 표시·상태 뱃지)가 전부다.
@@ -65,11 +61,9 @@ export function TransferBoardView({
   initialUserId,
   serverNowMs,
   scopeStartIso,
-  league,
-  sort,
-  club: requestedClub,
 }: TransferBoardViewProps) {
-  const router = useRouter();
+  // 필터(`?league=`·`?sort=`·`?club=`)는 **주소가 소유한다** — SSR 첫 렌더부터 화면 안 이동까지 소스가 하나다
+  const { league, sort, club: requestedClub } = useBoardFilters();
 
   // ⚠ **서버 시각이 우선이다** — `useNowMs()`는 세션당 한 번 고정되므로 클라 값을 앞에 두면
   //   낡은 시계가 갓 받은 서버 시각을 이긴다(`data-and-state.md`). `??`가 단축평가라 훅은
@@ -99,7 +93,7 @@ export function TransferBoardView({
   /** 리그는 URL이 소유한다 — `replace`라 뒤로가기 스택에 리그 변경이 쌓이지 않는다. 리그를 바꾸면 구단 필터는 푼다(다른 리그의 구단이다) */
   const handleLeagueSelect = (next: TransferLeague | null) => {
     setLeagueSheetOpen(false);
-    if (next !== league) router.replace(boardHref(next, sort, null), { scroll: false });
+    if (next !== league) navigateBoard(boardHref(next, sort, null), "replace");
   };
 
   const allDeals = deals.data;

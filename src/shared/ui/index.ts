@@ -11,7 +11,7 @@ export { Skeleton } from "./skeleton";
 export { EmptyState } from "./empty-state";
 export { StaleBanner } from "./stale-banner";
 export { TextField } from "./text-field";
-// 칩 외형 — 이동(`<Link>`)에 입힐 수 있게 클래스 함수로만 둔다(buttonClassName과 같은 이유)
+// 칩 외형 — 이동(링크 앵커)에 입힐 수 있게 클래스 함수로만 둔다(buttonClassName과 같은 이유)
 export { chipClassName } from "./chip-class";
 // 오버레이 2종 + 로그인 안내
 // 닫기 수단은 스크림 탭·Escape·그래버(탭·스와이프) — 별도 "닫기" 행을 두지 않는다.

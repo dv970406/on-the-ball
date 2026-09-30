@@ -1,12 +1,12 @@
 "use client";
 
 import { ChevronDown, X } from "lucide-react";
-import Link from "next/link";
 import type { TransferLeague, TransferSort } from "@/entities/transfer";
 import { chipClassName, Icon } from "@/shared/ui";
 import { boardHref } from "../lib/board-href";
 import { leagueLabel } from "../lib/league-options";
 import type { ClubOption } from "../model/use-transfer-board";
+import { BoardLink } from "./board-link";
 
 /** 레일에 늘어놓는 구단 수 — 그 뒤는 딜이 한두 건인 구단이라 칩으로 둘 가치가 작다. 선택된 구단은 순위와 무관하게 남긴다 */
 const MAX_CHIPS = 14;
@@ -28,9 +28,9 @@ interface FilterRailProps {
  * 팬이 이적 소식을 읽는 단위는 리그가 아니라 **구단**이다 — 리그 필터는 목록을 5분의 1로밖에 줄이지 못한다. 리그는
  * 구단 칩의 범위를 고르는 상위 선택으로 남는다(리그를 바꾸면 구단 필터는 풀린다 — 뷰의 `handleLeagueSelect`).
  *
- * ⚠ **구단 칩은 이동이다(`<Link>`)** — 상태를 URL이 소유하므로 정렬 링크와 같은 형태다(`nextjs.md` "필터는 색인
- *   대상인가": 같은 집합의 부분집합이라 색인 대상은 아니고 canonical에서 떨어진다). 선택 표시는 `aria-current="page"`,
- *   형태는 `chipClassName`(잉크, 에메랄드 아님).
+ * ⚠ **구단 칩은 이동이다(`BoardLink`)** — 상태를 URL이 소유하므로 정렬 링크와 같은 형태다(`nextjs.md` "필터는 색인
+ *   대상인가": 같은 집합의 부분집합이라 색인 대상은 아니고 canonical에서 떨어진다). 누르면 서버를 부르지 않고 주소만
+ *   바꾼다. 선택 표시는 `aria-current="page"`, 형태는 `chipClassName`(잉크, 에메랄드 아님).
  * ⚠ **`전체 구단` 칩이 없다.** 필터 없음이 기본 상태라 그 칩은 늘 켜져 있는 장식이었다 → 선택된 칩에 ×를 붙이고 그 칩의
  *   링크가 필터를 푼다(`href`가 구단 `null`). 칩 하나가 줄고 "무엇이 걸려 있는가"가 또렷해진다.
  * ⚠ **칩에 건수를 적지 않는다.** 순서가 이미 건수순이고, 누르면 구간 제목이 건수를 말한다 — 한 화면에 숫자 20개가
@@ -64,7 +64,7 @@ export function FilterRail({ options, club, league, sort, onOpenLeague }: Filter
             {shown.map((o) => {
               const isSelected = club === o.code;
               return (
-                <Link
+                <BoardLink
                   key={o.code}
                   href={boardHref(league, sort, isSelected ? null : o.code)}
                   aria-current={isSelected ? "page" : undefined}
@@ -77,7 +77,7 @@ export function FilterRail({ options, club, league, sort, onOpenLeague }: Filter
                       <span className="sr-only">필터 해제</span>
                     </>
                   )}
-                </Link>
+                </BoardLink>
               );
             })}
           </nav>
