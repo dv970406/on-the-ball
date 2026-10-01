@@ -23,7 +23,7 @@ interface UseTransferDetailArgs {
   initialReports?: TransferReport[];
   /** 서버가 미리 조회한 댓글 — `undefined`면 클라이언트가 조회한다 */
   initialComments?: CommentList;
-  /** 서버가 그 데이터를 읽은 시각 — 뒤로가기가 되살린 옛 페이로드를 stale로 보게 한다(`useCommentListQuery`) */
+  /** 서버가 그 데이터를 읽은 시각 — 뒤로가기가 되살린 옛 페이로드를 stale로 보게 한다(딜·타임라인·댓글 공통) */
   serverNowMs?: number;
   initialUserId?: string;
 }
@@ -48,19 +48,33 @@ export function useTransferDetail({
   // 스코프돼 있어(관심 임베딩이 "내 행만") 키가 갈리면 서버가 채운 캐시에 닿지 못한다.
   const userId = sessionStatus === "loading" ? initialUserId : storeUserId;
 
-  const dealQuery = useTransferDealQuery(
+  // 서버 시각을 기기 시계로 옮겨 넣는다 — 기기 시계와 빼서 신선도를 재기 때문이다(`serverToClientTime`).
+  // ⚠ 세 조회가 같은 값을 쓴다 — 뒤로가기가 되살린 옛 서버 페이로드를 신선한 것으로 앉히지 않는다
+  const initialDataUpdatedAt = () =>
+    serverNowMs === undefined ? undefined : serverToClientTime(serverNowMs);
+
+  /**
+   * ⚠ 딜 단건은 `ownsPrefetch`로 가르지 않는다 — 개인화 값이 `isWatched` 하나뿐이고 그 값을 그리는
+   *   `WatchToggle`이 세션으로 3분기한다(`nextjs.md` 서버 프리페치 절의 예외).
+   */
+  const dealQuery = useTransferDealQuery({
     dealId,
     userId,
     // ⚠ 프리페치가 있으면 복원을 기다리지 않는다 — 기다리면 서버가 그린 HTML을 스켈레톤이 덮는다
-    initialDeal !== undefined || sessionStatus !== "loading",
-    initialDeal,
-  );
+    enabled: initialDeal !== undefined || sessionStatus !== "loading",
+    initialData: initialDeal,
+    initialDataUpdatedAt,
+  });
 
   /**
    * 보도 타임라인은 "나"에 종속되지 않아(키에 유저가 없다) 세션 복원을 기다릴 이유가 없다 —
    * 항상 켜 둔다. 프리페치가 있으면 `initialData`가 곧바로 캐시에 앉는다.
    */
-  const reportsQuery = useTransferReportsQuery(dealId, true, initialReports);
+  const reportsQuery = useTransferReportsQuery({
+    dealId,
+    initialData: initialReports,
+    initialDataUpdatedAt,
+  });
 
   /**
    * 댓글 — 키가 userId로 스코프된다(내 표 임베딩이 "내 행만"). 딜과 같은 규약이다:
@@ -83,9 +97,7 @@ export function useTransferDetail({
     userId,
     enabled: initialComments !== undefined || sessionStatus !== "loading",
     initialData: ownsPrefetch ? initialComments : undefined,
-    // 서버 시각을 기기 시계로 옮겨 넣는다 — 기기 시계와 빼서 신선도를 재기 때문이다(`serverToClientTime`)
-    initialDataUpdatedAt: () =>
-      serverNowMs === undefined ? undefined : serverToClientTime(serverNowMs),
+    initialDataUpdatedAt,
     placeholderData: commentsPlaceholder,
   });
 

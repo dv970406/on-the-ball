@@ -2,7 +2,7 @@
 
 import { Link2, Unlink } from "lucide-react";
 import { OAUTH_PROVIDERS, OAUTH_PROVIDER_LABEL } from "@/shared/config";
-import { Button, EmptyState, Skeleton } from "@/shared/ui";
+import { Button, EmptyState, Skeleton, StaleBanner } from "@/shared/ui";
 import { useLinkedIdentitiesQuery } from "@/entities/session";
 import { useLinkIdentity, useUnlinkIdentity } from "@/features/link-identity";
 
@@ -31,7 +31,7 @@ export function LinkedAccounts({ userId }: { userId: string | undefined }) {
   /**
    * ⚠ **가장 최근 실패를 먼저 보여준다.** mutation의 error는 다음 호출까지 남으므로
    *   `link.error ?? unlink.error ?? …` 순으로 두면 **오래된 실패가 새 실패를 가린다**.
-   *   조회 실패는 아래 EmptyState가 이미 말하고 있으므로 여기서는 제외한다(중복 낭독 방지).
+   *   조회 실패는 아래 EmptyState·StaleBanner가 이미 말하고 있으므로 여기서는 제외한다(중복 낭독 방지).
    */
   const actionError = unlink.error?.message ?? link.error?.message ?? null;
 
@@ -58,6 +58,11 @@ export function LinkedAccounts({ userId }: { userId: string | undefined }) {
           description={identities.error.message}
           onRetry={() => identities.refetch()}
         />
+      )}
+
+      {/* 캐시된 목록은 그대로 두고 최신화 실패만 알린다 */}
+      {identities.error && identities.data && (
+        <StaleBanner noun="연결 정보" onRetry={() => identities.refetch()} />
       )}
 
       {identities.data && (

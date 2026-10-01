@@ -1,7 +1,7 @@
-"use client";
-
+// ⚠ `"use client"`가 없다 — 상호작용이 없는 렌더러라 서버 렌더 여지를 남긴다(`architecture.md`).
+//    그래서 순수 함수는 배럴이 아니라 직접 경로로 가져온다(`credibility-badge.tsx`와 같은 이유).
 import { FeeDelta, FeeValue, type TransferDeal, feeKindLabel, formatFee, formatFeeRange } from "@/entities/transfer";
-import { cn } from "@/shared/lib";
+import { cn } from "@/shared/lib/cn";
 
 /** 값이 없는 칸 — 전부 같은 글자(`—`)로 말한다 */
 const EMPTY = "—";

@@ -1,8 +1,9 @@
-"use client";
-
+// ⚠ `"use client"`가 없다 — 상호작용이 없는 렌더러라 서버 렌더 여지를 남긴다(`architecture.md`).
+//    그래서 순수 함수는 배럴이 아니라 직접 경로로 가져온다(`credibility-badge.tsx`와 같은 이유).
 import Link from "next/link";
 import { ROUTES } from "@/shared/config";
-import { cn, formatRelativeTime } from "@/shared/lib";
+import { cn } from "@/shared/lib/cn";
+import { formatRelativeTime } from "@/shared/lib/format";
 import { reporterName } from "../lib/reporter";
 import { isDeadStage } from "../lib/stage";
 import type { TransferDealListItem } from "../model/types";
@@ -62,7 +63,7 @@ export function DealRow({ deal, nowMs, hidden }: DealRowProps) {
         className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-[9px] rounded-md px-3 py-3 transition-colors duration-150 ease-otb active:bg-canvas-soft"
       >
         <div className={cn("min-w-0", dead && "opacity-60")}>
-          {/* 화면의 계층이 h1(sr-only 이적시장) → h2(구간) → h3(선수) */}
+          {/* 화면의 계층이 h1(`BoardHeader`의 이적시장) → h2(구간) → h3(선수) */}
           <h3 className="flex items-center gap-[5px] text-[15px] font-medium leading-[1.3] tracking-[-0.3px] text-ink">
             {deal.isWatched && <WatchMark />}
             <span className="truncate">{name}</span>

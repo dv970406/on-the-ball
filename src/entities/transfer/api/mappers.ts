@@ -204,3 +204,14 @@ export function buildDealListItem(row: DealListSelectRow): TransferDealListItem 
     latestReport: latest ? buildReport(latest) : null,
   };
 }
+
+/**
+ * 목록에서 **내 관심 표시만** 지운다 — 다른 사용자로 그린 목록을 잠시 보여 줄 때 쓴다.
+ *
+ * ⚠ 개인화가 항목마다 흩어진 목록이라, 서버가 본 사용자와 지금 사용자가 다르면 서버 목록을 그대로
+ *   캐시에 넣지 않는다(`nextjs.md` 서버 프리페치 절) — 이 사본을 자리 표시로만 쓰고 새로 받는다.
+ *   댓글의 `withoutMyVotes`와 같은 자리다.
+ */
+export function withoutWatches(deals: TransferDealListItem[]): TransferDealListItem[] {
+  return deals.map((deal) => (deal.isWatched ? { ...deal, isWatched: false } : deal));
+}

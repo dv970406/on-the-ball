@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { serverToClientTime } from "@/shared/lib";
 import { useSessionStore } from "@/entities/session";
 import {
   dealHasClub,
@@ -14,6 +15,7 @@ import {
   type TransferReport,
   type TransferSort,
   useTransferDealListQuery,
+  withoutWatches,
 } from "@/entities/transfer";
 
 interface UseTransferBoardArgs {
@@ -26,6 +28,8 @@ interface UseTransferBoardArgs {
   club: string | null;
   /** `serverNowMs ?? useNowMs()` — 순서는 뷰가 지킨다. `null`이면 캐러셀 판정을 미룬다 */
   nowMs: number | null;
+  /** 서버가 그 목록을 읽은 시각 — 뒤로가기가 되살린 옛 페이로드를 stale로 보게 한다 */
+  serverNowMs?: number;
 }
 
 /** 구단 필터 칩 하나 — 그 구단이 출발·행선지로 걸린 딜 수 순 */
@@ -63,6 +67,7 @@ export function useTransferBoard({
   sort,
   club,
   nowMs,
+  serverNowMs,
 }: UseTransferBoardArgs) {
   const sessionStatus = useSessionStore((s) => s.status);
   const storeUserId = useSessionStore((s) => s.user?.id);
@@ -70,13 +75,28 @@ export function useTransferBoard({
   // 캐시에 닿지 못하고 화면이 스켈레톤으로 되돌아간다.
   const userId = sessionStatus === "loading" ? initialUserId : storeUserId;
 
-  const dealsQuery = useTransferDealListQuery(
+  /**
+   * ⚠ **서버가 본 사용자와 지금 사용자가 다르면 서버 목록을 캐시에 넣지 않는다.** 행마다 관심 표시가
+   *   붙는 목록이라, 보드를 연 채 로그아웃(다른 탭·세션 부정)하면 새 키(비로그인)에 이전 사용자의
+   *   관심 표시가 "신선한" 데이터로 앉는다 — 그때는 관심을 지운 사본을 자리 표시로만 쓰고 새로 받는다
+   *   (`nextjs.md` 서버 프리페치 절 · 상세 댓글의 `ownsPrefetch`와 같은 규약).
+   */
+  const ownsPrefetch = userId === initialUserId;
+  const dealsPlaceholder = useMemo(
+    () => (!ownsPrefetch && initialDeals ? withoutWatches(initialDeals) : undefined),
+    [ownsPrefetch, initialDeals],
+  );
+  const dealsQuery = useTransferDealListQuery({
     userId,
     scopeStartIso,
     // ⚠ 프리페치가 있으면 복원을 기다리지 않는다 — 기다리면 서버가 그린 HTML을 스켈레톤이 덮는다
-    initialDeals !== undefined || sessionStatus !== "loading",
-    initialDeals,
-  );
+    enabled: initialDeals !== undefined || sessionStatus !== "loading",
+    initialData: ownsPrefetch ? initialDeals : undefined,
+    // 서버 시각을 기기 시계로 옮겨 넣는다 — 기기 시계와 빼서 신선도를 재기 때문이다(`serverToClientTime`)
+    initialDataUpdatedAt: () =>
+      serverNowMs === undefined ? undefined : serverToClientTime(serverNowMs),
+    placeholderData: dealsPlaceholder,
+  });
 
   const deals = dealsQuery.data;
 

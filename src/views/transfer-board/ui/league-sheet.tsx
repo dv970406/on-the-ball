@@ -24,20 +24,22 @@ interface LeagueSheetProps {
 export function LeagueSheet({ open, league, onSelect, onClose }: LeagueSheetProps) {
   return (
     <Sheet open={open} onClose={onClose} label="리그 선택">
-      {LEAGUE_OPTIONS.map(({ value, label }) => {
-        const selected = value === league;
-        return (
-          <div key={label} className={selected ? "bg-canvas-soft" : undefined}>
-            <SheetItem onClick={() => onSelect(value)}>
-              <span aria-hidden className="inline-flex w-4 shrink-0 justify-center">
-                {selected && <Icon as={Check} size={16} />}
-              </span>
-              {label}
-              {selected && <span className="sr-only">(선택됨)</span>}
-            </SheetItem>
-          </div>
-        );
-      })}
+      <ul>
+        {LEAGUE_OPTIONS.map(({ value, label }) => {
+          const selected = value === league;
+          return (
+            <li key={label} className={selected ? "bg-canvas-soft" : undefined}>
+              <SheetItem onClick={() => onSelect(value)}>
+                <span aria-hidden className="inline-flex w-4 shrink-0 justify-center">
+                  {selected && <Icon as={Check} size={16} />}
+                </span>
+                {label}
+                {selected && <span className="sr-only">(선택됨)</span>}
+              </SheetItem>
+            </li>
+          );
+        })}
+      </ul>
     </Sheet>
   );
 }

@@ -2,7 +2,7 @@
 
 import { Camera, LogOut } from "lucide-react";
 import { ROUTES, avatarUrl } from "@/shared/config";
-import { Avatar, Button, EmptyState, Icon, Skeleton, TextField } from "@/shared/ui";
+import { Avatar, Button, EmptyState, Icon, Skeleton, StaleBanner, TextField } from "@/shared/ui";
 import { BottomTabBar } from "@/widgets/bottom-tab-bar";
 import { SubHeader } from "@/widgets/sub-header";
 import { useProfileQuery } from "@/entities/profile";
@@ -84,6 +84,8 @@ export function ProfileView({
       <>
         {header}
         <main className={mainClassName}>
+          {/* EmptyState의 title은 <p>라 이 분기에도 h1을 둔다(정상 분기와 같은 sr-only 제목) */}
+          <h1 className="sr-only">프로필</h1>
           <EmptyState
             title="프로필을 불러오지 못했어요"
             description={profile.error.message}
@@ -101,6 +103,7 @@ export function ProfileView({
       <>
         {header}
         <main className={mainClassName}>
+          <h1 className="sr-only">프로필</h1>
           <EmptyState title="프로필을 찾을 수 없어요" description="다시 로그인해 주세요." />
         </main>
         {tabBar}
@@ -130,12 +133,9 @@ export function ProfileView({
           </p>
         )}
 
-        {profile.error && (
-          <p
-            className="border-b border-hairline bg-canvas-soft px-5 py-2.5 text-[12px] text-ink-mute"
-          >
-            최신 정보를 불러오지 못했어요. 표시된 내용이 오래된 것일 수 있어요.
-          </p>
+        {/* 캐시된 프로필은 그대로 두고 최신화 실패만 알린다 — 재시도 수단까지 `StaleBanner`가 갖는다 */}
+        {profile.error && profile.data && (
+          <StaleBanner noun="프로필" onRetry={() => profile.refetch()} />
         )}
 
         {/*
@@ -144,14 +144,14 @@ export function ProfileView({
         */}
         {!profile.data && (
           <>
-              <div className="flex flex-col items-center px-5 pt-8">
-                <Skeleton className="size-24 rounded-full" />
-                <Skeleton className="mt-3 h-[18px] w-24" />
-              </div>
-              <div className="flex flex-col gap-3 px-5 pt-8">
-                <Skeleton className="h-[70px] w-full" />
-                <Skeleton className="h-[50px] w-full" />
-              </div>
+            <div className="flex flex-col items-center px-5 pt-8">
+              <Skeleton className="size-24 rounded-full" />
+              <Skeleton className="mt-3 h-[18px] w-24" />
+            </div>
+            <div className="flex flex-col gap-3 px-5 pt-8">
+              <Skeleton className="h-[70px] w-full" />
+              <Skeleton className="h-[50px] w-full" />
+            </div>
           </>
         )}
 

@@ -105,9 +105,6 @@ export function BottomTabBar() {
                 e.preventDefault();
                 setAskSignIn(tab);
               }}
-              aria-haspopup={
-                tab.signInAction && sessionStatus === "guest" ? "dialog" : undefined
-              }
               className={className}
             >
               {content}

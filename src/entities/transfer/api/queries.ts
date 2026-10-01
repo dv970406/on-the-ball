@@ -12,6 +12,31 @@ import { buildDealListQuery, buildDealQuery, buildReportsQuery } from "./list-qu
 import { buildDeal, buildDealListItem, buildReport } from "./mappers";
 
 /**
+ * 서버 프리페치의 신선도 — 세 조회가 같은 뜻으로 받는다.
+ *
+ * ⚠ **`initialDataUpdatedAt`을 빼지 않는다.** 넣지 않으면 initialData가 **지금 받은 것**으로 취급되는데,
+ *   뒤로가기는 Next가 보관한 옛 서버 페이로드를 되살린다 — 그 옛 데이터가 신선한 것으로 캐시에 앉아
+ *   staleTime 동안 다시 받지 않았다(`useCommentListQuery`와 같은 사고 — `nextjs.md`의 서버 프리페치 절).
+ *   호출부는 서버 시각을 기기 시계로 옮겨 넣는다(`serverToClientTime`).
+ */
+interface PrefetchFreshness {
+  initialDataUpdatedAt?: number | (() => number | undefined);
+}
+
+interface UseTransferDealListQueryArgs extends PrefetchFreshness {
+  userId: string | undefined;
+  scopeStartIso: string;
+  enabled?: boolean;
+  /** 서버 프리페치 — ⚠ 서버가 **같은 사용자**로 그린 것만 넣는다(`useTransferBoard`) */
+  initialData?: TransferDealListItem[];
+  /**
+   * 캐시에 넣지 않고 조회가 끝날 때까지만 보여 줄 목록 — 서버가 **다른 사용자**로 그린 목록을 관심 표시를
+   * 지워 넘긴다(`withoutWatches`). 없으면 키가 바뀌는 동안 이전 키의 목록을 그대로 보인다(`keepPreviousData`).
+   */
+  placeholderData?: TransferDealListItem[];
+}
+
+/**
  * 보드의 딜 목록 — 범위 시작 이후 전부(≤`TRANSFER_DEAL_LIMIT`). 리그·정렬은 뷰가 계산한다.
  *
  * ⚠ **세션이 확정되기 전에는 부르지 않는다**(`enabled`). 키가 userId로 스코프돼 있어서,
@@ -21,16 +46,19 @@ import { buildDeal, buildDealListItem, buildReport } from "./mappers";
  *   (호출부가 그 판정을 갖는다).
  * ⚠ `initialData`의 **키 `userId`·`scopeStartIso`도 서버가 준 값이어야 한다.**
  */
-export function useTransferDealListQuery(
-  userId: string | undefined,
-  scopeStartIso: string,
+export function useTransferDealListQuery({
+  userId,
+  scopeStartIso,
   enabled = true,
-  initialData?: TransferDealListItem[],
-) {
+  initialData,
+  initialDataUpdatedAt,
+  placeholderData,
+}: UseTransferDealListQueryArgs) {
   return useQuery<TransferDealListItem[], Error>({
     initialData,
+    initialDataUpdatedAt,
     queryKey: transferKeys.list(userId, scopeStartIso),
-    placeholderData: keepPreviousData,
+    placeholderData: placeholderData ?? keepPreviousData,
     queryFn: async () => {
       const supabase = requireBrowserSupabase();
       // ⚠ 조립은 `buildDealListQuery`가 단독으로 소유한다 — SSR 페이지가 같은 함수를 부른다
@@ -45,6 +73,13 @@ export function useTransferDealListQuery(
   });
 }
 
+interface UseTransferDealQueryArgs extends PrefetchFreshness {
+  dealId: number;
+  userId: string | undefined;
+  enabled?: boolean;
+  initialData?: TransferDeal | null;
+}
+
 /**
  * 딜 하나 — 없으면 `null`.
  *
@@ -53,14 +88,16 @@ export function useTransferDealListQuery(
  * ⚠ `initialData`의 **키 `userId`도 서버가 준 값이어야 한다** — 세션 복원 전 `undefined`로
  *   찾으면 캐시에 닿지 못해 화면이 스켈레톤으로 되돌아간다(호출부가 그 값을 넘긴다).
  */
-export function useTransferDealQuery(
-  dealId: number,
-  userId: string | undefined,
+export function useTransferDealQuery({
+  dealId,
+  userId,
   enabled = true,
-  initialData?: TransferDeal | null,
-) {
+  initialData,
+  initialDataUpdatedAt,
+}: UseTransferDealQueryArgs) {
   return useQuery<TransferDeal | null, Error>({
     initialData,
+    initialDataUpdatedAt,
     queryKey: transferKeys.detail(dealId, userId),
     queryFn: async () => {
       const supabase = requireBrowserSupabase();
@@ -75,17 +112,25 @@ export function useTransferDealQuery(
   });
 }
 
+interface UseTransferReportsQueryArgs extends PrefetchFreshness {
+  dealId: number;
+  enabled?: boolean;
+  initialData?: TransferReport[];
+}
+
 /**
  * 상세의 보도 타임라인 — 최신순 전부.
  * ⚠ "나"에 종속되지 않아 키에 유저가 없다 — `initialData`가 있으면 세션 복원을 기다릴 이유도 없다.
  */
-export function useTransferReportsQuery(
-  dealId: number,
+export function useTransferReportsQuery({
+  dealId,
   enabled = true,
-  initialData?: TransferReport[],
-) {
+  initialData,
+  initialDataUpdatedAt,
+}: UseTransferReportsQueryArgs) {
   return useQuery<TransferReport[], Error>({
     initialData,
+    initialDataUpdatedAt,
     queryKey: transferKeys.reports(dealId),
     queryFn: async () => {
       const supabase = requireBrowserSupabase();

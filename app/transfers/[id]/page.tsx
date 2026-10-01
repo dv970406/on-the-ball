@@ -21,7 +21,7 @@ import type { CommentList } from "@/entities/comment/model/types";
 import { TransferDetailView } from "@/views/transfer-detail";
 
 const FALLBACK_METADATA: Metadata = { title: "이적 상세" };
-/** 없는 딜 — `Page`가 `notFound()`를 부르므로 **404 화면과 같은 제목**이어야 한다. */
+/** 없는 딜·형식이 틀린 id — `Page`가 `notFound()`를 부르므로 **404 화면과 같은 제목**이어야 한다. */
 const NOT_FOUND_METADATA: Metadata = { title: NOT_FOUND_TITLE };
 const META_TITLE_MAX = 60;
 const META_DESCRIPTION_MAX = 120;
@@ -133,7 +133,8 @@ function describe(head: Extract<DealHead, { state: "found" }>): string {
 export async function generateMetadata(props: PageProps<"/transfers/[id]">): Promise<Metadata> {
   const { id } = await props.params;
   const dealId = parsePostId(id);
-  if (dealId === null) return FALLBACK_METADATA;
+  // id 형식이 틀린 주소도 `Page`가 `notFound()`를 부른다 → 없는 딜과 같은 제목이어야 한다
+  if (dealId === null) return NOT_FOUND_METADATA;
 
   const head = await fetchDealHead(dealId);
   if (head.state === "missing") return NOT_FOUND_METADATA;

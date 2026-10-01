@@ -1,5 +1,5 @@
 // ⚠ "use client" 모듈 포함 — 서버에서는 model/types·api/mappers·api/keys·api/list-query와
-//    lib/league·lib/stage·lib/route-label·lib/player-name을 직접 import한다(허용 목록은 `check-conventions.mjs`).
+//    lib/stage·lib/route-label·lib/player-name을 직접 import한다(허용 목록은 `check-conventions.mjs`).
 //
 // ⚠ **다른 레이어가 소비하지 않는 것은 올리지 않는다.** `TransferClubRow`·`TransferNewsRow`·
 //    `TransferDealWatchRow`·`TransferStatus`·`STAGE_GROUP`·`isDeadStage`·`feeDelta`·`ClubRoute`·
@@ -13,13 +13,14 @@ export type {
   TransferLeague,
   TransferReport,
   TransferSort,
-  TransferStage,
 } from "./model/types";
 // ⚠ 리그 시트가 5개 리그를 이 순서로 그린다 — 손으로 다시 적지 않는다(망라성 가드가 여기 있다)
 export { TRANSFER_LEAGUES } from "./model/types";
 export { transferKeys } from "./api/keys";
 // ⚠ 상한은 서버 안전한 api/mappers에 있다 — 목록 SSR이 같은 값을 써야 하고 화면이 잘림을 말한다
 export { TRANSFER_DEAL_LIMIT } from "./api/mappers";
+// ⚠ 서버가 다른 사용자로 그린 목록의 자리 표시용 사본 — 관심 표시를 캐시에 사실처럼 앉히지 않는다
+export { withoutWatches } from "./api/mappers";
 export {
   useTransferDealListQuery,
   useTransferDealQuery,

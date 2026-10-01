@@ -1,9 +1,9 @@
-"use client";
-
+// ⚠ `"use client"`가 없다 — 상호작용이 없는 렌더러라 서버 렌더 여지를 남긴다(`architecture.md`).
+//    그래서 순수 함수는 배럴이 아니라 직접 경로로 가져온다(`credibility-badge.tsx`와 같은 이유).
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { ROUTES } from "@/shared/config";
-import { formatRelativeTime } from "@/shared/lib";
+import { formatRelativeTime } from "@/shared/lib/format";
 import { Icon } from "@/shared/ui";
 import { reporterName } from "../lib/reporter";
 import { destinationClubs, routeLabels } from "../lib/route-label";

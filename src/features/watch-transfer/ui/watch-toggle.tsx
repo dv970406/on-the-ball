@@ -66,7 +66,6 @@ export function WatchToggle({ dealId, watched, onSignInRequired }: WatchTogglePr
     return (
       <button
         type="button"
-        aria-haspopup="dialog"
         // ⚠ 인자 없이 감싼다 — `onClick`은 MouseEvent를 실어 부른다
         onClick={() => onSignInRequired()}
         className={buttonClassName({ variant: "secondary", block: true })}

@@ -54,8 +54,6 @@ interface TransferDetailViewProps {
   serverNowMs?: number;
 }
 
-/** 방향을 못 읽은 구단의 표기 — 경로 카드에서는 이름 자리를 `—`로 비운다 */
-
 /** 경로 카드의 한 칸 — `FROM`/`TO` 라벨 · 엠블럼 24 + 정식명 · 리그 */
 function RouteCell({
   label,
@@ -228,6 +226,9 @@ export function TransferDetailView({
         ⚠ 아래 `pb`는 하단 고정 바(관심 토글) 높이 + safe-area다 — 본문이 바에 가려지지 않게.
       */}
       <main className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(96px+env(safe-area-inset-bottom))]">
+        {/* 본문 h1(선수명)은 딜이 있을 때만 그려진다 — 로딩·실패·없음 분기에서는 sr-only로 둔다
+            (EmptyState의 title은 <p>라 heading이 0개가 된다 — `app/not-found.tsx`와 같은 사정) */}
+        {!deal && <h1 className="sr-only">이적 상세</h1>}
         {isLoading && (
           <div aria-hidden className="pt-4">
             {/* 골격은 실제 화면과 같다 — 뱃지 줄 · 이름 · 정보줄 · 경로 카드 · 이적료 카드 · 탭 · 입력칸 */}

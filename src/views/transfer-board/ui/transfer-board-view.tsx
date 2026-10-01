@@ -80,6 +80,7 @@ export function TransferBoardView({
     sort,
     club: requestedClub,
     nowMs,
+    serverNowMs,
   });
 
   const [leagueSheetOpen, setLeagueSheetOpen] = useState(false);
@@ -109,7 +110,10 @@ export function TransferBoardView({
         <AppBar leading={<AuthStatus />} />
 
         {/* ⚠ 화면 제목(h1)은 sr-only가 아니라 `BoardHeader`의 보이는 "이적시장"이다 — 다른 목록과
-            달리 이 화면은 제목을 실제로 그리므로 sr-only를 더 두면 같은 글자가 두 번 읽힌다. */}
+            달리 이 화면은 제목을 실제로 그리므로 sr-only를 더 두면 같은 글자가 두 번 읽힌다.
+            ⚠ 단 `BoardHeader`는 보드가 있을 때만 그려진다 — 로딩·조회 실패 분기에서는 h1이 0개가 되므로
+              그때만 sr-only로 둔다(EmptyState의 title은 <p>다 — `app/not-found.tsx`와 같은 사정). */}
+        {!allDeals && <h1 className="sr-only">이적시장</h1>}
 
         {deals.isLoading && <TransferBoardSkeleton />}
 

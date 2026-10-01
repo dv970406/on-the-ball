@@ -56,7 +56,7 @@
   ```ts
   export type TransferDealRow = Database["public"]["Tables"]["transfer_deal"]["Row"];
   ```
-- 이미 뽑아 둔 것: `ProfileRow`(`@/entities/profile`), `TransferDealRow`·`TransferClubRow`·`TransferNewsRow`·`TransferDealWatchRow`(`entities/transfer/model/types` — 슬라이스 내부).
+- 이미 뽑아 둔 것: `ProfileRow`(`entities/profile/model/types`), `TransferDealRow`·`TransferClubRow`·`TransferNewsRow`·`TransferDealWatchRow`(`entities/transfer/model/types` — 슬라이스 내부).
 
 ## `@/shared/api`
 - `requireBrowserSupabase` — 브라우저 supabase 클라이언트(`SupabaseClient<Database>`, 없으면 한국어 에러 throw). **쿼리·뮤테이션 훅은 이걸 쓴다** — null 가드를 각자 반복하지 않는다.
@@ -83,8 +83,8 @@
 - **`useLinkedIdentitiesQuery(userId)` / `identityKeys`** — 연결된 로그인 수단 조회. 조회는 여기, 쓰기(연결·해제)는 `features/link-identity`다(`entities/transfer` ↔ `features/watch-transfer`와 같은 분업). ⚠ 키를 **userId로 스코프**한다 — 계정 전환 시 이전 사용자의 목록이 노출되지 않게.
 
 ## `@/entities/profile`
-- `useProfileQuery(userId)` / `profileKeys` / `PROFILE_SELECT` / `buildProfile` — 닉네임·아바타 조회.
-- `MyProfile` / `ProfileRow` — 도메인 타입 / DB 행 타입. `MyProfile.avatarPath`는 **경로**다(전체 URL이 아니다).
+- `useProfileQuery(userId)` / `profileKeys` — 닉네임·아바타 조회. 결과 타입 `MyProfile`의 `avatarPath`는 **경로**다(전체 URL이 아니다).
+- ⚠ `MyProfile`·`ProfileRow`·`PROFILE_SELECT`·`buildProfile`은 배럴에 없다 — 슬라이스 밖 소비자가 0이다(서버가 필요하면 `model/types`·`api/mappers` 직접 경로).
 - ⚠ **`userId`를 인자로 받는다.** 세션을 직접 읽지 않는 이유는 `entities`끼리 서로 import할 수 없기 때문이다 — 세션을 아는 **상위 레이어**(`views/profile`이 선례)가 `user?.id`를 넘긴다.
 - ⚠ **`avatarUrl`은 여기 없다 → `@/shared/config`.** 작성자 아바타를 그리는 엔티티가 다시 생기면 entities끼리는 import할 수 없어서다(`OAUTH_PROVIDERS`와 같은 사정).
 - ⚠ **profiles 컬럼을 다른 엔티티의 select에 임베딩하면 `features/update-profile`의 무효화 대상도 함께 늘려야 한다.** 프로필을 바꿔도 그 캐시는 저절로 갱신되지 않아 옛 값이 남는다.
@@ -95,7 +95,9 @@
 - `useUpdateAvatar` / `ACCEPTED_IMAGE_TYPES` — 아바타 업로드(정사각 crop + webp 리사이즈는 슬라이스 내부 `resizeToAvatar`). ⚠ 받는 형식·원본 상한은 **기능마다 다르므로** 각 feature가 갖는다 — 이미지를 받는 기능이 또 생기면 리사이즈 메커니즘만 `shared`로 올리고 형식·상한은 각자 둔다(정사각 crop은 본문 사진에 쓰면 내용이 날아가 형태가 같지 않다).
 
 ## `@/entities/transfer`
-- `useTransferDealListQuery(userId, scopeStartIso, enabled, initialData)` / `useTransferDealQuery(dealId, userId, enabled, initialData)` / `useTransferReportsQuery(dealId, enabled, initialData)` — 보드 목록(범위 안 전부) · 딜 단건 · 상세 보도 타임라인.
+- `useTransferDealListQuery({ userId, scopeStartIso, enabled, initialData, initialDataUpdatedAt, placeholderData })` / `useTransferDealQuery({ dealId, userId, enabled, initialData, initialDataUpdatedAt })` / `useTransferReportsQuery({ dealId, enabled, initialData, initialDataUpdatedAt })` — 보드 목록(범위 안 전부) · 딜 단건 · 상세 보도 타임라인. 인자 형태는 `useCommentListQuery`와 같다.
+  ⚠ `initialData`를 넣으면 `initialDataUpdatedAt`(서버가 읽은 시각 → `serverToClientTime`)도 함께 넣는다 — 빼면 뒤로가기가 되살린 옛 서버 페이로드가 신선한 것으로 앉는다(`nextjs.md`).
+  ⚠ 목록은 서버가 본 사용자와 지금 사용자가 다르면 `initialData`가 아니라 **`withoutWatches`** 사본을 `placeholderData`로 넘긴다(행마다 관심 표시가 붙는 목록이다 — `useTransferBoard`). 딜 단건은 개인화 값이 하나뿐이라 이 규칙 밖이다.
   ⚠ **목록·상세는 `userId`로 스코프된다**(관심 임베딩이 "내 행만"이라 응답 자체가 "나"에 종속된다). **타임라인은 스코프되지 않는다**("나"에 종속된 값이 없다).
   ⚠ **리그·정렬은 쿼리 키에 넣지 않는다** — 서버가 범위 안 딜 **전체**(≤`TRANSFER_DEAL_LIMIT`)를 내리고 뷰(`sortDeals`·`groupDeals`·`dealInLeague`)가 같은 데이터로 계산한다. 필터를 키에 넣으면 `initialData`가 캐시에 닿지 못하는 사고가 난다(`nextjs.md`의 실측 사고와 같은 함정).
   ⚠ `initialData`의 `undefined`(프리페치 안 함·실패)와 `[]`(받았는데 없다)는 다른 뜻이다.
@@ -161,7 +163,7 @@
 - **`safeNextPath(next, origin)`** — `?next=` 값을 앱 내부 경로로만 통과시킨다. **직접 문자열 검사를 짜지 말 것** — `startsWith("/") && !startsWith("//")`로는 `/\evil.com`도 `/..//evil.com`도 못 막는다(둘 다 실제로 뚫렸다).
 - **`OAUTH_PROVIDERS` / `OAUTH_PROVIDER_LABEL`** — 지원 소셜 프로바이더의 단일 소스. `supabase/config.toml`의 `[auth.external.*]`와 갈리면 안 된다. ⚠ `shared`에 있는 이유는 로그인(`features/sign-in`)과 계정 연결(`features/link-identity`)이 같은 목록을 써야 하는데 features끼리는 import할 수 없어서다.
 - **`avatarUrl(path)` / `AVATAR_BUCKET`** — 아바타 **경로** → 공개 URL. ⚠ DB에는 전체 URL이 아니라 경로만 저장한다(호스트가 환경마다 다르다: 로컬 `127.0.0.1:64321` ↔ 원격 `*.supabase.co`). 조립은 이 함수 한 곳에서만. 버킷명 문자열도 여기서 가져다 쓴다(`features/update-profile`이 선례).
-- **`publicStorageUrl(bucket, path)`** — 공개 버킷 경로 → URL 조립의 **단일 소스**. 새 공개 버킷이 생기면 여기에 붙인다(버킷별 함수는 이 함수를 감싸기만 한다).
+- **`publicStorageUrl(bucket, path)`**(`shared/config/storage.ts` — 배럴에 없다) — 공개 버킷 경로 → URL 조립의 **단일 소스**. 새 공개 버킷이 생기면 이 함수를 감싸는 버킷별 함수를 `shared/config`에 두고 그것을 배럴로 노출한다(`avatarUrl`이 선례). 호출부가 버킷 URL을 직접 조립하지 않는다.
 - **`OG_IMAGE` / `OG_SITE` / `NOT_FOUND_TITLE` / `absoluteUrl(path)`** — 세그먼트가 `openGraph`를 채울 때 함께 싣는 이미지·사이트 공통 값(`siteName`·`locale`), 없는 리소스의 메타데이터 제목(404 화면과 같아야 한다), 그리고 앱 경로 → 절대 URL. ⚠ `new URL(path, env.siteUrl)`을 호출부가 각자 짜지 말 것 — 사이트맵·`robots.txt`·`og:url` 셋이 **같은 URL**을 가리켜야 검색엔진·공유 플랫폼이 한 주소를 대표로 본다(canonical과도 같은 경로여야 한다).
 - **`env`** — `NEXT_PUBLIC_*` 환경변수의 단일 소스(`supabaseUrl`·`supabaseAnonKey`·`siteUrl`·`googleSiteVerification`·`naverSiteVerification`). **`process.env`를 호출부에서 다시 읽지 말 것** — `proxy.ts`가 화면·훅과 같은 supabase 인스턴스를 봐야 세션 쿠키가 어긋나지 않는다.
   - `siteUrl`은 `og:image`를 절대 URL로 만드는 `metadataBase`(루트 layout)용이다. `NEXT_PUBLIC_SITE_URL` → `VERCEL_URL` → `localhost:3000` 순으로 폴백한다.

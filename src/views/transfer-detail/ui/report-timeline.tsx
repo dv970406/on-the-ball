@@ -7,7 +7,7 @@ import {
   reporterName,
 } from "@/entities/transfer";
 import { cn, formatRelativeTime } from "@/shared/lib";
-import { Icon, Skeleton } from "@/shared/ui";
+import { Icon, Skeleton, StaleBanner } from "@/shared/ui";
 
 interface ReportTimelineProps {
   /** `undefined`면 아직 받지 못한 것(로딩 또는 실패) — `[]`는 "받았는데 없다" */
@@ -51,6 +51,9 @@ export function ReportTimeline({ reports, error, onRetry, nowMs }: ReportTimelin
           </button>
         </p>
       )}
+
+      {/* 받아 둔 타임라인은 그대로 두고 최신화 실패만 알린다(data-and-state.md) */}
+      {reports !== undefined && error !== null && <StaleBanner noun="보도" onRetry={onRetry} />}
 
       {reports !== undefined && reports.length === 0 && (
         <p className="py-3 text-[12px] text-ink-mute">
