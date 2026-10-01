@@ -9,6 +9,7 @@
  *   node scripts/sync-transfer-news.mjs --derive-only            # 수집 없이 딜 파생만 돈다
  *   node scripts/sync-transfer-news.mjs --derive-only --dry-run  # 파생 결과 요약만 찍고 쓰지 않는다(LLM도 부르지 않는다)
  *   node scripts/sync-transfer-news.mjs --derive-only --rejudge  # 저장된 판정을 무시하고 전부 다시 묻는다(지시문·사전을 고친 뒤)
+ *   node scripts/sync-transfer-news.mjs --derive-only --replay   # 저장된 원출력을 지금의 해석으로 다시 읽는다(API를 부르지 않는다 — 해석만 고친 뒤)
  *   node scripts/sync-transfer-news.mjs --verify                 # 계정 인증·채널 출처를 점검한다
  *   node scripts/sync-transfer-news.mjs --remote                 # 원격 프로젝트에 쓴다(명시적일 때만). 대상은 환경변수다 —
  *                                                                #   로컬에서는 `set -a; source .env.prod; set +a` 뒤에 붙인다(.env.local은 로컬 값)
@@ -34,16 +35,18 @@ const dryRun = argv.includes("--dry-run");
 const reprocess = argv.includes("--reprocess");
 const deriveOnly = argv.includes("--derive-only");
 const rejudge = argv.includes("--rejudge");
+const replay = argv.includes("--replay");
 const onlyArg = flag(argv, "only");
 
 // 모르는 플래그와 뜻이 겹치는 조합은 거부한다 — 조용히 무시하면 의도와 다른 일이 원격에 일어난다
-const KNOWN = new Set(["--remote", "--dry-run", "--reprocess", "--derive-only", "--rejudge", "--verify", "--only"]);
+const KNOWN = new Set(["--remote", "--dry-run", "--reprocess", "--derive-only", "--rejudge", "--replay", "--verify", "--only"]);
 const unknownFlags = argv.filter((a, i) => a.startsWith("--") ? !KNOWN.has(a) : argv[i - 1] !== "--only");
 if (unknownFlags.length) usage(`알 수 없는 인자: ${unknownFlags.join(" ")}`);
 if (argv.includes("--only") && !onlyArg) usage("--only 뒤에 소스 id가 필요합니다");
 if ([dryRun && !deriveOnly, reprocess, deriveOnly, argv.includes("--verify")].filter(Boolean).length > 1) {
   usage("--dry-run · --reprocess · --derive-only · --verify 는 함께 쓸 수 없습니다(--derive-only 와 --dry-run 만 예외)");
 }
+if (replay && (!deriveOnly || dryRun || rejudge)) usage("--replay 는 --derive-only 와 함께만 씁니다(--dry-run·--rejudge 와는 함께 쓸 수 없습니다)");
 if (rejudge && (!deriveOnly || dryRun)) usage("--rejudge 는 --derive-only 와 함께만 씁니다(--dry-run 과는 함께 쓸 수 없습니다)");
 if (reprocess && onlyArg) usage("--reprocess 는 저장분 전체를 다시 추출합니다 — --only 와 함께 쓸 수 없습니다");
 if (deriveOnly && onlyArg) usage("--derive-only 는 소스를 읽지 않습니다 — --only 와 함께 쓸 수 없습니다");
@@ -94,7 +97,7 @@ if (allowRemote && /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(url)) {
 const supabase = createSyncClient(url, key);
 
 if (deriveOnly) {
-  await derive({ dryRun, rejudge });
+  await derive({ dryRun, rejudge, replay });
   console.log(`\n대상: ${url}`);
   process.exit(process.exitCode ?? 0);
 }
@@ -148,7 +151,7 @@ async function expand() {
  * 키가 없으면 판정 없이 파생한다. 원격 실행에서 키가 없으면 실패다 — 조용히 지나가면 새 딜이 영영 열리지 않고 화면이 영문으로 남는다.
  * 판정이 계통적으로 실패해도(인증) 파생은 끝까지 쓴다(새 딜은 닫힘·기존 딜은 유지) — 종료 코드만 올린다.
  */
-async function derive({ dryRun: summaryOnly, rejudge: again = false }) {
+async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: reread = false }) {
   try {
     const apiKey = env.ANTHROPIC_API_KEY;
     if (!apiKey && !summaryOnly) {
@@ -168,7 +171,7 @@ async function derive({ dryRun: summaryOnly, rejudge: again = false }) {
           }
         }
       : null;
-    const r = await runDerivation(supabase, { dryRun: summaryOnly, rejudge: again, judge });
+    const r = await runDerivation(supabase, { dryRun: summaryOnly, rejudge: again, replay: reread, judge });
     const s = r.summary;
     const stages = Object.entries(s.stages).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(" · ") || "—";
     console.log(`\n딜 파생${summaryOnly ? "(드라이런)" : ""}: 딜 ${s.deals} · 구단 ${s.clubs} · 연결된 보도 ${s.linkedRows}건`);
@@ -178,9 +181,11 @@ async function derive({ dryRun: summaryOnly, rejudge: again = false }) {
     if (skipped) console.log(`  건너뜀: ${skipped}`);
     if (r.lookup) console.log(`  이름 사전(위키데이터): 조회 ${r.lookup.tried} · 찾음 ${r.lookup.found} · 없음 ${r.lookup.notFound} · 실패 ${r.lookup.failed}`);
     if (r.clubLookup) console.log(`  현 소속(위키데이터 P54): 조회 ${r.clubLookup.tried} · 찾음 ${r.clubLookup.found} · 없음 ${r.clubLookup.notFound} · 실패 ${r.clubLookup.failed}`);
+    if (r.replayed) console.log(`  원출력 재생(API 호출 없음): 대상 ${r.replayed.read} · 달라져 다시 쓴 것 ${r.replayed.changed} · 기사를 못 받아 건너뜀 ${r.replayed.skipped} · 지금 해석으로 이동 ${r.replayed.move} · 아님 ${r.replayed.notMove}(회고 ${r.replayed.retrospective} · 제목뿐 ${r.replayed.titleOnly}) · 불가 ${r.replayed.invalid}`);
+    if (r.nameSync?.synced) console.log(`  이름 사전 맞춤(사람 사전 → 캐시): 표기 ${r.nameSync.synced}건 · 요약 ${r.nameSync.summariesFixed}건`);
     const j = r.judged;
     if (j && "read" in j) {
-      console.log(`  LLM 판정·요약 · ${JUDGE_MODEL}: 대상 ${j.read} · 이동 ${j.move}(요약 ${j.summarized}, 요약 버림 ${j.summaryInvalid}) · 아님 ${j.notMove} · 판정 불가 ${j.invalid} · 실패 ${j.failed} · 기사 본문 ${j.articles}(못 받음 ${j.articleMissing})`);
+      console.log(`  LLM 판정·요약 · ${JUDGE_MODEL}: 대상 ${j.read} · 이동 ${j.move}(요약 ${j.summarized}, 요약 버림 ${j.summaryInvalid}) · 아님 ${j.notMove}(회고 ${j.retrospective ?? 0} · 제목뿐 ${j.titleOnly ?? 0} · 선수 미특정 ${j.unnamed ?? 0}) · 판정 불가 ${j.invalid} · 실패 ${j.failed} · 기사 본문 ${j.articles}(못 받음 ${j.articleMissing})`);
       console.log(`  토큰: 입력 ${j.inputTokens}(캐시 읽음 ${j.cacheReadTokens} · 캐시 씀 ${j.cacheWriteTokens}) · 출력 ${j.outputTokens}`);
     }
     for (const w of r.warnings) console.warn(`  ⚠ ${w}`);

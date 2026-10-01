@@ -38,7 +38,7 @@ export { splitHotRumors } from "./lib/rumor-heat";
 // ⚠ 진행 중 구간의 소구간(합의 임박·협상 중) — 뱃지 톤과 같은 갈림
 export { splitProgress } from "./lib/stage";
 // ⚠ 이적료 표기·범위 — 상세의 이적료 카드가 쓴다(목록 UI는 같은 슬라이스라 상대 경로)
-export { formatFee, formatFeeRange } from "./lib/fee";
+export { feeKindLabel, formatFee, formatFeeRange } from "./lib/fee";
 // ⚠ 경로 두 칸의 문구(FA·미확인·미정·외 N)의 단일 소스 — 상세 경로 카드와 목록 UI가 같은 말을 한다
 export { destinationClubs, routeLabels } from "./lib/route-label";
 // ⚠ 선수 표시명(`playerKo ?? player`)의 단일 소스 — 목록·카드·상세 제목·`<title>`이 같은 이름을 그린다

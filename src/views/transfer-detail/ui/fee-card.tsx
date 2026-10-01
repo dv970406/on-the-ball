@@ -1,6 +1,6 @@
 "use client";
 
-import { FeeDelta, FeeValue, type TransferDeal, formatFee, formatFeeRange } from "@/entities/transfer";
+import { FeeDelta, FeeValue, type TransferDeal, feeKindLabel, formatFee, formatFeeRange } from "@/entities/transfer";
 import { cn } from "@/shared/lib";
 
 /** 값이 없는 칸 — 전부 같은 글자(`—`)로 말한다 */
@@ -18,6 +18,7 @@ interface FeeCardProps {
  *
  * - **원화 환산은 없다**(하드코딩 환율은 거짓 숫자다). 주급은 원문 표기 그대로다.
  * - 결렬 딜도 값은 그대로 그린다 — 뱃지만 결렬이다.
+ * - 제목은 금액의 성격이다 — 실제 이적료가 아닌 금액(거절된 제안액·구단의 요구액)을 "이적료"로 부르지 않는다.
  * - 이적료 자체가 없으면 부제를 그리지 않는다 — "옵션 없음"은 이적료가 있을 때만 뜻이 있다.
  *
  * ⚠ 이 KV의 모든 칸은 **라벨 위 · 값 아래**다. 칸 구분은 헤어라인이고 그림자는 없다.
@@ -51,9 +52,11 @@ export function FeeCard({ deal }: FeeCardProps) {
       className="mt-3 overflow-hidden rounded-lg border border-hairline"
     >
       <div className="p-3.5">
-        <span className={labelClassName}>추정 이적료</span>
+        {/* 제목이 금액의 성격을 말한다(제안액·요구액…) — 금액이 없으면(FA·미공개) 성격도 없다 */}
+        <span className={labelClassName}>{feeKindLabel(hasFee ? deal.feeKind : null)}</span>
         <FeeValue
           deal={deal}
+          caption={false}
           className="mt-2 block text-[36px] leading-none tracking-[-1.5px] text-ink"
           labelClassName="text-[20px] font-medium"
         />

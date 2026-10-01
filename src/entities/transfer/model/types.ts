@@ -130,6 +130,11 @@ export interface TransferDeal {
   feeAmount: TransferDealRow["fee_amount"];
   feeCurrency: TransferDealRow["fee_currency"];
   feeText: TransferDealRow["fee_text"];
+  /**
+   * 그 금액의 성격 — 이적료 · 제안액 · 요구액 · 바이아웃 · 평가액. 보도가 말하는 금액의 대부분은 실제 이적료가 아니라서
+   * 화면이 성격을 함께 그린다(`feeKindLabel`). 판정자가 읽지 못한 금액은 `null`("추정 이적료").
+   */
+  feeKind: TransferDealRow["fee_kind"];
   /** 같은 통화의 **직전 다른** 보도 이적료 — 변동폭(`FeeDelta`)의 기준. 없으면 `null` */
   prevFeeAmount: TransferDealRow["prev_fee_amount"];
   /** 같은 통화 보도의 최소·최대 — 상세의 "보도 범위" */

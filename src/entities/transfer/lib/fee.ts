@@ -1,4 +1,35 @@
+import type { Database } from "@/types/database.types";
 import type { TransferDeal } from "../model/types";
+
+type TransferFeeKind = Database["public"]["Enums"]["transfer_fee_kind"];
+
+/**
+ * 금액의 성격 라벨 — 보도가 말하는 금액은 대부분 실제 이적료가 아니다(거절된 제안액, 구단이 부르는 요구액, 매체의 평가액).
+ * 전부 "이적료"로 그리면 "£86M에 이적"으로 읽힌다 — 성격을 함께 그린다. `Record`라 enum 값이 늘면 컴파일이 누락을 잡는다.
+ */
+const FEE_KIND_LABEL: Record<TransferFeeKind, string> = {
+  fee: "이적료",
+  bid: "제안액",
+  asking_price: "요구액",
+  release_clause: "바이아웃",
+  valuation: "평가액",
+};
+
+/** 성격을 모르는 금액(규칙이 읽은 것)의 라벨 */
+export const UNKNOWN_FEE_KIND_LABEL = "추정 이적료";
+
+/** 금액 칸의 제목 — 성격을 알면 그 라벨, 모르면 "추정 이적료" */
+export function feeKindLabel(kind: TransferDeal["feeKind"]): string {
+  return kind === null ? UNKNOWN_FEE_KIND_LABEL : FEE_KIND_LABEL[kind];
+}
+
+/**
+ * 금액 옆에 붙이는 짧은 표시 — **실제 이적료가 아닐 때만**(제안액·요구액·바이아웃·평가액). 이적료와 성격 미상은 금액만 그린다
+ * (목록의 모든 금액에 "이적료"를 붙이면 소음이다).
+ */
+export function feeKindCaption(kind: TransferDeal["feeKind"]): string | null {
+  return kind === null || kind === "fee" ? null : FEE_KIND_LABEL[kind];
+}
 
 /**
  * 통화 코드 → 기호. DB CHECK가 세 값만 허용한다(마이그레이션 20260924000001) — 모르는 코드가

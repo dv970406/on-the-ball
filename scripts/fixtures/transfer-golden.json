@@ -2,9 +2,18 @@
  "_comment": [
   "이적 딜 파생의 정답 세트 — 운영 transfer_news 행 id별로 \"이 보도가 특정 선수의 구단 이동을 (현재 진행형으로) 보도하는가\"와 그 선수들.",
   "2026-09-28 운영 보도 101건(딜 후보 합집합 41 + 미선택 이적 어휘 보도 무작위 60)을 파이프라인 결과를 보지 않은 독립 채점자 둘이 원문 기사를 읽고 매겼다. 둘이 갈린 9건은 원문으로 판정했다(가십 모음은 두 채점자가 모두 적은 선수만).",
+  "2026-10-01 운영 보도 524건을 더했다 — LLM이 판정한 190건 전부와, 판정에 가지 못한 보도의 층화 표본 334건(단계 있음 54 · 단계 없음+이적 어휘 200 · 그 밖 80). 파이프라인의 답을 보지 않은 채점자(LLM 서브에이전트)가 원문만 읽고 매겼고, 회고·재계약·선수 미특정·모음 기사는 이동 보도가 아니다(basis에 분류). 앞의 101건과 겹치면 앞의 것이 남는다.",
   "⚠ 저장소가 공개라 본문을 싣지 않는다(재배포 원칙) — 본문은 scripts/eval-transfer.mjs --export 로 받은 로컬 스냅샷(.cache/, gitignore)에서 읽는다."
  ],
  "items": [
+  {
+   "id": 1,
+   "source": "bsky:benjacobs",
+   "url": "https://bsky.app/profile/jacobsben.bsky.social/post/3mw4nl7xfkc2s",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
   {
    "id": 5,
    "source": "bsky:benjacobs",
@@ -26,6 +35,14 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 7,
+   "source": "bsky:benjacobs",
+   "url": "https://bsky.app/profile/jacobsben.bsky.social/post/3mvagllptjc2y",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal)"
+  },
+  {
    "id": 33,
    "source": "bsky:theathletic",
    "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mw732m6zvc2o",
@@ -34,12 +51,164 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 35,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mw6vzk6pta2o",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 37,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mw6khm747j2n",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 65,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mw2zwyhmyn2t",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 67,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mvzrsug7vy2t",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 83,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mvxpxse27j2x",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 104,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mvtgilcttc2c",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 144,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mvmyojxfv72w",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 158,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mvkf3cecwu2j",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 172,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mviiffkdot2c",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 176,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mvidq6uvnm2j",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 178,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mvi4qjresy2t",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 186,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mvhbfend4f2v",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 220,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mv7xlytzyq2d",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
    "id": 229,
    "source": "bsky:theathletic",
    "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mv7pnxxqc72c",
    "is_move_report": false,
    "players": [],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 235,
+   "source": "bsky:kinsella",
+   "url": "https://bsky.app/profile/nizaarkinsella.bsky.social/post/3mw4m42d3dk2q",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 241,
+   "source": "bsky:kinsella",
+   "url": "https://bsky.app/profile/nizaarkinsella.bsky.social/post/3mvncyn6was2e",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 244,
+   "source": "bsky:kinsella",
+   "url": "https://bsky.app/profile/nizaarkinsella.bsky.social/post/3mvamt4rcms2h",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal)"
+  },
+  {
+   "id": 296,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/videos/cqkgxp97nxzno?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 310,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c68042y9l4kno?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 328,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sounds/play/p0pc29mg?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
   },
   {
    "id": 337,
@@ -52,6 +221,14 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 345,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66720",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
    "id": 353,
    "source": "tg:romano",
    "url": "https://x.com/FabrizioRomano/status/2102798534986846341",
@@ -62,6 +239,14 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 354,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66711",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
    "id": 355,
    "source": "tg:romano",
    "url": "https://x.com/FabrizioRomano/status/2102797265823793635",
@@ -70,6 +255,32 @@
     "David Alaba"
    ],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 369,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66696",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 370,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66695",
+   "is_move_report": true,
+   "players": [
+    "Neto"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 371,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66694",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
   },
   {
    "id": 372,
@@ -103,12 +314,30 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 376,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66689",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
    "id": 377,
    "source": "tg:romano",
    "url": "https://x.com/FabrizioRomano/status/2102722185349525797",
    "is_move_report": false,
    "players": [],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 380,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66685",
+   "is_move_report": true,
+   "players": [
+    "David Alaba"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
   },
   {
    "id": 381,
@@ -119,6 +348,62 @@
     "David Alaba"
    ],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 383,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66682",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 386,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66679",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 389,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66676",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 400,
+   "source": "tg:ornstein-mirror",
+   "url": "https://t.me/David_Ornstein/1979",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 402,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/live-blog/11095/13025492/man-utd-transfer-news-rumours-and-gossip-live-updates-and-latest-on-deals-signings-loans-and-contracts",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
+  },
+  {
+   "id": 419,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13590954/man-utd-red-devils-announced-record-revenues-in-2026-despite-not-playing-european-football",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 420,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13591017/scotland-robbie-ure-delighted-unusual-route-from-rangers-to-sevilla-has-earned-first-call-up-aged-22",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
   },
   {
    "id": 423,
@@ -245,6 +530,24 @@
    "basis": "판정"
   },
   {
+   "id": 440,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/24/the-system-not-tuchel-led-to-world-cup-failure-but-euro-2028-offers-new-hope",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 443,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/23/christian-eriksen-leaves-wolfsburg-mutual-consent-denmark",
+   "is_move_report": true,
+   "players": [
+    "Christian Eriksen"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+  },
+  {
    "id": 445,
    "source": "rss:guardian-football",
    "url": "https://www.theguardian.com/football/2026/sep/23/summer-football-transfer-window-best-value-deals",
@@ -261,12 +564,166 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 448,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/23/manchester-united-seventh-straight-annual-loss-record-revenue-financial-results",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 450,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/23/harry-kane-england-world-cup-argentina-nations-league-spain",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 458,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/video/2026/sep/24/england-face-world-champions-spain-as-international-break-commences-football-weekly",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 459,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/ng-interactive/2026/sep/01/womens-transfer-window-summer-2026-all-deals-from-worlds-top-six-leagues",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(list_roundup)"
+  },
+  {
+   "id": 462,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/21/serie-a-inter-roma-lautaro-martinez-gian-piero-gasperini",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
    "id": 463,
    "source": "rss:guardian-football",
    "url": "https://www.theguardian.com/football/2026/sep/21/ghosts-2023-surface-borussia-dortmund-bundesliga-summit-stuttgart",
    "is_move_report": false,
    "players": [],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 467,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/19/zinedine-zidane-france-coach-wizard-behind-curtain",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 473,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/23/madrid-mourinho-javier-tebas-football-daily-newsletter",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 474,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/21/tottenham-hotspur-premier-league",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 477,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/audio/2026/sep/22/dockers-derby-delivers-and-england-squad-upheaval-football-weekly",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 478,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/audio/2026/sep/22/spurs-in-seventh-heaven-arsenal-rescue-a-point-and-late-goals-galore-womens-football-weekly",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 479,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/21/wsl-talking-points-arsenal-isobel-goodwin-england",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 481,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMilAFBVV95cUxQQldCNDRUdnpzUmZSbTgweVQ2LU02TkhoLUZydkRISjNYVkhZVzl4b2FQc3NkYkxHbnQ1a3JsZVpoY0JoYnFiODloQW9BYTVoQVBEbHBuMWU5SHZrdEFBWmZJRm5vVzNDYjJiNUdzb1diNW9rb1F1eW5kSnF2OFk0OTZDZUxEdHdoXzQxOE5Fcm94NGNy?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
+  },
+  {
+   "id": 482,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMie0FVX3lxTE9xRFgxUkhLS0ViQ3hSUVVCZzRFaUxIaEQ5S3poZU1kWloxMXNseXlxOFkzYlBMajZvMGZENTNTQ2daLVlqcWEtcUtNWjNlNUpqRGNSV0loLXNXdGRYbTZOQ0R5bFg3MzFHanVraUM4WGMybzFTY3FrOGFtVdIBgAFBVV95cUxPWEMtUXlaVDdOTktpV3B1SVA5ZnZsaUhrUmlJVkFkaVZPNDdkbi0tR2FQVURsVm1scy1YVEhkSF95ZENoNUhxTmtWSFJjQzlXeTBpV2pmVjZTOUIyN0cxRGZfQnd2bjB2YXdCeFJRYnJpanFxSXYtTjM4MmFuc2tFMw?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 486,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMinwFBVV95cUxOQkI3RkxyNlRTZU5nVEZkcEg1ay1vdHpsa0JsbUx6MGdzZEVFSmZBRk84TzQ1Rm1Wcnp6RDFBZE1JVnB3VU1KdC1xWDRWVVZHeGl1Mm0xVklGU0t6cmcwc1RSbG1vY0VWRVVLVmtKbjVLNHlWZU0tU2pOak9BZTZBWk8tcW9kbWRaRWxyT0Z5X2RjSU41aElta3JIMldqVjQ?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player · 확신 medium)"
+  },
+  {
+   "id": 487,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMikAFBVV95cUxPODhaVFN4T0RZTThoMjhHa2p0bTNEZEprSFVWQjJxUFN5OHV0Rl8zT01WRHkzV1hzR1Z3eUViTGRyWjczRVFTTVJnUk54c2VLaUhNYldla2pOekdPeTFyMzhsT2Jfd0pZSmVFSE9xZmg3Zlplc2pIRXhpRjkxQlV3dTBJZVVkN1B1dlk1dXZWUmo?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
+  },
+  {
+   "id": 492,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMi_AFBVV95cUxPdzdXdVU1NFVpVDBXQWZsOHFqZ0NUMDg0eXRhazZYUEdvU0JFUEpKNVJYbnJ0enhlS3Z0SWkwTkpfS2lPVGhselZ3LWRhZE00TDJyZkhOTmk1VVZCN29TbG9mRm9XRmtQNkJXcVpQRmRSV3VtRmVhd2tHTTRXOWREOVlNM1BENXdJMGhhUEVKcjRvZXdYTWFvdmF3cUotaEp1b3NuWHhVTmU2ejBvNmN1b3RCY2hrQVRoX2lkaUxLdWU5SzkzNHJWaWxhYmpySllhcTRBSzdNNWlSUXA4b3l5b0FHNEx6VlFFcnhKUS11OTU4X3pDYVF5VWZwbEw?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
+  },
+  {
+   "id": 494,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMifEFVX3lxTE51c0QtU21tbFByWm94WjFiTjNzdm1NcEx6QnR2Q2pZLUxLc3l2MEdiYkRXcWt5SGVid0JzaENrNDlhcExtdzdiem1PY3NCaXpFZU1zR2liNG80endXYmpJSWJhTkNUQ2VyZVo0OVVid1I5RnRORDRTM0VwbWfSAYIBQVVfeXFMUGViQ0QxNmhZbm1qa3VDMEktbEZBX2xxNFRIVEdXSEgwTUdFZ2ZiaXdqUi1GMmZvOXFzcG94RVYtY1NqaGJRUGJYOFVsaU8wWVdLUmxOZXBfUGM2bXJ4bTNYQWFfdUhBN3E0VlN2bDhnWms0MDlYa3BmQVZxX0g0bzkxdw?oc=5",
+   "is_move_report": true,
+   "players": [
+    "Alaba"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 498,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMipAFBVV95cUxPcGJYQnZ2TzNsUlpQaGw0bDBqaTJyc19xOFphbUFieTl3Q2Z2aXFqWHJCTnpaZGVLZjF4d3p5RmltOGZCVV82S3dYcldXV2MtdG1WUDNsNVlIMXdOYUlxVDJpU3hFSEV6d1hqWElVaE5tcHl1blk2dk9WMDc1WkxQb0E1R01NcGVGcFFKeU9TRUl3MlVRYUpYZjhqQVJFVWNKd3d6Rg?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
+  },
+  {
+   "id": 500,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMiygFBVV95cUxQZ2Z3NUtoMlZ2eUsyWHpTUDRUeWlrWmV5R2RwcXhlam0tamdaNG11UkRWS0pqM1V2LWsweWNTaFZiNUJ2S0NNc2FKbWV0bk8zaWEwN25iN0pFVlpKUk5YUDhUMW52TWI0bE1XdmpXaGt6YlpXa0FMT3JkZGNscDhPUzc2MW56ak5ZRGVLRm9OYUFEektROExMUXVZenRWaWwwWWcxNWhrTnF4R3lUS3IxdDdBenp6aUl2ckhsanVwU3hqcWFiNG5rNTh3?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
   },
   {
    "id": 501,
@@ -283,6 +740,22 @@
    "is_move_report": false,
    "players": [],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 508,
+   "source": "gnews:ornstein",
+   "url": "https://news.google.com/rss/articles/CBMijAFBVV95cUxOVlRaaFNBMTV6R29ibjJtWkpiR2c2Q3ZUMHhCSjltZWZzMGdFd3JoT2pZU190dXU5Z1pjSUVzNS1EWk1lTWdRWFZFbmxCekwydUlLbmUyN0syQ3hZVk5SZk15dnNMM0pXNXBCWWlxT1dhd1hnMEFEMTI0aW5nazUyQVlxcXlieVdMbDJ2RQ?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
+  },
+  {
+   "id": 509,
+   "source": "gnews:ornstein",
+   "url": "https://news.google.com/rss/articles/CBMi7wFBVV95cUxQQkhMUXFmM2ZvYnhRb0xZcXcxeGZjQ0I0NTZYWTB4NEVETndJZVp1MmtEWEJpN0QwWEJYY3paeV9ZemJVTDJ2Wk9zZ3pXSk56dGw1MktWaGEwd1J3NV9DQzNtRGlpblkyc0pUMlNHQUhtX1ZFWnNjVzdyaUFCTlY0RTVSSXhOMkNqRndtSy04OGZISTlpMkdYY1Y5Vk9URkIzNGphS1RLWlVJRHpnY2dVcXd1QzJfbmVYeTVYZ1dRVVo0b2ZtcFdWWlBwZWNLZWFfdnFKa2dVc2hVOTZjZHZSUkhkUzVDbl9CRzk2YTd6cw?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
   },
   {
    "id": 516,
@@ -321,12 +794,28 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 529,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66734",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
    "id": 538,
    "source": "rss:bbc-football",
    "url": "https://www.bbc.co.uk/sport/football/articles/ck4glyl0nwd6o?at_medium=RSS&amp;at_campaign=rss",
    "is_move_report": false,
    "players": [],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 549,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cm780yp0nq7eo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
   },
   {
    "id": 572,
@@ -337,6 +826,14 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 573,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/24/pints-points-arguments-for-against-booze-football-daily",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
    "id": 578,
    "source": "gnews:romano",
    "url": "https://news.google.com/rss/articles/CBMikgFBVV95cUxQclhIbWdUNGJKejM3dWZTdGtJTk1iVURkRVU0ckp1aGVTblJPYVh5eWhpRjVmWndpU3NRelpZQmlvc3RBaTUxaGxaQmM3TXdENVdpZ196Q25PR1R6eEg4bmZIb1AyQkdWM2lta21ZeTFLLU1RREk5NkRfQmg1OGUzVWpJaWx2SS0xS1Z4MTdxRDBKZw?oc=5",
@@ -345,6 +842,16 @@
     "Philippe Coutinho"
    ],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 580,
+   "source": "gnews:ornstein",
+   "url": "https://news.google.com/rss/articles/CBMinwFBVV95cUxNMm1PRlJQY3RybkJGLWJuZnhPczhuR05udFhCVmV5ZHNxdWl4Y3F4bjhRdUl3TFFSQ3Q4NW9zam1xb0dsbURtczhVUGktOVFFdW9vWUxWMmpqX00xZ1hZdVhscWppVWh6X0hlbUd5dUVEdVdlNzFOOFVMYkhOZHBYOTVwb3VNTGI4T2NfZ0lyalQwZmpyMHRabERPSUVDWTQ?oc=5",
+   "is_move_report": true,
+   "players": [
+    "JJ Gabriel"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
   },
   {
    "id": 582,
@@ -361,6 +868,14 @@
     "Alessandro Bastoni"
    ],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 586,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66735",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
   },
   {
    "id": 587,
@@ -395,12 +910,38 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 614,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cqe9ep4nvxr8o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 619,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/netherlands-vs-germany/report/553985",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
    "id": 650,
    "source": "bsky:theathletic",
    "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mwcwehhovq2m",
    "is_move_report": false,
    "players": [],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 656,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66748",
+   "is_move_report": true,
+   "players": [
+    "Lautaro Martínez"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
   },
   {
    "id": 658,
@@ -411,6 +952,16 @@
     "Isaac Konde"
    ],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 660,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66744",
+   "is_move_report": true,
+   "players": [
+    "Isaac Konde"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
   },
   {
    "id": 679,
@@ -427,6 +978,40 @@
     "Alessandro Bastoni"
    ],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 694,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6y8zp2v1zl4o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 707,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/25/luis-de-la-fuente-spain-world-keep-us-winning",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 710,
+   "source": "gnews:ornstein",
+   "url": "https://news.google.com/rss/articles/CBMikwFBVV95cUxONXpIdEx5N3lkLUlQN2JhdzVRTko0dkRQYnFidFhRMDRDQ1hfVDh4b2JqbmVMNUFSWHRMZ1F4VkY2MnpuY0hZS2pnZ3lOVjFUVFQ0R3VWVnFGd3FCQUxDWTVBRTZFWHRqaTU3ZkdiWVFqYmFHemNySkdZOFV0SXhzUFl6R0hUUzl6OThZLUZNN2RyeDA?oc=5",
+   "is_move_report": true,
+   "players": [
+    "Ngumoha"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 712,
+   "source": "bsky:ornstein",
+   "url": "https://bsky.app/profile/david-ornstein.bsky.social/post/3mwdg3kwkxc2b",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
   },
   {
    "id": 720,
@@ -453,6 +1038,38 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 751,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cmwyzjedq51lo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 769,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/25/gianni-infantino-fifa-pressure-reform-premier-league-bundesliga-la-liga-serie-a",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 775,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/25/ashley-sanchez-interview-nwsl-record-uswnt-callup",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 777,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMirwFBVV95cUxOZV9Oa3ZDY2RxZzFHangxLTh0c3dfcUhNQUJ0MVZSdXV5cnVia090OXFwbDhnWEJlb1cyUXIxQ1lTWFg3em43c1FCRm5DMWNVc01yam9vRXI4a05LRVBKc3VXQWZuRXUwWV9zbnoxVVFKUTlMSFA5Y00wd2Z4RWRHak1oQ18xd1dhMUJMa2xDRWZEbFctYTNxZVBoZ2s4ZHFoVW5FaWFqWWdCcXFOdlow?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
+  },
+  {
    "id": 778,
    "source": "gnews:romano",
    "url": "https://news.google.com/rss/articles/CBMiZEFVX3lxTFBRLVlaNXpvanl3MjJoY3ZYUGpHRVdJX1h1Z04xc2lNWXNIczc3dURyM0FqOTFkMjdBLTNJWURCbENEZ2dLT3NodEMxZWs3OXpkdlp0N01wUkF4Nm82ZDNVOG05RVE?oc=5",
@@ -471,6 +1088,30 @@
     "Isaac Konde"
    ],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 787,
+   "source": "bsky:delaney",
+   "url": "https://bsky.app/profile/migueldelaney.bsky.social/post/3mweasc7qq225",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 788,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66766",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal)"
+  },
+  {
+   "id": 790,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66764",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
   },
   {
    "id": 812,
@@ -507,6 +1148,40 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 846,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cmly4qkly434o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 848,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cqrl67e2eye4o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "JJ Gabriel"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 851,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cw98022gvjr1o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 864,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cq62jxymr012o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
    "id": 878,
    "source": "rss:sky-transfers",
    "url": "https://www.skysports.com/football/news/11095/13591878/transfer-news-brentford-hold-kevin-schade-contract-talks-as-arsenal-liverpool-track-germany-winger",
@@ -525,6 +1200,14 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 885,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/25/thomas-tuchel-cole-palmer-england-spain-nations-league",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
    "id": 887,
    "source": "rss:guardian-football",
    "url": "https://www.theguardian.com/football/2026/sep/25/liverpool-cody-gakpo-tough-summer-manchester-city",
@@ -533,12 +1216,52 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 891,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/25/england-spain-football-daily-newsletter",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 895,
+   "source": "gnews:ornstein",
+   "url": "https://news.google.com/rss/articles/CBMi2wFBVV95cUxNbXFqVUVvZkZYMnJfU0cxaVRHNWNTOF8zelJjUkxYdlZiaVFqQ19PTllyX3VXb2J4MDFaZE5TNFAwTFZYYWRNcW85bG1zcHFNZUxRYnFXX3RJR3NYTmo1Y2RvMC0yZ01OU21NcEF2T1d5akppbkNndUlKZjN0Y2o1bmQzQnpYU2R0OHRmNUR6RVROaG1Ub21UclMyZ3R6bzI4QjlrRVdDWVQ0V3hqVklUd0JyZkMzZzZpcTkzVjNSREZrX0puUERENlpPQUN4enlHVldiREo0ejd3UGc?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
+  },
+  {
+   "id": 902,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66772",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 903,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66771",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
    "id": 905,
    "source": "tg:romano",
    "url": "https://x.com/FabrizioRomano/status/2103563304593477890",
    "is_move_report": false,
    "players": [],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 909,
+   "source": "bsky:delaney",
+   "url": "https://bsky.app/profile/migueldelaney.bsky.social/post/3mweqx3qrds25",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
   },
   {
    "id": 916,
@@ -557,6 +1280,14 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 936,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6grv7x544qro?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
    "id": 944,
    "source": "rss:bbc-gossip",
    "url": "https://www.bbc.co.uk/sport/football/articles/c84gkkepxxl4o?at_medium=RSS&amp;at_campaign=rss",
@@ -571,6 +1302,38 @@
     "Valentin Atangana"
    ],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 961,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/25/rodri-adamant-manchester-city-deserved-success-despite-being-found-guilty-of-rule-breaking",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 963,
+   "source": "gnews:ornstein",
+   "url": "https://news.google.com/rss/articles/CBMi0gFBVV95cUxNZUlKR3pNWWtBaHZhWUctV1dfVUg0SEE4SHpGNlo3YXRKU2VpMVhIWllNdTBMWkNaRVpHRlZOekZCU0FnVTNNWU14QTNudHZEWC03T1FHWWlyeUJtWi1hY19IdTN5MURfWWl3ZENFdmlMRmNMRE1qVUxORlptWWdmMUR6bGMzUnZNZWNJMF9IUUkyS2JVbkQwS2QyTVRoTXNEdnkyZ25Yd1ZOMEw1NVluRnBmbjdvbnN1UHVhRElJOThqTEI2TG4yOF9oLXBhYUNYd0E?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 973,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66778",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal)"
+  },
+  {
+   "id": 974,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66777",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
   },
   {
    "id": 981,
@@ -597,6 +1360,62 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 1002,
+   "source": "gnews:ornstein",
+   "url": "https://news.google.com/rss/articles/CBMi_gFBVV95cUxQbU5ZLUpoZzRUTmZNREQtZFR0Uk95V1RQSDNJTzhSWmtXRzhKd0ZWeW96aEhoZ0pfOGg3NnVGbTAwVWR2OHJGdWRwc0hDY09saE16eV83eElCWlp5bXNoN25LUnQ4S1ZHX3pEdmI1bmpEUUZwekpBLTBDM0tRUUZ4OEZHWlZ2OV83dU53M3FCRFNMQ2M4ZmR4dGdHUG01ZVNpR1JaaEVlS1VfaU9RUzBhQ1ZXUXVEZjU2cUtFRUZkNkE1c2xPb3pkbV9jSVFfcURZM2RzM3hDMUNJVlkzNmRMZUtheFR5WW5Kd1VPZTJ5OGtrT1lZTlZReU9fZDJqUQ?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1008,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66781",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal)"
+  },
+  {
+   "id": 1040,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sounds/play/p0pcj8w1?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1050,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/26/liverpool-rehire-julian-ward-sporting-director-replace-richard-hughes",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 1054,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMif0FVX3lxTE5tTHVIaUVUaHNBdE9ST2dtcVlFTnRNQ3ZJRERHNkhkNlRyRElJdDIwTEkwRW4ydms4RjduNG5pcWJra3pJaVdKM3E4WEVQNFBneUJHcnpTOFI3TG5ub3pWUi1UbGpRTUZWLThDaU5iT2Y1aEJBVlBSanp1QTRZTVXSAYQBQVVfeXFMTVN0X0laU0FNbEVmamtYWjcwYzJVRjlGY2J3VmdQUW0zVUFEbXlOREEzaHdHcTFMM1BHMGJjVlpfVEZyRlNjakxweTlfeXlOdTlsWjF4ZWEzN1hEMHBsM3YxNUlNVEU5S3d0c1pkbGNZaWY3YThnemRabk00WE40Wm1tMHky?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective · 확신 medium)"
+  },
+  {
+   "id": 1059,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66787",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1062,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66784",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
    "id": 1074,
    "source": "rss:bbc-football",
    "url": "https://www.bbc.co.uk/sport/football/articles/c84gkkepxxl4o?at_medium=RSS&amp;at_campaign=rss",
@@ -613,12 +1432,63 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 1085,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c60m33n3nxgko?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 1098,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMitgFBVV95cUxQR3FMLTFKQjRJNGM3NFhkRHpwVEV1R25MTUZ5dTFvVHlLVTFLZUZzZ3ZyQXR3MnlIM3B2R3hUV1hKMzh1aTR2S01YQzNOaTJ5NV9ScnNpTGVSUE9UeWplUXBGZVdhSVFFQ3RnRFpXQ3ZHXy1ib1lTcS1XSDFNck5tcWF0bEtWckhoclgza2dJRklYUkVHbDh3MXdJc0RjV2ZyOGFIUlZPVF9DNVA4dTFfUHRtZXhuZw?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
+  },
+  {
+   "id": 1099,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMifEFVX3lxTFBPLWtXLTd6TXJDWF8wQTM2MF96cjNDWDR4N0dtMlJLWWlscTdrbXAtaWw4bk45djhQazV6US1CMG5UT1BQTHpJWGk1QWVJdk9NcWpLMm9DZlh4SkRvX0dhamhWQWJVZms0Z2dxZjdBR0YwcEh1ZGM0TFdJMmvSAYIBQVVfeXFMUDl6VzNfSVJ0dmVJTm56M0FsSUNrdklwM3FYT1dHajhGZ2t3akd2amZNZFBkN0xISzFYNFpIRU5ZMWdBVlg1NDdqVDhUa0RDOGR4NVJ4VHo1YzZfY2FSVFZ5SElNQjBGVy1hWENxNzZQR0x3TGpXS2h2NU5lekF0VEpZUQ?oc=5",
+   "is_move_report": true,
+   "players": [
+    "Chiesa",
+    "Luis Henrique"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+  },
+  {
+   "id": 1112,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/london-city-lionesses-vs-brighton-and-hove-albion-women/report/575777",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
    "id": 1115,
    "source": "rss:guardian-football",
    "url": "https://www.theguardian.com/football/live/2026/sep/26/england-v-spain-nations-league-football-live-score-updates",
    "is_move_report": false,
    "players": [],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1121,
+   "source": "gnews:mokbel",
+   "url": "https://news.google.com/rss/articles/CBMidkFVX3lxTFA0TklhQV9EdnZlZEVFT1VYcHlPMTFySzJtb1F1d0xQRTFQRGduRE85OXBVVnNjSHUwMlcwQmVTXzNJT1JhU3NEVVJFUnJ2OEkzNG9ibHduYUZXMkFIOC04RVRfZXo4eHpmb0xISHpEUVhCblQwZ1E?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
+  },
+  {
+   "id": 1122,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mwhe2ausz22g",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
   },
   {
    "id": 1127,
@@ -657,6 +1527,22 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 1142,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/england-vs-spain/report/554000",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 1146,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/27/england-spain-nations-league-meet-new-55-minute-collapse-not-same-as-old",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
    "id": 1178,
    "source": "bsky:gold",
    "url": "https://bsky.app/profile/alasdairgold.bsky.social/post/3mw4qxmnjy22m",
@@ -673,6 +1559,62 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 1195,
+   "source": "bsky:gold",
+   "url": "https://bsky.app/profile/alasdairgold.bsky.social/post/3mvn7jyngps27",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1201,
+   "source": "bsky:gold",
+   "url": "https://bsky.app/profile/alasdairgold.bsky.social/post/3mvj2omvtmc25",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 1212,
+   "source": "bsky:tanswell",
+   "url": "https://bsky.app/profile/jacobtanswell.bsky.social/post/3mvurkjkyfk2u",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 1224,
+   "source": "bsky:tanswell",
+   "url": "https://bsky.app/profile/jacobtanswell.bsky.social/post/3mvumx5wqrs2b",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 1230,
+   "source": "bsky:tanswell",
+   "url": "https://bsky.app/profile/jacobtanswell.bsky.social/post/3mvuluspq722b",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 1234,
+   "source": "bsky:tanswell",
+   "url": "https://bsky.app/profile/jacobtanswell.bsky.social/post/3mvucgjtwmk2c",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 1258,
+   "source": "bsky:tanswell",
+   "url": "https://bsky.app/profile/jacobtanswell.bsky.social/post/3mvnv32xbek2x",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
    "id": 1268,
    "source": "bsky:waugh",
    "url": "https://bsky.app/profile/chrisdhwaugh.bsky.social/post/3mwfnae2ics27",
@@ -681,12 +1623,92 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 1269,
+   "source": "bsky:waugh",
+   "url": "https://bsky.app/profile/chrisdhwaugh.bsky.social/post/3mwfnack5gs27",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1270,
+   "source": "bsky:waugh",
+   "url": "https://bsky.app/profile/chrisdhwaugh.bsky.social/post/3mwd6wi7ets2w",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1274,
+   "source": "bsky:waugh",
+   "url": "https://bsky.app/profile/chrisdhwaugh.bsky.social/post/3mvzqufat6c2z",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1320,
+   "source": "bsky:waugh",
+   "url": "https://bsky.app/profile/chrisdhwaugh.bsky.social/post/3mviu4jxfu22j",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 1326,
+   "source": "bsky:waugh",
+   "url": "https://bsky.app/profile/chrisdhwaugh.bsky.social/post/3mvio6jx27k2j",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 1340,
+   "source": "bsky:boyland",
+   "url": "https://bsky.app/profile/paddyboyland.bsky.social/post/3mvp4r2sfhs2x",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
    "id": 1343,
    "source": "bsky:boyland",
    "url": "https://bsky.app/profile/paddyboyland.bsky.social/post/3mvmo4alkmc2o",
    "is_move_report": false,
    "players": [],
    "basis": "판정"
+  },
+  {
+   "id": 1354,
+   "source": "bsky:pittbrooke",
+   "url": "https://bsky.app/profile/jackpittbrooke.bsky.social/post/3mvqobw34wc2m",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1355,
+   "source": "bsky:pittbrooke",
+   "url": "https://bsky.app/profile/jackpittbrooke.bsky.social/post/3mvp2wtivts2w",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1373,
+   "source": "bsky:doyle",
+   "url": "https://bsky.app/profile/iandoylesport.bsky.social/post/3mwdgq363dc26",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1374,
+   "source": "bsky:doyle",
+   "url": "https://bsky.app/profile/iandoylesport.bsky.social/post/3mwbtob34zk2o",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
   },
   {
    "id": 1381,
@@ -713,12 +1735,142 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 1427,
+   "source": "bsky:ryder",
+   "url": "https://bsky.app/profile/leeryder.bsky.social/post/3mwh6227an22z",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1440,
+   "source": "bsky:ryder",
+   "url": "https://bsky.app/profile/leeryder.bsky.social/post/3mwbfdx4ucs26",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 1446,
+   "source": "bsky:ryder",
+   "url": "https://bsky.app/profile/leeryder.bsky.social/post/3mw6cadyw5s2s",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1450,
+   "source": "bsky:ryder",
+   "url": "https://bsky.app/profile/leeryder.bsky.social/post/3mw3paeu6mc2g",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
+  },
+  {
+   "id": 1453,
+   "source": "bsky:ryder",
+   "url": "https://bsky.app/profile/leeryder.bsky.social/post/3mvzo22twpk2v",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 1455,
+   "source": "bsky:ryder",
+   "url": "https://bsky.app/profile/leeryder.bsky.social/post/3mvz6u77u7c2z",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
+  },
+  {
    "id": 1464,
    "source": "bsky:ryder",
    "url": "https://bsky.app/profile/leeryder.bsky.social/post/3mvug5tbjlk2i",
    "is_move_report": false,
    "players": [],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1466,
+   "source": "bsky:ryder",
+   "url": "https://bsky.app/profile/leeryder.bsky.social/post/3mvrp5yddyk27",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury · 확신 medium)"
+  },
+  {
+   "id": 1468,
+   "source": "bsky:ryder",
+   "url": "https://bsky.app/profile/leeryder.bsky.social/post/3mvpstbhevs2v",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 1477,
+   "source": "bsky:ryder",
+   "url": "https://bsky.app/profile/leeryder.bsky.social/post/3mvkpbslovc24",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1492,
+   "source": "bsky:townley",
+   "url": "https://bsky.app/profile/johntownley.bsky.social/post/3mvzraggrtk2l",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 1498,
+   "source": "bsky:townley",
+   "url": "https://bsky.app/profile/johntownley.bsky.social/post/3mvxempphb22t",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 1501,
+   "source": "bsky:townley",
+   "url": "https://bsky.app/profile/johntownley.bsky.social/post/3mvuw2wrbuk26",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 1528,
+   "source": "bsky:townley",
+   "url": "https://bsky.app/profile/johntownley.bsky.social/post/3mvsszhbbh22w",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 1553,
+   "source": "bsky:townley",
+   "url": "https://bsky.app/profile/johntownley.bsky.social/post/3mvnlxyxrtk27",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 1569,
+   "source": "bsky:mitten",
+   "url": "https://bsky.app/profile/andymitten.bsky.social/post/3mwbvlorptk2c",
+   "is_move_report": true,
+   "players": [
+    "Isaac Konde"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 1572,
+   "source": "bsky:balague",
+   "url": "https://bsky.app/profile/guillem-balague.bsky.social/post/3mwatz3nwns2q",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
   },
   {
    "id": 1601,
@@ -731,6 +1883,14 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 1604,
+   "source": "rss:men-manutd",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/alejandro-garnacho-man-united-villa-34677602",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
    "id": 1610,
    "source": "rss:men-manutd",
    "url": "https://www.manchestereveningnews.co.uk/sport/football/manchester-united-confirm-another-talented-34670960",
@@ -741,12 +1901,248 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 1612,
+   "source": "rss:men-manutd",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/man-united-academy-transfer-decision-34653704",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 1614,
+   "source": "rss:men-manutd",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/manchester-uniteds-academy-after-jj-34666314",
+   "is_move_report": true,
+   "players": [
+    "JJ Gabriel"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+  },
+  {
+   "id": 1615,
+   "source": "rss:men-manutd",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/man-united-joshua-zirkzee-netherlands-34672150",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 1624,
+   "source": "rss:men-manutd",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/man-united-latest-wayne-rooney-34666937",
+   "is_move_report": true,
+   "players": [
+    "JJ Gabriel"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+  },
+  {
+   "id": 1625,
+   "source": "rss:men-manutd",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/manchester-united-scrutiny-world-away-34666542",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 1627,
+   "source": "rss:men-manutd",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/transfer-news/man-utd-transfer-liverpool-konde-34668898",
+   "is_move_report": true,
+   "players": [
+    "Isaac Konde",
+    "Karim Cassim"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 1632,
+   "source": "rss:men-mancity",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/man-united-city-de-gea-34676525",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(list_roundup)"
+  },
+  {
+   "id": 1655,
+   "source": "rss:echo-liverpool",
+   "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/liverpool-jurgen-klopp-morton-araujo-34676503",
+   "is_move_report": true,
+   "players": [
+    "Tyler Morton",
+    "Ronald Araujo"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+  },
+  {
+   "id": 1656,
+   "source": "rss:echo-liverpool",
+   "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/jurgen-klopp-makes-unfortunate-florian-34676726",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 1666,
+   "source": "rss:echo-liverpool",
+   "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/trey-nyoni-drops-hint-liverpool-34676451",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 1677,
+   "source": "rss:echo-liverpool",
+   "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/jamie-carragher-makes-ibrahima-konate-34671251",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 1683,
+   "source": "rss:echo-everton",
+   "url": "https://www.liverpoolecho.co.uk/news/liverpool-news/evertons-new-stadium-signed-five-34674461",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1689,
+   "source": "rss:echo-everton",
+   "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/everton-home-kit-202627-deal-34675777",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1696,
+   "source": "rss:echo-everton",
+   "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/sean-dyche-makes-harrison-armstrong-34670824",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion · 확신 medium)"
+  },
+  {
+   "id": 1697,
+   "source": "rss:echo-everton",
+   "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/friedkin-group-claims-concerning-david-34667106",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1701,
+   "source": "rss:echo-everton",
+   "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/cahill-everton-folarin-balogun-transfer-34665953",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 1706,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/news/five-chelsea-players-point-prove-34663663",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury · 확신 medium)"
+  },
+  {
+   "id": 1712,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/news/jordan-henderson-paul-scholes-chelsea-34670588",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
    "id": 1713,
    "source": "rss:fl-chelsea",
    "url": "https://www.football.london/chelsea-fc/news/joao-pedro-agreement-reached-after-34670603",
    "is_move_report": false,
    "players": [],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1715,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/transfer-news/xabi-alonso-gets-219m-chelsea-34666261",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 1717,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/transfer-news/xabi-alonsos-clear-transfer-wish-34665267",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1719,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/news/won-champions-league-chelsea-winning-34657600",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1720,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/transfer-news/chelsea-might-forced-revisit-52m-34660639",
+   "is_move_report": true,
+   "players": [
+    "Morgan Rogers"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+  },
+  {
+   "id": 1723,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/transfer-news/xabi-alonso-given-morgan-rogers-34658905",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 1726,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/news/xabi-alonsos-extensive-list-chelsea-34654686",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion · 확신 medium)"
+  },
+  {
+   "id": 1731,
+   "source": "rss:fl-arsenal",
+   "url": "https://www.football.london/arsenal-fc/transfer-news/arsenal-already-completed-four-exciting-34667581",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
+  },
+  {
+   "id": 1733,
+   "source": "rss:fl-arsenal",
+   "url": "https://www.football.london/arsenal-fc/news/viktor-gyokeres-reveals-arsenal-frustration-34675933",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 1736,
+   "source": "rss:fl-arsenal",
+   "url": "https://www.football.london/arsenal-fc/news/four-arsenal-players-point-prove-34665045",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 1737,
+   "source": "rss:fl-arsenal",
+   "url": "https://www.football.london/arsenal-fc/news/mikel-arteta-denied-chance-play-34673160",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
   },
   {
    "id": 1739,
@@ -759,12 +2155,36 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 1741,
+   "source": "rss:fl-arsenal",
+   "url": "https://www.football.london/arsenal-fc/news/arsenal-transfer-news-kai-havertz-34673150",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective · 확신 medium)"
+  },
+  {
    "id": 1747,
    "source": "rss:fl-arsenal",
    "url": "https://www.football.london/arsenal-fc/transfer-news/vinicius-jr-arsenal-truth-emerges-34670712",
    "is_move_report": false,
    "players": [],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1756,
+   "source": "rss:fl-tottenham",
+   "url": "https://www.football.london/tottenham-hotspur-fc/news/five-tottenham-players-point-prove-34666730",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury · 확신 medium)"
+  },
+  {
+   "id": 1765,
+   "source": "rss:fl-tottenham",
+   "url": "https://www.football.london/tottenham-hotspur-fc/news/tottenham-news-oliver-irow-plymouth-34670028",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
   },
   {
    "id": 1769,
@@ -783,6 +2203,16 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 1773,
+   "source": "rss:fl-tottenham",
+   "url": "https://www.football.london/tottenham-hotspur-fc/news/dele-alli-next-club-training-34665334",
+   "is_move_report": true,
+   "players": [
+    "Dele Alli"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+  },
+  {
    "id": 1781,
    "source": "rss:chronicle-nufc",
    "url": "https://www.chroniclelive.co.uk/sport/football/football-news/newcastle-uniteds-intriguing-next-move-34676155",
@@ -791,12 +2221,106 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 1787,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/sport/football/football-news/chris-dobey-explains-darts-world-34672872",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1789,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/sport/football/transfer-news/newcastle-united-lukas-hornicek-transfer-34675876",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 1790,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/sport/football/football-news/newcastle-united-scour-euro-market-34674763",
+   "is_move_report": true,
+   "players": [
+    "Noah Fernandez",
+    "Amir Bouhamdi"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 1794,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/sport/football/football-news/five-big-talking-points-matthias-34671353",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1799,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/sport/football/transfer-news/newcastle-united-agreed-lewis-halls-34660966",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal · 확신 low)"
+  },
+  {
+   "id": 1800,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/sport/football/football-news/what-yoane-wissa-after-newcastle-34669934",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
    "id": 1804,
    "source": "rss:chronicle-nufc",
    "url": "https://www.chroniclelive.co.uk/sport/football/football-news/nick-woltemade-newcastle-transfer-bayern-34668549",
    "is_move_report": false,
    "players": [],
    "basis": "판정"
+  },
+  {
+   "id": 1808,
+   "source": "rss:birmingham-villa",
+   "url": "https://www.birminghammail.co.uk/sport/football/football-news/unai-emery-interest-expected-aston-34675551",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 1810,
+   "source": "rss:birmingham-villa",
+   "url": "https://www.birminghammail.co.uk/whats-on/food-drink-news/aston-villa-icon-calls-out-34672642",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1825,
+   "source": "rss:birmingham-villa",
+   "url": "https://www.birminghammail.co.uk/sport/football/football-news/aston-villa-qa-buendia-contract-34652967",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1828,
+   "source": "rss:birmingham-villa",
+   "url": "https://www.birminghammail.co.uk/sport/football/football-news/aston-villa-sent-exciting-52m-34650189",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player · 확신 low)"
+  },
+  {
+   "id": 1839,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/man-utd-city-de-gea-37705599",
+   "is_move_report": true,
+   "players": [
+    "David Eze",
+    "Karrim Cassim"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
   },
   {
    "id": 1858,
@@ -810,6 +2334,115 @@
    "basis": "판정"
   },
   {
+   "id": 1861,
+   "source": "rss:standard-football",
+   "url": "https://www.standard.co.uk/sport/football/england-spain-analysis-tuchel-b1298520.html",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 1868,
+   "source": "rss:standard-football",
+   "url": "https://www.standard.co.uk/sport/football/man-utd-transfer-news-david-eze-b1298487.html",
+   "is_move_report": true,
+   "players": [
+    "David Eze",
+    "Karim Cassim",
+    "Isaac Konde",
+    "JJ Gabriel"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 1870,
+   "source": "rss:standard-football",
+   "url": "https://www.standard.co.uk/sport/football/salah-egypt-afcon-artificial-pitch-b1298498.html",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 1875,
+   "source": "rss:standard-football",
+   "url": "https://www.standard.co.uk/news/politics/manchester-city-guilty-charges-lisa-nandy-premier-league-sanctions-b1298476.html",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1891,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/alajbegovic-right-juventus-decision-spalletti/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 1893,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/report-patric-to-leave-lazio-for-al-ittifaq/",
+   "is_move_report": true,
+   "players": [
+    "Patric"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 1895,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/report-manu-kone-worth-e100m-chelsea-man-utd/",
+   "is_move_report": true,
+   "players": [
+    "Manu Koné"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 1905,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/vladimirov-pandolfi-milan-futuro-talents-eye",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other · 확신 medium)"
+  },
+  {
+   "id": 1914,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/cagliari-star-italy-debut-price-tag-milan-scout",
+   "is_move_report": true,
+   "players": [
+    "Alessandro Romano"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 1917,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/inacio-waiting-for-milan-40m-january-move",
+   "is_move_report": true,
+   "players": [
+    "Goncalo Inacio"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 1927,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/reinstated-but-unused-amorim-message-tomori",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 1930,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/cisse-hat-trick-italy-u21s-milan-plans",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury · 확신 medium)"
+  },
+  {
    "id": 1932,
    "source": "rss:sempremilan",
    "url": "https://sempremilan.com/milan-scouts-also-impressed-cagliari-mendy",
@@ -821,12 +2454,32 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 1934,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/why-milan-endrick-chances-growing-real-madrid",
+   "is_move_report": true,
+   "players": [
+    "Endrick"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
    "id": 1935,
    "source": "rss:sempremilan",
    "url": "https://sempremilan.com/van-bommel-reflects-milan-managing-one-day",
    "is_move_report": false,
    "players": [],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1937,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/milan-new-assault-inacio-40m-summer",
+   "is_move_report": true,
+   "players": [
+    "Goncalo Inacio"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
   },
   {
    "id": 1939,
@@ -837,12 +2490,36 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 1941,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/gullit-amorim-well-milan-manchester-united-transition",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1942,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/why-cardinale-wants-head-of-football",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
    "id": 1943,
    "source": "rss:sempremilan",
    "url": "https://sempremilan.com/agent-corinthians-andre-collapsed-deal-modric",
    "is_move_report": false,
    "players": [],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1944,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/amorim-irreplaceable-de-winter-pavlovic-reasons",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
   },
   {
    "id": 1953,
@@ -853,6 +2530,24 @@
     "André-Frank Zambo Anguissa"
    ],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1954,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/ancelotti-boost-milan-real-madrid-endric",
+   "is_move_report": true,
+   "players": [
+    "Endrick"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 1956,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/milan-hunt-director-four-names-list",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
   },
   {
    "id": 1959,
@@ -869,6 +2564,22 @@
    "is_move_report": false,
    "players": [],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1965,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/how-musah-convinced-amorim-west-ham",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective · 확신 medium)"
+  },
+  {
+   "id": 1966,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/official-tommaso-mancioppi-extends-contract-milan",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal)"
   },
   {
    "id": 1967,
@@ -895,12 +2606,54 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 1977,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/milan-accelerate-pulisic-renewal-talks-offer",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal)"
+  },
+  {
+   "id": 1984,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/why-redbird-considering-al-nassr-stake",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
    "id": 1988,
    "source": "rss:sempremilan",
    "url": "https://sempremilan.com/why-chances-coming-comotto-diawara-camarda",
    "is_move_report": false,
    "players": [],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 1991,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/chelsea-spurs-brighton-brentford-camarda-monitor",
+   "is_move_report": true,
+   "players": [
+    "Francesco Camarda"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 1997,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/pulisic-milan-desire-move-forward-together",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal)"
+  },
+  {
+   "id": 4005,
+   "source": "bsky:ryder",
+   "url": "https://bsky.app/profile/leeryder.bsky.social/post/3mwikjkljb227",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
   },
   {
    "id": 4017,
@@ -951,6 +2704,22 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 4050,
+   "source": "rss:echo-liverpool",
+   "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/man-city-115-charges-latest-34678300",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 4055,
+   "source": "rss:echo-everton",
+   "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/folarin-balogun-agreement-reached-after-34677948",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective · 확신 medium)"
+  },
+  {
    "id": 4056,
    "source": "rss:fl-arsenal",
    "url": "https://www.football.london/arsenal-fc/news/cesc-fabregas-arsenal-clause-confirmed-34672184",
@@ -988,6 +2757,70 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 4069,
+   "source": "rss:birmingham-villa",
+   "url": "https://www.birminghammail.co.uk/sport/football/football-news/aston-villa-manzambi-johan-newcastle-34678457",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 4077,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/erling-haaland-man-city-contract-37706655",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion · 확신 low)"
+  },
+  {
+   "id": 4082,
+   "source": "rss:standard-football",
+   "url": "https://www.standard.co.uk/sport/football/england-lewis-hall-injury-latest-tuchel-b1298564.html",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 4089,
+   "source": "rss:gffn",
+   "url": "https://www.getfootballnewsfrance.com/2026/when-juventus-approached-me-it-felt-a-bit-like-a-dream-lyons-pavel-sulc-on-what-made-him-turn-down-a-move-to-turin/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 4094,
+   "source": "rss:gffn",
+   "url": "https://www.getfootballnewsfrance.com/2026/zinedine-zidane-makes-history-in-his-first-match-as-france-manager/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 4118,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/milan-talks-pavlovic-new-contract-expected-salary",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal)"
+  },
+  {
+   "id": 4121,
+   "source": "bsky:ryder",
+   "url": "https://bsky.app/profile/leeryder.bsky.social/post/3mwjdmdimmk26",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion · 확신 low)"
+  },
+  {
+   "id": 4124,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66799",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(list_roundup · 확신 low)"
+  },
+  {
    "id": 4140,
    "source": "rss:bbc-football",
    "url": "https://www.bbc.co.uk/sport/football/articles/cw770034l523o?at_medium=RSS&amp;at_campaign=rss",
@@ -1004,6 +2837,38 @@
     "Manu Kone"
    ],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 4162,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/live/2026/sep/27/chelsea-v-arsenal-womens-super-league-live-score-updates",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 4178,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/sport/football/football-news/joe-willocks-newcastle-united-contract-34678984",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal · 확신 medium)"
+  },
+  {
+   "id": 4190,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/ireland-israel-nations-league-uefa-37707577",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 4195,
+   "source": "rss:standard-football",
+   "url": "https://www.standard.co.uk/sport/football/wsl-highlights-chelsea-fc-arsenal-result-b1298584.html",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
   },
   {
    "id": 4197,
@@ -1030,6 +2895,94 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 4207,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/mancini-distances-himself-from-manchester-city/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 4208,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/gattuso-wary-of-long-break-at-lazio/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 4215,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/fiorentina-captain-de-gea-reacts-to-man-city/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 4220,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/milan-krosche-dont-align-casting-process",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 4232,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cqx2zz6d5716o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 4254,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/israel-vs-republic-of-ireland/report/554010",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 4261,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/27/denmark-wales-nations-league-group-a4-match-report",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 4262,
+   "source": "rss:men-manutd",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/man-utd-ineos-jim-ratcliffe-34679894",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 4266,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/transfer-news/manu-kone-chelsea-transfer-news-34679719",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 4272,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/man-utd-ineos-jim-ratcliffe-37708275",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 4291,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/27/scott-mctominay-sebastien-pocognoli-scotland-switzerland-nations-league",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
    "id": 4292,
    "source": "rss:echo-liverpool",
    "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/liverpool-agreed-virgil-van-dijk-34679057",
@@ -1038,12 +2991,2191 @@
    "basis": "두 채점자 일치"
   },
   {
+   "id": 4294,
+   "source": "rss:gffn",
+   "url": "https://www.getfootballnewsfrance.com/2026/desire-doue-to-be-preferred-to-ousmane-dembele-in-france-starting-line-up-against-belgium/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
    "id": 4296,
    "source": "rss:gffn",
    "url": "https://www.getfootballnewsfrance.com/2026/i-love-football-im-not-interested-in-politics-manchester-city-midfielder-rayan-cherki-on-dreaming-to-win-the-ballon-dor/",
    "is_move_report": false,
    "players": [],
    "basis": "두 채점자 일치"
+  },
+  {
+   "id": 6595,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13592576/barcelona-closely-monitoring-as-estevao-grows-impatient-over-chelsea-role-paper-talk",
+   "is_move_report": true,
+   "players": [
+    "Estevao"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6596,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13592576/barcelona-closely-monitoring-as-estevao-grows-impatient-over-chelsea-role-paper-talk",
+   "is_move_report": true,
+   "players": [
+    "Joao Felix"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 6612,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cm74kp52d3xko?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Estevao Willian"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6613,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cm74kp52d3xko?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Joao Felix"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 6614,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cm74kp52d3xko?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Erling Haaland"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6615,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cm74kp52d3xko?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Abdelhamid Ait Boudlal"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6616,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cm74kp52d3xko?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Ibrahim Maza"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6617,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cm74kp52d3xko?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Tyrick Mitchell"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6618,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cm74kp52d3xko?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Ethan Ampadu"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6619,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13592359/man-utd-transfer-news-barcelona-left-back-alejandro-balde-eyed-for-january-move-paper-talk",
+   "is_move_report": true,
+   "players": [
+    "Alejandro Balde"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6620,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13592359/man-utd-transfer-news-barcelona-left-back-alejandro-balde-eyed-for-january-move-paper-talk",
+   "is_move_report": true,
+   "players": [
+    "Gvidas Gineitis"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+  },
+  {
+   "id": 6624,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13592359/man-utd-transfer-news-barcelona-left-back-alejandro-balde-eyed-for-january-move-paper-talk",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 6625,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c3n0770xvjk1o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Rabbi Matondo"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6627,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c3n0770xvjk1o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 6628,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c3n0770xvjk1o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal)"
+  },
+  {
+   "id": 6661,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cw770034l523o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Dani Olmo"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6662,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cw770034l523o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Trent Alexander-Arnold"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6663,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cw770034l523o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Alejandro Balde"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6664,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cw770034l523o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Micky van de Ven"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6665,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cw770034l523o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Fikayo Tomori",
+    "Ruben Loftus-Cheek"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 6666,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cw770034l523o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Tomas Araujo"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6667,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cw770034l523o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Erling Haaland"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6668,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cw770034l523o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Manu Kone"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6671,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c82077kwe70lo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 6672,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c82077kwe70lo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 6678,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13591966/transfer-news-crystal-palace-chairman-steve-parish-tells-liverpool-accepting-50m-ismaila-sarr-bid-was-never-going-to-happen-paper-talk",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 6680,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13591966/transfer-news-crystal-palace-chairman-steve-parish-tells-liverpool-accepting-50m-ismaila-sarr-bid-was-never-going-to-happen-paper-talk",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective · 확신 low)"
+  },
+  {
+   "id": 6684,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13591966/transfer-news-crystal-palace-chairman-steve-parish-tells-liverpool-accepting-50m-ismaila-sarr-bid-was-never-going-to-happen-paper-talk",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 6718,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c84gkkepxxl4o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Marcos Llorente"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6719,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c84gkkepxxl4o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Alessandro Bastoni"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6720,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c84gkkepxxl4o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Kevin Schade"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6724,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c84gkkepxxl4o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Finn Jeltsch"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 6725,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c84gkkepxxl4o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Valentin Atangana"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 6735,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6x2zrp30kxko?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal)"
+  },
+  {
+   "id": 9239,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6eq8eygy4e5o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Dani Olmo"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 9241,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6eq8eygy4e5o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Giorgio Scalvini"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 9243,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6eq8eygy4e5o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Tyler Morton"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 9244,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6eq8eygy4e5o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Abdukodir Khusanov"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 9269,
+   "source": "rss:men-manutd",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/man-united-latest-jj-gabriel-34679108",
+   "is_move_report": true,
+   "players": [
+    "JJ Gabriel"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+  },
+  {
+   "id": 9270,
+   "source": "rss:men-manutd",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/transfer-news/three-manchester-united-stars-future-34678889",
+   "is_move_report": true,
+   "players": [
+    "JJ Gabriel"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+  },
+  {
+   "id": 9273,
+   "source": "rss:men-mancity",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/transfer-news/man-city-agreed-exciting-2027-34678569",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective · 확신 low)"
+  },
+  {
+   "id": 9289,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/manchester-united-transfer-news-balde-37707226",
+   "is_move_report": true,
+   "players": [
+    "JJ Gabriel"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 11823,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mwlbfef6hx2n",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 11827,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mwl24qughw2g",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 11832,
+   "source": "bsky:ryder",
+   "url": "https://bsky.app/profile/leeryder.bsky.social/post/3mwl6er3u7222",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
+  },
+  {
+   "id": 11835,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66821",
+   "is_move_report": true,
+   "players": [
+    "Isaac Konde"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 11839,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66817",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 11841,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66815",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 11843,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66813",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 11863,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13592945/lewis-ferguson-on-rangers-dream-after-summer-speculation-about-bologna-captains-future",
+   "is_move_report": true,
+   "players": [
+    "Lewis Ferguson"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+  },
+  {
+   "id": 11864,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/28/wsl-talking-points-chelsea-arsenal-alexia-putellas",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 11868,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/video/2026/sep/28/the-manchester-city-verdict-and-england-run-world-champions-close-football-weekly",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 11869,
+   "source": "rss:men-manutd",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/manchester-united-might-deal-worst-34682639",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 11875,
+   "source": "rss:men-mancity",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/erling-haaland-real-madrid-barcelona-34681231",
+   "is_move_report": true,
+   "players": [
+    "Erling Haaland",
+    "Josko Gvardiol",
+    "Ayyoub Bouaddi",
+    "Elliot Anderson",
+    "Enzo Fernandez",
+    "Rayan Cherki"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 11881,
+   "source": "rss:echo-liverpool",
+   "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/manchester-united-confirm-signing-liverpool-34683510",
+   "is_move_report": true,
+   "players": [
+    "Isaac Konde"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 11882,
+   "source": "rss:echo-liverpool",
+   "url": "https://www.liverpoolecho.co.uk/sport/football/transfer-news/liverpool-transfer-news-yankuba-minteh-34683082",
+   "is_move_report": true,
+   "players": [
+    "Yankuba Minteh"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 11904,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/transfer-news/chelseas-transfer-stance-estevao-willian-34682404",
+   "is_move_report": true,
+   "players": [
+    "Estevao Willian"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 11905,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/transfer-news/chelsea-risk-wrath-fans-xabi-34681493",
+   "is_move_report": true,
+   "players": [
+    "Estevao Willian"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 11908,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/news/chelsea-given-estevao-willian-transfer-34680668",
+   "is_move_report": true,
+   "players": [
+    "Estevao Willian"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 11914,
+   "source": "rss:fl-westham",
+   "url": "https://www.football.london/west-ham-united-fc/news/west-ham-legend-gives-instant-34681027",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 11915,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/sport/football/transfer-news/nick-woltemade-can-send-transfer-34680639",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other · 확신 low)"
+  },
+  {
+   "id": 11917,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/sport/football/football-news/newcastle-united-legend-nobby-solano-34675581",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 11920,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/sport/football/football-news/newcastle-united-sign-up-6ft-34681128",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal)"
+  },
+  {
+   "id": 11921,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/sport/football/transfer-news/newcastle-united-told-joe-willock-34680759",
+   "is_move_report": true,
+   "players": [
+    "Joe Willock"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 11925,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/cody-gakpo-liverpool-injury-news-37710791",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 11934,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/jj-gabriel-man-utd-request-37708774",
+   "is_move_report": true,
+   "players": [
+    "JJ Gabriel"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 11936,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/transfer-news/gary-neville-man-utd-transfers-37708671",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 11950,
+   "source": "rss:standard-football",
+   "url": "https://www.standard.co.uk/sport/football/tottenham-news-tonali-b1298681.html",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 11959,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/official-neto-returns-to-juventus/",
+   "is_move_report": true,
+   "players": [
+    "Norberto Neto"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 11961,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/milan-tottenham-and-aston-villa-tracking-kim/",
+   "is_move_report": true,
+   "players": [
+    "Kim Min-jae"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 11962,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/report-juventus-join-race-inter-calhanoglu/",
+   "is_move_report": true,
+   "players": [
+    "Hakan Calhanoglu"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 11967,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/official-lazio-sell-patric-to-al-ettifaq-11/",
+   "is_move_report": true,
+   "players": [
+    "Patric"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 11968,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/parma-agreement-gilardino-italy-return-coach/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 11977,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/milan-battling-aston-villa-spurs-kim-min-jae",
+   "is_move_report": true,
+   "players": [
+    "Kim Min-Jae"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 11978,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/gila-dominating-san-siro-amorim-go-to-defender",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 11993,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMikAFBVV95cUxPZ2NLNkFwb2tLZEJZNzhSQTAtakxyemd3ZEdpbXZ4NmtQUERwNmNwS2dueUo0NHZ2OURaU0NqMlZza18zU3BjUmhiOW1ocHkwOTFKc0ZISGgzdjdQSHVDZWhUS0EzcTRQZ0JkX3JMcmdrRUNZRjVuSTFnVHJNWXVSczBtUkRjSUI4Y3Z5REdwTXo?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
+  },
+  {
+   "id": 12000,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6ge4lnj0vnqo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12004,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6ge4lnj0vnqo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 12009,
+   "source": "bsky:delaney",
+   "url": "https://bsky.app/profile/migueldelaney.bsky.social/post/3mwlt54wsd22i",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12019,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66823",
+   "is_move_report": true,
+   "players": [
+    "Neto"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 12026,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/watch/video/13593041/manchester-city-chief-executive-ferran-soriano-declines-to-answer-questions",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12038,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/28/thomas-tuchel-england-trent-alexander-arnold-nations-league",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 12039,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/28/europe-top-flight-clubs-get-share-pot-from-fifa-club-world-cup",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12044,
+   "source": "rss:men-mancity",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/man-city-charges-joe-hart-34686476",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12056,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/news/news-opinion/remembering-benjamin-satterley-proud-geordie-34683709",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12057,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/sport/football/transfer-news/anthony-gordon-barcelona-newcastle-united-34686184",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 12058,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/sport/football/transfer-news/newcastle-united-transfer-round-up-34680589",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(list_roundup)"
+  },
+  {
+   "id": 12062,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/jj-gabriel-man-utd-ferdinand-37712320",
+   "is_move_report": true,
+   "players": [
+    "JJ Gabriel"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 12067,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/england-lewis-hall-thomas-tuchel-37712163",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 12071,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/czech-republic-england-preview-news-37711849",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12081,
+   "source": "rss:standard-football",
+   "url": "https://www.standard.co.uk/sport/football/england-arsenal-fc-injury-latest-konsa-o-reilly-b1298749.html",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 12082,
+   "source": "rss:standard-football",
+   "url": "https://www.standard.co.uk/sport/football/arsenal-fc-transfer-rumours-haaland-eze-calafiori-replacements-b1298745.html",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(list_roundup)"
+  },
+  {
+   "id": 12086,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/video-calafiori-reward-excitable-turkish-fan/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12095,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/italy-tactic-advisor-tonali-creative-tottenham/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12106,
+   "source": "rss:gffn",
+   "url": "https://www.getfootballnewsfrance.com/2026/real-madrid-legend-marcelo-to-become-fc-nantes-ambassador/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 12107,
+   "source": "rss:gffn",
+   "url": "https://www.getfootballnewsfrance.com/2026/le-havre-pass-up-chance-to-sign-raheem-sterling/",
+   "is_move_report": true,
+   "players": [
+    "Raheem Sterling"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+  },
+  {
+   "id": 12108,
+   "source": "rss:gffn",
+   "url": "https://www.getfootballnewsfrance.com/2026/luc-holtz-set-to-leave-ligue-2-side-fc-metz/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 12114,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/ac-milan-24m-loss-2025-26-key-figures",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12121,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMi8gFBVV95cUxNYTVhaUVNVFFMc09FSHhLWElYVnc4U2taa0RqY1A0WFVPa1FuZ2JiSUsydXBET1hvQUFsdzdXYWRMR3dHd0tJSk1JZEVDNHl6TXRLMXZ6RzlHZmVfb3pnNzR1dG1kcGNmdUk5czlUa0xNbGRuM1l3MkdsTmxWODA2UE9ibzZJQ043SWVabUdxUWV6MDhGMjhCcGNGemNubjYzWUhnclNoRmU5Z1ZEbU0wT3JlVlBoRUZGQ0g3MGQwMkFxcm5Eb3ZGSUtvMXZHb3dydDBfSUR0eENBc3hJS05XUEhaQWJKMWdTck0wejBSaXdzZw?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 12129,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cked73ppgql3o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Alberto Costa"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 12131,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cked73ppgql3o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Haaland"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 12132,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cked73ppgql3o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Raheem Sterling"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 12135,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cked73ppgql3o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Aurelien Tchouameni"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 12136,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13593048/real-madrid-defender-raul-asencio-rejected-transfer-interest-from-liverpool-and-chelsea-this-summer-paper-talk",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective · 확신 low)"
+  },
+  {
+   "id": 12138,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13593048/real-madrid-defender-raul-asencio-rejected-transfer-interest-from-liverpool-and-chelsea-this-summer-paper-talk",
+   "is_move_report": true,
+   "players": [
+    "Joe Willock"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 12140,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13593048/real-madrid-defender-raul-asencio-rejected-transfer-interest-from-liverpool-and-chelsea-this-summer-paper-talk",
+   "is_move_report": true,
+   "players": [
+    "Lewis Ferguson"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 12182,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/29/billy-kenny-goodison-gazza-everton-interview",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12184,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/29/fifa-accuses-uefa-misinformation-campaign-gianni-infantino-influence-election",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12187,
+   "source": "rss:men-manutd",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/transfer-news/man-united-jj-gabriel-news-34686603",
+   "is_move_report": true,
+   "players": [
+    "JJ Gabriel",
+    "Mezian Mesloub"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 12194,
+   "source": "rss:echo-liverpool",
+   "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/liverpool-latest-cody-gakpo-medical-34684206",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury · 확신 medium)"
+  },
+  {
+   "id": 12200,
+   "source": "rss:men-mancity",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/man-united-transfer-news-city-34685905",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
+  },
+  {
+   "id": 12201,
+   "source": "rss:men-mancity",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/decision-taken-star-who-keeps-34683150",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12204,
+   "source": "rss:echo-everton",
+   "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/hope-any-punishments-handed-manchester-34684442",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion · 확신 medium)"
+  },
+  {
+   "id": 12209,
+   "source": "rss:fl-arsenal",
+   "url": "https://www.football.london/arsenal-fc/transfer-news/doku-arsenal-transfer-man-city-34686401",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player · 확신 low)"
+  },
+  {
+   "id": 12211,
+   "source": "rss:fl-arsenal",
+   "url": "https://www.football.london/arsenal-fc/news/arsenal-latest-cesc-fabregas-clause-34683682",
+   "is_move_report": true,
+   "players": [
+    "Erling Haaland"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+  },
+  {
+   "id": 12213,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/transfer-news/chelsea-given-clear-transfer-demand-34683463",
+   "is_move_report": true,
+   "players": [
+    "Estevao Willian"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 12214,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/arsenal-fc/news/joining-arsenal-chelsea-hardest-decision-34681011",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 12218,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/sport/football/football-news/its-bad-month-realistic-outlook-34682025",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12225,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/premier-league-clubs-mascot-cost-37710347",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12230,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/liverpool-transfers-van-dijk-medical-37710319",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury · 확신 low)"
+  },
+  {
+   "id": 12231,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/man-utd-transfer-liverpool-city-37711193",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
+  },
+  {
+   "id": 12237,
+   "source": "rss:gffn",
+   "url": "https://www.getfootballnewsfrance.com/2026/official-gregory-proment-replaces-luc-holtz-as-fc-metz-manager/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 12241,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c64gvnzey95go?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Kosta Nedeljkovic"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+  },
+  {
+   "id": 12249,
+   "source": "bsky:delaney",
+   "url": "https://bsky.app/profile/migueldelaney.bsky.social/post/3mwnvgpuulk2i",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12250,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mwnypkxi6t2g",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal)"
+  },
+  {
+   "id": 12266,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66843",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal)"
+  },
+  {
+   "id": 12267,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66842",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 12286,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/live-blog/11095/13279295/brighton-transfers-latest-news-rumours-and-gossip-live-updates-goals-and-highlights",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12290,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/29/premier-league-fast-start-teams-manchester-city",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12292,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/29/sam-gough-journey-hazard-at-pe-to-para-lionesses-captain",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12295,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/commentisfree/2026/sep/29/manchester-city-global-mega-rich-impunity",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12299,
+   "source": "rss:men-manutd",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/manchester-united-secret-friendly-ratcliffe-34686842",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12305,
+   "source": "rss:men-mancity",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/transfer-news/cavan-sullivan-man-city-charges-34688481",
+   "is_move_report": true,
+   "players": [
+    "Cavan Sullivan"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 12308,
+   "source": "rss:echo-liverpool",
+   "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/bayern-munich-chief-drops-florian-34689637",
+   "is_move_report": true,
+   "players": [
+    "Florian Wirtz"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 12327,
+   "source": "rss:fl-arsenal",
+   "url": "https://www.football.london/arsenal-fc/players/eberechi-ezes-arsenal-future-doubt-34684579",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion · 확신 low)"
+  },
+  {
+   "id": 12330,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/transfer-news/chelsea-target-set-stamford-bridge-34690171",
+   "is_move_report": true,
+   "players": [
+    "Alex Scott"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 12334,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/transfer-news/xabi-alonso-two-wildcard-solutions-34687804",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12338,
+   "source": "rss:fl-tottenham",
+   "url": "https://www.football.london/tottenham-hotspur-fc/transfer-news/harry-kane-transfers-tottenham-bayern-34691115",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal · 확신 medium)"
+  },
+  {
+   "id": 12345,
+   "source": "rss:birmingham-villa",
+   "url": "https://www.birminghammail.co.uk/sport/football/football-news/aston-villa-nicolas-jackson-emery-34688775",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 12351,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/man-city-115-charges-haaland-37715457",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12353,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/manchester-city-charges-verdict-transfers-37714844",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12358,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/la-liga-tebas-manchester-city-37714083",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12368,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/thierry-henry-arsenal-man-city-37712875",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other · 확신 medium)"
+  },
+  {
+   "id": 12383,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/official-parma-appoint-gilardino-as-head-coach/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 12385,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/bologna-take-free-agent-darmian-on-trial/",
+   "is_move_report": true,
+   "players": [
+    "Matteo Darmian"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 12393,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/new-san-siro-milan-inter-urge-unveil-rendering/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12406,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/amorim-encouraging-signs-diawara-wont-rush",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other · 확신 medium)"
+  },
+  {
+   "id": 12407,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/milan-back-in-red-cardinale-plans-keep-investing",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12409,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/milan-compose-three-man-defender-shortlist",
+   "is_move_report": true,
+   "players": [
+    "Kim Min-Jae",
+    "Goncalo Inacio",
+    "Tiago Gabriel"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 12410,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/leao-lawyer-explains-exit-plan-galatasaray-decision",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective · 확신 medium)"
+  },
+  {
+   "id": 12412,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMitAFBVV95cUxQcDZaOUhfTUJhVmRlRkxHRWFXam1IWk9XN0M5R0gzQ2ZDYlZwTXEwZGhMZGRZTEJURlNaYi1CWlFTZmdzLVlvR2V6Z3RNS055YktIVVNuNlh0U3ZQSTJZNVFXcjI4dG9JcnFKd1pBTUFzV1piZ0l3VmhCMUpTTkJQSkstaVptOHVCZ2JyZ3UtSTdkU0tubEt4dnZDRHVRRmZXZlkwaHpKWUdUSG9oZkZuTmZqcGg?oc=5",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 12417,
+   "source": "rss:gffn",
+   "url": "https://www.getfootballnewsfrance.com/2026/bayern-munich-plotting-winter-move-for-jules-kounde/",
+   "is_move_report": true,
+   "players": [
+    "Jules Koundé"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 12435,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66858",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12440,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66853",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12443,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66850",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12444,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66849",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12449,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sounds/play/p0pd2w9y?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12458,
+   "source": "rss:men-manutd",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/transfer-news/man-utd-transfer-balde-amorim-34692114",
+   "is_move_report": true,
+   "players": [
+    "Alejandro Balde"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 12464,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/29/football-daily-newsletter-nations-league-germany-netherlands-france-italy",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12467,
+   "source": "rss:men-mancity",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/man-city-charges-live-sanctions-34691802",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12469,
+   "source": "rss:men-mancity",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/man-city-charges-guilty-guardiola-34692136",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12473,
+   "source": "rss:men-mancity",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/man-city-hit-back-premier-34691952",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12488,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/news/uk-news/alan-shearer-gary-lineker-show-37714703",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12493,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/man-city-charges-premier-league-37715873",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12506,
+   "source": "rss:standard-football",
+   "url": "https://www.standard.co.uk/sport/football/man-city-guilty-soriano-b1298896.html",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12510,
+   "source": "rss:standard-football",
+   "url": "https://www.standard.co.uk/sport/football/man-utd-transfer-news-howe-arsenal-fc-brobbey-b1298867.html",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(list_roundup · 확신 medium)"
+  },
+  {
+   "id": 12520,
+   "source": "rss:gffn",
+   "url": "https://www.getfootballnewsfrance.com/2026/as-monaco-seek-to-extend-paris-brunner-contract-with-borussia-dortmund-keeping-buy-back-clause/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal · 확신 medium)"
+  },
+  {
+   "id": 12534,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6g7kl592vlmo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Virgil van Dijk"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 12535,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6g7kl592vlmo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal)"
+  },
+  {
+   "id": 12537,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6g7kl592vlmo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Jean-Philippe Mateta"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 12539,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6g7kl592vlmo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Jules Kounde"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 12547,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66872",
+   "is_move_report": true,
+   "players": [
+    "Cavan Sullivan"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 12548,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66871",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 12557,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c8dx51r59xndo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12578,
+   "source": "rss:standard-football",
+   "url": "https://www.standard.co.uk/sport/football/chelsea-fc-transfer-latest-tottenham-b1298915.html",
+   "is_move_report": true,
+   "players": [
+    "Leo Black"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 12583,
+   "source": "rss:standard-football",
+   "url": "https://www.standard.co.uk/sport/football/england-czech-republic-result-nations-league-gordon-kane-b1298908.html",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 12588,
+   "source": "rss:gffn",
+   "url": "https://www.getfootballnewsfrance.com/2026/as-monaco-aim-to-extend-contract-of-brazilian-full-back-vanderson/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal)"
+  },
+  {
+   "id": 12590,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13593423/man-city-guilty-premier-league-club-knew-of-independent-commissions-verdict-in-the-summer-paper-talk",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 15912,
+   "source": "bsky:theathletic",
+   "url": "https://bsky.app/profile/theathleticfc.bsky.social/post/3mwpiqgqkx62a",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 15916,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c9lyk46gekkeo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 15925,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/30/a-league-launch-clouded-by-manchester-city-cheating-scandal-apl",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 15928,
+   "source": "rss:echo-liverpool",
+   "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/liverpool-transfers-bradley-barcola-scotti-34690291",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
+  },
+  {
+   "id": 15934,
+   "source": "rss:fl-arsenal",
+   "url": "https://www.football.london/arsenal-fc/news/arsenal-latest-mikel-arteta-set-34691915",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 15936,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/news/five-injury-boosts-75m-chelsea-34689390",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 15939,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/manchester-city-charges-verdict-live-37706564",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 15943,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/liverpool-transfers-wonderkid-bradley-barcola-37714494",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(unnamed_player)"
+  },
+  {
+   "id": 15944,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/man-utd-jj-gabriel-transfer-37714623",
+   "is_move_report": true,
+   "players": [
+    "JJ Gabriel"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+  },
+  {
+   "id": 15948,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c63eqg2wz7ndo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 15951,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c63eqg2wz7ndo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 15956,
+   "source": "bsky:benjacobs",
+   "url": "https://bsky.app/profile/jacobsben.bsky.social/post/3mwqe3ytrvc27",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 15957,
+   "source": "bsky:kinsella",
+   "url": "https://bsky.app/profile/nizaarkinsella.bsky.social/post/3mwq27qpff22b",
+   "is_move_report": true,
+   "players": [
+    "Alex Scott"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+  },
+  {
+   "id": 15958,
+   "source": "bsky:kinsella",
+   "url": "https://bsky.app/profile/nizaarkinsella.bsky.social/post/3mwpzpl4ers2j",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 15966,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66881",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 15969,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66878",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 15971,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66876",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective · 확신 medium)"
+  },
+  {
+   "id": 15985,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/30/throw-your-medals-in-the-bin-roy-keane-tells-manchester-city-players",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 15990,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/30/footballers-scoring-first-touch-of-careers-the-knowledge",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 15991,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/video/2026/sep/30/the-premier-league-v-manchester-city-and-england-beat-czechia-football-weekly",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 15998,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13593167/rangers-transfers-inside-the-summer-window-that-lay-foundations-for-consecutive-celtic-wins-but-will-it-deliver-long-term-success",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 15999,
+   "source": "rss:men-manutd",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/breaking-man-united-alvaro-arbeloa-34695847",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 16019,
+   "source": "rss:echo-everton",
+   "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/dan-friedkin-hails-billion-pound-34693323",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 16022,
+   "source": "rss:fl-arsenal",
+   "url": "https://www.football.london/arsenal-fc/news/arsenal-news-martin-odegaard-injury-34693808",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 16024,
+   "source": "rss:fl-tottenham",
+   "url": "https://www.football.london/tottenham-hotspur-fc/news/tottenham-pay-massive-price-over-34694857",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 16033,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/sport/football/football-news/aladji-bamba-something-first-time-34693391",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 16036,
+   "source": "rss:birmingham-villa",
+   "url": "https://www.birminghammail.co.uk/sport/football/transfer-news/aston-villa-transfers-kevin-viveros-34695302",
+   "is_move_report": true,
+   "players": [
+    "Kevin Viveros"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 16048,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/man-city-charges-ferran-soriano-37717797",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 16053,
+   "source": "rss:mirror-football",
+   "url": "https://www.mirror.co.uk/sport/football/news/manchester-city-premier-league-report-37716920",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 16065,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/gilmour-very-hard-say-no-to-napoli-mctominay/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 16068,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/scalvini-every-word-italy-france-turkiye-move/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 16073,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/juventus-inter-premier-league-clubs-romano/",
+   "is_move_report": true,
+   "players": [
+    "Alessandro Romano"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 16076,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/juventus-capital-increases-almost-1-5b-2007/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 16083,
+   "source": "rss:gffn",
+   "url": "https://www.getfootballnewsfrance.com/2026/olivier-giroud-reveals-borussia-dortmund-interest-before-progressing-by-leaving-arsenal-for-chelsea/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 16085,
+   "source": "rss:gffn",
+   "url": "https://www.getfootballnewsfrance.com/2026/romas-manu-kone-admits-that-things-happened-during-summer-transfer-window-amid-reported-arsenal-and-chelsea-interest/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 16088,
+   "source": "rss:gffn",
+   "url": "https://www.getfootballnewsfrance.com/2026/bayern-munich-plan-to-begin-talks-to-extend-michael-olise-contract-but/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(renewal · 확신 medium)"
+  },
+  {
+   "id": 16094,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/giroud-admits-close-joining-inter-before-milan",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 16095,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/nba-europe-discussions-continued-efc-conference",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 16097,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/cisse-moreira-battling-saelemaekers-absence",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 16100,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/giroud-lists-two-milan-players-best-teammates",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 16101,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/modric-standing-ovation-return-spain",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury · 확신 medium)"
+  },
+  {
+   "id": 16105,
+   "source": "bsky:townley",
+   "url": "https://bsky.app/profile/johntownley.bsky.social/post/3mwqploa2t22o",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 16107,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66886",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 16111,
+   "source": "tg:romano",
+   "url": "https://t.me/fabrizioromanotg/66882",
+   "is_move_report": true,
+   "players": [
+    "Chris Smalling"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 16119,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/30/gianni-infantino-fifa-swiss-football-association-withdrawn-support-president-election-bid",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 16120,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/30/football-daily-newsletter-the-big-story-is-of-course-scotland",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 16134,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6vgy205kmmro?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Chris Smalling"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 16137,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cqp93d33y144o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 16144,
+   "source": "rss:men-mancity",
+   "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/man-city-115-charges-timeline-34695051",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 16157,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/transfer-news/chelsea-transfer-jarrell-quansah-alonso-34696479",
+   "is_move_report": true,
+   "players": [
+    "Jarrell Quansah"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 16177,
+   "source": "rss:standard-football",
+   "url": "https://www.standard.co.uk/sport/football/could-man-city-be-relegated-expelled-premier-league-b1298994.html",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 16187,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/muzzi-rejected-arsenal-wenger-cagliari-fury/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 16196,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/krosche-boto-ozek-ausilio-four-leading-hof-candidates",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 16199,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/pellegatti-please-milan-maestro-renew-one-condition",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 16200,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/athekame-reveals-amorim-advice-lyon-loan",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 16202,
+   "source": "gnews:romano",
+   "url": "https://news.google.com/rss/articles/CBMihwFBVV95cUxQQTd4ME9mVVY1dVZZcW9TdWtDSzZZeS1sY2c2Ty00aVBKS0hIZzFYamdYLVJvckFKZTFTSUNYTHFncUFEaWhnOGRWcnBqbkRGNDJkSjY5OFZzd05zN2RhcUticHdtWGY2Q2oxd3BJTUEzWUNyX3R1ZGdYY3Q5OHBLT2QtUWpyYnM?oc=5",
+   "is_move_report": true,
+   "players": [
+    "Chris Smalling"
+   ],
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+  },
+  {
+   "id": 16207,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cm0rekrpxnl1o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 16210,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/articles/cj3v4vx2nqd7o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 16211,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/ck3reye2vnypo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 16212,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/videos/cr86x8n80572o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 16215,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13593765/man-city-charges-club-sponsor-etihad-airways-considering-legal-action-against-premier-league",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 16223,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/30/etihad-airways-considering-legal-action-premier-league-manchester-city",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 16245,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13593813/man-city-guilty-premier-league-rivals-demanding-sanctions-imposed-before-end-of-season-paper-talk",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 16247,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13593813/man-city-guilty-premier-league-rivals-demanding-sanctions-imposed-before-end-of-season-paper-talk",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(interview_opinion · 확신 low)"
+  },
+  {
+   "id": 16248,
+   "source": "rss:sky-transfers",
+   "url": "https://www.skysports.com/football/news/11095/13593813/man-city-guilty-premier-league-rivals-demanding-sanctions-imposed-before-end-of-season-paper-talk",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 16259,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c3ew9vv7444xo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Kevin Schade"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 16260,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c3ew9vv7444xo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-01 채점(retrospective)"
+  },
+  {
+   "id": 16262,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c3ew9vv7444xo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Phil Foden"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 16263,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c3ew9vv7444xo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Giorgio Scalvini"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 16264,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c3ew9vv7444xo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Dodo"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
+  },
+  {
+   "id": 16265,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c3ew9vv7444xo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Yankuba Minteh"
+   ],
+   "basis": "2026-10-01 채점(transfer_current)"
   }
  ]
 }

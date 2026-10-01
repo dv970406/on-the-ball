@@ -60,13 +60,13 @@
     "nationality": "FRA"
   },
   "folarin balogun": {
-    "ko": "폴라린 발로군",
+    "ko": "폴라린 발로건",
     "position": "ST",
     "birthYear": 2001,
     "nationality": "USA"
   },
   "cody gakpo": {
-    "ko": "코디 가크포",
+    "ko": "코디 각포",
     "position": "LW/ST",
     "birthYear": 1999,
     "nationality": "NED"
@@ -107,12 +107,6 @@
     "birthYear": 2006,
     "nationality": "BRA"
   },
-  "inacio": {
-    "ko": "곤살루 이나시우",
-    "position": "CB",
-    "birthYear": 2001,
-    "nationality": "POR"
-  },
   "gilberto mora": {
     "ko": "힐베르토 모라",
     "position": "AM",
@@ -147,5 +141,110 @@
     "position": "CM",
     "birthYear": 2001,
     "nationality": "FRA"
+  },
+  "goncalo inacio": {
+    "ko": "곤살루 이나시우",
+    "position": "CB",
+    "birthYear": 2001,
+    "nationality": "POR"
+  },
+  "erling haaland": {
+    "ko": "엘링 홀란드"
+  },
+  "virgil van dijk": {
+    "ko": "버질 반 다이크"
+  },
+  "alex scott": {
+    "ko": "알렉스 스콧"
+  },
+  "ethan ampadu": {
+    "ko": "에단 암파두"
+  },
+  "micky van de ven": {
+    "ko": "미키 판 더 펜"
+  },
+  "trent alexanderarnold": {
+    "ko": "트렌트 알렉산더-아놀드"
+  },
+  "joao felix": {
+    "ko": "주앙 펠릭스"
+  },
+  "hakan calhanoglu": {
+    "ko": "하칸 찰하놀루"
+  },
+  "jeanphilippe mateta": {
+    "ko": "장-필립 마테타"
+  },
+  "andrefrank zambo anguissa": {
+    "ko": "앙드레-프랑크 잠보 앙귀사"
+  },
+  "cavan sullivan": {
+    "ko": "캐번 설리번"
+  },
+  "isaac konde": {
+    "ko": "아이작 콘데"
+  },
+  "abdelhamid ait boudlal": {
+    "ko": "압델하미드 아이트 부들랄"
+  },
+  "lukas hornicek": {
+    "ko": "루카스 호르니체크"
+  },
+  "michael olise": {
+    "ko": "마이클 올리세"
+  },
+  "jj gabriel": {
+    "ko": "JJ 가브리엘"
+  },
+  "noah fernandez": {
+    "ko": "노아 페르난데스"
+  },
+  "florian wirtz": {
+    "ko": "플로리안 비르츠"
+  },
+  "phil foden": {
+    "ko": "필 포든"
+  },
+  "aurelien tchouameni": {
+    "ko": "오렐리앵 추아메니"
+  },
+  "rio ngumoha": {
+    "ko": "리오 은구모하"
+  },
+  "morgan rogers": {
+    "ko": "모건 로저스"
+  },
+  "matteo darmian": {
+    "ko": "마테오 다르미안"
+  },
+  "lewis ferguson": {
+    "ko": "루이스 퍼거슨"
+  },
+  "jarrell quansah": {
+    "ko": "자렐 콴사"
+  },
+  "harry kane": {
+    "ko": "해리 케인"
+  },
+  "kim minjae": {
+    "ko": "김민재"
+  },
+  "dani olmo": {
+    "ko": "다니 올모"
+  },
+  "alejandro balde": {
+    "ko": "알레한드로 발데"
+  },
+  "patric": {
+    "ko": "파트릭"
+  },
+  "dodo": {
+    "ko": "도도"
+  },
+  "pavel sulc": {
+    "ko": "파벨 슐츠"
+  },
+  "jules kounde": {
+    "ko": "쥘 쿤데"
   }
 }

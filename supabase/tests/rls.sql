@@ -1145,6 +1145,26 @@ select count(*) = 1 from public.transfer_deal where id = :td2 and is_free_agent 
 rollback to s;
 
 \echo ''
+\echo '-- 36e-1. 금액의 성격 (20261001000001) — 성격은 금액에 딸린다 --'
+savepoint s;
+\echo '[❌차단] 금액이 없는 딜에 금액의 성격'
+update public.transfer_deal set fee_kind = 'bid' where id = :td2;
+rollback to s;
+
+savepoint s;
+\echo '[t 기대] 금액이 있는 딜은 성격을 가질 수 있다'
+update public.transfer_deal set fee_kind = 'asking_price' where id = :td1;
+select fee_kind = 'asking_price' from public.transfer_deal where id = :td1;
+rollback to s;
+
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[t 기대] 비로그인이 금액의 성격을 읽는다(테이블 단위 grant가 새 컬럼도 덮는다)'
+select count(*) = 1 from public.transfer_deal where id = :td1 and fee_kind is null;
+rollback to s;
+
+\echo ''
 \echo '-- 36f. 관심 구단 (20260928000005) — 딜의 자식 행, 읽기 공개 · 쓰기 없음 --'
 insert into public.transfer_deal_suitor (deal_id, club_code, position) values (:td2, 'rlstest-a', 0);
 
@@ -1345,6 +1365,41 @@ savepoint s;
 \echo '[t 기대] 선수 이름·단계·관심 구단을 판정과 함께 쓴다'
 update public.transfer_news set verdict = 'move', verdict_player = 'barcola', verdict_player_name = 'Bradley Barcola', verdict_stage = 'agreement', verdict_suitors = array['Chelsea', 'Arsenal'], verdict_at = now() where id = :tv1;
 select verdict_player_name = 'Bradley Barcola' and verdict_stage = 'agreement' and cardinality(verdict_suitors) = 2 from public.transfer_news where id = :tv1;
+rollback to s;
+
+\echo ''
+\echo '-- 37-3. 판정자가 읽은 금액과 원출력 (20261001000001) --'
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[❌차단] 비로그인이 판정자의 금액·원출력을 읽는다 — 비공개 추출 컬럼'
+select verdict_raw, verdict_fee_amount, verdict_fee_currency, verdict_fee_kind from public.transfer_news where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 판정 시도 없는 원출력'
+update public.transfer_news set verdict_raw = '{"move":false}' where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] "이동 아님" 판정에 금액'
+update public.transfer_news set verdict = 'not_move', verdict_at = now(), verdict_fee_amount = 60, verdict_fee_currency = 'GBP', verdict_fee_kind = 'bid' where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 성격 없는 금액 — 금액·통화·성격은 한 묶음이다'
+update public.transfer_news set verdict = 'move', verdict_player = 'barcola', verdict_at = now(), verdict_fee_amount = 60, verdict_fee_currency = 'GBP' where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 모르는 통화'
+update public.transfer_news set verdict = 'move', verdict_player = 'barcola', verdict_at = now(), verdict_fee_amount = 60, verdict_fee_currency = 'KRW', verdict_fee_kind = 'fee' where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[t 기대] 금액·통화·성격과 원출력을 "이동" 판정과 함께 쓴다'
+update public.transfer_news set verdict = 'move', verdict_player = 'barcola', verdict_at = now(), verdict_raw = '{"move":true}', verdict_fee_amount = 60, verdict_fee_currency = 'GBP', verdict_fee_kind = 'bid' where id = :tv1;
+select verdict_fee_amount = 60 and verdict_fee_kind = 'bid' and verdict_raw is not null from public.transfer_news where id = :tv1;
 rollback to s;
 
 rollback to s37v;

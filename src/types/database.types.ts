@@ -66,6 +66,7 @@ export type Database = {
           fee_amount: number | null
           fee_currency: string | null
           fee_high_amount: number | null
+          fee_kind: Database["public"]["Enums"]["transfer_fee_kind"] | null
           fee_low_amount: number | null
           fee_text: string | null
           first_reported_at: string
@@ -92,6 +93,7 @@ export type Database = {
           fee_amount?: number | null
           fee_currency?: string | null
           fee_high_amount?: number | null
+          fee_kind?: Database["public"]["Enums"]["transfer_fee_kind"] | null
           fee_low_amount?: number | null
           fee_text?: string | null
           first_reported_at: string
@@ -118,6 +120,7 @@ export type Database = {
           fee_amount?: number | null
           fee_currency?: string | null
           fee_high_amount?: number | null
+          fee_kind?: Database["public"]["Enums"]["transfer_fee_kind"] | null
           fee_low_amount?: number | null
           fee_text?: string | null
           first_reported_at?: string
@@ -368,9 +371,15 @@ export type Database = {
           verdict: Database["public"]["Enums"]["transfer_verdict"] | null
           verdict_at: string | null
           verdict_evidence: string | null
+          verdict_fee_amount: number | null
+          verdict_fee_currency: string | null
+          verdict_fee_kind:
+            | Database["public"]["Enums"]["transfer_fee_kind"]
+            | null
           verdict_from: string | null
           verdict_player: string | null
           verdict_player_name: string | null
+          verdict_raw: string | null
           verdict_stage: Database["public"]["Enums"]["transfer_stage"] | null
           verdict_suitors: string[]
           verdict_to: string | null
@@ -402,9 +411,15 @@ export type Database = {
           verdict?: Database["public"]["Enums"]["transfer_verdict"] | null
           verdict_at?: string | null
           verdict_evidence?: string | null
+          verdict_fee_amount?: number | null
+          verdict_fee_currency?: string | null
+          verdict_fee_kind?:
+            | Database["public"]["Enums"]["transfer_fee_kind"]
+            | null
           verdict_from?: string | null
           verdict_player?: string | null
           verdict_player_name?: string | null
+          verdict_raw?: string | null
           verdict_stage?: Database["public"]["Enums"]["transfer_stage"] | null
           verdict_suitors?: string[]
           verdict_to?: string | null
@@ -436,9 +451,15 @@ export type Database = {
           verdict?: Database["public"]["Enums"]["transfer_verdict"] | null
           verdict_at?: string | null
           verdict_evidence?: string | null
+          verdict_fee_amount?: number | null
+          verdict_fee_currency?: string | null
+          verdict_fee_kind?:
+            | Database["public"]["Enums"]["transfer_fee_kind"]
+            | null
           verdict_from?: string | null
           verdict_player?: string | null
           verdict_player_name?: string | null
+          verdict_raw?: string | null
           verdict_stage?: Database["public"]["Enums"]["transfer_stage"] | null
           verdict_suitors?: string[]
           verdict_to?: string | null
@@ -469,6 +490,12 @@ export type Database = {
         | "linked_mirror"
         | "outlet"
         | "cited"
+      transfer_fee_kind:
+        | "fee"
+        | "bid"
+        | "asking_price"
+        | "release_clause"
+        | "valuation"
       transfer_stage:
         | "rumour"
         | "talks"
@@ -614,6 +641,13 @@ export const Constants = {
         "linked_mirror",
         "outlet",
         "cited",
+      ],
+      transfer_fee_kind: [
+        "fee",
+        "bid",
+        "asking_price",
+        "release_clause",
+        "valuation",
       ],
       transfer_stage: [
         "rumour",

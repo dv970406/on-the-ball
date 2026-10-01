@@ -5,7 +5,7 @@
  *   node scripts/test-transfer-judge.mjs
  */
 import { createNameBook } from "./lib/transfer/names-ko.mjs";
-import { evidenceIn, isEnumeratedWith, loneOtherClub, normalizeDestination,
+import { evidenceIn, fullNameFor, judgeFee, localizeSummary, moneyMentions, replayJudgements, isEnumeratedWith, loneOtherClub, normalizeDestination,
   ARTICLE_MAX_CHARS,
   BODY_MAX_CHARS,
   EVIDENCE_MAX_CHARS,
@@ -65,7 +65,13 @@ const ALABA = { ...NO_FIX, player: "David Alaba" };
   const ALA = "🚨⚪️⚫️ EXCLUSIVE: Udinese have reached a verbal agreement with David Alaba! Austrian star, a dream signing for the Italian club. Formal steps needed ahead of the here we go.";
   check("근거 — '...'로 가운데를 건너뛴 인용을 받는다(조각이 순서대로 있다)", evidenceIn(ALA, "Udinese have reached a verbal agreement with David Alaba! ... Formal steps needed ahead of the here we go"));
   check("근거 — 말줄임표(…)도 같다", evidenceIn(ALA, "Udinese have reached a verbal agreement with David Alaba… Formal steps needed ahead"));
-  check("근거 — 조각의 순서가 뒤바뀌면 받지 않는다", !evidenceIn(ALA, "Formal steps needed ahead ... Udinese have reached a verbal agreement"));
+  check("근거 — 조각마다 원문에 있으면 순서가 달라도 받는다(모델은 뒤 문단의 문장을 먼저 적는다)", evidenceIn(ALA, "Formal steps needed ahead ... Udinese have reached a verbal agreement"));
+  {
+    const PORTO = "FC Porto agree deal to sign Chris Smalling, here we go!\n\nDeal done for the English centre back joining as free agent.\n\nMedical underway right now for English defender joining Porto.";
+    check("근거 — \"...\" 없이 이어 적은 두 문장도 문장마다 원문에 있으면 받는다", evidenceIn(PORTO, "FC Porto agree deal to sign Chris Smalling, here we go! Medical underway right now"));
+    check("근거 — ⚠ 문장 하나라도 원문에 없으면 받지 않는다", !evidenceIn(PORTO, "FC Porto agree deal to sign Chris Smalling, here we go! He signs a five year contract"));
+    check("근거 — ⚠ 짧은 조각만으로는 받지 않는다", !evidenceIn(PORTO, "Deal done. Here we go!"));
+  }
   check("근거 — 낱말 하나를 바꾼 인용은 받지 않는다(he ↔ they)", !evidenceIn("Falk suggesting they could well return in a year's time.", "he could well return in a year's time"));
   check("근거 — 원문에 없는 낱말이 끼면 받지 않는다", !evidenceIn(AMP, "Leeds United have agreed to sell Wales defender Ethan Ampadu"));
   check("근거 — 멀리 떨어진 낱말을 이어 붙인 인용은 받지 않는다(건너뛰기 한도)", !evidenceIn("Chelsea are keen. Many weeks later and after a long saga involving several other clubs and agents, Arsenal finally sign John Doe.", "Chelsea sign John Doe"));
@@ -98,7 +104,58 @@ const ALABA = { ...NO_FIX, player: "David Alaba" };
 const BODY = "Udinese have reached a verbal agreement with David Alaba! Austrian star leaves Real Madrid as a free agent.";
 {
   const r = parseJudgement(J({ move: true, player: "David Alaba", player_ko: "다비드 알라바", stage: "agreement", from: "Real Madrid", to: "Udinese", evidence: "reached a verbal agreement with David Alaba", summary_ko: "다비드 알라바가 우디네세와 구두 합의했다." }), BODY, ALABA);
-  check("이동 + 근거 + 선수·단계·구단·요약 → move", eq(r, { kind: "move", player: "David Alaba", playerKo: "다비드 알라바", stage: "agreement", evidence: "reached a verbal agreement with David Alaba", from: "Real Madrid", to: "Udinese", suitors: [], summary: "다비드 알라바가 우디네세와 구두 합의했다.", summaryIssue: null }), JSON.stringify(r));
+  check("이동 + 근거 + 선수·단계·구단·요약 → move", eq(r, { kind: "move", rawClubs: ["Real Madrid", "Udinese"], player: "David Alaba", playerKo: "다비드 알라바", stage: "agreement", evidence: "reached a verbal agreement with David Alaba", from: "Real Madrid", to: "Udinese", suitors: [], fee: null, summary: "다비드 알라바가 우디네세와 구두 합의했다.", summaryIssue: null }), JSON.stringify(r));
+}
+// ── 시점·금액·한 토큰 이름·요약 문자 ────────────────────────────────────
+{
+  const GAKPO = "Cody Gakpo reflects on tough summer after collapse of Manchester City move. He was an £80m target for City in August before talks stalled.";
+  const past = parseJudgement(J({ move: true, timing: "past", stage: "collapsed", evidence: "collapse of Manchester City move", summary_ko: "요약." }), GAKPO, { ...NO_FIX, player: "Cody Gakpo" });
+  check("시점 — 지난 일의 회고(past)는 이동이라 해도 이동 아님으로 접는다(다시 묻지 않는다)", past.kind === "not_move" && past.retrospective === true, JSON.stringify(past));
+  check("시점 — 회고는 근거가 원문과 어긋나도 이동 아님이다(판정 불가로 두고 다시 묻지 않는다)", parseJudgement(J({ move: true, timing: "past", evidence: "지어낸 근거", summary_ko: "요약." }), GAKPO, { ...NO_FIX, player: "Cody Gakpo" }).kind === "not_move");
+  {
+    const JELTSCH = "Real Madrid are interested in Stuttgart's 20-year-old centre-back Finn Jeltsch. (AS)";
+    const r = parseJudgement(J({ move: true, from: "VfB Stuttgart", to: "Real Madrid", evidence: "Real Madrid are interested in Stuttgart's", summary_ko: "요약." }), JELTSCH, { ...NO_FIX, player: "Finn Jeltsch" });
+    check("구단 — 모델이 다듬어 적은 이름도 원문에서 잡히는 구단이면 정규명으로 받는다(VfB Stuttgart ← Stuttgart's)", r.from === "VfB Stuttgart" && r.to === "Real Madrid", JSON.stringify(r));
+    check("구단 — ⚠ 원문에 없는 구단은 사전에 있어도 받지 않는다", parseJudgement(J({ move: true, from: "Bayern Munich", to: "Real Madrid", evidence: "Real Madrid are interested in Stuttgart's", summary_ko: "요약." }), JELTSCH, { ...NO_FIX, player: "Finn Jeltsch" }).from === null);
+  }
+  check("시점 — current·없음은 그대로 이동", parseJudgement(J({ move: true, timing: "current", evidence: "collapse of Manchester City move", summary_ko: "요약." }), GAKPO, { ...NO_FIX, player: "Cody Gakpo" }).kind === "move");
+
+  const MINTEH = "Liverpool had a £60m bid for Yankuba Minteh rejected, with Brighton wanting £80m. Ronald Araujo's option is €47m. His wage is £100,000 a week.";
+  const fee = (f) => parseJudgement(J({ move: true, evidence: "£60m bid for Yankuba Minteh rejected", summary_ko: "요약.", fee: f }), MINTEH, { ...NO_FIX, player: "Yankuba Minteh" }).fee;
+  check("금액 — 원문에 있는 금액·통화면 성격과 함께 받는다", eq(fee({ amount: 60, currency: "GBP", kind: "bid" }), { amount: 60, currency: "GBP", kind: "bid" }));
+  check("금액 — ⚠ 원문에 없는 금액은 받지 않는다(판정은 그대로)", fee({ amount: 65, currency: "GBP", kind: "bid" }) === null);
+  check("금액 — ⚠ 통화가 다르면 받지 않는다", fee({ amount: 60, currency: "EUR", kind: "bid" }) === null);
+  check("금액 — 모르는 성격·범위 밖 금액은 받지 않는다", fee({ amount: 60, currency: "GBP", kind: "wage" }) === null && fee({ amount: 0, currency: "GBP", kind: "fee" }) === null && fee({ amount: 900, currency: "GBP", kind: "fee" }) === null);
+  check("금액 — 원문 표기 읽기(£60m · €30.57m · £500k · €500,000 · 60 million euros)", eq(moneyMentions("£60m, €30.57m, £500k, €500,000, 60 million euros").map((m) => `${m.amount}${m.currency}`), ["60GBP", "30.57EUR", "0.5GBP", "0.5EUR", "60EUR"]));
+  check("금액 — 단위 없는 작은 수(주급·등번호)는 금액이 아니다", moneyMentions("£80 shirt").length === 0);
+  check("금액 — 범위는 두 끝을 모두 금액으로 읽는다(€20-25m · £40m-£50m)", ["20EUR", "25EUR", "40GBP", "50GBP"].every((k) => moneyMentions("a valuation of €20-25m, or £40m-£50m").some((m) => `${m.amount}${m.currency}` === k)));
+  check("금액 — 범위의 높은 값을 판정자가 적으면 받는다", eq(judgeFee({ amount: 25, currency: "EUR", kind: "valuation" }, "a valuation of €20-25m"), { amount: 25, currency: "EUR", kind: "valuation" }));
+
+  const HAALAND = "Chelsea, Arsenal and Bayern Munich are among the teams interested in Haaland.";
+  const book = { playersBySurname: (t) => (t === "haaland" ? [{ key: "erling haaland", name: "Erling Haaland" }] : t === "silva" ? [{ key: "bernardo silva", name: "Bernardo Silva" }, { key: "thiago silva", name: "Thiago Silva" }] : []) };
+  check("한 토큰 이름 — 아는 선수 한 명의 성이면 전체 이름으로 받는다", parseJudgement(J({ move: true, player: "Haaland", evidence: "interested in Haaland", summary_ko: "요약." }), HAALAND, { ...NO_FIX, names: book }).player === "Erling Haaland");
+  check("한 토큰 이름 — 원문에 전체 이름이 있으면 그것", fullNameFor("Alaba", "Alaba: Ex-Real Madrid defender agrees. David Alaba has reached", null) === "David Alaba");
+  check("한 토큰 이름 — ⚠ 같은 성의 아는 선수가 둘이면 풀지 않는다", fullNameFor("Silva", "City want Silva.", book) === null);
+  const patric = parseJudgement(J({ move: true, player: "Zitolo", evidence: "Lazio have sold Zitolo", summary_ko: "요약." }), "Official: Lazio have sold Zitolo to Al-Ettifaq.", { ...NO_FIX, names: book });
+  check("한 토큰 이름 — ⚠ 못 풀면 이동 아님(선수 미특정)이고 그 이름을 남긴다(사람이 사전에 넣는다)", patric.kind === "not_move" && patric.unnamed === true && patric.mention === "Zitolo", JSON.stringify(patric));
+
+  {
+    const LIVE = "Transfer news LIVE: Arsenal target Alexander-Arnold; Man Utd triple deal\n\nFollow all the latest";
+    const body = "Liverpool have appointed Julian Ward as sporting director.";
+    const opt = { ...NO_FIX, player: "Trent Alexander-Arnold" };
+    const j = J({ move: true, to: "Arsenal", evidence: "Arsenal target Alexander-Arnold", summary_ko: "요약." });
+    check("제목뿐 — ⚠ 받은 기사 본문에 그 선수가 없으면 이동 아님(라이브 블로그·모음의 제목)", parseJudgement(j, `${LIVE}\n\n[기사 본문]\n${body}`, { ...opt, article: body }).titleOnly === true);
+    check("제목뿐 — 본문에 성이 나오면 그대로 이동", parseJudgement(j, `${LIVE}\n\n[기사 본문]\nArsenal want Alexander-Arnold.`, { ...opt, article: "Arsenal want Alexander-Arnold." }).kind === "move");
+    check("제목뿐 — 기사 본문을 받지 않는 글(SNS·가십 항목)은 보지 않는다", parseJudgement(j, LIVE, opt).kind === "move");
+  }
+  check("요약 이름 — 영문 이름과 모델의 제 표기를 사전 표기로, 영문으로 남은 구단을 한국어로", localizeSummary("맨유의 JJ Gabriel과 JJ 개브리얼을 Sporting CP가 원한다.", { player: "JJ Gabriel", playerKoByModel: "JJ 개브리얼", ko: "JJ 가브리엘", rawClubs: ["Sporting CP"], clubKo: () => "스포르팅 CP" }) === "맨유의 JJ 가브리엘과 JJ 가브리엘을 스포르팅 CP가 원한다.");
+  check("요약 이름 — ⚠ 이미 한국어 이름이 적힌 구단은 다시 바꾸지 않는다(PSV 에인트호번 에인트호번)", localizeSummary("PSV 에인트호번 소속 미드필더", { player: "X Y", playerKoByModel: null, ko: null, rawClubs: ["PSV"], clubKo: () => "PSV 에인트호번" }) === "PSV 에인트호번 소속 미드필더");
+  check("요약 이름 — 사전 표기가 없으면 그대로 둔다", localizeSummary("Dany Freire가 이적했다.", { player: "Dany Freire", playerKoByModel: null, ko: null }) === "Dany Freire가 이적했다.");
+  check("요약 — ⚠ 한자가 섞이면 버린다", judgeSummary("각포는 英 언론의 관심을 받았다.", {}).reason?.includes("英"));
+  check("요약 — ⚠ 아랍 문자가 섞이면 버린다", Boolean(judgeSummary("알라바가 메دي컬을 진행한다.", {}).reason));
+  check("요약 — 낱말 끝의 行은 '행'으로 고쳐 받는다", judgeSummary("맨체스터 시티行 이적이 무산됐다.", {}).text === "맨체스터 시티행 이적이 무산됐다.");
+  check("요약 — 용어를 괄호로 되풀이한 것을 걷는다", judgeSummary("알라바가 우디네세로 이적이 확정되었으며(이적 확정), 1년 계약을 맺는다.", {}).text === "알라바가 우디네세로 이적이 확정되었으며, 1년 계약을 맺는다.");
+  check("요약 — 통화 기호·영문 고유명사·악센트는 통과한다", judgeSummary("JJ Gabriel이 €30.57m에 Pavel Šulc와 함께 이적했다.", {}).text != null);
 }
 check("코드 블록으로 감싸도 읽는다", parseJudgement('```json\n' + J({ move: true, evidence: "Austrian star", summary_ko: "요약." }) + "\n```", BODY, ALABA).kind === "move");
 check("근거의 공백·따옴표·대소문자 차이는 접는다", parseJudgement(J({ move: true, evidence: "Udinese have  reached a VERBAL agreement", summary_ko: "요약." }), BODY, ALABA).kind === "move");
@@ -193,7 +250,7 @@ const names = createNameBook({ players: { "david alaba": { ko: "다비드 알라
   check("요청 — 표기는 그 보도의 구단·선수 중 표기가 있는 것만(프리셋 · 자동 캐시 · 사람 사전)",
     eq(buildGlossary(need, names), ["Real Madrid = 레알 마드리드", "Udinese = 우디네세", "Watford = 왓퍼드 FC", "David Alaba = 다비드 알라바"]), JSON.stringify(buildGlossary(need, names)));
   check("요청 — 같은 입력이면 같은 요청(변동값이 없다)", JSON.stringify(req) === JSON.stringify(buildJudgeRequest(need, names, "system")));
-  check("요청 — 스키마는 모든 필드를 요구하고 다른 필드를 막는다", JUDGE_SCHEMA.additionalProperties === false && eq(JUDGE_SCHEMA.required, ["move", "player", "player_ko", "stage", "from", "to", "suitors", "evidence", "summary_ko"]));
+  check("요청 — 스키마는 모든 필드를 요구하고 다른 필드를 막는다", JUDGE_SCHEMA.additionalProperties === false && eq(JUDGE_SCHEMA.required, ["move", "timing", "player", "player_ko", "stage", "from", "to", "suitors", "fee", "evidence", "summary_ko"]));
 }
 {
   const sys = buildSystem({ "pre-contract": "사전 계약" });
@@ -276,7 +333,7 @@ const noLookup = async () => ({ wikidataId: null, nameKo: null });
   check("저장 — 이동·아님·판정 불가는 쓰고, 일시 실패는 쓰지 않는다(다음 실행이 다시 묻는다)", eq(db.writes.map((w) => w.id), [1, 2, 3, 5, 6, 7]));
   const w1 = db.writes[0];
   check("저장 — 이동은 판정·선수·근거·구단·단계·관심 구단·요약·시각을 쓴다",
-    eq(Object.keys(w1).sort(), ["id", "summary_ko", "verdict", "verdict_at", "verdict_evidence", "verdict_from", "verdict_player", "verdict_player_name", "verdict_stage", "verdict_suitors", "verdict_to"]) && w1.verdict_from === "Real Madrid" && w1.verdict_to === "Udinese" && w1.verdict_stage === "agreement" && w1.verdict_player_name === "David Alaba" && w1.summary_ko === "다비드 알라바가 우디네세와 구두 합의했다.", JSON.stringify(w1));
+    eq(Object.keys(w1).sort(), ["id", "summary_ko", "verdict", "verdict_at", "verdict_evidence", "verdict_fee_amount", "verdict_fee_currency", "verdict_fee_kind", "verdict_from", "verdict_player", "verdict_player_name", "verdict_raw", "verdict_stage", "verdict_suitors", "verdict_to"]) && typeof w1.verdict_raw === "string" && JSON.parse(w1.verdict_raw).move === true && w1.verdict_from === "Real Madrid" && w1.verdict_to === "Udinese" && w1.verdict_stage === "agreement" && w1.verdict_player_name === "David Alaba" && w1.summary_ko === "다비드 알라바가 우디네세와 구두 합의했다.", JSON.stringify(w1));
   check("저장 — 아님은 요약을 비우고 근거를 남긴다", db.writes[1].verdict === "not_move" && db.writes[1].summary_ko === null && db.writes[1].verdict_evidence === "Alan Shearer in agreement with Thomas Tuchel" && db.writes[1].verdict_from === null);
   check("저장 — 판정 불가는 값 없이 선수·시각만(요약은 건드리지 않는다)", db.writes[2].verdict === null && db.writes[2].verdict_player === "joao pedro" && db.writes[2].verdict_at && !("summary_ko" in db.writes[2]));
   check("저장 — 요약이 버려졌는데 옛 요약이 있으면 둔다(영문으로 되돌리지 않는다)", db.writes[3].verdict === "move" && !("summary_ko" in db.writes[3]));
@@ -339,6 +396,24 @@ const noLookup = async () => ({ wikidataId: null, nameKo: null });
   const broke = { messages: { create: async () => { creditCalls += 1; throw new Anthropic.BadRequestError(400, { type: "error", error: { type: "invalid_request_error", message: "Your credit balance is too low to access the Anthropic API." } }, "Your credit balance is too low to access the Anthropic API.", new Headers()); } } };
   const r2 = await runJudgements(fakeDb(), [1, 2, 3].map((id) => ({ id, playerKey: "david alaba", player: "David Alaba", body: BODY })), { names, corrections: {}, lookup: noLookup, client: broke });
   check("크레딧 소진 — 첫 거부에서 멈춘다", creditCalls === 1 && r2.warnings.some((w) => w.includes("사용 한도")));
+}
+
+// ── 재생 — 저장된 원출력을 지금의 해석으로 다시 읽는다(API 없음) ──
+{
+  const db = fakeDb();
+  const names = createNameBook({ players: { "david alaba": { ko: "다비드 알라바" } } });
+  const raw = (o) => JSON.stringify({ move: true, timing: "current", player: "David Alaba", player_ko: null, stage: "agreement", from: "Real Madrid", to: "Udinese", suitors: [], fee: null, evidence: "reached a verbal agreement with David Alaba", summary_ko: "David Alaba가 Udinese와 구두 합의했다.", ...o });
+  const stored = (id, extra) => ({ id, body: BODY, source_id: "tg:romano", external_id: `x${id}`, url: null, verdict_at: "2026-09-30T00:00:00.000Z", verdict_player: "david alaba", verdict_suitors: [], ...extra });
+  const r = await replayJudgements(db, [
+    // 옛 해석으로는 판정 불가였던 행(근거의 순서) — 지금의 해석으로는 이동이다
+    stored(1, { verdict: null, verdict_raw: raw({ evidence: "Austrian star leaves Real Madrid ... reached a verbal agreement with David Alaba" }) }),
+    // 지금의 해석으로도 같은 값이면 쓰지 않는다
+    stored(2, { verdict: "move", verdict_player_name: "David Alaba", verdict_evidence: "reached a verbal agreement with David Alaba", verdict_from: "Real Madrid", verdict_to: "Udinese", verdict_stage: "agreement", summary_ko: "다비드 알라바가 우디네세와 구두 합의했다.", verdict_raw: raw({}) }),
+    // 원출력이 없는 행(옛 형식)은 재생 대상이 아니다
+    stored(3, { verdict: "move", verdict_raw: null }),
+  ], { names, lookup: async () => ({ nameKo: null, wikidataId: null }) });
+  check("재생 — 원출력이 있는 행만 다시 읽고, 달라진 행만 쓴다", r.read === 2 && r.changed === 1 && eq(db.writes.map((w) => w.id), [1]), JSON.stringify([r.read, r.changed, db.writes.map((w) => w.id)]));
+  check("재생 — 판정 시각은 그대로 두고(새 시도가 아니다) 요약의 이름을 사전 표기로 맞춘다", db.writes[0]?.verdict === "move" && db.writes[0]?.verdict_at === "2026-09-30T00:00:00.000Z" && db.writes[0]?.summary_ko === "다비드 알라바가 우디네세와 구두 합의했다.", JSON.stringify(db.writes[0]));
 }
 
 console.log(`\nLLM 판정 ${pass}/${pass + fail} 통과`);

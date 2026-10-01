@@ -218,7 +218,12 @@ const PLAYER_CASES = [
   // 헤드라인·본문이 붙은 원문 — 앞 덩어리("Ings Wycombe Wanderers")는 버리고 본문의 선수를 잡는다
   { players: ["Danny Ings"], text: "Wycombe sign ex-England striker Ings Wycombe Wanderers sign former Burnley striker Danny Ings." },
   { players: [], text: "Official: Tommaso Mancioppi extends contract with Milan Futuro By: Oliver Fisher" },
-  { players: [], text: "Harry Kane confirms new deal talks with FC Bayern are advancing." },
+  { players: [], text: "Jamal Musiala confirms new deal talks with FC Bayern are advancing." },
+  // 사람 사전에 있는 선수는 앵커 문형이 없어도 전체 이름으로 잡는다(지역지 제목) — 재계약·회고는 파생과 판정자가 거른다
+  { players: ["Harry Kane"], text: "Rio Ferdinand takes firm stance over Bayern and Harry Kane - 'Can't be bullied'" },
+  { players: ["Erling Haaland"], text: "Arsenal latest: clause comes to light as Erling Haaland's future clarified" },
+  // 제목 끝의 이름과 다음 줄 첫머리의 이름은 한 덩어리가 아니다
+  { players: ["Raheem Sterling"], text: "Le Havre pass up chance to sign Raheem Sterling\n\nRaheem Sterling (31), currently out of contract, has been offered to two French clubs." },
   // 오탐 — "in agreement with"은 의견 동의다(대표팀 소집 논평이 투헬의 합의 딜이 됐다)
   { players: [], text: "Alan Shearer in agreement with Thomas Tuchel after brutal Cole Palmer blast" },
   // 가십 항목 끝의 출처 신문 괄호는 선수가 아니다
@@ -389,6 +394,10 @@ const CLUB_CASES = [
   { text: "Real Madrid, como siempre, spurs no one.", expect: ["Real Madrid"] },
   { text: "Chelsea loan Rio Ngumoha to #FCBayern.", expect: ["Chelsea"] },
   { text: "Chelsea Women sign Kim from Arsenal Women.", expect: [] },
+  // 홀로 쓴 "Sporting"은 스포르팅 CP다 — 직함("Sporting director")·다른 구단(Gijon·Kansas City)은 아니다
+  { text: "Milan send new offer to Sporting for Inacio.", expect: ["AC Milan", "Sporting CP"] },
+  { text: "Sporting director Deco and Sporting Director Julian Ward spoke.", expect: [] },
+  { text: "Sporting Gijon sign the winger.", expect: ["Sporting Gijon"] },
   { text: "Olympique Lyonnais and Stade Rennais agree deal.", expect: ["Lyon", "Rennes"] },
 ];
 let clubPass = 0;

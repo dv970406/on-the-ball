@@ -28,7 +28,7 @@ export const RUMOR_CAROUSEL_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
 const CLUB_COLUMNS = "code, name, short_name, league";
 const DEAL_COLUMNS =
-  "id, player, player_ko, position, birth_year, nationality, stage, fee_amount, fee_currency, fee_text, prev_fee_amount, fee_low_amount, fee_high_amount, add_on_amount, contract_text, wage_text, first_reported_at, latest_reported_at, report_count, is_free_agent";
+  "id, player, player_ko, position, birth_year, nationality, stage, fee_amount, fee_currency, fee_text, fee_kind, prev_fee_amount, fee_low_amount, fee_high_amount, add_on_amount, contract_text, wage_text, first_reported_at, latest_reported_at, report_count, is_free_agent";
 /**
  * ⚠ **`body`가 없다.** anon·authenticated에는 `body`를 뺀 컬럼만 grant돼 있어 `select=*`도
  *   `body`도 42501이다(`api-and-db.md` 이적 소식 절) — 그래서 컬럼을 나열한다.
@@ -142,6 +142,7 @@ export interface DealSelectRow {
   fee_amount: TransferDealRow["fee_amount"];
   fee_currency: TransferDealRow["fee_currency"];
   fee_text: TransferDealRow["fee_text"];
+  fee_kind: TransferDealRow["fee_kind"];
   prev_fee_amount: TransferDealRow["prev_fee_amount"];
   fee_low_amount: TransferDealRow["fee_low_amount"];
   fee_high_amount: TransferDealRow["fee_high_amount"];
@@ -174,6 +175,7 @@ export function buildDeal(row: DealSelectRow): TransferDeal {
     feeAmount: row.fee_amount,
     feeCurrency: row.fee_currency,
     feeText: row.fee_text,
+    feeKind: row.fee_kind,
     prevFeeAmount: row.prev_fee_amount,
     feeLowAmount: row.fee_low_amount,
     feeHighAmount: row.fee_high_amount,

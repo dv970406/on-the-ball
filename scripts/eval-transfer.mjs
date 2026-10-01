@@ -2,7 +2,7 @@
  * 이적 딜 파생의 정확도 평가 — 정답 세트(`scripts/fixtures/transfer-golden.json`)에 지금 코드를 돌려 채점한다.
  *
  *   node scripts/eval-transfer.mjs --export [--remote]   # 운영(또는 로컬) 보도를 로컬 스냅샷으로 받는다(.cache/, 읽기만)
- *   node scripts/eval-transfer.mjs                        # 스냅샷으로 채점(LLM 토큰 0 — 저장된·캐시된 판정만 쓴다)
+ *   node scripts/eval-transfer.mjs                        # 스냅샷으로 채점(LLM 토큰 0 — 운영에 저장된 판정과 캐시된 판정만 쓴다)
  *   node scripts/eval-transfer.mjs --judge                # 판정이 없는 후보를 LLM에 묻고 캐시에 남긴다(토큰을 쓴다)
  *   node scripts/eval-transfer.mjs --offline              # 위키데이터 이름 조회도 하지 않는다(스냅샷의 캐시만)
  *
@@ -12,7 +12,9 @@
  * ⚠ **저장소가 공개라 본문을 커밋하지 않는다**(재배포 원칙 — `api-and-db.md`). 정답 세트에는 id·URL·정답만 있고,
  *   본문은 `--export`가 받은 `.cache/transfer-eval/snapshot.json`(gitignore)에서 읽는다.
  * ⚠ **기준 시각을 스냅샷에 고정한다** — 파생 범위가 지금 시각을 따라 움직이면 같은 데이터로도 결과가 바뀐다.
- * ⚠ LLM 판정은 `.cache/transfer-eval/verdicts.json`에 캐시한다(보도 id·선수 키) — 규칙만 고쳤으면 다시 부르지 않는다.
+ * ⚠ LLM 판정은 **운영에 저장된 것을 스냅샷과 함께 받아 그대로 쓴다**(이미 치른 비용이다) — 규칙만 고쳤으면 토큰이 들지 않는다.
+ *   `--judge`가 새로 물은 것은 `.cache/transfer-eval/verdicts.json`에 캐시한다(보도 id·선수 키).
+ * ⚠ 품질 검증에 API를 먼저 쓰지 않는다 — 채점은 원문만 읽는 독립 채점자(사람·서브에이전트)가 하고 그 결과를 정답 세트에 더한다.
  */
 import fs from "node:fs";
 import { createSyncClient, guardTarget, loadEnv } from "./lib/sync-db.mjs";
@@ -45,7 +47,7 @@ const verdictCache = fs.existsSync(VERDICTS) ? JSON.parse(fs.readFileSync(VERDIC
 // 스냅샷의 행을 지금 추출기로 다시 읽는다(재처리와 같다) — 저장된 판정은 캐시가 덮는다
 const rows = snap.rows.map((r) => {
   const e = extractTransfer(r.body ?? "");
-  return { ...r, stage: e.stage, players: e.players, relevance: e.relevance, deal_id: null };
+  return { ...r, stage: e.stage, players: e.players, clubs: e.clubs, relevance: e.relevance, deal_id: null };
 });
 const applyVerdicts = () => {
   for (const r of rows) {
@@ -131,6 +133,17 @@ console.log(`  보드 딜 ${d.deals.length}건 · 정답으로 채점 가능한 
 for (const deal of d.deals) console.log(`    ${wrong.some((w) => w.startsWith(`${deal.player} —`)) ? "✗" : "·"} ${deal.player}${deal.player_ko ? `(${deal.player_ko})` : ""} [${deal.stage}] ${deal.from_club_code ?? "?"} → ${deal.to_club_code ?? "?"} 보도 ${deal.report_count}`);
 console.log(`  재현율(이동 보도 선수 → 딜) ${covered.length}/${truePlayers.size} = ${pct(covered.length, truePlayers.size)}`);
 console.log(`  추출 재현율(이동 보도에서 선수 이름을 뽑음) ${extHit}/${extAll} = ${pct(extHit, extAll)}`);
+// 보도 단위 — 이동 보도가 판정자에게 갔는가(판정이 있거나 판정 대기), 딜에 묶였는가. 규칙 관문의 재현율을 본다
+{
+  const moveRows = goldenIn.filter((g) => g.is_move_report);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const pending = new Set(d.judgeNeeds.map((x) => x.id));
+  const linked = new Set(d.deals.flatMap((x) => x.rowIds));
+  const seen = moveRows.filter((g) => byId.get(g.id)?.verdict || pending.has(g.id));
+  const falseMove = goldenIn.filter((g) => !g.is_move_report && byId.get(g.id)?.verdict === "move");
+  console.log(`  보도 단위: 이동 보도 ${moveRows.length}건 중 판정자에게 간 것 ${seen.length} = ${pct(seen.length, moveRows.length)} · 딜에 묶인 것 ${moveRows.filter((g) => linked.has(g.id)).length}`);
+  console.log(`  이동 보도가 아닌데 "이동" 판정이 저장된 것 ${falseMove.length}건${falseMove.length ? ` — ${falseMove.map((g) => `#${g.id}`).join(" ")}` : ""}`);
+}
 console.log(`  방향 채움(출발·행선지 둘 다) ${d.deals.filter((x) => x.from_club_code && x.to_club_code).length}/${d.deals.length}`);
 console.log(`  건너뜀: ${Object.entries(d.skipped).map(([k, v]) => `${k} ${v}`).join(" · ")}`);
 console.log(`  판정 대기(캐시에 판정 없음 — --judge로 묻는다) ${d.judgeNeeds.length}건`);
@@ -159,10 +172,11 @@ async function exportSnapshot() {
     return out;
   };
   // 정답 세트가 가리키는 보도가 속한 기간 전체(파생 범위 계산에 필요한 이웃 보도까지)
-  const rows = await read("transfer_news", "id, source_id, url, provenance_url, body, published_at", (q) => q.gte("id", minId - 2000));
-  const { data: names, error } = await supabase.from("transfer_name_ko").select("kind, key, name_ko, wikidata_id, checked_at");
+  // 운영에 저장된 판정(verdict*)까지 받는다 — 이미 치른 호출이라 채점이 토큰 없이 돈다
+  const rows = await read("transfer_news", "*", (q) => q.gte("id", minId - 2000));
+  const { data: names, error } = await supabase.from("transfer_name_ko").select("kind, key, name_en, name_ko, wikidata_id, source, checked_at");
   if (error) throw new Error(`이름 캐시 조회 실패: ${error.message}`);
   fs.mkdirSync(DIR, { recursive: true });
-  fs.writeFileSync(SNAPSHOT, JSON.stringify({ exportedAt: new Date().toISOString(), nowIso: "2026-09-28T02:00:04Z", source: url, rows, names }));
+  fs.writeFileSync(SNAPSHOT, JSON.stringify({ exportedAt: new Date().toISOString(), nowIso: new Date().toISOString(), source: url, rows, names }));
   console.log(`스냅샷 ${rows.length}행 · 이름 캐시 ${names.length}행 → ${SNAPSHOT}`);
 }

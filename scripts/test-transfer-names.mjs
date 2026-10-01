@@ -3,7 +3,7 @@
  *
  *   node scripts/test-transfer-names.mjs
  */
-import { CLUB_RECHECK_MS, RECHECK_MS, canonicalClubName, createNameBook, missingNames, shortClubName } from "./lib/transfer/names-ko.mjs";
+import { CLUB_RECHECK_MS, RECHECK_MS, cacheLlmNames, canonicalClubName, createNameBook, lookupAndCache, missingNames, renameInSummary, shortClubName, syncDictionaryNames } from "./lib/transfer/names-ko.mjs";
 import { koLabel, lookupKo, normalizeName, pickCurrentClub, pickEntity, toHits } from "./lib/transfer/wikidata.mjs";
 
 let pass = 0;
@@ -159,6 +159,44 @@ const clubBook = createNameBook({ cache: [
 ] });
 check("사전 — 현 소속은 찾은 행만 값이고, 못 찾은 행·없는 행은 null", clubBook.currentClub("harry kane") === "Bayern Munich" && clubBook.currentClub("finn jeltsch") === null && clubBook.currentClub("nobody") === null);
 check("사전 — 조회 대상: 없는 행·재확인 주기가 지난 행(찾았어도 소속은 바뀐다), 최근 행은 아니다", clubBook.needsClubLookup("nobody", NOW) && clubBook.needsClubLookup("old man", NOW) && !clubBook.needsClubLookup("harry kane", NOW) && !clubBook.needsClubLookup("finn jeltsch", NOW));
+
+// ── 표기의 기준은 팬들이 쓰는 표기다 — 사람 사전 → 판정자의 통용 표기 → 위키데이터 레이블 ──
+{
+  const cache = [
+    { kind: "player", key: "cody gakpo", name_en: "Cody Gakpo", name_ko: "코디 가크포", wikidata_id: "Q1", source: "wikidata", checked_at: "2026-09-01T00:00:00Z" },
+    { kind: "player", key: "isaac konde", name_en: "Isaac Konde", name_ko: "아이작 콘데", wikidata_id: null, source: "llm", checked_at: "1970-01-01T00:00:00.000Z" },
+    { kind: "player", key: "bernardo silva", name_en: "Bernardo Silva", name_ko: "베르나르두 실바", wikidata_id: "Q2", source: "wikidata", checked_at: "2026-09-01T00:00:00Z" },
+    { kind: "player", key: "thiago silva", name_en: "Thiago Silva", name_ko: null, wikidata_id: "Q3", source: "wikidata", checked_at: "2026-09-01T00:00:00Z" },
+  ];
+  const book = createNameBook({ players: { "erling haaland": { ko: "엘링 홀란드" } }, cache });
+  check("표기 — 믿는 표기는 사람 사전과 통용 표기뿐이다(위키데이터 레이블은 판정자에게 넘기지 않는다)", book.playerKoTrusted("erling haaland") === "엘링 홀란드" && book.playerKoTrusted("isaac konde") === "아이작 콘데" && book.playerKoTrusted("cody gakpo") === null && book.playerKo("cody gakpo") === "코디 가크포");
+  check("성으로 찾기 — 아는 선수(사전 · 확인된 캐시) 중 그 성을 가진 선수", eq(book.playersBySurname("haaland"), [{ key: "erling haaland", name: "Erling Haaland" }]) && book.playersBySurname("silva").length === 2 && book.playersBySurname("konde").length === 0);
+
+  check("요약 표기 — 전체 이름과 성 부분을 함께 바꾼다", renameInSummary("리버풀의 판 데이크가 떠난다. 버질 판 데이크는", "버질 판 데이크", "버질 반 다이크") === "리버풀의 반 다이크가 떠난다. 버질 반 다이크는");
+  check("요약 표기 — 받침이 달라지면 조사를 맞추고, 이미 바뀐 글자를 또 늘리지 않는다", renameInSummary("엘링 홀란과 홀란드, 홀란은", "엘링 홀란", "엘링 홀란드") === "엘링 홀란드와 홀란드, 홀란드는");
+  check("요약 표기 — 가크포를 → 각포를", renameInSummary("코디 가크포의 이적, 가크포를 원한다", "코디 가크포", "코디 각포") === "코디 각포의 이적, 각포를 원한다");
+
+  // 쓰기 흐름 — 가짜 DB(쓴 것을 모은다)
+  const fake = (summaries = []) => {
+    const log = { upserts: [], updates: [] };
+    const news = { select: () => news, eq: () => news, not: async () => ({ data: summaries, error: null }), update: (v) => ({ eq: async (_c, id) => { log.updates.push({ table: "transfer_news", id, ...v }); return { error: null }; } }) };
+    const names = { upsert: async (rows) => { log.upserts.push(...rows); return { error: null }; }, update: (v) => ({ eq: () => ({ eq: async (_c, key) => { log.updates.push({ table: "transfer_name_ko", key, ...v }); return { error: null }; } }) }) };
+    return { log, from: (t) => (t === "transfer_news" ? news : names) };
+  };
+  const db1 = fake([{ id: 7, summary_ko: "코디 가크포의 이적이 무산됐다." }]);
+  const wrote = await cacheLlmNames(db1, [{ key: "cody gakpo", name: "Cody Gakpo", ko: "코디 각포" }, { key: "erling haaland", name: "Erling Haaland", ko: "엘링 홀란" }, { key: "isaac konde", name: "Isaac Konde", ko: "이삭 콘데" }], book);
+  check("통용 표기 — 위키데이터 레이블을 덮고 항목 id는 남긴다(사람 사전·앞선 통용 표기는 건드리지 않는다)", wrote === 1 && eq(db1.log.upserts.map((r) => [r.key, r.name_ko, r.wikidata_id, r.source]), [["cody gakpo", "코디 각포", "Q1", "llm"]]), JSON.stringify(db1.log.upserts));
+  check("통용 표기 — 레이블을 덮으면 이미 쓴 요약도 바꾼다", eq(db1.log.updates, [{ table: "transfer_news", id: 7, summary_ko: "코디 각포의 이적이 무산됐다." }]), JSON.stringify(db1.log.updates));
+
+  const db2 = fake();
+  const found = async () => ({ ok: true, json: async () => ({}) });
+  await lookupAndCache(db2, [{ kind: "player", key: "isaac konde", name: "Isaac Konde" }], { book, fetchImpl: found }).catch(() => null);
+  check("조회 — 통용 표기가 있는 행은 위키데이터가 표기를 덮지 않는다", db2.log.upserts.every((r) => r.key !== "isaac konde" || (r.name_ko === "아이작 콘데" && r.source === "llm")), JSON.stringify(db2.log.upserts));
+
+  const db3 = fake([{ id: 9, summary_ko: "리버풀이 가크포를 판다." }]);
+  const sync = await syncDictionaryNames(db3, book, { "cody gakpo": { ko: "코디 각포" }, "erling haaland": { ko: "엘링 홀란드" } });
+  check("사전 맞춤 — 사람 사전과 다른 캐시 표기를 사전 표기로 고치고 요약도 바꾼다(캐시에 없는 선수는 대상이 아니다)", sync.synced === 1 && sync.summariesFixed === 1 && eq(db3.log.updates, [{ table: "transfer_name_ko", key: "cody gakpo", name_ko: "코디 각포" }, { table: "transfer_news", id: 9, summary_ko: "리버풀이 각포를 판다." }]), JSON.stringify([sync, db3.log.updates]));
+}
 
 console.log(`\n이름 사전 ${pass}/${pass + fail} 통과`);
 if (fail) process.exit(1);

@@ -118,7 +118,11 @@ const CLUB_ALIASES = {
   "Feyenoord": ["Feyenoord"],
   "Benfica": ["Benfica"],
   "Porto": ["FC Porto", "Porto"],
-  "Sporting CP": ["Sporting CP", "Sporting Lisbon"],
+  // ⚠ 홀로 쓴 "Sporting"은 이적 보도에서 스포르팅 CP다 — 사전에 없으면 위키데이터 조회로 넘어가 스포르팅 히혼으로 풀렸다(재실행:
+  //   "Sporting 소속 이나시우"가 "스포르팅 히혼 소속"이 됐다). 직함·다른 구단(`ALIAS_NOT_FOLLOWED`)은 뺀다.
+  "Sporting CP": ["Sporting CP", "Sporting Lisbon", "Sporting"],
+  "Sporting Gijon": ["Sporting Gijon", "Sporting Gijón", "Sporting de Gijón"],
+  "Sporting Kansas City": ["Sporting Kansas City", "Sporting KC"],
   "Club Brugge": ["Club Brugge", "Brugge"],
   "Galatasaray": ["Galatasaray"],
   "Fenerbahce": ["Fenerbahce", "Fenerbahçe"],
@@ -182,7 +186,9 @@ const CLUB_ALIASES = {
  * ⚠ 나머지는 대소문자를 무시한다(해시태그·소문자 표기를 받으려고). 이 목록은 "소문자로 쓰이면 구단이 아닌" 것만이다:
  *   "spurs"(동사), "villa"(별장), "palace"·"forest", 스페인어 "como"·"rayo"·"levante", "om"·"ol".
  */
-const CASE_SENSITIVE = new Set(["Como", "Rayo", "Levante", "Spurs", "OM", "OL", "Villa", "Forest", "Palace"]);
+const CASE_SENSITIVE = new Set(["Como", "Rayo", "Levante", "Spurs", "OM", "OL", "Villa", "Forest", "Palace", "Sporting"]);
+/** 별칭 바로 뒤에 오면 그 구단이 아닌 낱말 — "Sporting director"(직함)·"Sporting Club de …"(다른 구단 이름의 머리) */
+const ALIAS_NOT_FOLLOWED = { Sporting: String.raw`(?!\s+(?:[Dd]irectors?|[Cc]lub|Charleroi|Cristal|Braga|Life|News|[Cc]hief|[Dd]epartment))` };
 
 /**
  * 구단명 바로 뒤에 오면 **그 구단이 아니다** — 여자팀·2군·유스팀이다.
@@ -203,7 +209,7 @@ const ALIAS_INDEX = Object.entries(CLUB_ALIASES)
     alias,
     // ⚠ 해시태그는 끝 경계를 따로 둔다 — 없으면 "#FCBayern"이 "#FCB"(바르셀로나)에 걸린다(실제 수집 글 2건)
     re: new RegExp(
-      alias.startsWith("#") ? `${escapeRe(alias)}(?![A-Za-z0-9_])` : `\\b${escapeRe(alias)}\\b`,
+      alias.startsWith("#") ? `${escapeRe(alias)}(?![A-Za-z0-9_])` : `\\b${escapeRe(alias)}\\b${ALIAS_NOT_FOLLOWED[alias] ?? ""}`,
       CASE_SENSITIVE.has(alias) ? "gu" : "giu",
     ),
   }));

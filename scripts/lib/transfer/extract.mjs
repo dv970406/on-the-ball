@@ -4,8 +4,9 @@ import { detectClubs, isClubName } from "./clubs.mjs";
 /**
  * 규칙 기반 구조화 추출 — 단계·선수·구단·이적료·주급·옵션·관련성.
  *
- * 추출은 규칙이 한다(LLM은 그 뒤에서 거부권·방향·요약만 — `judge.mjs`). 딜 파생이 이 값 위에 서 있어,
- * 추출이 틀리면 없는 이적이 보드에 생긴다 → **정밀도를 택하고 재현율을 포기한다**(틀린 값보다 빈 값).
+ * 이 값은 **LLM 판정 전의 1차 추출**이다 — 어떤 보도를 판정에 보낼지(단계·선수·구단)를 정하고, 판정이 없는 보도의 딜 값이 된다.
+ * 판정이 있는 보도는 선수·단계·구단·금액을 판정자의 값으로 쓴다(`judge.mjs` · `derive-deals.mjs`). 주급·옵션·계약은 늘 여기서 읽는다.
+ * 틀린 추출은 없는 이적을 판정에 올리므로 **정밀도를 택한다**(틀린 값보다 빈 값).
  * 규칙을 고쳤으면 `node scripts/test-transfer-extract.mjs`로 회귀를 확인하고
  * `node scripts/sync-transfer-news.mjs --reprocess`로 저장분을 다시 추출한다.
  */
@@ -315,7 +316,12 @@ const ROLE_PREFIX = `(?:${ci("the")}\\s+)?(?:\\d{1,2}yo\\s+)?(?:[a-z]+\\s+)?(?:$
  */
 const TOKEN = "\\p{Lu}[\\p{L}\\p{M}'’‑-]+";
 const PARTICLE = "(?:van|von|der|den|de|da|das|do|dos|di|del|della|dei|la|le|ter|ten|bin|ben|el|al|y)";
-const NAME = `(${TOKEN}(?:\\s+(?:${PARTICLE}\\s+){0,2}${TOKEN}){0,3})`;
+/**
+ * 토큰 사이는 **같은 줄의 공백**만이다 — `\s+`로 두면 제목 끝의 이름과 다음 줄 첫머리의 이름이 한 덩어리가 된다
+ * ("…sign Raheem Sterling\n\nRaheem Sterling (31)…" → "Raheem Sterling Raheem Sterling", 운영에서 미확인 선수로 막혔다).
+ */
+const GAP = "[^\\S\\n]+";
+const NAME = `(${TOKEN}(?:${GAP}(?:${PARTICLE}${GAP}){0,2}${TOKEN}){0,3})`;
 
 /**
  * `<name> to …` 문형은 뒤에 **사전에 있는 구단**이 와야 선수 앵커다. 없는 이름을 "to X" 하나로 인정하면
@@ -459,6 +465,7 @@ function roleAfter(after) {
 
 /** 한 토큰 이름(Neymar·Rodri)은 사람 사전에 있을 때만 받는다 — 사전의 정규형 키 */
 let mononyms;
+let dictKeys = [];
 function isKnownMononym(name) {
   if (!mononyms) {
     let dict = {};
@@ -467,9 +474,31 @@ function isKnownMononym(name) {
     } catch {
       dict = {};
     }
-    mononyms = new Set(Object.keys(dict).filter((k) => !k.startsWith("_") && !k.includes(" ")));
+    dictKeys = Object.keys(dict).filter((k) => !k.startsWith("_"));
+    mononyms = new Set(dictKeys.filter((k) => !k.includes(" ")));
   }
   return mononyms.has(foldName(name));
+}
+/** 사람 사전의 여러 토큰 이름(정규형 키) — `knownPlayersIn`이 쓴다 */
+let fullNames;
+const NAME_RUN = new RegExp(NAME, "gu");
+/** 글에 나온 사람 사전 선수의 전체 이름(원문 표기) — 이름 덩어리의 연속한 2~4토큰이 사전 키와 같으면 그 선수다 */
+function knownPlayersIn(text) {
+  if (!fullNames) {
+    isKnownMononym("");
+    fullNames = new Set(dictKeys.filter((k) => k.includes(" ")));
+  }
+  const out = new Set();
+  for (const m of text.matchAll(NAME_RUN)) {
+    const tokens = m[1].split(/\s+/u);
+    for (let i = 0; i < tokens.length; i += 1) {
+      for (let n = 2; i + n <= tokens.length; n += 1) {
+        const sub = tokens.slice(i, i + n).join(" ").replace(/['’]s$/u, "");
+        if (fullNames.has(foldName(sub))) out.add(sub);
+      }
+    }
+  }
+  return [...out];
 }
 /** 사람 이름 토큰이 될 수 없는 낱말인가 — 어휘 집합 또는 구단 표기 */
 const isVocab = (t) => {
@@ -634,6 +663,10 @@ function detectPlayers(text, clubs) {
       found.add(name);
     }
   }
+  // 앵커 문형이 하나도 못 잡았으면 **사람 사전에 있는 선수의 전체 이름**이 글에 있는지 본다 — 지역지 제목은 앵커 없이 이름만 쓴다
+  // ("Rio Ferdinand takes firm stance over Man Utd and JJ Gabriel", "…as Erling Haaland's future clarified"). 사전에 있는 이름이라
+  // 사람인지 가릴 필요가 없다. 한 토큰 이름은 보지 않는다(흔한 낱말과 겹친다).
+  if (!found.size) for (const name of knownPlayersIn(text)) found.add(name);
   // 같은 사람이 짧게·길게 두 번 잡히면 긴 쪽만 남긴다("Morgan Gibbs" ⊂ "Morgan Gibbs-White")
   return [...found].filter((n) => ![...found].some((o) => o !== n && o.startsWith(n)));
 }
