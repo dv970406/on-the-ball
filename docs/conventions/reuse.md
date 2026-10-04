@@ -19,7 +19,7 @@
 - **`normalizeNickname`** — **보이는 텍스트의 정규형**(보이지 않는 문자 제거 · NBSP·전각공백을 보통 공백으로 · 연속 공백 접기 · **NFC**). 이름은 첫 호출자를 기록할 뿐이고 닉네임 전용이 아니다 — **화면에서 구분되어야 하는 값**은 이걸로 접는다. 접지 않으면 `.trim()`을 통과한 '찬성'·'찬성 '·'찬'+제로폭공백+'성'이 서로 다른 값으로 저장되어 똑같이 생긴 항목이 여럿 뜬다. **DB의 `public.normalize_nickname`과 같은 결과를 내야 한다** — 두 문자 집합(`INVISIBLE`/`BLANK`)의 합집합이 `hasVisibleChar`의 클래스와 같아야 한다는 제약까지 한 쌍이다(한쪽만 고치지 말 것).
   ⚠ **닉네임 길이는 원본이 아니라 정규형으로 잰다.** DB 트리거가 쓰기 직전에 정규화하므로 원본으로 재면 화면과 저장값이 갈린다 — 꼬리 공백·제로폭이 정규형에서 사라지기 때문이다.
   ⚠ **마지막 단계가 NFC다.** 없으면 `isPlainNickname`이 자모 분해형 한글(U+1112 U+1161 U+11AB = '한')을 거부하는데, 그 형태는 macOS에서 복사한 한글로 실제로 들어온다. ⚠ **NFKC로 바꾸지 말 것** — 전각 `Ａ`가 `A`로 접혀 `isPlainNickname`이 막으려는 동형이의 입력이 통과한다.
-- **`isPlainNickname`** — 닉네임 허용 문자(한글 음절 · 한글 자모 · 영문 · 숫자). **공백도 허용하지 않는다.** DB의 `public.is_plain_nickname`(`profiles_nickname_plain` CHECK)과 **글자 하나까지 같아야 한다** — 갈리면 클라가 통과시킨 값이 23514가 되어 사용자는 한국어 안내 대신 "입력값이 허용 범위를 벗어났어요."를 본다.
+- **`isPlainNickname`** — 닉네임 허용 문자(한글 음절 · 한글 자모 · 영문 · 숫자). **공백도 허용하지 않는다.** DB의 `public.is_plain_nickname`(`profiles_nickname_plain` CHECK)과 **글자 하나까지 같아야 한다** — 갈리면 클라가 통과시킨 값이 23514가 되어 사용자는 한국어 안내 대신 "입력한 내용을 다시 확인해 주세요."를 본다.
   - ⚠ **정규형에 적용한다**(`normalizeNickname`의 결과). 원본으로 판정하면 NFD 한글이 거부되고 꼬리 공백까지 에러가 된다.
   - ⚠ **정규식을 호출부에 다시 적지 말 것**(`parsePostId`·`safeNextPath`와 같은 이유). 자모 범위 상한이 `ㅣ`(U+3163)인 것도 규약이다 — 다음 문자 U+3164는 HANGUL FILLER로 화면에 아무것도 그리지 않아, 한 글자만 넓혀도 "보이지 않는 닉네임"이 돌아온다.
   - 부수 효과로 **동형이의 사칭이 막힌다** — 키릴 `а`·전각 `Ａ`는 정규형을 통과하지만 라틴 글자와 화면에서 구분되지 않았다.
@@ -62,7 +62,7 @@
 - `requireBrowserSupabase` — 브라우저 supabase 클라이언트(`SupabaseClient<Database>`, 없으면 한국어 에러 throw). **쿼리·뮤테이션 훅은 이걸 쓴다** — null 가드를 각자 반복하지 않는다.
 - `getBrowserSupabase` — null을 그대로 받아 분기해야 할 때만.
 - `toDbErrorMessage` — PostgREST/RPC 에러 → 한국어. `P0001`(우리가 띄운 메시지)은 그대로 통과시킨다. 작성자 FK(`…_user_id_fkey`) 위반 23503은 "계정 정보를 찾을 수 없어요"로 접는다(탈퇴·삭제된 계정의 세션이 남은 채 쓴 경우).
-- **`toWriteErrorMessage(supabase, error)`** — 로그인이 필요한 쓰기의 에러 → 한국어. 42501이면 세션을 확인해 세션이 없을 때 "로그인이 풀렸어요"로 바꾸고, 나머지는 `toDbErrorMessage`와 같다. 로그인 필수 쓰기 훅은 이것을 쓴다(`data-and-state.md`).
+- **`toWriteErrorMessage(supabase, error)`** — 로그인이 필요한 쓰기의 에러 → 한국어. 42501이면 세션을 확인해 세션이 없을 때 "로그인이 만료됐어요"로 바꾸고, 나머지는 `toDbErrorMessage`와 같다. 로그인 필수 쓰기 훅은 이것을 쓴다(`data-and-state.md`).
 - ⚠ `createSupabaseServerClient`는 배럴에 없다 — `@/shared/api/supabase-server`를 직접 import(`next/headers` 의존).
 - **`createSupabaseAnonClient` / `ANON_REVALIDATE`** (`@/shared/api/supabase-anon` 직접 경로) — 쿠키를 읽지 않는 서버 클라이언트. fetch가 Next Data Cache를 타므로 **응답이 모든 익명 요청에 동일한 조회에만** 쓴다. 새로 만들지 말 것 — 수명 상수가 TanStack `staleTime`과 한 값으로 묶여 있다(`nextjs.md`). ⚠ 캐시 히트가 DB를 없애는 것이지 **왕복이 0이 되는 것은 아니다** — in-flight 중복 제거가 없어 캐시가 빈 순간의 동시 요청은 전부 통과한다.
 - **`hasSessionCookie()`** (같은 자리, `supabase-server`) — 이 요청에 세션이 있는지를 **네트워크 없이** 판정. 위 두 클라이언트를 고르는 데만 쓴다. ⚠ `getUser()`로 바꾸지 말 것(로그인 사용자에게 GoTrue 왕복이 하나 더 붙는다). ⚠ 판정을 **좁히지 말 것** — 넓게 잡혀 있어야 헛짚어도 평소 경로로 갈 뿐이고, 좁히면 로그인 사용자가 관심 표시가 빠진 익명 목록을 받는다.

@@ -217,7 +217,7 @@ export function TransferDetailView({
 
   return (
     <>
-      <SubHeader title="이적 상세" fallbackHref={ROUTES.transferList} />
+      <SubHeader title="딜 상세" fallbackHref={ROUTES.transferList} />
 
       {/*
         ⚠ **스크롤 영역이 여기 있어야 한다** — 루트 프레임이 `h-dvh … overflow-hidden`이라 `<main>`이
@@ -228,7 +228,7 @@ export function TransferDetailView({
       <main className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(96px+env(safe-area-inset-bottom))]">
         {/* 본문 h1(선수명)은 딜이 있을 때만 그려진다 — 로딩·실패·없음 분기에서는 sr-only로 둔다
             (EmptyState의 title은 <p>라 heading이 0개가 된다 — `app/not-found.tsx`와 같은 사정) */}
-        {!deal && <h1 className="sr-only">이적 상세</h1>}
+        {!deal && <h1 className="sr-only">딜 상세</h1>}
         {isLoading && (
           <div aria-hidden className="pt-4">
             {/* 골격은 실제 화면과 같다 — 뱃지 줄 · 이름 · 정보줄 · 경로 카드 · 이적료 카드 · 탭 · 입력칸 */}
@@ -249,22 +249,22 @@ export function TransferDetailView({
         {error && !deal && (
           <EmptyState
             className="pt-4"
-            title="이적 소식을 불러오지 못했어요"
+            title="딜을 불러오지 못했어요"
             description={error.message}
             onRetry={() => refetch()}
           />
         )}
         {error && deal && (
           <div className="pt-4">
-            <StaleBanner noun="이적 소식" onRetry={() => refetch()} />
+            <StaleBanner noun="딜" onRetry={() => refetch()} />
           </div>
         )}
 
         {deal === null && (
           <EmptyState
             className="pt-4"
-            title="이적 건을 찾을 수 없어요"
-            description="삭제되었거나 없는 이적 건이에요."
+            title="딜을 찾을 수 없어요"
+            description="삭제됐거나 없는 딜이에요."
           />
         )}
 

@@ -48,7 +48,7 @@ export function SignInView({
     <AuthShell
       // 서비스 이름과 한 줄 소개만 — 인증 화면은 로그인이라는 목적 하나만 드러낸다
       title="온더볼"
-      description="모든 축구팬들을 위한 커뮤니티."
+      description="유럽 5대 리그 이적 소식을 한곳에서"
       // 게스트 진입 — 로그인 없이 목록을 둘러본다(읽기는 RLS가 공개로 허용한다)
       belowForm={
         <div className="mt-5 text-center">

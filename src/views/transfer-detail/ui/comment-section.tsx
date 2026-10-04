@@ -51,7 +51,7 @@ const SORT_OPTIONS: { key: CommentSort; label: string }[] = [
   { key: "latest", label: "최신순" },
 ];
 
-const PLACEHOLDER = "이 이적, 어떻게 봐요?";
+const PLACEHOLDER = "이 이적, 어떻게 보세요?";
 
 /** 표·답글·삭제 줄의 텍스트 버튼 — 32px, 히트 영역은 위아래로 넓혀 44px, 가로는 최소 폭 44px */
 const ACTION_BUTTON =
@@ -166,7 +166,7 @@ export function CommentSection({
 
       {threads && threads.length === 0 && (
         <p className="py-8 text-center text-[13px] text-ink-mute-2">
-          아직 아무도 거들지 않았어요. 처음을 차지하세요.
+          아직 댓글이 없어요. 첫 댓글을 남겨 보세요.
         </p>
       )}
 

@@ -53,8 +53,9 @@ export function ClubRoute({ deal, size, className }: ClubRouteProps) {
       ) : (
         <Icon as={ArrowRight} size={12} className="shrink-0 text-ink-faint" />
       )}
-      {/* 스크린리더용 — 아이콘이 `aria-hidden`이라 방향이 읽히지 않는다 */}
-      <span className="sr-only">{dead ? (denied ? "부인" : "결렬") : "에서"}</span>
+      {/* 스크린리더용 — 아이콘이 `aria-hidden`이라 방향이 읽히지 않는다. "A, 행선지 B (결렬)"로 읽힌다
+          ("A에서 B"는 조사 "(으)로"를 구단 이름 받침에 맞춰 붙일 수 없어 쓰지 않는다) */}
+      <span className="sr-only">, 행선지 </span>
       <span
         className={cn(
           "inline-flex min-w-0 items-center gap-[5px]",
@@ -69,6 +70,7 @@ export function ClubRoute({ deal, size, className }: ClubRouteProps) {
           <TransferCrest club={destinations[0] ?? null} size={size} className={dead ? "opacity-50" : undefined} />
         )}
         <span className={stacked ? "line-clamp-2 whitespace-normal" : "truncate"}>{label.to}</span>
+        {dead && <span className="sr-only"> ({denied ? "부인" : "결렬"})</span>}
       </span>
     </span>
   );

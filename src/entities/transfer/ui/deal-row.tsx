@@ -39,7 +39,7 @@ interface DealRowProps {
  * ⚠ **디바이더는 같은 구간의 행 사이에만** — `[&+&]:before:…`(형제 선택자)라 구간 첫 행 위·
  *   마지막 행 아래에는 없다. 좌우 `inset-x-3`로 행 패딩 안에서 끝난다.
  * ⚠ 결렬 변형: 행 `bg-[#f3f3f3] grayscale`(`@theme` 동결이라 arbitrary hex),
- *   이름·경로·이적료 `opacity-60`, meta `opacity-85`, 변동폭 자리에 `무산`, 출처 대신 최신
+ *   이름·경로·이적료 `opacity-60`, meta `opacity-85`, 변동폭 생략(상태는 뱃지가 말한다), 출처 대신 최신
  *   보도 요지 1줄. **이름에는 취소선이 없다** — 행선지 약칭·이적료에만(`ClubRoute`가 진다).
  * ⚠ 이 행의 에메랄드는 `WatchMark`(관심)뿐이다 — 관심 딜에만 뜬다.
  * ⚠ 렌더 중에 시계를 읽지 않는다 — 상대시각은 `nowMs`를 받아 계산한다.
@@ -79,11 +79,8 @@ export function DealRow({ deal, nowMs, hidden }: DealRowProps) {
               dead ? "text-ink-mute-2 line-through decoration-hairline-strong" : "text-ink",
             )}
           />
-          {dead ? (
-            <span className="text-[11px] font-medium text-crimson">무산</span>
-          ) : (
-            <FeeDelta deal={deal} lead />
-          )}
+          {/* 죽은 딜은 변동폭을 그리지 않는다 — 결렬·부인은 같은 행의 상태 뱃지가 말한다 */}
+          {!dead && <FeeDelta deal={deal} lead />}
         </div>
 
         <div

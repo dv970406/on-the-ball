@@ -128,7 +128,7 @@ export function useCommentDeletion({
     setInvalidated((prev) => ({ seq: (prev?.seq ?? 0) + 1, reason: pendingInvalid }));
   }
   const afterInvalidated = useEffectEvent((reason: "gone" | "notMine") => {
-    if (reason === "gone") toast("이미 삭제된 댓글이에요.");
+    if (reason === "gone") toast("이미 삭제된 댓글이에요");
     focusFallback();
   });
   useEffect(() => {

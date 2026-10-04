@@ -20,7 +20,7 @@ import { buildCommentList } from "@/entities/comment/api/mappers";
 import type { CommentList } from "@/entities/comment/model/types";
 import { TransferDetailView } from "@/views/transfer-detail";
 
-const FALLBACK_METADATA: Metadata = { title: "이적 상세" };
+const FALLBACK_METADATA: Metadata = { title: "딜 상세" };
 /** 없는 딜·형식이 틀린 id — `Page`가 `notFound()`를 부르므로 **404 화면과 같은 제목**이어야 한다. */
 const NOT_FOUND_METADATA: Metadata = { title: NOT_FOUND_TITLE };
 const META_TITLE_MAX = 60;

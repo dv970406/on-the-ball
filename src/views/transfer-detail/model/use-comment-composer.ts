@@ -306,7 +306,7 @@ export function useCommentComposer(
     // 진행 중이 아닐 때만 에러를 걷는다(`clearDraft`와 같은 이유)
     if (writeComment.error) writeComment.reset();
     returnFocus();
-    if (lostDraft) toast("답글을 달던 댓글이 삭제됐어요.");
+    if (lostDraft) toast("답글을 달던 댓글이 삭제됐어요");
   });
   useEffect(() => {
     if (lostTarget) afterTargetLost(lostTarget.lostDraft);

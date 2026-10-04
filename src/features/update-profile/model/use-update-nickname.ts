@@ -31,7 +31,7 @@ export const NICKNAME_LIMIT: TextLimit = { grapheme: 20, codePoint: 200 };
  * 세 가지를 본다: 보이는 글자 유무(DB `has_visible_char`) · 허용 문자
  * (DB `is_plain_nickname`) · 길이 두 단위(DB `profiles_nickname_check`).
  * **셋 다 DB에 짝이 있고, 이 함수가 먼저 막는 이유는 문구 때문이다** —
- * DB까지 가면 23514가 `toDbErrorMessage`에서 "입력값이 허용 범위를 벗어났어요."로
+ * DB까지 가면 23514가 `toDbErrorMessage`에서 "입력한 내용을 다시 확인해 주세요."로
  * 접혀 어느 규칙을 어겼는지 말하지 못한다.
  */
 export function validateNickname(value: string): string | null {

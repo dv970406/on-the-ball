@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   title: { template: "%s | 온더볼", default: "온더볼" },
   // 서비스 소개 문구의 단일 소스 — 하위 페이지는 이 값을 상속한다.
   // sign-in 화면과 opengraph-image.alt.txt도 같은 문구를 쓴다(세 곳이 갈리면 공유 프리뷰만 옛 톤으로 남는다).
-  description: "모든 축구팬들을 위한 커뮤니티",
+  description: "유럽 5대 리그 이적 소식을 한곳에서",
   /**
    * 색인 지시 — 기본값(index, follow)에 미리보기 상한을 연다.
    *

@@ -39,7 +39,7 @@ export function RumorCarousel({ rumors, nowMs }: RumorCarouselProps) {
         id="tm-rumors-title"
         className="px-5 pb-2.5 text-[13px] font-medium tracking-[-0.2px] text-ink-mute"
       >
-        최근 3일 · 신뢰도 높은 소식
+        최근 3일 · 공신력 높은 소식
       </h2>
       <ul
         onScroll={handleScroll}

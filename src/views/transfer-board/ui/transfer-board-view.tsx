@@ -123,14 +123,14 @@ export function TransferBoardView({
         */}
         {deals.error && !allDeals && (
           <EmptyState
-            title="이적 소식을 불러오지 못했어요"
+            title="딜을 불러오지 못했어요"
             description={deals.error.message}
             onRetry={() => deals.refetch()}
           />
         )}
 
         {/* 캐시된 보드는 그대로 두고 최신화 실패만 알린다 */}
-        {deals.error && allDeals && <StaleBanner noun="이적 소식" onRetry={() => deals.refetch()} />}
+        {deals.error && allDeals && <StaleBanner noun="딜" onRetry={() => deals.refetch()} />}
 
         {allDeals && (
           // 계정이 바뀌는 동안(placeholderData) 이전 보드가 남아 있다는 걸 은은하게 알린다
@@ -167,7 +167,7 @@ export function TransferBoardView({
               />
 
               {groups.length === 0 ? (
-                <EmptyState title="조건에 맞는 이적 건이 없어요" />
+                <EmptyState title="조건에 맞는 딜이 없어요" />
               ) : (
                 <BoardSections groups={groups} nowMs={nowMs} sort={sort} />
               )}
@@ -178,7 +178,7 @@ export function TransferBoardView({
               */}
               {allDeals.length >= TRANSFER_DEAL_LIMIT && (
                 <p className="px-5 pb-1 pt-4 text-center text-[12px] text-ink-mute-2">
-                  이적 건은 {formatCount(TRANSFER_DEAL_LIMIT)}건까지만 표시하고 있어요.
+                  딜은 {formatCount(TRANSFER_DEAL_LIMIT)}건까지만 표시하고 있어요.
                 </p>
               )}
             </div>

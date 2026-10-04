@@ -8,7 +8,7 @@
   - `toAuthErrorMessage` (`@/entities/session`) — supabase `AuthError`
   - `toDbErrorMessage` (`@/shared/api`) — PostgREST/RPC 에러
   - `toWriteErrorMessage` (`@/shared/api`) — **로그인이 필요한 쓰기**의 PostgREST 에러. `toDbErrorMessage`를 감싸되
-    42501이면 세션을 확인해 세션이 없을 때 "로그인이 풀렸어요"로 바꾼다 — 세션이 만료된 채 누른 쓰기가
+    42501이면 세션을 확인해 세션이 없을 때 "로그인이 만료됐어요"로 바꾼다 — 세션이 만료된 채 누른 쓰기가
     "권한이 없어요"로 접히면 사용자는 다시 로그인하면 된다는 것을 알 수 없다. 로그인 필수 쓰기 훅은 이것을 쓴다.
 - Vercel 스킬 `client-swr-dedup`은 요청 중복 제거를 **SWR**로 예시하지만, 이 프로젝트는 동일 목적(중복 제거·캐싱)을 TanStack Query로 달성한다. **SWR API는 도입하지 않는다** — 원칙(raw 호출 금지·중복 제거)만 취하고 라이브러리는 기존 스택을 따른다.
 

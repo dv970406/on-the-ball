@@ -49,7 +49,7 @@ export async function resizeToAvatar(file: File): Promise<Blob> {
     canvas.height = target;
 
     const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("이미지를 처리하지 못했어요.");
+    if (!ctx) throw new Error("이미지를 처리하지 못했어요. 다른 사진을 골라 주세요.");
 
     // 가운데 정사각 crop → target으로 축소
     ctx.drawImage(
@@ -67,7 +67,7 @@ export async function resizeToAvatar(file: File): Promise<Blob> {
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, "image/webp", 0.85),
     );
-    if (!blob) throw new Error("이미지를 변환하지 못했어요.");
+    if (!blob) throw new Error("이미지를 변환하지 못했어요. 다른 사진을 골라 주세요.");
     return blob;
   } finally {
     // ⚠ 명시적으로 닫는다 — ImageBitmap은 GC를 기다리지 않고 메모리를 붙들고 있다

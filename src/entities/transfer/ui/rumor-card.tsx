@@ -67,7 +67,7 @@ export function RumorCard({ deal, report, nowMs, priority }: RumorCardProps) {
           </span>
           <span className="flex justify-center text-ink">
             <Icon as={ArrowRight} size={18} />
-            <span className="sr-only">에서</span>
+            <span className="sr-only">, 행선지 </span>
           </span>
           <span className="flex flex-col items-center gap-[7px] text-[12px] font-medium text-ink">
             {destinations.length > 1 ? (

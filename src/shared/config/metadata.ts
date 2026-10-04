@@ -25,7 +25,7 @@ export const OG_IMAGE = {
   type: "image/png",
   width: 1200,
   height: 630,
-  alt: "온더볼 — 모든 축구팬들을 위한 커뮤니티",
+  alt: "온더볼 — 유럽 5대 리그 이적 소식을 한곳에서",
 } as const;
 
 /**

@@ -26,7 +26,7 @@ const DB_ERROR_MESSAGE: Record<string, string> = {
   // 23505 unique_violation — 닉네임 중복(profiles_nickname_lower_key) 등
   "23505": "이미 사용 중인 값이에요.",
   // 23503 foreign_key_violation — 참조 대상이 사라짐
-  "23503": "대상을 찾을 수 없어요. 이미 삭제되었을 수 있어요.",
+  "23503": "대상을 찾을 수 없어요. 이미 삭제됐을 수 있어요.",
   // 42501 insufficient_privilege — Postgres 자신의 영어 메시지(RLS·컬럼 권한·EXECUTE 차단).
   // 우리가 의도적으로 띄우는 권한 에러는 P0001로 던져 메시지를 그대로 노출한다.
   "42501": "권한이 없어요.",
@@ -34,12 +34,12 @@ const DB_ERROR_MESSAGE: Record<string, string> = {
   // 어느 테이블에서든 나올 수 있으므로 대상을 특정하지 않는다.
   PGRST116: "대상을 찾을 수 없어요.",
   // 23514 check_violation — 클라이언트 검증과 DB 제약이 어긋났을 때(길이·공백)
-  "23514": "입력값이 허용 범위를 벗어났어요.",
+  "23514": "입력한 내용을 다시 확인해 주세요.",
   // 22P02 invalid_text_representation — enum에 없는 값.
   // enum 컬럼을 쓰면서 생긴 코드다: text+check였다면 23514로 왔을 자리다.
-  "22P02": "허용되지 않는 값이에요.",
+  "22P02": "입력한 내용을 다시 확인해 주세요.",
   // 23502 not_null_violation — 필수 컬럼 누락
-  "23502": "필수 값이 비어 있어요.",
+  "23502": "빠진 내용이 있어요. 다시 확인해 주세요.",
 };
 
 export function toDbErrorMessage(error: unknown): string {

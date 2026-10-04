@@ -37,7 +37,7 @@ export function validateComment(value: string): string | null {
  * 답글 대상이 그 사이 지워져 DB 트리거(`transfer_deal_comment_check_depth`)가 거부했을 때의 문구.
  * ⚠ 마이그레이션의 P0001 문구와 **글자 하나까지 같아야 한다** — 한쪽만 고치면 아래 판정이 조용히 거짓이 된다.
  */
-const REPLY_TARGET_MISSING_MESSAGE = "답글을 달 댓글을 찾을 수 없어요. 삭제되었을 수 있어요.";
+const REPLY_TARGET_MISSING_MESSAGE = "답글을 달 댓글을 찾을 수 없어요. 삭제됐을 수 있어요.";
 
 /**
  * 이 작성 실패가 "답글 대상이 지워졌다"는 사유인가 — 답글 칸이 대상 소실 안내를 겹쳐 내지 않는 데 쓴다.

@@ -17,7 +17,7 @@ export async function toWriteErrorMessage(
   const code = (error as { code?: unknown } | null)?.code;
   if (code === "42501") {
     const { data } = await supabase.auth.getSession();
-    if (!data.session) return "로그인이 풀렸어요. 다시 로그인해 주세요.";
+    if (!data.session) return "로그인이 만료됐어요. 다시 로그인해 주세요.";
   }
   return toDbErrorMessage(error);
 }

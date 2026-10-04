@@ -183,7 +183,7 @@ export function normalizeNickname(value: string): string {
  * ⚠ `supabase/migrations/20260910000001_nickname_charset.sql`의
  *   `public.is_plain_nickname`과 **글자 하나까지 같아야 한다.** 한쪽만 고치면
  *   클라이언트가 통과시킨 값이 DB의 23514가 되어, 사용자는 한국어 안내 대신
- *   "입력값이 허용 범위를 벗어났어요."를 본다.
+ *   "입력한 내용을 다시 확인해 주세요."를 본다.
  *
  * ⚠ **정규형에 적용한다**(`normalizeNickname`의 결과). 원본으로 판정하면 NFD 한글이
  *   거부되고, 꼬리 공백처럼 DB가 조용히 다듬는 입력까지 에러가 된다.
