@@ -28,6 +28,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { clampCp, slugify, upsertRows } from "../sync-db.mjs";
 import { clubCode, clubDisplay, presetClubs } from "./club-display.mjs";
+import { canonicalClubName } from "./clubs.mjs";
 import { contractText, parseContract } from "./contract.mjs";
 import { DEST, FORMER, FROM, LEFT_FREE, SUITOR_FROM, addVotes, collectVotes, topVote } from "./direction.mjs";
 import { extractTransfer } from "./extract.mjs";
@@ -498,6 +499,17 @@ export function clubRowsToWrite(derivedClubs, names = createNameBook()) {
  *     선수 없이 묻는 행(규칙이 선수를 못 뽑았거나 넓힌 후보)이다.
  *   `nameNeeds`는 딜마다 선수 키·구단 정규명 — 이름 사전에서 빠진 것을 찾는 데 쓴다(저장하지 않는다).
  */
+/**
+ * 판정이 읽은 구단 이름을 **지금의** 구단 사전으로 다시 맞춘다(`canonicalClubName`). 판정은 그날의 사전으로 정규화돼 저장되므로,
+ * 별칭을 더해도 옛 행은 옛 이름("Hull")으로 남아 같은 구단이 두 코드로 갈린다 — 여기서 맞추면 다음 파생이 곧바로 바로잡는다
+ * (원출력 재생 없이). 같은 구단으로 접힌 관심 구단은 하나만 남긴다. 행은 고치지 않고 사본을 돌려준다.
+ */
+function withCanonicalVerdictClubs(r) {
+  const canon = (c) => (c ? canonicalClubName(c) : c);
+  const suitors = r.verdict_suitors ? [...new Set(r.verdict_suitors.map(canon))] : r.verdict_suitors;
+  return { ...r, verdict_from: canon(r.verdict_from), verdict_to: canon(r.verdict_to), verdict_suitors: suitors };
+}
+
 export function deriveDeals(rows, opts) {
   const windows = opts.windows ?? loadWindows();
   const names = opts.names ?? createNameBook({ players: loadPlayerDictionary(), clubs: loadGlossary().clubs });
@@ -508,7 +520,7 @@ export function deriveDeals(rows, opts) {
   const skip = (why) => { skipped[why] = (skipped[why] ?? 0) + 1; };
 
   // 같은 보도는 대표 한 행만 본다(나머지는 딜에 묶이지 않고 판정·요약 대상도 아니다)
-  const { reps, duplicates } = dedupeRows(rows);
+  const { reps, duplicates } = dedupeRows(rows.map(withCanonicalVerdictClubs));
   if (duplicates) skipped["중복 보도"] = duplicates;
   const candidates = reps.filter((r) => {
     if (isCandidate(r, startMs) || isSoftCandidate(r, startMs)) return true;

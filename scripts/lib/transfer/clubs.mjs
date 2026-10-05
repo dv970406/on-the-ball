@@ -27,7 +27,9 @@ const CLUB_ALIASES = {
   "Ipswich Town": ["Ipswich Town", "Ipswich"],
   "Southampton": ["Southampton", "#SaintsFC"],
   "Coventry City": ["Coventry City", "Coventry"],
-  "Hull City": ["Hull City"],
+  // "Hull" 단독도 이적 보도에서는 헐 시티다 — 없으면 판정자가 읽은 "Hull"이 위키데이터 조회로 넘어가 같은 구단이 두 코드
+  //   (`hull-city`·`hull`)로 갈렸다(관심 구단에 헐 시티가 두 번 실렸다). 럭비 리그 구단(`ALIAS_NOT_FOLLOWED`)은 뺀다.
+  "Hull City": ["Hull City", "Hull"],
   "West Bromwich Albion": ["West Bromwich Albion", "West Brom", "#WBA"],
 
   "Real Madrid": ["Real Madrid", "#RealMadrid"],
@@ -184,11 +186,17 @@ const CLUB_ALIASES = {
 /**
  * 대소문자를 구분해 매칭하는 별칭 — 영어·스페인어 일반어와 같은 철자다.
  * ⚠ 나머지는 대소문자를 무시한다(해시태그·소문자 표기를 받으려고). 이 목록은 "소문자로 쓰이면 구단이 아닌" 것만이다:
- *   "spurs"(동사), "villa"(별장), "palace"·"forest", 스페인어 "como"·"rayo"·"levante", "om"·"ol".
+ *   "spurs"(동사), "villa"(별장), "palace"·"forest", "hull"(선체), 스페인어 "como"·"rayo"·"levante", "om"·"ol".
  */
-const CASE_SENSITIVE = new Set(["Como", "Rayo", "Levante", "Spurs", "OM", "OL", "Villa", "Forest", "Palace", "Sporting"]);
-/** 별칭 바로 뒤에 오면 그 구단이 아닌 낱말 — "Sporting director"(직함)·"Sporting Club de …"(다른 구단 이름의 머리) */
-const ALIAS_NOT_FOLLOWED = { Sporting: String.raw`(?!\s+(?:[Dd]irectors?|[Cc]lub|Charleroi|Cristal|Braga|Life|News|[Cc]hief|[Dd]epartment))` };
+const CASE_SENSITIVE = new Set(["Como", "Rayo", "Levante", "Spurs", "OM", "OL", "Villa", "Forest", "Palace", "Sporting", "Hull"]);
+/**
+ * 별칭 바로 뒤에 오면 그 구단이 아닌 낱말 — "Sporting director"(직함)·"Sporting Club de …"(다른 구단 이름의 머리),
+ * "Hull KR"·"Hull FC"(럭비 리그 구단 — 헐 시티는 "Hull City"로 먼저 잡힌다)
+ */
+const ALIAS_NOT_FOLLOWED = {
+  Sporting: String.raw`(?!\s+(?:[Dd]irectors?|[Cc]lub|Charleroi|Cristal|Braga|Life|News|[Cc]hief|[Dd]epartment))`,
+  Hull: String.raw`(?!\s+(?:KR\b|FC\b|Kingston|Rovers))`,
+};
 
 /**
  * 구단명 바로 뒤에 오면 **그 구단이 아니다** — 여자팀·2군·유스팀이다.
@@ -231,6 +239,18 @@ export function detectClubs(text) {
     masked = masked.replace(re, " ");
   }
   return [...found];
+}
+
+/**
+ * 별칭 하나를 통째로 받아 정규 영문명으로 바꾼다 — 별칭이 아니면 그대로 돌려준다.
+ * 저장된 판정의 구단 이름(`verdict_from`·`verdict_to`·`verdict_suitors`)은 판정한 날의 사전으로 정규화돼 있다 →
+ * 사전에 별칭을 더한 뒤에도 옛 판정이 옛 이름으로 남아 같은 구단이 두 코드로 갈린다. 딜 파생이 읽을 때 이것으로 다시 맞춘다.
+ * ⚠ 대소문자 구분 별칭("Hull"·"Villa")은 그 철자 그대로일 때만 바꾼다(`detectClubs`와 같은 판정).
+ */
+export function canonicalClubName(name) {
+  const t = name.trim();
+  const hit = ALIAS_INDEX.find((a) => (CASE_SENSITIVE.has(a.alias) ? a.alias === t : a.alias.toLowerCase() === t.toLowerCase()));
+  return hit ? hit.canonical : name;
 }
 
 export function isClubName(s) {

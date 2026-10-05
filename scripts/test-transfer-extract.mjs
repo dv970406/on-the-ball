@@ -399,6 +399,10 @@ const CLUB_CASES = [
   { text: "Sporting director Deco and Sporting Director Julian Ward spoke.", expect: [] },
   { text: "Sporting Gijon sign the winger.", expect: ["Sporting Gijon"] },
   { text: "Olympique Lyonnais and Stade Rennais agree deal.", expect: ["Lyon", "Rennes"] },
+  // 홀로 쓴 "Hull"은 헐 시티다 — 럭비 리그 구단(Hull KR·Hull FC)과 소문자 "hull"(선체)은 아니다
+  { text: "Hull and Fulham are monitoring the winger.", expect: ["Hull City", "Fulham"] },
+  { text: "Hull City want the striker.", expect: ["Hull City"] },
+  { text: "Hull KR and Hull FC sign props; the hull of the ship.", expect: [] },
 ];
 let clubPass = 0;
 for (const c of CLUB_CASES) {
