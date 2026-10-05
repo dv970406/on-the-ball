@@ -83,8 +83,13 @@ export function useToggleTransferWatch() {
     },
 
     onMutate: async ({ dealId }) => {
-      // 진행 중인 리페치가 낙관적 값을 덮어쓰지 못하게 먼저 취소한다
-      await queryClient.cancelQueries({ queryKey: transferKeys.all });
+      // 진행 중인 리페치가 낙관적 값을 덮어쓰지 못하게 먼저 취소한다.
+      // ⚠ `isWatched`를 담은 두 캐시(목록·상세)만 취소한다 — `transferKeys.all`로 넓히면 관심과 무관한 조회
+      //   (보도 타임라인·구단 목록·응원 구단)까지 되돌려, 처음 받던 중이던 조회가 데이터 없이 멈춘다.
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: transferKeys.lists() }),
+        queryClient.cancelQueries({ queryKey: transferKeys.details() }),
+      ]);
 
       const snapshot: WatchSnapshot = {
         lists: queryClient.getQueriesData<TransferDealListItem[]>({

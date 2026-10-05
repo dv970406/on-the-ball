@@ -27,7 +27,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { clampCp, slugify, upsertRows } from "../sync-db.mjs";
-import { clubCode, clubDisplay } from "./club-display.mjs";
+import { clubCode, clubDisplay, presetClubs } from "./club-display.mjs";
 import { contractText, parseContract } from "./contract.mjs";
 import { DEST, FORMER, FROM, LEFT_FREE, SUITOR_FROM, addVotes, collectVotes, topVote } from "./direction.mjs";
 import { extractTransfer } from "./extract.mjs";
@@ -460,6 +460,25 @@ export function clubRecord(canonical, names = createNameBook()) {
     short_name: clampCp(ko?.short ?? canonical, 40),
     league: clubDisplay(canonical).league,
   };
+}
+
+/**
+ * 구단 표(`transfer_club`)에 쓸 행 — 이번 파생에 나온 구단 + **표시 프리셋의 구단 전부**.
+ *
+ * 응원 구단(`transfer_club_follow`)이 이 표를 FK로 잡고, 고르는 화면이 5대 리그 구단을 이 표에서 읽는다 — 딜이 아직 없는
+ * 구단도 고를 수 있어야 한다(그 구단의 첫 딜을 알리는 것이 응원 구단의 쓸모다). 값이 그대로인 행은 쓰지 않으므로
+ * (`writeDeals`) 매시 비용은 조회 한두 번이다.
+ * ⚠ 같은 코드가 양쪽에 있으면 파생에 나온 쪽을 쓴다 — 둘 다 `clubRecord`가 만든 같은 값이라 차이가 없지만, 딜이
+ *   가리키는 행이 이번 파생의 값이라는 것을 순서로 못박아 둔다.
+ */
+export function clubRowsToWrite(derivedClubs, names = createNameBook()) {
+  const byCode = new Map();
+  for (const canonical of presetClubs()) {
+    const club = clubRecord(canonical, names);
+    if (club) byCode.set(club.code, club);
+  }
+  for (const club of derivedClubs) byCode.set(club.code, club);
+  return [...byCode.values()];
 }
 
 /**
@@ -1057,7 +1076,10 @@ export async function runDerivation(supabase, opts = {}) {
     }
   }
 
-  const write = opts.dryRun ? null : await writeDeals(supabase, derived, rows, { log });
+  // 구단 표에는 프리셋 구단 전부를 함께 쓴다(`clubRowsToWrite`) — 요약의 구단 수는 이번 파생에 나온 것만 센다
+  const write = opts.dryRun
+    ? null
+    : await writeDeals(supabase, { ...derived, clubs: clubRowsToWrite(derived.clubs, names) }, rows, { log });
   return {
     summary: summarize(derived),
     warnings: [...derived.warnings, ...(lookup?.warnings ?? []), ...(clubLookup?.warnings ?? []), ...(replayed?.warnings.filter((w) => !w.includes("판정 불가")) ?? []), ...(judged?.warnings ?? [])],

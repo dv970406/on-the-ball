@@ -13,6 +13,8 @@ import { userScope } from "@/shared/lib/query-scope";
  *   범위 시작(ISO)은 키에 들어간다 — 값이 다르면 다른 집합이다(창이 바뀌는 순간에만 바뀐다).
  *
  * ⚠ 타임라인은 "나"에 종속되지 않는다(임베딩에 정책 게이팅이 없다) → 스코프를 붙이지 않는다.
+ * ⚠ 응원 구단(`follows`)은 로그인해야만 성립하는 조회라 `userId: string`이다(`profileKeys`와 같은 형태 —
+ *   `userScope`의 `"guest"` 조각이 필요 없다). 구단 목록(`clubs`)은 "나"와 무관하다.
  */
 export const transferKeys = {
   all: ["transfer"] as const,
@@ -24,4 +26,10 @@ export const transferKeys = {
     [...transferKeys.details(), id, userScope(userId)] as const,
   /** 상세의 보도 타임라인 — 딜 단건과 키를 나눈다(관심 토글이 상세만 무효화한다) */
   reports: (id: number) => [...transferKeys.all, "reports", id] as const,
+  /** 5대 리그 구단 목록 — 응원 구단을 고르는 화면 */
+  clubs: () => [...transferKeys.all, "clubs"] as const,
+  /** 내 응원 구단 */
+  follows: (userId: string) => [...transferKeys.all, "follows", userId] as const,
+  /** 응원 구단 쓰기(뮤테이션) — 요청을 한 줄로 세우고 줄 끝을 판정하는 데 쓴다 */
+  followMutation: () => [...transferKeys.all, "follow-mutation"] as const,
 } as const;

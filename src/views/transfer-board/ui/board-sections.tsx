@@ -25,6 +25,11 @@ interface BoardSectionsProps {
   nowMs: number | null;
   /** 루머 구간의 펼침 순서를 정한다 — 최신순이면 열기 순, 이적료순이면 그 순서 그대로(`splitHotRumors`) */
   sort: TransferSort;
+  /**
+   * 접지 않고 전부 펼친다 — **관심 필터가 켜진 보드**가 그 자리다. 접기는 "보드에 무엇이 많은가"를 줄이는 장치인데,
+   * 내가 담은 딜은 목록 자체가 내가 고른 것이다: 식은 루머라고 접으면 담아 둔 딜이 한 건도 안 보이는 구간이 생긴다.
+   */
+  expanded: boolean;
 }
 
 /**
@@ -42,7 +47,7 @@ interface BoardSectionsProps {
  *   형제 자리에 남아 선이 끊기지 않는다.
  * ⚠ 펼침 상태는 구간 키별 로컬 state다 — URL에 싣지 않는다(공유할 상태가 아니다). 필터가 바뀌어도 유지된다.
  */
-export function BoardSections({ groups, nowMs, sort }: BoardSectionsProps) {
+export function BoardSections({ groups, nowMs, sort, expanded }: BoardSectionsProps) {
   const [revealed, setRevealed] = useState<Partial<Record<TransferGroupKey, number>>>({});
   const reveal = (key: TransferGroupKey, initial: number) =>
     setRevealed((prev) => ({ ...prev, [key]: (prev[key] ?? initial) + PAGE }));
@@ -75,6 +80,7 @@ export function BoardSections({ groups, nowMs, sort }: BoardSectionsProps) {
                 group={group}
                 nowMs={nowMs}
                 sort={sort}
+                expanded={expanded}
                 revealed={revealed[group.key]}
                 onReveal={(initial) => reveal(group.key, initial)}
               />
@@ -90,13 +96,15 @@ interface ListGroupProps {
   group: BoardGroup;
   nowMs: number | null;
   sort: TransferSort;
+  /** 접지 않는다(`BoardSectionsProps.expanded`) */
+  expanded: boolean;
   /** 이 구간에서 펼친 행 수 — 아직 안 눌렀으면 undefined(기본값은 구간마다 다르다) */
   revealed: number | undefined;
   onReveal: (initial: number) => void;
 }
 
 /** 목록 구간 하나 — 루머는 열기 순 접기, 진행 중은 소구간, 나머지는 페이지 단위 접기 */
-function ListGroup({ group, nowMs, sort, revealed, onReveal }: ListGroupProps) {
+function ListGroup({ group, nowMs, sort, expanded, revealed, onReveal }: ListGroupProps) {
   if (group.key === "prog") {
     const subgroups = splitProgress(group.deals);
     if (subgroups.length > 1) {
@@ -124,7 +132,8 @@ function ListGroup({ group, nowMs, sort, revealed, onReveal }: ListGroupProps) {
   const split = group.key === "rumor" ? splitHotRumors(group.deals, nowMs, sort) : null;
   const ordered: TransferDealListItem[] = split ? [...split.hot, ...split.rest] : group.deals;
   const initial = split ? split.hot.length : PAGE;
-  const shown = Math.min(ordered.length, revealed ?? initial);
+  // 순서는 접을 때와 같게 둔다(뜨거운 루머가 앞) — 필터를 켜고 끌 때 같은 딜의 자리가 뒤섞이지 않게
+  const shown = expanded ? ordered.length : Math.min(ordered.length, revealed ?? initial);
   const remaining = ordered.length - shown;
 
   return (

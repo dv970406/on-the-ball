@@ -6,17 +6,20 @@ import {
   parseTransferClub,
   parseTransferLeague,
   parseTransferSort,
+  parseTransferWatch,
   type TransferLeague,
   type TransferSort,
 } from "@/entities/transfer";
 
-/** 보드 필터 — 리그·정렬·구단. **URL이 소유한다**(공유 링크·뒤로가기가 필터를 잃지 않게) */
+/** 보드 필터 — 리그·정렬·구단·관심. **URL이 소유한다**(공유 링크·뒤로가기가 필터를 잃지 않게) */
 export interface BoardFilters {
   /** `null` = 전체 리그 */
   league: TransferLeague | null;
   sort: TransferSort;
   /** `null` = 전체 구단. 보드에 없는 구단이면 모델(`useTransferBoard`)이 전체로 폴백한다 */
   club: string | null;
+  /** 관심 딜만 보는가(`?watch=1`) — 비로그인이면 담은 딜이 없어 빈 목록이 된다 */
+  watch: boolean;
 }
 
 /**
@@ -52,6 +55,7 @@ export function useBoardFilters(): BoardFilters {
       league: parseTransferLeague(searchParams.get("league") ?? undefined),
       sort: parseTransferSort(searchParams.get("sort") ?? undefined),
       club: parseTransferClub(searchParams.get("club") ?? undefined),
+      watch: parseTransferWatch(searchParams.get("watch") ?? undefined),
     }),
     [searchParams],
   );

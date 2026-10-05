@@ -7,6 +7,8 @@
 //    없지만 서버 page가 `lib/stage` 직접 경로로 쓴다(og description). `check:conventions`가 이 유형을
 //    **잡지 못하므로**(상대 경로 소비도 "현역"으로 센다) 손으로 지킨다.
 export type {
+  // 응원 구단(조회·고르는 화면·쓰기 훅)이 구단 한 건을 주고받는다
+  TransferClub,
   TransferDeal,
   TransferDealListItem,
   TransferGroupKey,
@@ -25,7 +27,12 @@ export {
   useTransferDealListQuery,
   useTransferDealQuery,
   useTransferReportsQuery,
+  // 응원 구단 — 5대 리그 구단 목록과 내가 고른 구단. 쓰기는 `features/follow-club`
+  useTransferClubListQuery,
+  useFollowedClubsQuery,
 } from "./api/queries";
+// ⚠ 구단을 늘어놓는 순서(정식명순)의 단일 소스 — 낙관적 갱신이 조회와 같은 순서로 끼워 넣어야 항목이 튀지 않는다
+export { compareClubs } from "./api/mappers";
 // ⚠ 구간 순서·라벨은 구간 점프 칩(빈 구간도 0건으로 그린다)이 직접 돈다 — `groupDeals`는 빈 구간을 뺀다
 export { GROUP_LABEL, GROUP_ORDER } from "./lib/stage";
 // ⚠ 정렬 → 분류 순서다. 안정 정렬·빈 구간 제외 규칙을 이 둘이 단독으로 소유한다
@@ -33,7 +40,15 @@ export { groupDeals, sortDeals } from "./lib/sort";
 // ⚠ 캐러셀 판정(T1 · 3일 이내)의 단일 소스 — 서버 프리페치와 뷰가 같은 함수를 부른다
 export { pickRecentRumors } from "./lib/rumors";
 // ⚠ URL 파라미터 해석과 리그·구단 필터 — 링크가 만드는 주소와 보드가 읽는 주소가 같은 판정을 써야 한다
-export { dealHasClub, dealInLeague, parseTransferClub, parseTransferLeague, parseTransferSort } from "./lib/league";
+export {
+  dealHasClub,
+  dealInLeague,
+  dealIsWatched,
+  parseTransferClub,
+  parseTransferLeague,
+  parseTransferSort,
+  parseTransferWatch,
+} from "./lib/league";
 // ⚠ 루머 구간의 접기 — 식은 루머·열기 상위 판정을 뷰가 다시 짜지 않는다
 export { splitHotRumors } from "./lib/rumor-heat";
 // ⚠ 진행 중 구간의 소구간(합의 임박·협상 중) — 뱃지 톤과 같은 갈림

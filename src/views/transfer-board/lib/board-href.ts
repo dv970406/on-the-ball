@@ -2,7 +2,7 @@ import type { TransferLeague, TransferSort } from "@/entities/transfer";
 import { ROUTES } from "@/shared/config";
 
 /**
- * 보드 URL — 리그·정렬·구단을 쿼리(`?league=`·`?sort=`·`?club=`)로 싣는다. 세 상태는 **URL이 소유한다**
+ * 보드 URL — 리그·정렬·구단·관심을 쿼리(`?league=`·`?sort=`·`?club=`·`?watch=`)로 싣는다. 네 상태는 **URL이 소유한다**
  * (로컬 state면 뒤로가기·공유 링크가 필터를 잃는다).
  *
  * ⚠ **기본값에는 파라미터를 붙이지 않는다** — `?sort=latest`·빈 `?league=`라는 중복 URL을
@@ -13,11 +13,18 @@ import { ROUTES } from "@/shared/config";
  * ⚠ 리그명은 한글이라 `encodeURIComponent`로 싣는다 — 공백이 든 `세리에 A`도 `%20`으로 간다.
  *   해석은 뷰가 주소에서 한다(`useBoardFilters` → `parseTransferLeague`). 모르는 값은 전체로 폴백한다.
  * ⚠ 구단(`?club=`)은 구단 코드(slug)다 — 해석은 `parseTransferClub`, 보드에 없는 구단은 뷰가 전체로 폴백한다.
+ * ⚠ 관심(`?watch=1`)은 켜졌을 때만 붙는다 — 해석은 `parseTransferWatch`. 다른 필터와 함께 걸린다(AND).
  */
-export function boardHref(league: TransferLeague | null, sort: TransferSort, club: string | null = null): string {
+export function boardHref(
+  league: TransferLeague | null,
+  sort: TransferSort,
+  club: string | null = null,
+  watch = false,
+): string {
   const params: string[] = [];
   if (league !== null) params.push(`league=${encodeURIComponent(league)}`);
   if (sort !== "latest") params.push(`sort=${sort}`);
   if (club !== null) params.push(`club=${encodeURIComponent(club)}`);
+  if (watch) params.push("watch=1");
   return params.length === 0 ? ROUTES.transferList : `${ROUTES.transferList}?${params.join("&")}`;
 }

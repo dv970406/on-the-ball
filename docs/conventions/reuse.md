@@ -110,7 +110,7 @@
 - **`formatFee({amount, currency})`** — 이적료 표기(`€95M`). **`formatFeeRange(deal)`** 은 그 딜의 보도 이적료 최소–최대(`€58–95M`, 같으면 한 값). ⚠ `min(prev,fee)–(fee+add)` 공식을 쓰지 않는다 — 하락 딜에서 `€58–58M`로 퇴화한다. 직전 보도 대비 변동폭은 `FeeDelta`가 그린다 — 통화 변환은 하지 않는다(파생기가 `prevFeeAmount`에 같은 통화 값만 넣는다).
 - **`reporterName(report)`** — 보도 주체의 한국어 표기(기자는 전체 이름 "벤 제이콥스", 매체는 매체명 "BBC"). 캐러셀·목록·타임라인이 **이것 하나**를 쓴다 — 소스 등록용 영어 라벨을 화면에 따로 그리면 같은 기자가 화면마다 "Fabrizio Romano"·"파브리지오 로마노"로 갈린다. ⚠ **단일 소스는 `scripts/lib/transfer/reporters.json`** 이다(파이프라인이 TS를 못 읽어 JSON이 원본이다). 우선순위는 `bylines → sources → journalists → attributed_to 원문 → source_id`다. ⚠ **가십 칼럼이 인용한 신문의 보도(`attribution = 'cited'`)는 그보다 먼저 `cited` 표기(없으면 칼럼이 적은 원문 표기)다** — 소스가 BBC Sport 피드여도 BBC의 보도가 아니라서, 소스 표기로 떨어뜨리면 팀토크의 이적설이 "BBC"로 그려진다(운영 실측). 접는 규칙(`citedKey`)은 `reporter.ts` 하나가 갖는다.
 - **`TRANSFER_LEAGUES`** — 리그 시트의 노출 순서(5대 리그). `TransferLeague` 유니온과 `as const satisfies` + 망라성 가드로 서로 대조한다 — DB `transfer_club.league`가 enum이 아니라 `text + check`라 생성 타입에서 못 뽑아 손으로 적었기 때문이다.
-- **`dealInLeague(deal, league)` / `dealHasClub(deal, code)` / `parseTransferLeague(value)` / `parseTransferSort(value)` / `parseTransferClub(value)`** — 리그 필터(출발 **또는** 도착 일치, `null`은 전체) · 구단 필터(출발·행선지·관심 구단 어느 자리든) · URL `?league=`·`?sort=`·`?club=` 해석. 구단은 형식만 검사하고 보드에 없는 코드는 뷰가 전체로 폴백한다(창이 지나 사라진 구단의 공유 링크). ⚠ **모르는 리그는 `null`(전체로 폴백), 모르는 정렬은 `latest`로 폴백** — 파라미터 오염이 404를 양산하면 안 된다(`nextjs.md`의 필터 절). 링크를 만드는 곳과 URL을 해석하는 곳이 갈리면 조용히 어긋나므로 **역방향 판정을 호출부가 직접 짜지 말 것**. 보드는 이 판정을 서버가 아니라 뷰가 주소에서 한다(`views/transfer-board`의 `useBoardFilters`).
+- **`dealInLeague(deal, league)` / `dealHasClub(deal, code)` / `dealIsWatched(deal, watchOnly)` / `parseTransferLeague(value)` / `parseTransferSort(value)` / `parseTransferClub(value)` / `parseTransferWatch(value)`** — 리그 필터(출발 **또는** 도착 일치, `null`은 전체) · 구단 필터(출발·행선지·관심 구단 어느 자리든) · 관심 필터(내가 담은 딜만 — `?watch=1`일 때만 켜진다) · URL `?league=`·`?sort=`·`?club=`·`?watch=` 해석. 구단은 형식만 검사하고 보드에 없는 코드는 뷰가 전체로 폴백한다(창이 지나 사라진 구단의 공유 링크). ⚠ **모르는 리그는 `null`(전체로 폴백), 모르는 정렬은 `latest`로 폴백** — 파라미터 오염이 404를 양산하면 안 된다(`nextjs.md`의 필터 절). 링크를 만드는 곳과 URL을 해석하는 곳이 갈리면 조용히 어긋나므로 **역방향 판정을 호출부가 직접 짜지 말 것**. 보드는 이 판정을 서버가 아니라 뷰가 주소에서 한다(`views/transfer-board`의 `useBoardFilters`).
 - **`splitHotRumors(deals, nowMs, sort)`** — 루머 구간을 펼칠 것(식지 않은 것 중 열기 상위 10건 — 보도 수·최신 보도 공신력·최근성)과 접을 것으로 가른다. 7일 무소식 루머는 점수와 무관하게 접는다. 접힌 행도 HTML에 남기고 `hidden`으로 가린다 — 무한 스크롤·서버 페이지네이션 대신 이 접기가 긴 구간을 감당한다(본문 SSR·구간 점프·스크롤 복원 유지).
 - **`splitProgress(deals)`** — 진행 중 구간을 합의 임박(메디컬·개인 조건·합의) / 협상 중(제안·협상)으로 가른다. 뱃지 톤(`STAGE_STATUS`)과 같은 갈림이라 라벨도 `STATUS_LABEL`을 쓴다.
 - **`groupDeals(deals)` / `sortDeals(deals, sort)`** — 정렬 → 구간 분류. `sortDeals`가 **먼저**다(안정 정렬 — 같은 값끼리는 서버가 준 순서를 유지한다). `groupDeals`는 **빈 구간을 뺀다**(구간 점프 칩은 `GROUP_ORDER`·`GROUP_LABEL`을 직접 돌아 빈 구간도 0건으로 그린다).
@@ -139,6 +139,12 @@
 - `useDeleteComment(dealId)` — 본인 댓글 hard delete. 0행이면 "이미 삭제된 댓글이에요."(실패해도 다시 받아 유령 행을 걷는다). 확인 다이얼로그·항목별 가드는 뷰 model(`use-comment-deletion`)이 갖는다. ⚠ 확인 문구의 답글 수는 **누르는 순간 목록을 다시 받아** 최신 캐시로 세고, 받는 동안에는 확인 버튼을 막는다(`Dialog`의 `confirmDisabled`) — 받기 전 문구로 확정하면 알리지 않은 남의 답글이 cascade로 지워진다.
 - `CommentVoteButtons({ dealId, comment, onSignInRequired })` — 좋아요·싫어요. ⚠ 훅(`useVoteComment`)은 배럴에 없다(버튼이 유일한 호출부). 낙관적 갱신 + 같은 딜의 표를 `scope`로 직렬화 + "목표 표로 수렴"하는 요청 + 실패·0행만 줄 끝에서 한 번 재동기화(그때는 진행 중인 조회가 있어도 새로 받는다 — 표 때문에 조회를 취소하지는 않는다)(`data-and-state.md` 낙관적 업데이트 절). 가드도 `disabled`도 없다.
 - ⚠ 세 슬라이스 모두 비로그인 안내를 직접 띄우지 않는다 — `onSignInRequired`로 올리고 **뷰가 `SignInDialog` 한 벌**을 문구만 바꿔 쓴다.
+
+## `@/features/follow-club`
+- `useToggleClubFollow()` — 응원 구단 고르기·풀기(`mutate({ club, following, userId })`). 낙관적 갱신 + 요청을 `scope`로 한 줄 세우기 + 실패는 그 구단 하나만 되돌리기 + 줄 끝에서 한 번 재동기화(`data-and-state.md`). 가드도 `disabled`도 없고 성공 토스트도 없다 — 누른 줄의 체크가 곧 성공 표시다.
+- ⚠ **`userId`를 호출부가 넘긴다** — 낙관적 갱신이 그 사용자의 캐시 하나만 건드리고, 실행하는 순간의 세션과 대조해 줄 서 있는 동안 바뀐 계정의 요청을 보내지 않는다.
+- ⚠ RPC가 없다 — 카운터가 없어 지킬 불변조건이 `(user_id, club_code)` 기본키 하나뿐이다. 23505는 흡수한다(멱등).
+- 고르는 화면은 `views/profile`의 구단 시트이고, 고른 구단은 보드의 구단 칩 맨 앞에 놓인다(`views/transfer-board`).
 
 ## `@/features/watch-transfer`
 - `WatchToggle({ dealId, watched, onSignInRequired })` — 상세 하단의 관심 토글 하나. 조회는 `@/entities/transfer`다.

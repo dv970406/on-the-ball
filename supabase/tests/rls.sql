@@ -147,7 +147,7 @@ reset role;
 \echo '   ⚠ DELETE는 컬럼 단위 권한이 아니라 has_any_column_privilege가 거부한다'
 \echo '     (unrecognized privilege type) → 그쪽만 has_table_privilege로 본다.'
 \echo '   ⚠ authenticated의 INSERT/UPDATE는 여기서 세지 않는다 — 정상 기능이 그걸로 돈다.'
-\echo '     대신 **DELETE와 TRUNCATE**를 본다(관심·댓글·댓글 표만 정당한 DELETE 대상이다).'
+\echo '     대신 **DELETE와 TRUNCATE**를 본다(정당한 DELETE 대상은 아래 질의의 목록이 전부다).'
 \echo '[0행 기대] RLS가 꺼졌거나 anon에 쓰기 권한이 남은 테이블'
 select c.relname,
        c.relrowsecurity                                          as rls_on,
@@ -166,13 +166,13 @@ select c.relname,
         or has_table_privilege('anon', c.oid, 'DELETE')
         or has_table_privilege('anon', c.oid, 'TRUNCATE')
         or has_table_privilege('authenticated', c.oid, 'TRUNCATE')
-        -- 아래 셋만 정당하다 — 전부 자기 행만 지우는 DELETE 정책이 있다.
+        -- 아래만 정당하다 — 전부 자기 행만 지우는 DELETE 정책이 있다.
         --   transfer_deal_watch(관심 빼기) · transfer_deal_comment(내 댓글 삭제) ·
-        --   transfer_deal_comment_vote(표 거두기)
+        --   transfer_deal_comment_vote(표 거두기) · transfer_club_follow(응원 구단 풀기)
         -- 새 테이블에 DELETE를 열면 여기 이름을 더하고 사유를 적는다.
         or (has_table_privilege('authenticated', c.oid, 'DELETE')
             and c.relname not in ('transfer_deal_watch', 'transfer_deal_comment',
-                                  'transfer_deal_comment_vote')));
+                                  'transfer_deal_comment_vote', 'transfer_club_follow')));
 
 \echo '-- 17b. RLS는 켜졌는데 정책이 하나도 없는 테이블 (전면 차단이 의도인지 확인 필요)'
 \echo '[0행 기대] 정책이 없는 RLS 테이블'
@@ -1780,6 +1780,95 @@ select exists (select 1 from public.transfer_deal where id = :tdc2);
 rollback to s;
 
 rollback to s39;
+
+-- ---------------------------------------------------------------------
+\echo ''
+\echo '=== 40. 응원 구단 (20261005000001) ==='
+\echo '  설계 요약: transfer_club_follow는 관심(transfer_deal_watch)과 같은 형태다 — 복합 PK, 자기 행만'
+\echo '  SELECT·INSERT·DELETE, UPDATE 경로 없음. 다른 점은 anon에 SELECT grant조차 없다는 것이다'
+\echo '  (공개 목록에 임베딩되지 않는다 — 로그인 사용자의 전용 조회로만 읽는다).'
+\echo '  ⚠ 시드는 테스트 전용 구단 코드(rlstest-*)다 — 파생기가 넣은 실제 구단과 섞이지 않게.'
+savepoint s40;
+
+insert into public.transfer_club (code, canonical, name, short_name, league)
+values ('rlstest-f1', 'RLS Follow One', '팔로우 하나', 'F1', '프리미어리그'),
+       ('rlstest-f2', 'RLS Follow Two', '팔로우 둘',   'F2', '라리가');
+
+-- bob의 응원 구단 — "내 행만 보인다"의 상대역 (superuser로 넣는다)
+insert into public.transfer_club_follow (user_id, club_code) values (:'bob', 'rlstest-f1');
+
+savepoint s; :login_alice
+\echo '[❌차단] 남(bob) 명의로 응원 구단을 고른다'
+insert into public.transfer_club_follow (user_id, club_code) values (:'bob', 'rlstest-f2');
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[❌차단] 비로그인이 응원 구단을 고른다'
+insert into public.transfer_club_follow (user_id, club_code) values (:'alice', 'rlstest-f1');
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[❌차단] 비로그인이 응원 구단을 읽는다 — anon에는 SELECT grant가 없다(관심과 다르다)'
+select count(*) from public.transfer_club_follow;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] created_at을 실어 시각 위조 — insert grant 목록 밖이다'
+insert into public.transfer_club_follow (user_id, club_code, created_at) values (:'alice', 'rlstest-f1', now() - interval '1 year');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 없는 구단을 고른다 — FK(23503)'
+insert into public.transfer_club_follow (user_id, club_code) values (:'alice', 'rlstest-none');
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_club_follow (user_id, club_code) values (:'alice', 'rlstest-f1');
+\echo '[❌차단] 같은 구단을 두 번 고른다 — 복합 PK(23505, 훅이 멱등으로 흡수한다)'
+insert into public.transfer_club_follow (user_id, club_code) values (:'alice', 'rlstest-f1');
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_club_follow (user_id, club_code) values (:'alice', 'rlstest-f1');
+\echo '[❌차단] 행 UPDATE(다른 구단으로 옮기기) — 정책도 컬럼 권한도 없다(풀기는 delete)'
+update public.transfer_club_follow set club_code = 'rlstest-f2' where user_id = :'alice';
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_club_follow (user_id, club_code) values (:'alice', 'rlstest-f2');
+\echo '[1 / 0 기대] 내 응원 구단은 보이고 남(bob)의 것은 0행이다'
+select (select count(*) from public.transfer_club_follow where user_id = :'alice') as mine,
+       (select count(*) from public.transfer_club_follow where user_id = :'bob')   as others;
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_club_follow (user_id, club_code) values (:'alice', 'rlstest-f2');
+\echo '[rlstest-f2 기대] 구단 행 임베딩 — 필터 없이 읽어도 내가 고른 구단만 온다(앱의 조회와 같은 모양)'
+select c.code
+  from public.transfer_club_follow f
+  join public.transfer_club c on c.code = f.club_code;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '    ⚠ DELETE의 using 절은 필터로 동작한다 — 권한이 없으면 에러가 아니라 0행이다.'
+\echo '[DELETE 0 기대] 남(bob)의 응원 구단은 지워지지 않는다'
+delete from public.transfer_club_follow where user_id = :'bob';
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_club_follow (user_id, club_code) values (:'alice', 'rlstest-f1');
+\echo '[DELETE 1 기대] 내 응원 구단은 푼다'
+delete from public.transfer_club_follow where user_id = :'alice' and club_code = 'rlstest-f1';
+rollback to s;
+
+savepoint s;
+\echo '    (superuser — 구단 행이 사라지는 경로. 파생기는 구단을 지우지 않지만 FK의 동작을 못박아 둔다)'
+delete from public.transfer_club where code = 'rlstest-f1';
+\echo '[0 기대] 구단을 지우면 그 구단의 응원 행이 함께 사라진다 (cascade)'
+select count(*) from public.transfer_club_follow where club_code = 'rlstest-f1';
+rollback to s;
+
+rollback to s40;
 
 rollback;
 \echo ''

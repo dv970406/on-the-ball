@@ -49,6 +49,7 @@ pnpm db:types   # supabase gen types --local --schema public > src/types/databas
 
 ```
 transfer_deal · transfer_deal_watch · transfer_deal_suitor   ← watch·suitor는 deal에 딸린다
+transfer_club · transfer_club_follow                          ← follow는 club에 딸린다
 ```
 
 **판정은 취향이 아니라 컬럼이 한다** — 그 테이블의 PK·FK가 부모를 향하면 종속이다.
@@ -510,6 +511,9 @@ writer는 `scripts/lib/transfer/derive-deals.mjs`(`scripts/sync-transfer-news.mj
   `transfer_club` 행을 딜보다 먼저 upsert한다(FK 방향). 프리셋 밖 구단은 정규 영문명을
   slugify한 코드로 들어가고, 그 코드의 엠블럼 파일이 없으면 화면이 약칭 모노그램으로 떨어진다
   (`Crest`의 폴백).
+  ⚠ **표시 프리셋의 구단은 딜에 나오지 않아도 전부 쓴다**(`clubRowsToWrite`). 응원 구단(`transfer_club_follow`)이
+  이 표를 FK로 잡고 고르는 화면이 5대 리그 구단을 이 표에서 읽는다 — 딜이 아직 없는 구단도 고를 수 있어야 한다
+  (그 구단의 첫 딜을 알리는 것이 응원 구단의 쓸모다). 값이 그대로인 행은 쓰지 않으므로 매시 비용은 조회뿐이다.
 - **옵션 통화 일치**: `add_on_amount`는 그 딜의 `fee_currency`와 같은 통화로 잡힌 값만 쓴다 —
   통화가 다른 옵션을 섞으면 금액이 거짓말을 한다.
 - **삭제 규칙**: 딜은 **삭제하지 않고 다시 파생한다** — 범위 밖으로 나간 딜은 화면의 범위
@@ -570,6 +574,17 @@ writer는 `scripts/lib/transfer/derive-deals.mjs`(`scripts/sync-transfer-news.mj
   빼면 목록 select의 관심 임베딩이 42501로 죽어 비로그인에게 보드가 통째로 안 보인다 —
   anon은 정책에서 걸려 항상 빈 배열(= `isWatched` false)을 받을 뿐이다.
 - 딜이 지워지면(`report_count`가 0이 된 재파생) 관심도 함께 사라진다(`on delete cascade`).
+
+### `transfer_club_follow` — 응원 구단은 관심과 같은 형태다
+
+`(user_id, club_code)` 복합 PK · 본인 행만 SELECT·INSERT·DELETE · UPDATE 정책 없음 · 23505는 흡수 · `created_at`은
+INSERT grant 밖 — 전부 `transfer_deal_watch`와 같고, RPC가 없는 이유도 같다(카운터가 없다).
+
+- ⚠ **anon에는 SELECT grant조차 없다**(관심과 다른 점). 관심은 공개 목록 select에 임베딩되어 grant가 통로였지만,
+  응원 구단은 로그인 사용자의 전용 조회(`buildFollowedClubsQuery`)로만 읽는다 → 세션이 실린 클라이언트로만 부른다.
+- 조회는 유저 필터를 걸지 않는다 — SELECT 정책이 "내 행만"이라 필터가 곧 정책이다(관심 임베딩과 같은 구조).
+- 구단 FK가 `transfer_club`을 잡는다 → 그 표에 5대 리그 구단이 전부 있어야 고를 수 있다(위 딜 파생 절의 "구단").
+- 읽는 쪽: 보드(구단 칩의 순서)와 알림 발송(그 구단이 걸린 딜의 소식을 받을 사람).
 
 ### `transfer_deal_comment` — 딜 댓글 · 좋아요/싫어요
 
@@ -700,7 +715,7 @@ end if;
 
 | 자리 | 처리 | 왜 |
 |---|---|---|
-| 관심 담기(`transfer_deal_watch`) | 훅이 23505를 **성공으로 흡수** | 이미 담은 딜을 또 담으면 목표 상태 그대로다 — 멱등이 맞다 |
+| 관심 담기(`transfer_deal_watch`) · 응원 구단 고르기(`transfer_club_follow`) | 훅이 23505를 **성공으로 흡수** | 이미 담은 딜·고른 구단을 또 누르면 목표 상태 그대로다 — 멱등이 맞다 |
 | 댓글 표 던지기(`transfer_deal_comment_vote`) | 훅이 23505를 받으면 **`value` UPDATE로 이어 간다** | 다른 탭이 이미 표를 던졌다 — 목표 표로 맞추면 된다(흡수의 변형: 행은 있으니 값만 수렴시킨다) |
 | "접수했어요"류 쓰기 | 트리거가 **P0001로 설명** | 같은 접수를 두 번 "접수했어요"라고 말하면 거짓말이다 |
 
@@ -1035,6 +1050,8 @@ cascade 삭제는 RI(참조 무결성) **내부 트리거**가 수행하므로 �
 정책의 간접 우회로다.
 
 - `transfer_deal_suitor` — 딜의 관심 구단. 딜이 지워지면 함께 사라진다(파생 데이터라 잃을 것이 없다).
+- `transfer_club_follow.club_code` — 구단 행이 지워지면 그 구단의 응원 행이 함께 사라진다. 파생은 구단을 지우지
+  않는다 — 구단을 정리하는 작업을 만들려면 "누구의 응원 구단까지 지우는가"를 먼저 따진다.
 - `transfer_deal_watch` — 재파생이 딜을 지우면 모든 사용자의 관심이 함께 사라진다.
   딜이 없어졌으니 관심도 뜻을 잃는다는 판단으로 **수용한 트레이드오프**다.
   ⚠ 같은 딜에 매달린 **댓글은 반대로 `restrict`다** — 사용자가 쓴 글은 뜻을 잃지 않는다(위 댓글 절).

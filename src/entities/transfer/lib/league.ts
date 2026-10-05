@@ -44,6 +44,19 @@ export function parseTransferClub(value: string | undefined): string | null {
   return value !== undefined && CLUB_CODE.test(value) ? value : null;
 }
 
+/**
+ * URL `?watch=` → 관심 딜만 보는가. `1`일 때만 켜진다 — 그 밖의 값·없음은 꺼짐(전체)이다.
+ * ⚠ 링크는 `watch=1`만 만든다(`boardHref`) — 받는 쪽도 그 값만 받아 같은 필터의 별칭 URL을 늘리지 않는다.
+ */
+export function parseTransferWatch(value: string | undefined): boolean {
+  return value === "1";
+}
+
+/** 관심 필터 — 켜져 있으면 내가 담은 딜만. 비로그인은 `isWatched`가 늘 false라 빈 목록이 된다 */
+export function dealIsWatched(deal: Pick<TransferDeal, "isWatched">, watchOnly: boolean): boolean {
+  return !watchOnly || deal.isWatched;
+}
+
 /** 구단 필터 — 출발·행선지·관심 구단(`suitorCodes`) 어느 자리에든 그 구단이 있으면 포함. `null`은 전체 */
 export function dealHasClub(
   deal: Pick<TransferDeal, "fromClub" | "toClub" | "suitors">,

@@ -4,6 +4,7 @@ import { type ReactNode, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import {
   StatusBadge,
+  type TransferClub,
   type TransferDeal,
   type TransferReport,
   TransferCrest,
@@ -63,12 +64,11 @@ function RouteCell({
   className,
 }: {
   label: string;
-  // ⚠ `TransferClub`은 배럴에 없다(슬라이스 밖 소비자가 없어 올리지 않았다) — 딜의 필드 타입으로 받는다
-  club: TransferDeal["fromClub"];
+  club: TransferClub | null;
   /** 칸에 쓸 글자 — 구단이 없을 때의 문구(`FA`·`미확인`·`미정`)까지 `routeLabels`가 정한다. 구단이 여럿이면 쓰지 않는다(아래) */
   text: string;
   /** 행선지 칸의 구단들 — 둘 이상이면 한 줄에 하나씩 전부 적는다(여러 구단이 노리는 루머) */
-  clubs?: TransferDeal["suitors"];
+  clubs?: TransferClub[];
   className?: string;
 }) {
   const listed = clubs && clubs.length > 1 ? clubs : null;

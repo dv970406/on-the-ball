@@ -1,8 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import {
+  CLUB_LIST_SELECT,
   DEAL_DETAIL_SELECT,
   DEAL_LIST_SELECT,
+  FOLLOWED_CLUB_SELECT,
   REPORT_SELECT,
   TRANSFER_DEAL_LIMIT,
 } from "./mappers";
@@ -54,4 +56,22 @@ export function buildReportsQuery(supabase: SupabaseClient<Database>, dealId: nu
     .select(REPORT_SELECT)
     .eq("deal_id", dealId)
     .order("published_at", { ascending: false });
+}
+
+/**
+ * 5대 리그 구단 전부 — 응원 구단을 고르는 화면의 목록.
+ * ⚠ 리그가 있는 행만 받는다 — `transfer_club`에는 보도에 스친 하부 리그·타 대륙 구단도 들어 있다(엠블럼도 한국어 표기도 없다).
+ *   5대 리그 구단은 파생이 표시 프리셋에서 전부 채워 둔다(딜이 없는 구단도 있다 — `api-and-db.md`).
+ */
+export function buildClubListQuery(supabase: SupabaseClient<Database>) {
+  return supabase.from("transfer_club").select(CLUB_LIST_SELECT).not("league", "is", null);
+}
+
+/**
+ * 내 응원 구단.
+ * ⚠ **유저 필터를 걸지 않는다** — SELECT 정책이 "내 행만"이라 필터가 곧 정책이다. 그래서 세션이 실린 클라이언트로만
+ *   부른다(anon에는 이 표의 SELECT grant가 없어 42501이다 — 비로그인 경로에서 부르지 않는다).
+ */
+export function buildFollowedClubsQuery(supabase: SupabaseClient<Database>) {
+  return supabase.from("transfer_club_follow").select(FOLLOWED_CLUB_SELECT);
 }

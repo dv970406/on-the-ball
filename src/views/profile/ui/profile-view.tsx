@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Camera, LogOut } from "lucide-react";
 import { ROUTES, avatarUrl } from "@/shared/config";
 import { Avatar, Button, EmptyState, Icon, Skeleton, StaleBanner, TextField } from "@/shared/ui";
@@ -12,6 +13,8 @@ import { NICKNAME_LIMIT } from "@/features/update-profile";
 import { useAvatarUpload } from "../model/use-avatar-upload";
 import { useLinkReturn } from "../model/use-link-return";
 import { useNicknameForm } from "../model/use-nickname-form";
+import { ClubPickerSheet } from "./club-picker-sheet";
+import { FollowedClubs } from "./followed-clubs";
 import { LinkedAccounts } from "./linked-accounts";
 
 interface ProfileViewProps {
@@ -53,6 +56,8 @@ export function ProfileView({
    *   두 이동이 경합한다. 사유는 `entities/session`의 `lib/sign-out-intent` 주석.
    */
   const signOut = useSignOut();
+  /** 응원 구단 고르는 시트 — 스크롤 영역 밖(프레임 직속)에 렌더해야 해서 열림 상태를 여기서 갖는다 */
+  const [clubPickerOpen, setClubPickerOpen] = useState(false);
 
   const header = <SubHeader title="프로필" fallbackHref={ROUTES.transferList} />;
   /**
@@ -219,6 +224,9 @@ export function ProfileView({
           </>
         )}
 
+        {/* 응원 구단 — 자기 쿼리를 갖고 프로필과 동시에 출발한다 */}
+        <FollowedClubs userId={user?.id} onOpenPicker={() => setClubPickerOpen(true)} />
+
         {/* 로그인 수단 */}
         <LinkedAccounts userId={user?.id} />
 
@@ -259,6 +267,13 @@ export function ProfileView({
         </section>
       </main>
       {tabBar}
+
+      {/* ⚠ `<main>` **밖**이다 — `Sheet`가 `absolute`라 스크롤 영역 안에 두면 스크롤한 만큼 화면 밖에 뜬다 */}
+      <ClubPickerSheet
+        open={clubPickerOpen}
+        onClose={() => setClubPickerOpen(false)}
+        userId={user?.id}
+      />
     </>
   );
 }

@@ -57,6 +57,39 @@ export type Database = {
         }
         Relationships: []
       }
+      transfer_club_follow: {
+        Row: {
+          club_code: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          club_code: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          club_code?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transfer_club_follow_club_code_fkey"
+            columns: ["club_code"]
+            isOneToOne: false
+            referencedRelation: "transfer_club"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "transfer_club_follow_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transfer_deal: {
         Row: {
           add_on_amount: number | null

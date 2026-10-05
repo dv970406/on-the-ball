@@ -63,6 +63,15 @@ export const DEAL_DETAIL_SELECT =
 /** 상세의 보도 타임라인 — 딜에 묶인 보도 전부(정렬은 `list-query.ts`) */
 export const REPORT_SELECT = `${REPORT_COLUMNS}` as const;
 
+/** 구단 목록 — 응원 구단을 고르는 화면이 5대 리그 구단을 이 모양으로 받는다(범위는 `list-query.ts`) */
+export const CLUB_LIST_SELECT = `${CLUB_COLUMNS}` as const;
+
+/**
+ * 내 응원 구단 — 자식 행(`transfer_club_follow`)에 구단 행을 임베딩한다.
+ * ⚠ SELECT 정책이 "내 행만"이라 **필터 없이도 내 것만 온다**(관심 임베딩과 같은 구조 — 필터를 잊어 남의 행이 새는 길이 없다).
+ */
+export const FOLLOWED_CLUB_SELECT = `club:transfer_club(${CLUB_COLUMNS})` as const;
+
 type ClubSelectRow = Pick<TransferClubRow, "code" | "name" | "short_name" | "league">;
 
 /**
@@ -84,6 +93,33 @@ export function buildClub(row: ClubSelectRow | null): TransferClub | null {
     shortName: row.short_name,
     league: toLeague(row.league),
   };
+}
+
+/** 구단을 화면에 늘어놓는 순서 — 정식명 가나다순. 목록·응원 구단·낙관적 갱신이 같은 순서를 써야 항목이 튀지 않는다 */
+export function compareClubs(a: TransferClub, b: TransferClub): number {
+  return a.name.localeCompare(b.name, "ko");
+}
+
+/**
+ * 구단 목록 → 5대 리그 구단(정식명순).
+ * ⚠ 조회가 이미 리그 있는 행만 받지만 여기서 한 번 더 거른다 — CHECK 밖의 리그명은 `toLeague`가 `null`로 접는데,
+ *   그런 구단이 리그 없는 채로 고르는 화면에 섞이면 어느 묶음에도 들지 못한다.
+ */
+export function buildClubList(rows: ClubSelectRow[]): TransferClub[] {
+  return rows
+    .flatMap((row) => buildClub(row) ?? [])
+    .filter((club) => club.league !== null)
+    .sort(compareClubs);
+}
+
+/** `FOLLOWED_CLUB_SELECT`가 돌려주는 행 */
+export interface FollowedClubSelectRow {
+  club: ClubSelectRow | null;
+}
+
+/** 내 응원 구단(정식명순) */
+export function buildFollowedClubs(rows: FollowedClubSelectRow[]): TransferClub[] {
+  return rows.flatMap((row) => buildClub(row.club) ?? []).sort(compareClubs);
 }
 
 /** `REPORT_COLUMNS`가 돌려주는 행 — 컬럼 타입은 생성 타입에서 뽑는다 */

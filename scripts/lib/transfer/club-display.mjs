@@ -61,7 +61,7 @@ export function clubCode(canonical) {
   return p && typeof p === "object" && p.code ? p.code : null;
 }
 
-/** 프리셋에 오른 정규 영문명 목록(검사용) */
+/** 프리셋에 오른 정규 영문명 목록 — 검사와, 구단 표에 프리셋 구단 전부를 써 두는 파생(`clubRowsToWrite`)이 쓴다 */
 export function presetClubs() {
   return Object.keys(load().presets).filter((k) => !k.startsWith("_"));
 }

@@ -42,7 +42,7 @@
 
 | 페이지 | 조회하는 이유 | `cache()` |
 |---|---|---|
-| `app/transfers/page.tsx` | 이적 보드 목록 SSR | 지금은 불필요(메타데이터가 정적). **감싸 둔 이유는 `generateMetadata`를 동적으로 바꾸는 순간 2회가 되기 때문**이다. ⚠ 인자를 받게 되면 **원시값**으로 받는다(객체는 매 호출 새 참조라 중복이 없어지지 않는다). ⚠ 세션이 없으면 **익명 클라이언트**다(`hasSessionCookie()` 갈림) — 관심 임베딩이 "내 행만"이라 익명은 항상 빈 배열(= `isWatched` false)로 모든 요청에 같다. ⚠ 보드 범위 시작(`boardScopeStartMs`)은 **분 단위로 내린 ISO**로 조회·쿼리 키에 싣는다(ms면 익명 Data Cache가 매번 미스한다). `nowMs`는 Data Cache 밖(요청마다)에서 찍는다 |
+| `app/transfers/page.tsx` | 이적 보드 목록 SSR | 지금은 불필요(메타데이터가 정적). **감싸 둔 이유는 `generateMetadata`를 동적으로 바꾸는 순간 2회가 되기 때문**이다. ⚠ 인자를 받게 되면 **원시값**으로 받는다(객체는 매 호출 새 참조라 중복이 없어지지 않는다). ⚠ 세션이 없으면 **익명 클라이언트**다(`hasSessionCookie()` 갈림) — 관심 임베딩이 "내 행만"이라 익명은 항상 빈 배열(= `isWatched` false)로 모든 요청에 같다. ⚠ 보드 범위 시작(`boardScopeStartMs`)은 **분 단위로 내린 ISO**로 조회·쿼리 키에 싣는다(ms면 익명 Data Cache가 매번 미스한다). `nowMs`는 Data Cache 밖(요청마다)에서 찍는다. ⚠ **내 응원 구단은 세션이 있을 때만 함께 읽는다**(쿠키 클라이언트) — 익명에는 그 표의 SELECT grant가 없고, 익명 경로의 조회는 Data Cache를 타므로 사용자별 값을 실으면 안 된다 |
 | `app/transfers/[id]/page.tsx` | `<title>`·`og:*` + 404 판정 + **딜·보도 타임라인·댓글 SSR** | **필수** — `generateMetadata`와 `Page`가 같은 데이터를 쓴다. ⚠ **쿠키 클라이언트다**(익명 갈림이 없다) — `transfer_deal_watch(user_id)` 임베딩이 "내 행만"이라 응답이 사용자별이라 캐시할 수 없다 |
 | `app/sitemap.ts` | 목록·**이적 딜** URL 열거 | 불필요 — 소비자가 하나이고 `generateMetadata`가 없다. ⚠ **쿠키를 보지 않고 항상 익명 클라이언트다** — 크롤러가 읽는 문서라 누가 열든 공개분만 담아야 한다. 그래서 빌드 로그에 **`○`(정적) + `30s`** 로 찍힌다 — 쿠키를 읽지 않아 라우트가 통째로 프리렌더되고 `ANON_REVALIDATE`가 ISR 주기가 된다. **아래 "동적이어야 할 라우트가 `○`면 가드가 삼킨 것"의 예외가 이 행이다** — 쿠키를 읽지 않는 라우트만 `○`가 정상이다 |
 
@@ -162,7 +162,7 @@ Router Cache는 **URL로만 키가 잡히고 세션은 키에 들어가지 않�
 
 | 화면 | 서버가 조립하는 것 |
 |---|---|
-| `app/transfers/page.tsx` | 이적 딜 목록(범위 안 전부 — 필터와 무관하다. 리그·정렬·구단은 뷰가 주소에서 읽어 계산한다) (+ `userId` · **서버 시각** · `scopeStartIso`) |
+| `app/transfers/page.tsx` | 이적 딜 목록(범위 안 전부 — 필터와 무관하다. 리그·정렬·구단·관심은 뷰가 주소에서 읽어 계산한다) + 내 응원 구단(로그인 사용자만 — 구단 칩의 순서가 이 값을 본다) (+ `userId` · **서버 시각** · `scopeStartIso`) |
 | `app/transfers/[id]/page.tsx` | 딜 + 보도 타임라인 전체 + 댓글(최신 `COMMENT_LIST_LIMIT`건 — 탭 두 개를 모두 그린다) (+ `userId` · **서버 시각**) |
 
 - ⚠ **`initialData`에는 서버가 읽은 시각을 함께 준다**(`initialDataUpdatedAt: () => serverToClientTime(serverNowMs)` —
@@ -248,7 +248,7 @@ Router Cache는 **URL로만 키가 잡히고 세션은 키에 들어가지 않�
 | | 성격 | 처리 |
 |---|---|---|
 | 닫힌 큐레이션 분류 | 그 자체가 검색 착지점 — 고유 `<title>`·H1을 가질 자격이 있다 | 색인 대상 → **path** |
-| 같은 집합의 순서·부분집합 (이적 보드의 `?sort=`·`?league=`·`?club=`) | 중복이다 | **query + canonical** |
+| 같은 집합의 순서·부분집합 (이적 보드의 `?sort=`·`?league=`·`?club=`·`?watch=`) | 중복이다 | **query + canonical** |
 
 path로 둘 수 있는 것은 **닫힌 유한 분류**(DB enum 같은)뿐이다 — 조합이 터지지 않기 때문이다.
 열린 조합 패싯을 path로 만들면 크롤 트랩이 된다 → **닫힌 큐레이션 분류 = path / 열린 조합 패싯 = query.**

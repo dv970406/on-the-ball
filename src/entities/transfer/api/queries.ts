@@ -3,13 +3,26 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
 import type {
+  TransferClub,
   TransferDeal,
   TransferDealListItem,
   TransferReport,
 } from "../model/types";
 import { transferKeys } from "./keys";
-import { buildDealListQuery, buildDealQuery, buildReportsQuery } from "./list-query";
-import { buildDeal, buildDealListItem, buildReport } from "./mappers";
+import {
+  buildClubListQuery,
+  buildDealListQuery,
+  buildDealQuery,
+  buildFollowedClubsQuery,
+  buildReportsQuery,
+} from "./list-query";
+import {
+  buildClubList,
+  buildDeal,
+  buildDealListItem,
+  buildFollowedClubs,
+  buildReport,
+} from "./mappers";
 
 /**
  * 서버 프리페치의 신선도 — 세 조회가 같은 뜻으로 받는다.
@@ -142,5 +155,69 @@ export function useTransferReportsQuery({
       return (data ?? []).map(buildReport);
     },
     enabled: enabled && Number.isSafeInteger(dealId) && dealId > 0,
+  });
+}
+
+/** 구단 표는 파생이 표시 프리셋에서 채우는 운영 데이터다 — 한 세션 안에서 바뀔 일이 없어 길게 잡는다 */
+const CLUB_LIST_STALE_MS = 60 * 60_000;
+
+/**
+ * 5대 리그 구단 전부(정식명순) — 응원 구단을 고르는 화면이 연다.
+ * ⚠ "나"에 종속되지 않는다 — 누가 불러도 같은 목록이라 키에 유저가 없다.
+ */
+export function useTransferClubListQuery({ enabled = true }: { enabled?: boolean } = {}) {
+  return useQuery<TransferClub[], Error>({
+    queryKey: transferKeys.clubs(),
+    queryFn: async () => {
+      const supabase = requireBrowserSupabase();
+      const { data, error } = await buildClubListQuery(supabase);
+      if (error) {
+        console.error("[transfer] 구단 목록 조회 실패:", error);
+        throw new Error(toDbErrorMessage(error));
+      }
+      return buildClubList(data ?? []);
+    },
+    enabled,
+    staleTime: CLUB_LIST_STALE_MS,
+  });
+}
+
+interface UseFollowedClubsQueryArgs extends PrefetchFreshness {
+  /** 로그인 사용자 — 없으면 조회하지 않는다(비로그인에게는 응원 구단이 없다) */
+  userId: string | undefined;
+  enabled?: boolean;
+  /** 서버 프리페치 — ⚠ 서버가 **같은 사용자**로 읽은 것만 넣는다(키가 userId로 스코프된다) */
+  initialData?: TransferClub[];
+}
+
+/**
+ * 내 응원 구단(정식명순).
+ *
+ * ⚠ `userId`를 인자로 받는다 — entities끼리는 import할 수 없어 세션을 아는 상위 레이어가 넘긴다(`useProfileQuery`와 같다).
+ * ⚠ 보드는 이 값으로 구단 칩의 순서를 정한다 → 클라이언트에서만 받으면 하이드레이션 뒤에 칩이 자리를 바꾼다.
+ *   그래서 보드 page가 쿠키 세션으로 함께 읽어 `initialData`로 내린다(`nextjs.md` "사용자별 상태도 끝까지 서버가 그린다").
+ */
+export function useFollowedClubsQuery({
+  userId,
+  enabled = true,
+  initialData,
+  initialDataUpdatedAt,
+}: UseFollowedClubsQueryArgs) {
+  return useQuery<TransferClub[], Error>({
+    initialData,
+    initialDataUpdatedAt,
+    queryKey: transferKeys.follows(userId ?? ""),
+    queryFn: async () => {
+      // ⚠ `!`를 쓰지 않는다 — 아래 `enabled`와 떨어져 있어 한쪽만 고치면 조용히 깨진다
+      if (!userId) throw new Error("로그인이 필요해요.");
+      const supabase = requireBrowserSupabase();
+      const { data, error } = await buildFollowedClubsQuery(supabase);
+      if (error) {
+        console.error("[transfer] 응원 구단 조회 실패:", error);
+        throw new Error(toDbErrorMessage(error));
+      }
+      return buildFollowedClubs(data ?? []);
+    },
+    enabled: enabled && !!userId,
   });
 }
