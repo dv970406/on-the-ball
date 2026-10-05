@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
-import { hasVisibleChar, lengthOverflow, useToast, type TextLimit } from "@/shared/lib";
+import { hasVisibleChar, lengthOverflow, track, useToast, type TextLimit } from "@/shared/lib";
 import { commentKeys, refreshCommentLists } from "@/entities/comment";
 import { useSessionStore } from "@/entities/session";
 
@@ -87,6 +87,8 @@ export function useWriteComment(dealId: number) {
     // ⚠ 토스트는 **리페치가 끝난 뒤** 낸다 — 먼저 내면 느린 회선에서 "등록했어요"가 나오고 2~3초 동안
     //   목록에 새 댓글이 없다(QA 실측). 호출부의 최신순 전환(per-call onSuccess)과도 같은 순간이 된다.
     onSuccess: async (_data, { parentId }) => {
+      // 리페치를 기다리기 전에 센다 — 이벤트는 "등록이 일어났다"이지 목록이 갱신됐다가 아니다
+      track("comment_write", { deal_id: dealId, is_reply: parentId !== null });
       await refreshCommentLists(queryClient, dealId);
       if (parentId === null) toast("댓글을 등록했어요");
     },

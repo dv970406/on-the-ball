@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
-import { useToast } from "@/shared/lib";
+import { track, useToast } from "@/shared/lib";
 import {
   applyVote,
   commentKeys,
@@ -159,6 +159,7 @@ export function useVoteComment(dealId: number) {
       // 이 표보다 먼저 시작해 나중에 도착하는 조회가 이 표를 빠뜨려도 다시 입힐 수 있게 기억한다
       recordSettledVote(dealId, { commentId, userId, next });
       if (resync) needsResync.add(dealId);
+      track("comment_vote", { deal_id: dealId, value: next });
     },
 
     onError: (error, { commentId, userId }, rollback) => {

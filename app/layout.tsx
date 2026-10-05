@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import { jetbrainsMono } from "@/app/fonts";
 import { AppProviders } from "@/app/providers";
 import { env } from "@/shared/config";
@@ -91,6 +92,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </AppProviders>
       </body>
+      {/*
+        GA4 — 측정 ID가 있을 때만 싣는다(로컬·프리뷰는 비워 둔다). 스크립트는 하이드레이션 뒤에 내려오고
+        (`next/script`의 기본 전략), 화면 조회는 gtag가 주소 변화를 스스로 센다. 그 밖의 이벤트는
+        `track`(`@/shared/lib`) 하나로 보낸다.
+      */}
+      {env.gaId && <GoogleAnalytics gaId={env.gaId} />}
     </html>
   );
 }

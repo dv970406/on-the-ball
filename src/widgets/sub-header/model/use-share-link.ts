@@ -1,6 +1,7 @@
 "use client";
 
-import { useToast } from "@/shared/lib";
+import { ROUTES } from "@/shared/config";
+import { track, useToast } from "@/shared/lib";
 
 /**
  * 현재 화면의 링크 공유 — Web Share API가 있으면 OS 시트, 없으면 클립보드 복사.
@@ -17,6 +18,8 @@ export function useShareLink(title: string) {
 
   return async () => {
     const url = window.location.href;
+    // 분석용 분류 — 딜 상세의 공유가 이 버튼의 본래 쓰임이고, 그 밖의 화면은 한데 묶는다
+    const contentType = window.location.pathname.startsWith(`${ROUTES.transferList}/`) ? "deal" : "page";
 
     // ⚠ 공유 시트가 **있다고 성공하는 것은 아니다.** 권한 정책·비보안 컨텍스트·임베드에서는
     //   NotAllowedError로 거절된다. 전에는 이 경우에도 클립보드로 내려가지 못해
@@ -24,6 +27,7 @@ export function useShareLink(title: string) {
     if (navigator.share) {
       try {
         await navigator.share({ title, url });
+        track("share", { method: "sheet", content_type: contentType });
         return;
       } catch (e) {
         // 사용자가 시트를 닫은 것은 실패가 아니다 — 여기서 폴백하면 원치 않은 복사가 된다
@@ -38,6 +42,7 @@ export function useShareLink(title: string) {
       if (!navigator.clipboard) throw new Error("clipboard unavailable");
       await navigator.clipboard.writeText(url);
       toast("링크를 복사했어요");
+      track("share", { method: "clipboard", content_type: contentType });
     } catch (e) {
       console.error("[share] 링크 복사 실패:", e);
       toast("링크를 복사하지 못했어요");

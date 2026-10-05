@@ -3,7 +3,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { requireBrowserSupabase } from "@/shared/api";
 import { ROUTES, withNext, type OAuthProvider } from "@/shared/config";
-import { useDuplicateGuard, useToast } from "@/shared/lib";
+import { track, useDuplicateGuard, useToast } from "@/shared/lib";
 import { toAuthErrorMessage } from "@/entities/session";
 
 /**
@@ -57,6 +57,8 @@ export function useOAuthSignIn(next: string | null) {
   const start = (provider: OAuthProvider) => {
     if (guard.isLocked()) return;
     guard.lock();
+    // 누른 순간에 센다 — 성공하면 이 화면이 프로바이더로 넘어가 `onSuccess`가 돌 자리가 없다(완료는 `login`이 센다)
+    track("sign_in_start", { method: provider });
     mutation.mutate(provider);
   };
 

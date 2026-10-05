@@ -1,5 +1,5 @@
 /**
- * Supabase 연결 환경변수.
+ * 공개 환경변수(`NEXT_PUBLIC_*`)의 단일 소스 — Supabase 연결 · 배포 도메인 · 검색엔진 확인 · 분석.
  * NEXT_PUBLIC_* 값은 빌드 시 인라인되므로 모듈 최상위에서 읽어도 안전하다.
  * 값이 비어 있어도 빌드는 성공해야 하므로 여기서 throw하지 않는다 — 호출부에서 가드.
  */
@@ -26,7 +26,25 @@ export const env = {
    */
   googleSiteVerification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ?? "",
   naverSiteVerification: process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION ?? "",
+  /**
+   * GA4 측정 ID(`G-XXXXXXXXXX`) — 루트 layout이 이 값이 있을 때만 gtag를 싣고, `track`
+   * (`@/shared/lib`)도 이 값이 있을 때만 이벤트를 보낸다. 비우면 분석 스크립트가 아예 내려가지 않는다
+   * (로컬·프리뷰가 운영 수치에 섞이지 않게 운영 빌드에만 넣는다).
+   *
+   * ⚠ 값이 인라인 스크립트와 스크립트 주소에 그대로 들어간다 — 형식이 아니면 비운 것으로 다룬다.
+   *   오타 하나로 모든 화면에 깨진 스크립트가 실리는 것보다 측정이 꺼지는 편이 낫다.
+   */
+  gaId: resolveGaId(),
 };
+
+/** 형식(`G-` + 영숫자)이 맞을 때만 측정 ID로 받는다 — 아니면 로그를 남기고 끈다 */
+function resolveGaId(): string {
+  const raw = (process.env.NEXT_PUBLIC_GA_ID ?? "").trim();
+  if (!raw) return "";
+  if (/^G-[A-Z0-9]{4,20}$/.test(raw)) return raw;
+  console.error(`[env] NEXT_PUBLIC_GA_ID가 GA4 측정 ID 형식이 아니에요: ${JSON.stringify(raw)} — 분석을 끕니다.`);
+  return "";
+}
 
 /** 스킴이 빠진 값이 흔해서 붙여준다 — `new URL("example.com")`은 그대로 두면 throw한다 */
 function withScheme(value: string): string {

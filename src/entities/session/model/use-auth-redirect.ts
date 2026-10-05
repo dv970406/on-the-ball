@@ -3,6 +3,8 @@
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ROUTES, safeNextPath, signInWithNext } from "@/shared/config";
+import { track } from "@/shared/lib";
+import { readLastAuthProvider } from "../lib/last-auth-provider";
 import { consumeSignOutIntent } from "../lib/sign-out-intent";
 import type { SessionStatus } from "./types";
 
@@ -72,9 +74,23 @@ export function useRedirectGuestToSignIn(status: SessionStatus) {
  */
 export function useRedirectAfterSignIn(status: SessionStatus) {
   const router = useRouter();
+  /**
+   * 이 화면에 **프로바이더에서 돌아와**(`?code=`) 들어왔는가 — 로그인 완료를 세는 조건이다.
+   * ⚠ 마운트 직후에 읽어 둔다. 코드 교환이 끝나면 supabase가 주소에서 `code`를 걷어 내므로, 세션이 선 뒤에 읽으면
+   *   이미 없다. 자식의 effect가 세션 동기화(`AuthProvider`)의 effect보다 먼저 돌아 교환 전에 읽힌다.
+   */
+  const returnedFromProvider = useRef(false);
+  useEffect(() => {
+    returnedFromProvider.current = new URLSearchParams(window.location.search).has("code");
+  }, []);
 
   useEffect(() => {
     if (status !== "authenticated") return;
+    // 로그인 완료를 여기서 센다 — 로그인 화면에서 세션이 서는 순간이 이 effect 하나로 모인다(위 주석).
+    // ⚠ 프로바이더에서 돌아온 경우만 센다 — 이미 로그인한 사용자가 이 화면을 열어도 같은 effect가 돌지만 그건 로그인이
+    //   아니다(일어난 일만 센다 — `nextjs.md` 분석 절). 프로바이더는 `useSessionSync`가 같은 인증 이벤트에서 먼저
+    //   적어 둔 값이다.
+    if (returnedFromProvider.current) track("login", { method: readLastAuthProvider() ?? "unknown" });
     const next = new URLSearchParams(window.location.search).get("next");
     router.replace(safeNextPath(next, window.location.origin) ?? ROUTES.transferList);
   }, [status, router]);

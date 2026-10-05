@@ -22,6 +22,7 @@
     "start:prod": "set -a && . ./.env.prod && set +a && next start"
   },
   "dependencies": {
+    "@next/third-parties": "16.2.10",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.0",
     "@tanstack/react-query": "^5.101.2",

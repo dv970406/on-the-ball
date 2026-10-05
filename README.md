@@ -21,6 +21,7 @@
 | 프로필 | 닉네임(가입 시 랜덤 배정 → 본인이 변경) · 프로필 사진 업로드 · **로그인 수단 연결** |
 | 권한 | **2중 방어** — 클라이언트 가드(`AuthRequired`·`GuestOnly`, 안내) → **RLS + 컬럼 권한(실제 차단)**. `proxy.ts`는 세션 쿠키 갱신만 하고 라우트 가드를 두지 않는다(판정자가 둘이면 무한 리다이렉트가 된다 — `docs/conventions/nextjs.md`) |
 | 검색 유입 | 보드·딜 상세 **SSR** · 정렬·리그는 쿼리 + canonical · `sitemap.xml` · `robots.txt` |
+| 분석 | GA4(`NEXT_PUBLIC_GA_ID`가 있을 때만) — 이벤트는 `track`(`@/shared/lib`) 하나로 보낸다 |
 
 > **색인 대상 화면은 전부 SSR**입니다 — 보드와 딜 상세 모두 서버가 딜·보도 타임라인을 조립해
 > 초기 HTML에 담습니다(로그인·프로필처럼 색인하지 않는 화면만 클라이언트 쿼리). 프리페치는
@@ -109,6 +110,7 @@ pnpm dev
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon(publishable) 키 | 둘 다 | ✅ |
 | `NEXT_PUBLIC_SITE_URL` | `og:image` 절대 URL 기준(빌드 시점에 인라인) | 둘 다 | 배포 시 |
 | `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` / `NEXT_PUBLIC_NAVER_SITE_VERIFICATION` | Search Console·네이버 서치어드바이저 소유권 확인 메타(비우면 태그를 내보내지 않음). 등록 뒤 `/sitemap.xml` 제출 | `.env.prod` | 검색 등록 시 |
+| `NEXT_PUBLIC_GA_ID` | GA4 측정 ID(`G-…`). 비우면 분석 스크립트를 싣지 않는다 — 운영 빌드에만 넣는다 | `.env.prod` | 분석 사용 시 |
 | `SUPABASE_SERVICE_ROLE_KEY` | 운영 스크립트(`scripts/sync-transfer-news.mjs`) — 런타임에는 필요 없다 | `.env.local` | 원격 수집 시 |
 | `ANTHROPIC_API_KEY` | 이적 소식 한국어 요약(LLM). 없으면 로컬 실행은 요약을 건너뛰고, `--remote` 실행은 실패로 끝난다 | `.env.local` | 원격 수집 시 |
 | `API_FOOTBALL_KEY` | 구단 엠블럼 내려받기(`scripts/fetch-team-crests.mjs`) — 런타임에는 필요 없다 | `.env.local` | 엠블럼 추가 시 |
@@ -176,6 +178,7 @@ supabase migration list --linked    # ③ Local/Remote 열이 일치하는지 �
 | `NEXT_PUBLIC_SUPABASE_URL` | Production + Preview | 모든 조회가 "서비스 설정이 완료되지 않았어요."(빌드는 성공합니다) |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Production + Preview | 〃 |
 | `NEXT_PUBLIC_SITE_URL` | **Production만** | Preview는 비워 둬야 `VERCEL_URL` 폴백이 배포별 도메인을 잡습니다 |
+| `NEXT_PUBLIC_GA_ID` | **Production만** | 분석이 꺼집니다(스크립트를 싣지 않습니다). Preview에 넣으면 시험 클릭이 운영 수치에 섞입니다 |
 
 > ⚠ **`NEXT_PUBLIC_*`는 빌드 시점에 인라인됩니다** — 값을 바꾸면 **반드시 재배포**해야 합니다.
 > `NEXT_PUBLIC_SITE_URL`이 도메인 확정 전에 정해져야 하므로, Import 화면에서 프로젝트 이름을

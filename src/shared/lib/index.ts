@@ -6,6 +6,8 @@ export { useNowMs } from "./use-now";
 export { serverToClientTime } from "./server-clock";
 export { useFocusTrap } from "./use-focus-trap";
 export { useToast, useToastStore } from "./toast-store";
+// 분석 이벤트 — 이름·파라미터의 단일 소스(`AnalyticsEvents`)와 보내는 함수. 측정 ID가 없으면 아무것도 하지 않는다
+export { track } from "./analytics";
 export { parsePostId } from "./post-id";
 export {
   hasVisibleChar,

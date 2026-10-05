@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
-import { useToast } from "@/shared/lib";
+import { track, useToast } from "@/shared/lib";
 import { useSessionStore } from "@/entities/session";
 import { transferKeys, type TransferDeal, type TransferDealListItem } from "@/entities/transfer";
 
@@ -51,7 +51,8 @@ export function useToggleTransferWatch() {
   const user = useSessionStore((s) => s.user);
   const toast = useToast();
 
-  return useMutation<void, Error, ToggleWatchVariables, WatchSnapshot>({
+  // 결과값은 "행이 실제로 바뀌었는가"다 — 이미 담긴 딜을 또 담은 요청(23505 흡수)은 성공이지만 바뀐 것이 없다
+  return useMutation<boolean, Error, ToggleWatchVariables, WatchSnapshot>({
     mutationFn: async ({ dealId, watched }) => {
       const supabase = requireBrowserSupabase();
       if (!user) throw new Error("로그인이 필요해요.");
@@ -68,7 +69,7 @@ export function useToggleTransferWatch() {
           console.error("[transfer-watch] 관심 해제 실패:", error);
           throw new Error(await toWriteErrorMessage(supabase, error));
         }
-        return;
+        return true;
       }
 
       const { error } = await supabase
@@ -78,6 +79,7 @@ export function useToggleTransferWatch() {
         console.error("[transfer-watch] 관심 등록 실패:", error);
         throw new Error(await toWriteErrorMessage(supabase, error));
       }
+      return !error;
     },
 
     onMutate: async ({ dealId }) => {
@@ -104,8 +106,11 @@ export function useToggleTransferWatch() {
       return snapshot;
     },
 
-    onSuccess: (_data, { watched }) => {
+    onSuccess: (changed, { dealId, watched }) => {
       toast(watched ? "관심 목록에서 뺐어요" : "관심 목록에 담았어요");
+      // `watched`는 누르기 전 상태다 — 이벤트에는 누른 뒤의 상태를 싣는다.
+      // 바뀐 것이 없는 요청은 세지 않는다 — 같은 tick에 겹친 클릭이 전부 "담기"로 나가 한 번의 담기가 여러 번 집계된다
+      if (changed) track("watch_toggle", { deal_id: dealId, watched: !watched });
     },
 
     onError: (error, _vars, snapshot) => {
