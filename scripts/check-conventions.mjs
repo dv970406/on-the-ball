@@ -47,6 +47,8 @@ const DEEP_IMPORT_ALLOWED = new Set([
   // 경로 문구·선수 표시명 — 상세 SSR의 og description·`<title>`이 화면과 같은 말을 한다
   "@/entities/transfer/lib/route-label",
   "@/entities/transfer/lib/player-name",
+  // 이적료 표기·성격 라벨 — 딜 공유 카드(opengraph-image)가 상세의 이적료 카드와 같은 판정으로 그린다
+  "@/entities/transfer/lib/fee",
   "@/entities/session/lib/auth-error-message",
   "@/features/sign-in/lib/pkce-verifier",
 ]);

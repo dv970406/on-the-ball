@@ -1,5 +1,5 @@
 // ⚠ "use client" 모듈 포함 — 서버에서는 model/types·api/mappers·api/keys·api/list-query와
-//    lib/stage·lib/route-label·lib/player-name을 직접 import한다(허용 목록은 `check-conventions.mjs`).
+//    lib/stage·lib/route-label·lib/player-name·lib/fee를 직접 import한다(허용 목록은 `check-conventions.mjs`).
 //
 // ⚠ **다른 레이어가 소비하지 않는 것은 올리지 않는다.** `TransferClubRow`·`TransferNewsRow`·
 //    `TransferDealWatchRow`·`TransferStatus`·`STAGE_GROUP`·`isDeadStage`·`feeDelta`·`ClubRoute`·

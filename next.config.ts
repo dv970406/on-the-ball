@@ -4,6 +4,23 @@ const nextConfig: NextConfig = {
   // 굳이 프레임워크와 버전대를 알려줄 이유가 없다 (X-Powered-By: Next.js)
   poweredByHeader: false,
 
+  /*
+   * 딜 공유 카드(`app/transfers/[id]/opengraph-image.tsx`)가 런타임에 파일로 읽는 자산.
+   *
+   * ⚠ **여기서 빠지면 로컬은 멀쩡하고 배포에서만 깨진다.** 그 라우트는 폰트·마크·엠블럼을
+   *   `process.cwd()` 기준으로 읽는데, 엠블럼 경로는 구단 코드로 조립해 빌드의 파일 추적이 따라가지 못한다.
+   *   카드가 읽는 파일을 더하면 여기도 함께 더한다.
+   * ⚠ 키는 **라우트 경로의 글로브**다 — 대괄호는 글로브 문법이라 동적 세그먼트 자리를 `*`로 적는다.
+   */
+  outputFileTracingIncludes: {
+    "/transfers/*/opengraph-image": [
+      "./src/app/fonts/og/**",
+      "./public/crests/**",
+      "./app/icon.svg",
+      "./app/opengraph-image.png",
+    ],
+  },
+
   async headers() {
     return [
       {

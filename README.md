@@ -20,7 +20,7 @@
 | 인증 | **카카오 · 구글 소셜 로그인**(로그인 = 가입) · 로그아웃. 에러는 한국어로 매핑 |
 | 프로필 | 닉네임(가입 시 랜덤 배정 → 본인이 변경) · 프로필 사진 업로드 · **로그인 수단 연결** |
 | 권한 | **2중 방어** — 클라이언트 가드(`AuthRequired`·`GuestOnly`, 안내) → **RLS + 컬럼 권한(실제 차단)**. `proxy.ts`는 세션 쿠키 갱신만 하고 라우트 가드를 두지 않는다(판정자가 둘이면 무한 리다이렉트가 된다 — `docs/conventions/nextjs.md`) |
-| 검색 유입 | 보드·딜 상세 **SSR** · 정렬·리그는 쿼리 + canonical · `sitemap.xml` · `robots.txt` |
+| 검색 유입 · 공유 | 보드·딜 상세 **SSR** · 정렬·리그는 쿼리 + canonical · `sitemap.xml` · `robots.txt` · 딜마다 그리는 공유 카드(`opengraph-image`) |
 | 분석 | GA4(`NEXT_PUBLIC_GA_ID`가 있을 때만) — 이벤트는 `track`(`@/shared/lib`) 하나로 보낸다 |
 
 > **색인 대상 화면은 전부 SSR**입니다 — 보드와 딜 상세 모두 서버가 딜·보도 타임라인을 조립해

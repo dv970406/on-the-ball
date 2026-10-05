@@ -4,7 +4,7 @@ import { notFound, unstable_rethrow } from "next/navigation";
 // ⚠ **새 파서를 만들지 않는다.** 하는 일이 "URL의 [id] → 엄격한 십진수 id"라 게시글 전용이
 //   아니고, 이름은 첫 호출자를 기록할 뿐이다.
 import { parsePostId } from "@/shared/lib/post-id";
-import { NOT_FOUND_TITLE, OG_IMAGE, OG_SITE, ROUTES, absoluteUrl } from "@/shared/config";
+import { NOT_FOUND_TITLE, OG_SITE, ROUTES, absoluteUrl } from "@/shared/config";
 // ⚠ 배럴(@/shared/lib)이 아니라 직접 경로 — 배럴은 "use client" 훅을 포함한다.
 import { clamp } from "@/shared/lib/text";
 import { createSupabaseServerClient } from "@/shared/api/supabase-server";
@@ -150,19 +150,19 @@ export async function generateMetadata(props: PageProps<"/transfers/[id]">): Pro
     description,
     // ⚠ 자기 참조 canonical — 추적 파라미터가 붙은 URL이 별개 페이지로 색인되는 것을 막는다.
     alternates: { canonical: ROUTES.transfer(dealId) },
-    // ⚠ **`images`를 명시한다.** 세그먼트가 `openGraph`를 채우면 루트의 `app/opengraph-image.png`
-    //   상속이 통째로 대체되어 이미지가 빠진다(실측). `og:url`도 Next가 만들어 주지 않는다.
+    // ⚠ **`images`를 적지 않는다.** 이 세그먼트의 이미지는 같은 폴더의 `opengraph-image.tsx`(딜마다 그리는 카드)가
+    //   낸다 — 여기에 `images`를 적으면 그 값이 파일 컨벤션을 **이겨서** 카드 대신 사이트 공통 이미지가 나간다(실측).
+    //   `twitter:image`도 그 파일에서 함께 나온다. `og:url`은 Next가 만들어 주지 않아 직접 적는다.
     openGraph: {
       ...OG_SITE,
       type: "article",
       title,
       description,
       url: absoluteUrl(ROUTES.transfer(dealId)),
-      images: OG_IMAGE,
       // 화면이 그리는 값과 같은 판정 — "업데이트 N분 전"이 곧 최신 보도 시각이다
       modifiedTime: deal.latestReportedAt,
     },
-    twitter: { card: "summary_large_image", title, description, images: OG_IMAGE },
+    twitter: { card: "summary_large_image", title, description },
   };
 }
 
