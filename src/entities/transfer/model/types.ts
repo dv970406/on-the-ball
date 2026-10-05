@@ -20,10 +20,13 @@ export type TransferStage = Database["public"]["Enums"]["transfer_stage"];
 export type TransferGroupKey = "official" | "hwg" | "prog" | "rumor" | "dead";
 
 /**
- * 상태 뱃지의 톤 — 단계를 일곱 가지 표시로 접은 것(`합의 임박`·`협상 중`이 여러 단계를 담는다).
+ * 상태 뱃지의 톤 — 단계를 화면의 표시로 접은 것(`합의 임박`·`협상 중`이 여러 단계를 담는다).
+ * ⚠ **DB enum(`transfer_status_tone`)에서 생성된 타입이다 — 손으로 적지 않는다.** 알림의 발송 기록
+ *   (`transfer_deal_push_log.status`)이 같은 값을 저장하므로, 톤이 늘면 마이그레이션이 먼저이고 그 순간 `Record<TransferStatus, …>`
+ *   맵(라벨·뱃지 클래스·공유 카드의 톤)이 컴파일 에러로 누락을 드러낸다. 단계 → 톤의 매핑은 `lib/stage.ts`가 갖는다.
  * ⚠ 구간(`TransferGroupKey`)과도 다르다 — `prog` 구간 안에 `imminent`·`talks` 두 톤, `dead` 구간 안에 `dead`(결렬)·`denied`(부인) 두 톤이 있다.
  */
-export type TransferStatus = "official" | "hwg" | "imminent" | "talks" | "rumor" | "dead" | "denied";
+export type TransferStatus = Database["public"]["Enums"]["transfer_status_tone"];
 
 /** 보드 정렬 — URL `?sort=`가 소유한다. 해석은 `lib/league.ts`의 `parseTransferSort` */
 export type TransferSort = "latest" | "fee";

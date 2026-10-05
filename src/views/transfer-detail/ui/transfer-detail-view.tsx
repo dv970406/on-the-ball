@@ -12,10 +12,11 @@ import {
   destinationClubs,
   playerName,
 } from "@/entities/transfer";
+import { usePushStatusQuery } from "@/entities/push";
 import { WatchToggle } from "@/features/watch-transfer";
 import { ROUTES } from "@/shared/config";
 import type { CommentList } from "@/entities/comment";
-import { cn, formatCount, formatRelativeTime, useNowMs } from "@/shared/lib";
+import { cn, formatCount, formatRelativeTime, useNowMs, useToastStore } from "@/shared/lib";
 import { Dialog, EmptyState, Icon, SignInDialog, Skeleton, StaleBanner } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
 import { flagEmoji } from "../lib/flag";
@@ -24,6 +25,7 @@ import { useTransferDetail } from "../model/use-transfer-detail";
 import { CommentSection } from "./comment-section";
 import { DetailTabs, detailPanelId, detailTabId, type DetailTabKey } from "./detail-tabs";
 import { FeeCard } from "./fee-card";
+import { PushNudge } from "./push-nudge";
 import { ReportTimeline } from "./report-timeline";
 
 interface TransferDetailViewProps {
@@ -157,7 +159,8 @@ function InfoLine({ deal }: { deal: TransferDeal }) {
  * 이적 상세 — 선수 · 경로 · 이적료 · `댓글 | 보도 타임라인` 탭 + 관심 토글.
  *
  * 하단 탭바를 렌더하지 않는다(서브헤더 화면이다). 공유는 `SubHeader`가 갖는다.
- * 확률 카드·알림 CTA·원화 환산은 두지 않는다(확률은 보류이고, 하드코딩 환율은 거짓 숫자다).
+ * 확률 카드·원화 환산은 두지 않는다(확률은 보류이고, 하드코딩 환율은 거짓 숫자다). 알림 안내는 관심 목록에 담은
+ * 직후에만 하단 바에 한 줄로 뜬다(`PushNudge`).
  *
  * ⚠ **두 탭 패널을 모두 렌더하고 `hidden`으로만 가린다** — 색인 대상 화면이라 비활성 탭을 조건부
  *   렌더로 빼면 크롤러가 그 패널을 보지 못한다(`nextjs.md` "탭으로 갈라도 HTML에는 전부 남긴다").
@@ -210,6 +213,24 @@ export function TransferDetailView({
   const [signInAction, setSignInAction] = useState<string | null>(null);
   /** 댓글이 기본 선택이다 */
   const [tab, setTab] = useState<DetailTabKey>("comments");
+  /**
+   * 이 화면에서 **방금** 관심 목록에 담았는가 — 알림 안내를 그 직후에만 낸다. 들어올 때 이미 담겨 있던 딜에는 내지
+   * 않는다(열 때마다 같은 물음이 뜨면 안내가 아니라 조르기다). 화면을 떠나면 사라진다.
+   */
+  const [justWatched, setJustWatched] = useState(false);
+  // 알림 상태는 안내를 낼 때만 필요하다 — 담기 전에는 조회하지 않는다(브라우저 API와 서버 왕복이 붙는다)
+  const pushStatus = usePushStatusQuery(justWatched ? session.userId : undefined);
+  /**
+   * ⚠ **"담았어요" 토스트가 걷힌 뒤에 처음 낸다.** 토스트는 하단 바 바로 위에 뜨는데(`shared/ui/toast`) 안내가 뜨면 바가
+   *   그만큼 높아져, 토스트가 방금 나타난 안내 문구를 정확히 덮는다(실측). 담았다는 확인이 먼저, 그다음이 물음이다.
+   * ⚠ **한번 뜬 뒤에는 토스트를 보지 않는다**(`nudgeRevealed`). 토스트가 뜰 때마다 물러나게 두면 댓글 등록 같은 무관한
+   *   토스트에도 하단 바가 오르내리고, 안내가 언마운트될 때마다 켜기 훅(과 그 가드)이 새로 만들어진다.
+   *   렌더 중에 state를 맞추는 형태다(조건이 한 번만 참이 되어 한 번만 돈다) — effect로 옮기면 한 프레임 늦는다.
+   */
+  const toastShowing = useToastStore((s) => s.message !== null);
+  const [nudgeRevealed, setNudgeRevealed] = useState(false);
+  if (justWatched && !toastShowing && !nudgeRevealed) setNudgeRevealed(true);
+  const showPushNudge = nudgeRevealed && deal?.isWatched === true && pushStatus.data === "off";
   // ⚠ **서버 시각이 우선이다** — `useNowMs()`는 세션당 한 번 고정된다(`data-and-state.md`).
   //   ⚠ `??`는 단축평가라 훅을 뒤에 두면 조건부 호출이 된다 → 먼저 무조건 부른다.
   const clientNowMs = useNowMs();
@@ -225,7 +246,15 @@ export function TransferDetailView({
         ⚠ `pt-*`를 두지 않는다 — 위쪽 여백은 각 분기의 첫 요소가 진다.
         ⚠ 아래 `pb`는 하단 고정 바(관심 토글) 높이 + safe-area다 — 본문이 바에 가려지지 않게.
       */}
-      <main className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(96px+env(safe-area-inset-bottom))]">
+      <main
+        className={cn(
+          "no-scrollbar min-h-0 flex-1 overflow-y-auto px-5",
+          // 알림 안내가 뜨면 하단 바가 그만큼 높아진다 — 본문 끝이 바에 가려지지 않게 함께 늘린다
+          showPushNudge
+            ? "pb-[calc(142px+env(safe-area-inset-bottom))]"
+            : "pb-[calc(96px+env(safe-area-inset-bottom))]",
+        )}
+      >
         {/* 본문 h1(선수명)은 딜이 있을 때만 그려진다 — 로딩·실패·없음 분기에서는 sr-only로 둔다
             (EmptyState의 title은 <p>라 heading이 0개가 된다 — `app/not-found.tsx`와 같은 사정) */}
         {!deal && <h1 className="sr-only">딜 상세</h1>}
@@ -377,10 +406,17 @@ export function TransferDetailView({
       */}
       {deal && (
         <footer className="absolute inset-x-0 bottom-0 z-[60] border-t border-hairline-cool bg-canvas px-4 pb-[max(30px,env(safe-area-inset-bottom))] pt-2.5">
+          {/* 방금 담은 사람에게만 — 알림이 꺼져 있고 이 기기에서 켤 수 있을 때(`PushNudge` 주석) */}
+          {showPushNudge && <PushNudge />}
           <WatchToggle
             dealId={deal.id}
             watched={deal.isWatched}
             onSignInRequired={() => setSignInAction("관심 목록에 담으려면")}
+            onWatched={() => {
+              // 다시 담을 때마다 "토스트 → 안내" 순서를 처음부터 밟는다
+              setNudgeRevealed(false);
+              setJustWatched(true);
+            }}
           />
         </footer>
       )}

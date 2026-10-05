@@ -75,13 +75,16 @@ export const config = {
   //   돌려준다(실측: 75~252B, 서버 조회는 돌지 않는다). 그런데 proxy는 그대로 타서
   //   **로그인 사용자에게 링크당 GoTrue 왕복이 하나씩** 붙었다 — 목록 화면에는 딜 행
   //   링크가 수십 개다. 프리페치에서 세션을 갱신하지 못해도 실제 이동이 곧바로 갱신한다.
+  // ⚠ **서비스 워커와 매니페스트도 제외한다**(`sw.js`·`manifest.webmanifest`). 브라우저는 워커가 깔린 사이트를
+  //   열 때마다 워커 스크립트가 바뀌었는지 다시 받아 보는데, 그 요청이 proxy를 타면 **로그인 사용자의 화면 이동마다
+  //   GoTrue 왕복이 하나씩** 붙는다. 둘 다 사용자와 무관한 정적 응답이다.
   // ⚠ 헤더 이름은 Next 내부 상수다(`next/dist/client/components/app-router-headers.js`의
   //   `NEXT_ROUTER_PREFETCH_HEADER = 'next-router-prefetch'`). 버전이 올라 이름이 바뀌면
   //   제외가 조용히 무효가 되는데, 그때의 대가는 예전 동작(왕복이 도로 붙는다)이라 안전한 방향이다.
   matcher: [
     {
       source:
-        "/((?!api/|api$|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|ico|woff2?)$).*)",
+        "/((?!api/|api$|_next/static|_next/image|favicon.ico|sw\\.js$|manifest\\.webmanifest$|.*\\.(?:svg|png|jpg|jpeg|gif|ico|woff2?)$).*)",
       missing: [{ type: "header", key: "next-router-prefetch" }],
     },
   ],

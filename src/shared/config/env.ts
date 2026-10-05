@@ -35,7 +35,25 @@ export const env = {
    *   오타 하나로 모든 화면에 깨진 스크립트가 실리는 것보다 측정이 꺼지는 편이 낫다.
    */
   gaId: resolveGaId(),
+  /**
+   * 웹 푸시의 VAPID **공개키**(base64url) — 브라우저가 푸시 구독을 만들 때 "이 서버의 알림만 받겠다"고 묶는 값이다.
+   * 짝이 되는 비밀키는 발송 스크립트(`scripts/sync-transfer-news.mjs`)의 환경에만 있다(`VAPID_PRIVATE_KEY`) —
+   * 이 모듈은 클라이언트 번들에 실리므로 **비밀키를 여기 두지 않는다.**
+   *
+   * 비어 있으면 알림 기능을 화면에 그리지 않는다(켤 수 없는 스위치를 두지 않는다).
+   * ⚠ 키를 바꾸면 기존 구독은 전부 무효가 된다(브라우저 구독이 옛 키에 묶여 있다) — 사용자가 다시 켜야 한다.
+   */
+  vapidPublicKey: resolveVapidPublicKey(),
 };
+
+/** 형식(P-256 공개키 65바이트의 base64url = 87자)이 맞을 때만 받는다 — 깨진 키로 구독을 시도하면 영문 예외만 남는다 */
+function resolveVapidPublicKey(): string {
+  const raw = (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "").trim();
+  if (!raw) return "";
+  if (/^[A-Za-z0-9_-]{87}$/.test(raw)) return raw;
+  console.error("[env] NEXT_PUBLIC_VAPID_PUBLIC_KEY가 VAPID 공개키 형식이 아니에요 — 알림 기능을 끕니다.");
+  return "";
+}
 
 /** 형식(`G-` + 영숫자)이 맞을 때만 측정 ID로 받는다 — 아니면 로그를 남기고 끈다 */
 function resolveGaId(): string {

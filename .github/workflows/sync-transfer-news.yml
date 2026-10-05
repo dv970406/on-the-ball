@@ -13,7 +13,8 @@
 # ⚠ 실패(소스 하나라도 실패 · 행 단위 저장 실패)는 종료 코드 1이라 이 작업이 빨간색이 된다 —
 #   읽는 화면이 없어 그게 유일한 신호다(`sync-transfer-news.mjs` 머리말).
 #
-# 필요한 저장소 시크릿: SUPABASE_URL(원격 프로젝트 URL) · SUPABASE_SERVICE_ROLE_KEY
+# 필요한 저장소 시크릿: SUPABASE_URL(원격 프로젝트 URL) · SUPABASE_SERVICE_ROLE_KEY · ANTHROPIC_API_KEY
+# 알림(웹 푸시)을 켜려면: VAPID_PUBLIC_KEY · VAPID_PRIVATE_KEY · VAPID_SUBJECT — 셋 중 하나라도 없으면 발송만 건너뛴다
 name: 이적 소식 수집
 
 on:
@@ -52,5 +53,10 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           # LLM 판정·요약(judge.mjs) — 없으면 --remote 실행은 실패로 끝난다(새 딜이 열리지 않고 화면이 영문으로 남는다)
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # 웹 푸시 알림(notify.mjs) — 이번 실행이 만든 새 딜·상태 변화를 관심 등록자·응원 구단 팬에게 보낸다.
+          # ⚠ 공개키는 앱 빌드(Vercel)의 NEXT_PUBLIC_VAPID_PUBLIC_KEY와 **같은 값**이어야 한다 — 갈리면 발송이 전부 403이다.
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
         # --remote: 원격 URL에 쓰는 것을 명시한다(없으면 로컬이 아닌 URL을 거부한다 — sync-db.mjs guardTarget)
         run: node scripts/sync-transfer-news.mjs --remote

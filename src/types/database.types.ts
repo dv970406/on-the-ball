@@ -30,6 +30,38 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles_push_subscription: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          p256dh: string
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          p256dh: string
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          p256dh?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_push_subscription_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transfer_club: {
         Row: {
           canonical: string
@@ -276,6 +308,32 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transfer_deal_push_log: {
+        Row: {
+          deal_id: number
+          sent_at: string
+          status: Database["public"]["Enums"]["transfer_status_tone"]
+        }
+        Insert: {
+          deal_id: number
+          sent_at?: string
+          status: Database["public"]["Enums"]["transfer_status_tone"]
+        }
+        Update: {
+          deal_id?: number
+          sent_at?: string
+          status?: Database["public"]["Enums"]["transfer_status_tone"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transfer_deal_push_log_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "transfer_deal"
             referencedColumns: ["id"]
           },
         ]
@@ -541,6 +599,14 @@ export type Database = {
         | "collapsed"
         | "denied"
         | "unknown"
+      transfer_status_tone:
+        | "official"
+        | "hwg"
+        | "imminent"
+        | "talks"
+        | "rumor"
+        | "dead"
+        | "denied"
       transfer_verdict: "move" | "not_move"
     }
     CompositeTypes: {
@@ -694,6 +760,15 @@ export const Constants = {
         "collapsed",
         "denied",
         "unknown",
+      ],
+      transfer_status_tone: [
+        "official",
+        "hwg",
+        "imminent",
+        "talks",
+        "rumor",
+        "dead",
+        "denied",
       ],
       transfer_verdict: ["move", "not_move"],
     },

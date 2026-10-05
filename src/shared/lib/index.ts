@@ -6,6 +6,17 @@ export { useNowMs } from "./use-now";
 export { serverToClientTime } from "./server-clock";
 export { useFocusTrap } from "./use-focus-trap";
 export { useToast, useToastStore } from "./toast-store";
+// 브라우저 푸시 구독의 순수 메커니즘(지원 판정 · 구독 · 해지) — 누구의 구독인지는 모른다(그 파일 주석).
+// ⚠ 전부 브라우저에서만 부른다(이벤트 핸들러 · effect · queryFn)
+export {
+  detectPushSupport,
+  getPushSubscription,
+  pushSubscriptionUsesKey,
+  serializePushSubscription,
+  subscribePush,
+  unsubscribePush,
+  type PushSupport,
+} from "./web-push";
 // 분석 이벤트 — 이름·파라미터의 단일 소스(`AnalyticsEvents`)와 보내는 함수. 측정 ID가 없으면 아무것도 하지 않는다
 export { track } from "./analytics";
 export { parsePostId } from "./post-id";

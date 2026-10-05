@@ -168,11 +168,13 @@ select c.relname,
         or has_table_privilege('authenticated', c.oid, 'TRUNCATE')
         -- 아래만 정당하다 — 전부 자기 행만 지우는 DELETE 정책이 있다.
         --   transfer_deal_watch(관심 빼기) · transfer_deal_comment(내 댓글 삭제) ·
-        --   transfer_deal_comment_vote(표 거두기) · transfer_club_follow(응원 구단 풀기)
+        --   transfer_deal_comment_vote(표 거두기) · transfer_club_follow(응원 구단 풀기) ·
+        --   profiles_push_subscription(알림 끄기)
         -- 새 테이블에 DELETE를 열면 여기 이름을 더하고 사유를 적는다.
         or (has_table_privilege('authenticated', c.oid, 'DELETE')
             and c.relname not in ('transfer_deal_watch', 'transfer_deal_comment',
-                                  'transfer_deal_comment_vote', 'transfer_club_follow')));
+                                  'transfer_deal_comment_vote', 'transfer_club_follow',
+                                  'profiles_push_subscription')));
 
 \echo '-- 17b. RLS는 켜졌는데 정책이 하나도 없는 테이블 (전면 차단이 의도인지 확인 필요)'
 \echo '[0행 기대] 정책이 없는 RLS 테이블'
@@ -1869,6 +1871,185 @@ select count(*) from public.transfer_club_follow where club_code = 'rlstest-f1';
 rollback to s;
 
 rollback to s40;
+
+-- ---------------------------------------------------------------------
+\echo ''
+\echo '=== 41. 웹 푸시 알림 — 구독 · 발송 기록 (20261005000002) ==='
+\echo '  설계 요약: profiles_push_subscription은 기기 하나의 구독이다(PK가 endpoint). 사용자는 자기 행만'
+\echo '  SELECT(키 컬럼 제외)·INSERT·DELETE하고 UPDATE 경로는 없다. 암호화 키는 발송(service_role)만 읽는다.'
+\echo '  한 계정의 구독은 열 개까지다 — 넘치면 트리거가 가장 오래된 것부터 걷어 낸다(거부하지 않는다).'
+\echo '  transfer_deal_push_log는 파생 스크립트만 쓰는 운영 기록이다(쓰기 정책·grant 없음, 읽기 공개).'
+\echo '  ⚠ 시드의 endpoint는 테스트 전용 호스트(rlstest.invalid)다 — 실제 구독과 섞이지 않게.'
+savepoint s41;
+
+-- 키는 형식 CHECK를 만족하는 자리 채움이다(p256dh 87자 · auth 22자, base64url)
+\set p256dh BKtestKEYtestKEYtestKEYtestKEYtestKEYtestKEYtestKEYtestKEYtestKEYtestKEYtestKEYtestKEY012
+\set authkey testAUTHtestAUTHtest01
+
+-- bob의 구독 — "내 행만 보인다"와 "남의 endpoint를 넘겨받을 수 없다"의 상대역 (superuser로 넣는다)
+insert into public.profiles_push_subscription (endpoint, user_id, p256dh, auth)
+values ('https://rlstest.invalid/push/bob-1', :'bob', :'p256dh', :'authkey');
+
+\echo ''
+\echo '-- 41a. 구독 — 자기 행만 --'
+
+savepoint s; :login_alice
+\echo '[❌차단] 남(bob) 명의로 구독을 넣는다 — 내 기기로 남의 알림을 받게 된다'
+insert into public.profiles_push_subscription (endpoint, user_id, p256dh, auth)
+values ('https://rlstest.invalid/push/alice-x', :'bob', :'p256dh', :'authkey');
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[❌차단] 비로그인 구독'
+insert into public.profiles_push_subscription (endpoint, user_id, p256dh, auth)
+values ('https://rlstest.invalid/push/anon-1', :'alice', :'p256dh', :'authkey');
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[❌차단] 비로그인이 구독을 읽는다 — anon에는 SELECT grant가 없다'
+select count(*) from public.profiles_push_subscription;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 남이 쓰는 endpoint를 내 명의로 넣는다 — PK(23505). 클라이언트는 그 전에 새 주소를 받는다'
+insert into public.profiles_push_subscription (endpoint, user_id, p256dh, auth)
+values ('https://rlstest.invalid/push/bob-1', :'alice', :'p256dh', :'authkey');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] created_at을 실어 시각 위조 — insert grant 목록 밖이다'
+insert into public.profiles_push_subscription (endpoint, user_id, p256dh, auth, created_at)
+values ('https://rlstest.invalid/push/alice-1', :'alice', :'p256dh', :'authkey', now() - interval '1 year');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] https가 아닌 endpoint — 발송 스크립트가 요청을 보내는 주소다'
+insert into public.profiles_push_subscription (endpoint, user_id, p256dh, auth)
+values ('http://rlstest.invalid/push/alice-1', :'alice', :'p256dh', :'authkey');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 호스트 자리에 파서마다 다르게 읽히는 글자(;)가 든 endpoint — 검사한 호스트와 접속하는 호스트가 갈린다'
+insert into public.profiles_push_subscription (endpoint, user_id, p256dh, auth)
+values ('https://evil.example;.push.apple.com/x', :'alice', :'p256dh', :'authkey');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 계정 정보(@)가 든 endpoint'
+insert into public.profiles_push_subscription (endpoint, user_id, p256dh, auth)
+values ('https://user@rlstest.invalid/push/alice-1', :'alice', :'p256dh', :'authkey');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 형식이 아닌 암호화 키'
+insert into public.profiles_push_subscription (endpoint, user_id, p256dh, auth)
+values ('https://rlstest.invalid/push/alice-1', :'alice', 'short', :'authkey');
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.profiles_push_subscription (endpoint, user_id, p256dh, auth)
+values ('https://rlstest.invalid/push/alice-1', :'alice', :'p256dh', :'authkey');
+\echo '[❌차단] 암호화 키를 읽는다 — SELECT grant에 키 컬럼이 없다(키는 발송만 읽는다)'
+select p256dh from public.profiles_push_subscription;
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.profiles_push_subscription (endpoint, user_id, p256dh, auth)
+values ('https://rlstest.invalid/push/alice-1', :'alice', :'p256dh', :'authkey');
+\echo '[❌차단] 행 UPDATE(구독을 남에게 넘기기) — 정책도 컬럼 권한도 없다'
+update public.profiles_push_subscription set user_id = :'bob' where endpoint = 'https://rlstest.invalid/push/alice-1';
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.profiles_push_subscription (endpoint, user_id, p256dh, auth)
+values ('https://rlstest.invalid/push/alice-1', :'alice', :'p256dh', :'authkey');
+\echo '[1 / 0 기대] 내 구독은 보이고 남(bob)의 구독은 0행이다 — "이 기기의 구독이 내 것인가"의 판정이 이 조회다'
+select (select count(*) from public.profiles_push_subscription where endpoint = 'https://rlstest.invalid/push/alice-1') as mine,
+       (select count(*) from public.profiles_push_subscription where endpoint = 'https://rlstest.invalid/push/bob-1')   as others;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '    ⚠ DELETE의 using 절은 필터로 동작한다 — 권한이 없으면 에러가 아니라 0행이다.'
+\echo '[DELETE 0 기대] 남(bob)의 구독은 지워지지 않는다'
+delete from public.profiles_push_subscription where endpoint = 'https://rlstest.invalid/push/bob-1';
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.profiles_push_subscription (endpoint, user_id, p256dh, auth)
+values ('https://rlstest.invalid/push/alice-1', :'alice', :'p256dh', :'authkey');
+\echo '[DELETE 1 기대] 내 구독은 지운다(알림 끄기)'
+delete from public.profiles_push_subscription where endpoint = 'https://rlstest.invalid/push/alice-1';
+rollback to s;
+
+savepoint s;
+-- alice의 구독 열 개를 과거 시각으로 깔아 둔다(superuser — created_at은 클라이언트가 실을 수 없다).
+-- ⚠ 시각을 서로 다르게 민다 — now()는 트랜잭션 시작 시각이라 그냥 넣으면 전부 같은 값이 되어 "가장 오래된 것"이 정해지지 않는다.
+insert into public.profiles_push_subscription (endpoint, user_id, p256dh, auth, created_at)
+select 'https://rlstest.invalid/push/alice-old-' || lpad(n::text, 2, '0'), :'alice', :'p256dh', :'authkey', now() - make_interval(days => 20 - n)
+  from generate_series(1, 10) n;
+:login_alice
+insert into public.profiles_push_subscription (endpoint, user_id, p256dh, auth)
+values ('https://rlstest.invalid/push/alice-new', :'alice', :'p256dh', :'authkey');
+\echo '[10 / 0 / 1 기대] 열한 번째 구독을 넣으면 열 개로 유지되고, 가장 오래된 것(old-01)이 사라지고 새 것이 남는다'
+select (select count(*) from public.profiles_push_subscription) as mine,
+       (select count(*) from public.profiles_push_subscription where endpoint = 'https://rlstest.invalid/push/alice-old-01') as oldest,
+       (select count(*) from public.profiles_push_subscription where endpoint = 'https://rlstest.invalid/push/alice-new') as newest;
+rollback to s;
+
+savepoint s;
+insert into public.profiles_push_subscription (endpoint, user_id, p256dh, auth, created_at)
+select 'https://rlstest.invalid/push/bob-old-' || lpad(n::text, 2, '0'), :'bob', :'p256dh', :'authkey', now() - make_interval(days => 20 - n)
+  from generate_series(1, 10) n;
+:login_alice
+\echo '    남(bob) 명의의 insert는 정책이 거부한다 — 그 시도가 bob의 오래된 구독을 걷어 내면 안 된다.'
+\echo '[❌차단] 남의 명의로 넣어 그 사람의 구독을 밀어내려 한다'
+insert into public.profiles_push_subscription (endpoint, user_id, p256dh, auth)
+values ('https://rlstest.invalid/push/alice-evict', :'bob', :'p256dh', :'authkey');
+rollback to s;
+
+\echo ''
+\echo '-- 41b. 발송 기록 — 앱에는 쓰기 경로가 없다 --'
+
+insert into public.transfer_club (code, canonical, name, short_name, league)
+values ('rlstest-p1', 'RLS Push One', '푸시 하나', 'P1', '프리미어리그');
+insert into public.transfer_deal (deal_key, player, from_club_code, stage, first_reported_at, latest_reported_at, report_count)
+values ('38278f5f553394e7', 'Rlstest Push Player', 'rlstest-p1', 'talks', now() - interval '1 day', now() - interval '1 hour', 1)
+returning id as tdp \gset
+insert into public.transfer_deal_push_log (deal_id, status) values (:tdp, 'talks');
+
+savepoint s; :login_alice
+\echo '[❌차단] 발송 기록을 직접 넣는다 — 넣으면 그 상태의 알림이 영영 나가지 않는다'
+insert into public.transfer_deal_push_log (deal_id, status) values (:tdp, 'official');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 발송 기록을 지운다 — 지우면 같은 알림이 다시 나간다(DELETE grant가 없다)'
+delete from public.transfer_deal_push_log where deal_id = :tdp;
+rollback to s;
+
+savepoint s;
+\echo '    (superuser — 파생 스크립트의 기록 경로)'
+\echo '[❌차단] 같은 (딜, 상태)를 두 번 기록한다 — 복합 PK(스크립트는 충돌을 무시하고 새로 들어간 것만 보낸다)'
+insert into public.transfer_deal_push_log (deal_id, status) values (:tdp, 'talks');
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 상태 톤이 아닌 값(단계 이름 here_we_go)을 기록한다 — enum(transfer_status_tone)'
+insert into public.transfer_deal_push_log (deal_id, status) values (:tdp, 'here_we_go');
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[1 기대] 발송 기록은 비로그인도 읽는다(감출 것이 없는 운영 기록)'
+select count(*) from public.transfer_deal_push_log where deal_id = :tdp;
+rollback to s;
+
+savepoint s;
+delete from public.transfer_deal where id = :tdp;
+\echo '[0 기대] 딜을 지우면 발송 기록이 함께 사라진다 (cascade)'
+select count(*) from public.transfer_deal_push_log where deal_id = :tdp;
+rollback to s;
+
+rollback to s41;
 
 rollback;
 \echo ''

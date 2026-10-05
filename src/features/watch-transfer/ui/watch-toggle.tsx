@@ -16,6 +16,11 @@ interface WatchToggleProps {
    *   (`data-and-state.md`의 세션 3분기).
    */
   onSignInRequired: () => void;
+  /**
+   * 방금 관심 목록에 **담았다**(뺀 것은 아니다) — 뷰가 이 순간에 알림 안내를 낸다.
+   * ⚠ 호출 시점은 훅의 `onSuccess`(토스트) 뒤다. 그 사이 화면을 떠났으면 불리지 않는다 — 떠난 화면에 낼 안내가 없다.
+   */
+  onWatched?: () => void;
 }
 
 const LABEL_ADD = "관심 목록에 담기";
@@ -32,7 +37,7 @@ const LABEL_REMOVE = "관심 목록에서 빼기";
  *   `onSettled`의 무효화가 확정한다(좋아요와 같은 판단). 연타해도 행은 하나뿐이다(PK).
  * ⚠ `aria-pressed`로 상태를 말한다 — 라벨도 함께 바뀌지만 토글 버튼의 롤 규약이다.
  */
-export function WatchToggle({ dealId, watched, onSignInRequired }: WatchToggleProps) {
+export function WatchToggle({ dealId, watched, onSignInRequired, onWatched }: WatchToggleProps) {
   const status = useSessionStore((s) => s.status);
   const toggle = useToggleTransferWatch();
 
@@ -81,7 +86,17 @@ export function WatchToggle({ dealId, watched, onSignInRequired }: WatchTogglePr
     <button
       type="button"
       aria-pressed={watched}
-      onClick={() => toggle.mutate({ dealId, watched })}
+      onClick={() =>
+        toggle.mutate(
+          { dealId, watched },
+          // `watched`는 누르기 전 상태다 — 담는 쪽(false → true)일 때만 알린다
+          {
+            onSuccess: () => {
+              if (!watched) onWatched?.();
+            },
+          },
+        )
+      }
       className={buttonClassName({ variant: watched ? "primary" : "secondary", block: true })}
     >
       <Icon as={Bell} size={18} className={watched ? "fill-current" : undefined} />

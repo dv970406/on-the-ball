@@ -14,9 +14,13 @@
  *   node scripts/sync-transfer-news.mjs --remote                 # 원격 프로젝트에 쓴다(명시적일 때만). 대상은 환경변수다 —
  *                                                                #   로컬에서는 `set -a; source .env.prod; set +a` 뒤에 붙인다(.env.local은 로컬 값)
  *
- * 단계: 수집 → 가십 칼럼을 항목 행으로 → 딜 파생. 파생 안에서 이름 조회(위키데이터)와 **LLM 판정·요약**(`judge.mjs` —
+ * 단계: 수집 → 가십 칼럼을 항목 행으로 → 딜 파생 → 알림. 파생 안에서 이름 조회(위키데이터)와 **LLM 판정·요약**(`judge.mjs` —
  * 보도 한 건에 한 번, 이동 여부·출발·행선지·한국어 요약)이 돈다. `ANTHROPIC_API_KEY`가 없으면 판정 없이 파생한다 —
  * 판정을 받지 못한 **새** 딜은 열리지 않고 이미 있는 딜은 남는다(원격 실행은 키가 없으면 실패다).
+ *
+ * 알림(`notify.mjs`)은 **정기 실행에서만** 돈다 — 이번 실행이 만든 새 딜·상태가 바뀐 딜을 관심 등록자·응원 구단 팬에게 웹 푸시로
+ * 보낸다. 사람이 돌리는 재처리(`--reprocess`·`--derive-only`…)는 알리지 않는다(규칙을 고친 뒤의 일괄 변화는 소식이 아니다).
+ * VAPID 키(`NEXT_PUBLIC_VAPID_PUBLIC_KEY`·`VAPID_PRIVATE_KEY`·`VAPID_SUBJECT`)가 없으면 건너뛴다.
  *
  * ⚠ 정기 실행 주기는 `maxRunIntervalMinutes()`(registry.mjs) 이하여야 한다 — 그보다 느리면 보관시간이 짧은 피드에서
  *   항목이 밀려나 유실된다. 스케줄은 `.github/workflows/sync-transfer-news.yml`(매시, `--remote`)이다.
@@ -25,6 +29,7 @@
 import { clampCp, createSyncClient, flag, guardTarget, loadEnv } from "./lib/sync-db.mjs";
 import { runDerivation } from "./lib/transfer/derive-deals.mjs";
 import { JUDGE_MODEL, runJudgements } from "./lib/transfer/judge.mjs";
+import { runNotifications } from "./lib/transfer/notify.mjs";
 import { expandRoundups, reprocessAll, syncSources } from "./lib/transfer/pipeline.mjs";
 import { SOURCES, enabledSources, findSource, maxRunIntervalMinutes } from "./lib/transfer/registry.mjs";
 import { inspectTelegramChannel, verifyBlueskyAccount } from "./lib/transfer/sources.mjs";
@@ -84,7 +89,7 @@ if (dryRun && !deriveOnly) {
 }
 
 // ── DB ────────────────────────────────────────────────────────────────
-const env = loadEnv(["ANTHROPIC_API_KEY"]);
+const env = loadEnv(["ANTHROPIC_API_KEY", "NEXT_PUBLIC_VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT"]);
 const url = env.NEXT_PUBLIC_SUPABASE_URL;
 const key = env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !key) usage("NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY가 필요합니다");
@@ -127,8 +132,9 @@ const t0 = Date.now();
 const results = await syncSources(supabase, targets);
 printResults(results);
 await expand();
-// 소스가 실패해도 파생은 돈다 — 성공한 소스의 새 보도가 보드에 닿아야 한다. 종료 코드는 둘 중 하나라도 실패면 1이다
-await derive({ dryRun: false });
+// 소스가 실패해도 파생은 돈다 — 성공한 소스의 새 보도가 보드에 닿아야 한다. 종료 코드는 둘 중 하나라도 실패면 1이다.
+// ⚠ 알림은 **이 경로(정기 실행)에서만** 켠다 — 재처리·수동 파생의 일괄 변화는 소식이 아니다
+await derive({ dryRun: false, notify: true });
 console.log(`\n${((Date.now() - t0) / 1000).toFixed(1)}초 · 대상: ${url}`);
 process.exit(process.exitCode ?? 0);
 
@@ -151,7 +157,7 @@ async function expand() {
  * 키가 없으면 판정 없이 파생한다. 원격 실행에서 키가 없으면 실패다 — 조용히 지나가면 새 딜이 영영 열리지 않고 화면이 영문으로 남는다.
  * 판정이 계통적으로 실패해도(인증) 파생은 끝까지 쓴다(새 딜은 닫힘·기존 딜은 유지) — 종료 코드만 올린다.
  */
-async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: reread = false }) {
+async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: reread = false, notify: announce = false }) {
   try {
     const apiKey = env.ANTHROPIC_API_KEY;
     if (!apiKey && !summaryOnly) {
@@ -197,9 +203,48 @@ async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: rer
       const w = r.write;
       console.log(`  저장(값이 바뀐 것만): 구단 ${w.clubs} · 딜 ${w.deals}(그대로 ${w.unchanged}) · 배정 ${w.linked} · 해제 ${w.unlinked} · 삭제 ${w.deleted}${w.failed ? ` · 실패 ${w.failed}` : ""}`);
       if (w.failed) process.exitCode = 1;
+      if (announce) await notify(w.changes);
     }
   } catch (e) {
     console.error(`✗ 딜 파생 실패: ${e.message}`);
+    process.exitCode = 1;
+    // 딜을 저장한 **뒤에** 실패했으면 변화 목록이 에러에 실려 온다(`writeDeals`) — 딜은 이미 새 단계라 다음 실행에는
+    // 차이가 없다. 여기서 보내지 않으면 그 소식(오피셜 포함)은 영영 알림이 되지 못한다.
+    if (announce && Array.isArray(e?.changes)) await notify(e.changes);
+  }
+}
+
+/**
+ * 알림 — 이번 실행의 변화를 웹 푸시로 보낸다. 키가 없으면 조용히 건너뛴다(아직 켜지 않은 기능이다).
+ * 개별 발송의 실패(기기가 꺼져 있다 · 푸시 서비스가 잠깐 죽었다)는 경고다 — 딜은 이미 저장됐고, 알림 한 건이 빠진 것으로
+ * 수집 작업을 빨갛게 만들지 않는다. **설정이 틀려 아무것도 가지 않는 경우**(키 형식 오류 · 인증 거부 · 기록 실패)만 종료 코드 1이다.
+ */
+async function notify(changes) {
+  const vapid = {
+    subject: env.VAPID_SUBJECT,
+    publicKey: env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    privateKey: env.VAPID_PRIVATE_KEY,
+  };
+  if (!vapid.subject || !vapid.publicKey || !vapid.privateKey) {
+    if (changes.length) console.log(`  알림: VAPID 키가 없어 건너뜁니다(변화 ${changes.length}건)`);
+    return;
+  }
+  try {
+    const n = await runNotifications(supabase, changes, { vapid, log: console });
+    if (n.planned === 0) return;
+    console.log(
+      `  알림: 변화 ${n.planned}건 중 새로 알릴 것 ${n.fresh}건${n.suppressed ? `(상한 초과 — ${n.suppressed}건은 기록만)` : ""} · 받는 사람 ${n.users}명 · 보냄 ${n.sent}` +
+        `${n.gone ? ` · 죽은 구독 정리 ${n.gone}` : ""}${n.failed ? ` · 실패 ${n.failed}` : ""}${n.unknownHosts ? ` · 모르는 푸시 서비스 ${n.unknownHosts}` : ""}`,
+    );
+    // ⚠ 인증 거부(401·403)는 **설정 오류**라 실패로 올린다 — VAPID 공개키가 앱 빌드의 것과 다르면 모든 발송이 이렇게
+    //   거부되는데, 경고로만 두면 알림이 한 건도 가지 않는 채로 작업이 초록으로 지나간다(일시적인 발송 실패와 다르다).
+    if (n.rejected) {
+      console.error(`✗ 푸시 서비스가 인증을 거부했습니다(${n.rejected}건) — VAPID 키가 앱 빌드의 NEXT_PUBLIC_VAPID_PUBLIC_KEY와 같은지 확인하세요`);
+      process.exitCode = 1;
+    }
+  } catch (e) {
+    // VAPID 형식 오류도 여기로 온다 — 기록을 넣기 전에 던지므로 알림을 잃지 않지만, 고칠 때까지 아무것도 가지 않는다
+    console.error(`✗ 알림 실패: ${e instanceof Error ? e.message : String(e)}`);
     process.exitCode = 1;
   }
 }

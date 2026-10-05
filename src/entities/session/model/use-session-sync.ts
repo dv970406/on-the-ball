@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { unsubscribePush } from "@/shared/lib";
 import { rememberAuthProvider } from "../lib/last-auth-provider";
 import { clearSignOutIntent } from "../lib/sign-out-intent";
 import { useSessionStore } from "./session-store";
@@ -87,6 +88,32 @@ export function useSessionSync() {
       const nextUserId = session?.user.id ?? null;
       cacheUserIdRef.current = nextUserId;
       const userChanged = prevUserId !== undefined && prevUserId !== nextUserId;
+
+      /*
+       * 이 브라우저에 더는 그 사용자의 세션이 없다(로그아웃 · 세션 부정 · 다른 탭의 로그아웃 · 계정 전환 · **만료된 채
+       * 돌아온 브라우저**) — **이 브라우저의 푸시 구독을 버린다.** 구독은 계정이 아니라 브라우저의 것이라, 남겨 두면 떠난 사람의 알림이
+       * 이 기기에 계속 온다. 서버의 행은 세션이 이미 없어 여기서 지울 수 없지만, 푸시 서비스가 그 주소를 죽이므로
+       * 다음 발송이 410을 받아 정리한다(`scripts/lib/transfer/notify.mjs`).
+       * ⚠ 직접 로그아웃(`features/sign-out`)에만 걸지 않는다 — 세션이 사라지는 경로가 여럿인데 이 콜백이 전부 받는다.
+       * ⚠ supabase를 부르지 않는 브라우저 API라 이 콜백에서 불러도 된다(위 ⚠의 금지는 `supabase.auth.*`다).
+       *   기다리지 않는다 — 실패해도 세션 정리를 막을 일이 아니고, 다음 사용자가 알림을 켤 때 남은 구독을 다시 거른다.
+       * ⚠ **첫 이벤트가 "세션 없음"인 경우도 포함한다**(`prevUserId`가 `undefined`). 세션이 만료된 채 다시 연 브라우저는
+       *   로그아웃 이벤트를 거치지 않는다 — 그 경로를 빼면 떠난 사람의 알림이 그 기기에 계속 온다. 구독이 없는 브라우저
+       *   (대부분의 비로그인 방문)에서는 등록된 워커가 없어 아무 일도 하지 않는다.
+       */
+      /*
+       * ⚠ 첫 이벤트의 "세션 없음"은 **쿠키가 실제로 없을 때만** 믿는다. auth-js는 만료된 토큰의 갱신이 일시 장애
+       *   (네트워크·5xx)로 실패하면 세션을 쿠키에 그대로 둔 채 첫 이벤트를 `null`로 낸다 — 그때 구독을 버리면 인증
+       *   서버가 잠깐 죽은 시간대의 방문자 전원이 알림을 조용히 잃는다(세션은 곧 스스로 복구된다). 세션이 정말 끝났으면
+       *   쿠키도 지워져 있다.
+       */
+      const hasSessionCookie = /(?:^|;\s*)sb-[^=;]*-auth-token(?:\.\d+)?=/.test(document.cookie);
+      const sessionGone =
+        nextUserId === null && (typeof prevUserId === "string" || (prevUserId === undefined && !hasSessionCookie));
+      const switchedUser = typeof prevUserId === "string" && nextUserId !== null && prevUserId !== nextUserId;
+      if (sessionGone || switchedUser) {
+        unsubscribePush().catch((e) => console.error("[auth] 푸시 구독 해지 실패:", e));
+      }
       if (
         event === "USER_UPDATED" ||
         ((event === "SIGNED_IN" || event === "SIGNED_OUT") && userChanged)

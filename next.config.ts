@@ -24,6 +24,21 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        /*
+         * 서비스 워커(`public/sw.js` — 웹 푸시 알림 전용).
+         *
+         * ⚠ **캐시하지 않는다.** 워커는 브라우저가 한 번 깔면 스스로 바꿔 주지 않고, 새 스크립트를 받아야만
+         *   갈아 끼운다 — 캐시에 걸리면 고친 워커(알림 문구·눌렀을 때 여는 주소)가 그만큼 늦게 닿는다.
+         * ⚠ CSP는 **이 파일에만** 건다 — 워커가 다른 출처의 스크립트를 끌어오지 못하게 한다(Next 16의 PWA 가이드).
+         */
+        source: "/sw.js",
+        headers: [
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'" },
+        ],
+      },
+      {
         // 자체 호스팅 Pretendard 서브셋 — 파일명이 버전 고정이라 불변 캐시 안전
         source: "/fonts/pretendard/:file*",
         headers: [

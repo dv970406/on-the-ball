@@ -18,6 +18,9 @@
 - `status`는 `"loading" | "authenticated" | "guest"` **명시 필드**다. `user !== null`에서 파생시키면 "복원 전"과 "비로그인"이 구분되지 않아, 새로고침할 때 비로그인 UI가 잠깐 보였다 바뀌는 깜빡임을 막을 수 없다.
 - 구독은 반드시 셀렉터로: `useSessionStore((s) => s.user)`.
 - ⚠ `onAuthStateChange` 콜백을 **async로 만들지 않는다**. `@supabase/auth-js` 2.110에서 async 오버로드는 `@deprecated`이며 `TOKEN_REFRESHED` 처리 중 중첩 리프레시가 나면 데드락된다. 콜백 안에서 `supabase.auth.*`를 다시 호출하는 것도 금지.
+- **이 브라우저에 그 사용자의 세션이 없다는 것을 알게 되면 푸시 구독을 버린다**(`use-session-sync` — 로그아웃·세션 부정·
+  다른 탭의 로그아웃·계정 전환, 그리고 세션이 만료된 채 다시 연 브라우저의 첫 인증 이벤트가 전부 이 한 곳으로 모인다). 구독은 계정이 아니라 브라우저의 것이라, 남겨 두면 떠난 사람의
+  알림이 그 기기에 계속 온다. 직접 로그아웃(`features/sign-out`)에만 걸지 않는다 — 세션이 사라지는 경로가 여럿이다.
 - 캐시 무효화는 `SIGNED_IN`·`SIGNED_OUT`·`USER_UPDATED`에서만 한다. `TOKEN_REFRESHED`까지 포함하면 토큰 갱신마다 화면 전체가 리페치된다.
   - ⚠ **`SIGNED_IN`·`SIGNED_OUT`은 유저 id가 실제로 바뀔 때만 센다.** auth-js 2.110은 저장된 세션을 복원할 때마다(페이지 로드, 다른 탭의 로드) `SIGNED_IN`을 발행해서, 이벤트 이름만 보면 로그인 사용자는 **매 로드마다** SSR이 넘긴 데이터를 버리고 전량 재조회한다(실측). 첫 이벤트는 기준만 세운다 — 그때의 캐시는 같은 쿠키 세션으로 SSR한 값이다(`use-session-sync`).
 
@@ -158,8 +161,8 @@ const handleSubmit = (e) => {
 
 | 가드를 둔다 | 두지 않는다 |
 |---|---|
-| **행이 생긴다** — 작성·등록류 뮤테이션 전부(딜 댓글·답글 — `use-comment-composer`) | **소셜 로그인** — 버튼을 누르면 페이지가 프로바이더로 넘어가 화면 자체가 사라진다(단 아래 PKCE 예외) |
-| **행이 사라진다** — 연결 해제(`useUnlinkIdentity`), 삭제류 뮤테이션 전부(댓글 삭제 — `use-comment-deletion`의 항목별 가드. 성공한 댓글은 재조회를 기다리지 않고 화면에서 뺀다) | **낙관적 업데이트** — 관심 토글(`useToggleTransferWatch`)·댓글 좋아요/싫어요(`useVoteComment`)(의도적으로 `disabled`조차 두지 않는다, 아래 절 참고) |
+| **행이 생긴다** — 작성·등록류 뮤테이션 전부(딜 댓글·답글 — `use-comment-composer`, 알림 켜기 — `usePushToggle`의 `enable`) | **소셜 로그인** — 버튼을 누르면 페이지가 프로바이더로 넘어가 화면 자체가 사라진다(단 아래 PKCE 예외) |
+| **행이 사라진다** — 연결 해제(`useUnlinkIdentity`), 삭제류 뮤테이션 전부(댓글 삭제 — `use-comment-deletion`의 항목별 가드. 성공한 댓글은 재조회를 기다리지 않고 화면에서 뺀다), 알림 끄기(`usePushToggle`의 `disable`) | **낙관적 업데이트** — 관심 토글(`useToggleTransferWatch`)·응원 구단 토글(`useToggleClubFollow`)·댓글 좋아요/싫어요(`useVoteComment`)(의도적으로 `disabled`조차 두지 않는다, 아래 절 참고) |
 | | **멱등한 UPDATE** — 닉네임 변경은 연타해도 행이 늘지 않아 `isPending` 확인으로 족하다 |
 
 #### 자리는 **그 뮤테이션을 조립하는 곳**이다

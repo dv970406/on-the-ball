@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { jetbrainsMono } from "@/app/fonts";
 import { AppProviders } from "@/app/providers";
-import { env } from "@/shared/config";
+import { TOKEN_COLORS, env } from "@/shared/config";
 import "@/app/styles/globals.css";
 
 export const metadata: Metadata = {
@@ -13,7 +13,8 @@ export const metadata: Metadata = {
   // default는 템플릿이 적용되지 않는 자리(루트·not-found)에 쓰인다.
   title: { template: "%s | 온더볼", default: "온더볼" },
   // 서비스 소개 문구의 단일 소스 — 하위 페이지는 이 값을 상속한다.
-  // sign-in 화면과 opengraph-image.alt.txt도 같은 문구를 쓴다(세 곳이 갈리면 공유 프리뷰만 옛 톤으로 남는다).
+  // sign-in 화면·opengraph-image.alt.txt·`OG_IMAGE`의 alt·매니페스트(`app/manifest.ts`)도 같은 문구를 쓴다
+  // (갈리면 그 자리만 옛 톤으로 남는다).
   description: "유럽 5대 리그 이적 소식을 한곳에서",
   /**
    * 색인 지시 — 기본값(index, follow)에 미리보기 상한을 연다.
@@ -49,7 +50,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#ffffff",
+  // 브라우저가 CSS 밖에서 읽는 값이라 토큰과 같은 값의 상수를 쓴다(매니페스트의 `theme_color`와 같은 값이어야 한다)
+  themeColor: TOKEN_COLORS.canvas,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

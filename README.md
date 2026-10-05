@@ -15,10 +15,12 @@
 
 | 영역 | 내용 |
 |---|---|
-| 이적시장 | 프리미어리그·유럽 5대 리그 이적 딜 보드(`/transfers`)와 딜 상세(`/transfers/[id]`, 보도 타임라인). 기자·매체 보도를 매시 수집해(`scripts/sync-transfer-news.mjs`, GitHub Actions) **딜을 파생**하고, 딜에 붙은 보도만 LLM이 한국어로 한두 문장 요약한다. 리그·정렬·구단 필터는 쿼리 파라미터 + canonical이고, 첫 화면만 SSR이며 필터 전환은 서버를 부르지 않는다(주소만 바꾼다). `/`는 이 보드로 리다이렉트된다 |
-| 관심 딜 | 로그인 사용자가 딜을 관심 목록에 담는다(낙관적 업데이트, 복합 PK로 멱등) |
+| 이적시장 | 프리미어리그·유럽 5대 리그 이적 딜 보드(`/transfers`)와 딜 상세(`/transfers/[id]`, 보도 타임라인). 기자·매체 보도를 매시 수집해(`scripts/sync-transfer-news.mjs`, GitHub Actions) **딜을 파생**하고, 딜에 붙은 보도만 LLM이 한국어로 한두 문장 요약한다. 리그·정렬·구단·관심 필터는 쿼리 파라미터 + canonical이고, 첫 화면만 SSR이며 필터 전환은 서버를 부르지 않는다(주소만 바꾼다). `/`는 이 보드로 리다이렉트된다 |
+| 관심 딜 · 응원 구단 | 로그인 사용자가 딜을 관심 목록에 담고(낙관적 업데이트, 복합 PK로 멱등) 보드의 `관심` 칩으로 모아 본다. 응원 구단을 고르면 보드의 구단 칩 맨 앞에 놓인다 |
+| 알림 | 웹 푸시 — 관심 딜의 상태가 바뀌거나 응원 구단에 새 딜이 생기면 수집 스크립트가 보낸다. 아이폰은 홈 화면에 추가한 앱에서만 된다(`app/manifest.ts` · `public/sw.js`) |
+| 딜 댓글 | 딜 상세의 댓글·답글(깊이 1)과 좋아요/싫어요 |
 | 인증 | **카카오 · 구글 소셜 로그인**(로그인 = 가입) · 로그아웃. 에러는 한국어로 매핑 |
-| 프로필 | 닉네임(가입 시 랜덤 배정 → 본인이 변경) · 프로필 사진 업로드 · **로그인 수단 연결** |
+| 프로필 | 닉네임(가입 시 랜덤 배정 → 본인이 변경) · 프로필 사진 업로드 · 응원 구단 · 알림 · **로그인 수단 연결** |
 | 권한 | **2중 방어** — 클라이언트 가드(`AuthRequired`·`GuestOnly`, 안내) → **RLS + 컬럼 권한(실제 차단)**. `proxy.ts`는 세션 쿠키 갱신만 하고 라우트 가드를 두지 않는다(판정자가 둘이면 무한 리다이렉트가 된다 — `docs/conventions/nextjs.md`) |
 | 검색 유입 · 공유 | 보드·딜 상세 **SSR** · 정렬·리그는 쿼리 + canonical · `sitemap.xml` · `robots.txt` · 딜마다 그리는 공유 카드(`opengraph-image`) |
 | 분석 | GA4(`NEXT_PUBLIC_GA_ID`가 있을 때만) — 이벤트는 `track`(`@/shared/lib`) 하나로 보낸다 |
@@ -30,7 +32,8 @@
 > 데이터 접근에 Route Handler를 두지 않고 **브라우저가 Supabase를 직접 호출**합니다.
 > 그래서 **RLS와 컬럼 권한이 유일한 방어선**이며, 마이그레이션이 곧 보안 설계입니다 —
 > 자세한 규칙은 [`docs/conventions/api-and-db.md`](docs/conventions/api-and-db.md).
-> 이적 데이터(`transfer_*`)는 앱에 쓰기 경로가 없고 service_role로 도는 수집 스크립트만 씁니다.
+> 보도에서 파생하는 이적 데이터(딜·구단·보도)는 앱에 쓰기 경로가 없고 service_role로 도는 수집 스크립트만 씁니다 —
+> 사용자가 쓰는 것은 자기 행(관심·응원 구단·댓글·표·알림 구독)뿐입니다.
 
 <details>
 <summary>청산 기록</summary>
@@ -111,6 +114,8 @@ pnpm dev
 | `NEXT_PUBLIC_SITE_URL` | `og:image` 절대 URL 기준(빌드 시점에 인라인) | 둘 다 | 배포 시 |
 | `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` / `NEXT_PUBLIC_NAVER_SITE_VERIFICATION` | Search Console·네이버 서치어드바이저 소유권 확인 메타(비우면 태그를 내보내지 않음). 등록 뒤 `/sitemap.xml` 제출 | `.env.prod` | 검색 등록 시 |
 | `NEXT_PUBLIC_GA_ID` | GA4 측정 ID(`G-…`). 비우면 분석 스크립트를 싣지 않는다 — 운영 빌드에만 넣는다 | `.env.prod` | 분석 사용 시 |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | 웹 푸시 공개키. 비우면 화면에 알림 기능을 그리지 않는다 | 둘 다 | 알림 사용 시 |
+| `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | 웹 푸시 비밀키·연락처 — 발송 스크립트(`scripts/sync-transfer-news.mjs`)만 쓴다. 런타임에는 필요 없다 | `.env.local` | 알림 사용 시 |
 | `SUPABASE_SERVICE_ROLE_KEY` | 운영 스크립트(`scripts/sync-transfer-news.mjs`) — 런타임에는 필요 없다 | `.env.local` | 원격 수집 시 |
 | `ANTHROPIC_API_KEY` | 이적 소식 한국어 요약(LLM). 없으면 로컬 실행은 요약을 건너뛰고, `--remote` 실행은 실패로 끝난다 | `.env.local` | 원격 수집 시 |
 | `API_FOOTBALL_KEY` | 구단 엠블럼 내려받기(`scripts/fetch-team-crests.mjs`) — 런타임에는 필요 없다 | `.env.local` | 엠블럼 추가 시 |
@@ -179,13 +184,14 @@ supabase migration list --linked    # ③ Local/Remote 열이 일치하는지 �
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Production + Preview | 〃 |
 | `NEXT_PUBLIC_SITE_URL` | **Production만** | Preview는 비워 둬야 `VERCEL_URL` 폴백이 배포별 도메인을 잡습니다 |
 | `NEXT_PUBLIC_GA_ID` | **Production만** | 분석이 꺼집니다(스크립트를 싣지 않습니다). Preview에 넣으면 시험 클릭이 운영 수치에 섞입니다 |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Production | 화면에 알림 기능이 그려지지 않습니다. 수집 워크플로의 `VAPID_PUBLIC_KEY` 시크릿과 **같은 값**이어야 합니다 |
 
 > ⚠ **`NEXT_PUBLIC_*`는 빌드 시점에 인라인됩니다** — 값을 바꾸면 **반드시 재배포**해야 합니다.
 > `NEXT_PUBLIC_SITE_URL`이 도메인 확정 전에 정해져야 하므로, Import 화면에서 프로젝트 이름을
 > 먼저 정하고 그 자리에서 `https://<이름>.vercel.app`을 넣은 뒤 첫 배포를 돌립니다.
 
 > ⚠ **`SUPABASE_AUTH_EXTERNAL_*`·`SUPABASE_PROJECT_REF`·`SUPABASE_DB_PASSWORD`·
-> `SUPABASE_ACCESS_TOKEN`·`SUPABASE_SERVICE_ROLE_KEY`는 Vercel에 넣지 않습니다** — 소셜 로그인 키는
+> `SUPABASE_ACCESS_TOKEN`·`SUPABASE_SERVICE_ROLE_KEY`·`VAPID_PRIVATE_KEY`는 Vercel에 넣지 않습니다** — 소셜 로그인 키는
 > 대시보드가, CLI 값은 로컬이, service_role은 수집 워크플로의 시크릿이 소유합니다. 앱 런타임에는
 > service_role이 필요 없습니다.
 
@@ -214,8 +220,10 @@ supabase migration list --linked    # ③ Local/Remote 열이 일치하는지 �
 ### 4. 이적 소식 수집 (GitHub Actions)
 
 `.github/workflows/sync-transfer-news.yml`이 **매시** `node scripts/sync-transfer-news.mjs --remote`를 돌린다
-(수집 → 딜 파생 → 한국어 요약). 저장소 시크릿에 `SUPABASE_URL`·`SUPABASE_SERVICE_ROLE_KEY`·
-`ANTHROPIC_API_KEY`를 넣는다. 주기의 상한과 무료 한도는 [`docs/conventions/api-and-db.md`](docs/conventions/api-and-db.md)의
+(수집 → 딜 파생 → 한국어 요약 → 알림 발송). 저장소 시크릿에 `SUPABASE_URL`·`SUPABASE_SERVICE_ROLE_KEY`·
+`ANTHROPIC_API_KEY`를 넣는다. 웹 푸시 알림을 켜려면 `VAPID_PUBLIC_KEY`·`VAPID_PRIVATE_KEY`·`VAPID_SUBJECT`를 더한다
+(`pnpm exec web-push generate-vapid-keys`로 만든다 — 공개키는 Vercel의 `NEXT_PUBLIC_VAPID_PUBLIC_KEY`와 같은 값).
+셋 중 하나라도 없으면 발송만 건너뛴다. 주기의 상한과 무료 한도는 [`docs/conventions/api-and-db.md`](docs/conventions/api-and-db.md)의
 이적 소식 동기화 절에 있다.
 
 ### 5. 배포 후 자동화되지 않는 것
@@ -241,23 +249,25 @@ supabase migration list --linked    # ③ Local/Remote 열이 일치하는지 �
 app/                     # Next.js 라우팅 전용 (view만 마운트)
 ├── page.tsx             #   / → /transfers 리다이렉트
 ├── (auth)/              #   sign-in (GuestOnly 셸). 소셜 로그인 복귀 지점이기도 하다
-├── transfers/           #   이적 보드 · [id] (딜 + 보도 타임라인)
-├── profile/             #   닉네임·사진 수정 + 계정 연결. 계정 연결의 복귀 지점
-└── sitemap.ts / robots.ts  #   색인 신호 (Route Handler는 없다 — 이 둘은 Next 특수 파일이다)
+├── transfers/           #   이적 보드 · [id] (딜 + 보도 타임라인 · 딜마다 그리는 공유 카드 opengraph-image)
+├── profile/             #   닉네임·사진 수정 + 응원 구단 + 알림 + 계정 연결. 계정 연결의 복귀 지점
+├── manifest.ts          #   홈 화면 앱(웹 푸시의 전제 — 아이폰은 설치한 앱에서만 알림이 된다)
+└── sitemap.ts / robots.ts  #   색인 신호 (Route Handler는 없다 — 이들은 Next 특수 파일이다)
+public/sw.js             # 서비스 워커 — 웹 푸시 알림 전용(캐시·오프라인 없음)
 proxy.ts                 # 세션 쿠키 리프레시 (Next 16의 middleware). 라우트 가드는 없다
 src/
 ├── app/                 # providers(QueryClient + AuthProvider), fonts, globals.css
 ├── views/               # 화면 조립 (⚠ pages 금지)
 ├── widgets/             # app-bar · bottom-tab-bar · sub-header · tab-scroll-area · auth-shell · auth-status
 ├── features/            # 사용자 액션 1개 = 슬라이스 1개
-├── entities/            # session · profile · transfer
+├── entities/            # session · profile · transfer · comment · push
 ├── shared/              # ui / api / lib / config
 └── types/               # database.types.ts (supabase 생성 — 손으로 고치지 않는다)
 supabase/
 ├── migrations/          # 스키마 = 보안 설계
 ├── seed.sql             # db reset이 자동 실행 (개발 계정 alice/bob)
 └── tests/               # run-rls.sh · rls.sql
-scripts/                 # 운영 스크립트 — 이적 소식 수집·파생·요약, 구단 엠블럼, 규약 검사
+scripts/                 # 운영 스크립트 — 이적 소식 수집·파생·요약·알림 발송, 구단 엠블럼, 규약 검사
 docs/
 ├── conventions/         # 코딩 컨벤션
 ├── oauth-setup.md       # 카카오·구글 앱 등록 → 키 → 검증 절차
@@ -278,7 +288,7 @@ pnpm lint         # ESLint 실행
 pnpm lint:fix     # ESLint 자동 수정
 pnpm db:types     # 로컬 스키마 → src/types/database.types.ts 재생성 (마이그레이션 추가 후 필수)
 pnpm check:conventions  # FSD 레이어·배럴·스타일 화이트리스트 검사
-pnpm test:transfer      # 이적 파이프라인 회귀(추출·조립·파생·요약·이름·소스 — DB 없이 돈다)
+pnpm test:transfer      # 이적 파이프라인 회귀(추출·조립·파생·요약·이름·소스·알림 — DB 없이 돈다)
 ```
 
 > ⚠ `build`와 `build:prod`는 **같은 `.next/`를 쓴다.** `build:prod` 뒤에 `pnpm start`를 부르면

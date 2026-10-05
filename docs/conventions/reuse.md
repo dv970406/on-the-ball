@@ -31,7 +31,7 @@
 - **`userScope(userId)`** — 쿼리 키의 사용자 스코프 조각(`undefined` → `"guest"`). ⚠ `"guest"` 리터럴을 호출부가 각자 적지 말 것 — 갈리면 **캐시 키가 조용히 어긋나** 빌드도 린트도 못 잡고 화면만 스켈레톤이 되거나 남의 데이터가 남는다. `transferKeys`가 쓴다. ⚠ `userId: string`인 키(`identityKeys`·`profileKeys`)에는 쓰지 않는다. `api/keys.ts`는 서버 소비자라 **직접 경로**로 가져온다.
 - **`useNextParam`** — 현재 URL의 `?next=`. `useSearchParams` 대신 쓴다(그걸 쓰면 화면 프리렌더가 CSR로 떨어진다).
   - ⚠ **읽은 값을 렌더에 쓰는 화면**용이다(로그인 화면의 `redirectTo` 조립). 값이 필요한 시점이 **effect 안뿐**이라면 이걸 쓰지 말고 거기서 직접 읽는다 — 이 훅은 `useSyncExternalStore`로 렌더 중에 읽으므로 렌더타임 의존이 새로 생긴다. 라우트 가드(`use-auth-redirect`)가 그 경우이고, 사유는 그 훅 주석에 있다.
-- **`useDuplicateGuard(mutation)`** — 렌더를 기다리지 않는 중복 실행 가드. `{ isLocked, lock }`을 돌려준다. **`ref` + 해제 effect를 직접 짜지 말 것** — `disabled={isPending}`가 왜 부족한지(같은 tick의 두 번째 클릭)가 이 훅의 주석에 모여 있다. 소비자는 `useOAuthSignIn`·`useLinkIdentity`·`useUnlinkIdentity`·댓글 입력칸(`views/transfer-detail/model/use-comment-composer`)이다.
+- **`useDuplicateGuard(mutation)`** — 렌더를 기다리지 않는 중복 실행 가드. `{ isLocked, lock }`을 돌려준다. **`ref` + 해제 effect를 직접 짜지 말 것** — `disabled={isPending}`가 왜 부족한지(같은 tick의 두 번째 클릭)가 이 훅의 주석에 모여 있다. 소비자는 `useOAuthSignIn`·`useLinkIdentity`·`useUnlinkIdentity`·`usePushToggle`·댓글 입력칸(`views/transfer-detail/model/use-comment-composer`)이다.
   - ⚠ **`isPending`(boolean)이 아니라 뮤테이션을 통째로 넘긴다.** 해제가 `status`+`submittedAt`에 걸려 있어서다 — boolean은 "아직 시작 전"과 "이미 끝남"을 구분하지 못해, 마이크로태스크만으로 끝나는 실패(동기 `throw`)에서 deps가 `false → false`가 되어 **자물쇠가 영영 풀리지 않았다.**
   - ⚠ **`isPending`을 prop으로 받는 컴포넌트에 두지 말 것.** 부모가 리렌더될 때까지 낡은 값을 읽으므로 같은 무증상 잠금이 된다 → 뮤테이션을 조립하는 쪽에 둔다.
   - ⚠ 확인과 잠금이 **나뉜 이유가 규약이다** — 사이에 끼는 검증이 실패하면 잠그지 않고 빠져나가야 한다. 잠그면 뮤테이션이 시작되지 않아 `isPending`이 돌지 않고, 그 자물쇠는 영영 풀리지 않는다.
@@ -45,6 +45,7 @@
 - **`serverToClientTime(serverMs)`** — 서버 시각을 **이 기기 시계** 기준으로 옮긴다(잰 오차의 최솟값을 쓴다 — 지연은 늘 양수라 최솟값이 참 오차에 가깝다). TanStack `initialDataUpdatedAt`처럼 기기 시계와 빼서 신선도를 재는 자리에 쓴다 — 서버 시각을 그대로 넣으면 기기 시계 오차만큼 방금 그린 SSR이 stale이 되거나 옛 페이로드가 신선해진다. ⚠ **화면에 그리는 값에는 쓰지 않는다** — 잰 오차가 기기마다 달라 서버 HTML과 갈린다. 신선도처럼 그려지지 않는 값에만 쓰고, 부르는 자리는 옵션 함수(`initialDataUpdatedAt: () => …` — Query가 만들어질 때 한 번)다.
 - `useScrollRestore` — 목록 스크롤 위치 저장/복원
 - `useFocusTrap` — 오버레이(`Dialog`·`Sheet`) 안에 포커스를 가둔다. ⚠ 초기 포커스는 **`preventScroll: true`** 로 준다 — 화면 밖에서 올라오는 시트에 그냥 `focus()`하면 브라우저가 `overflow-hidden`인 430px 프레임을 스크롤시켜 **되돌릴 수 없게** 화면이 밀린다(실측)
+- **`detectPushSupport()` / `getPushSubscription()` / `subscribePush(vapidPublicKey)` / `unsubscribePush()` / `serializePushSubscription(sub)` / `pushSubscriptionUsesKey(sub, key)`** — 브라우저 푸시 구독의 순수 메커니즘(`web-push.ts`). 누구의 구독인지·어디에 저장하는지는 모른다 — 그건 `entities/push`(조회)와 `features/push-notification`(쓰기)이 갖는다. `shared`에 있는 이유는 `entities/session`(세션이 사라질 때 구독을 버린다)과 그 둘이 함께 써야 하는데 서로 import할 수 없어서다. ⚠ **전부 브라우저에서만 부른다**(이벤트 핸들러·effect·queryFn) — 렌더 중에 부르면 서버 HTML과 갈린다. ⚠ `detectPushSupport`의 UA 판정은 "왜 안 되는가"의 안내용이다 — 기능이 있으면 UA를 보지 않는다(되는 곳을 UA로 막지 않는다).
 - **`track(name, params)`** — 분석 이벤트(GA4). **이벤트는 이것으로만 보낸다** — 이름·파라미터는 같은 파일의 `AnalyticsEvents`가 단일 소스라 없는 이름·빠진 파라미터가 컴파일 에러다. 측정 ID(`env.gaId`)가 없으면 아무것도 하지 않는다. 뮤테이션의 성공은 그 훅의 `onSuccess`에서 센다(`nextjs.md` 분석 절). ⚠ 사람을 가리키는 값·사용자가 쓴 글을 싣지 않는다.
 - `useToast` / `useToastStore` — 토스트 발행. **표시 영역(`ToastViewport`)은 `@/shared/ui`에 있고 루트에 하나만 둔다** — 상태와 UI가 레이어를 달리한다
 
@@ -120,8 +121,14 @@
 - `DealRow` / `DealMiniCard` / `RumorCard` / `StatusBadge` / `FeeDelta` / `TransferCrest` — 목록 행 · 미니 카드 · 캐러셀 카드 · 상태 뱃지 · 변동폭 · 구단 엠블럼(`Crest`의 얇은 래퍼 — 코드로 경로를 조립하는 도메인 지식만 갖는다). ⚠ `CrestStack`(엠블럼 겹치기)은 배럴에 없다 — 슬라이스 밖 소비자가 0이다.
   ⚠ **엠블럼을 직접 `<img>`로 그리지 말 것** — 폴백이 두 갈래인데 둘 다 필요하다: 코드가 비었을 때와, **파일이 없어 404일 때**(새 구단이 생기면 반드시 겪는다). 메커니즘은 `@/shared/ui`의 `Crest`가 갖는다.
 - ⚠ **한국어로는 "이적시장"·"딜"로 부른다.** URL(`/transfers`)·테이블(`transfer_deal`)·식별자(`transfer`)는 그대로 두고 화면·주석의 한국어만 통일한다.
-- ⚠ **`TransferClub`·`STAGE_GROUP`·`isDeadStage`·`feeDelta`·`ClubRoute`·`WatchMark`는 배럴에 없다** — 슬라이스 밖 소비자가 0이라 올리지 않았다. `STAGE_STATUS`·`STATUS_LABEL`도 배럴에는 없지만 서버 page가 `lib/stage` 직접 경로로 쓴다(og description). `check:conventions`는 상대 경로 소비를 현역으로 세어 이 유형을 잡지 못하므로 손으로 지킨다.
-- 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/keys`·`api/list-query`·`lib/stage`·`lib/route-label`·`lib/player-name`을 직접 import.
+- **`useTransferClubListQuery({ enabled })` / `useFollowedClubsQuery({ userId, enabled, initialData, initialDataUpdatedAt })`** — 5대 리그 구단 전부(정식명순, "나"와 무관) · 내 응원 구단(`userId`로 스코프 — 로그인해야만 성립해 비로그인이면 조회하지 않는다). 쓰기는 `features/follow-club`. ⚠ 보드는 응원 구단으로 구단 칩의 순서를 정하므로 **보드 page가 쿠키 세션으로 함께 읽어 `initialData`로 내린다** — 클라이언트에서만 받으면 하이드레이션 뒤에 칩이 자리를 바꾼다. 조립은 `buildClubListQuery`·`buildFollowedClubsQuery`(`api/list-query.ts`)가 갖고, 순서는 **`compareClubs`** 하나가 정한다(낙관적 갱신이 조회와 같은 순서로 끼워 넣어야 항목이 튀지 않는다). ⚠ `buildFollowedClubsQuery`는 유저 필터를 걸지 않는다 — SELECT 정책이 "내 행만"이다. anon에는 그 표의 grant가 없어 세션이 실린 클라이언트로만 부른다.
+- ⚠ **`STAGE_GROUP`·`isDeadStage`·`feeDelta`·`ClubRoute`·`WatchMark`는 배럴에 없다** — 슬라이스 밖 소비자가 0이라 올리지 않았다. `STAGE_STATUS`·`STATUS_LABEL`도 배럴에는 없지만 서버 page가 `lib/stage` 직접 경로로 쓴다(og description). `check:conventions`는 상대 경로 소비를 현역으로 세어 이 유형을 잡지 못하므로 손으로 지킨다.
+- 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/keys`·`api/list-query`·`lib/stage`·`lib/route-label`·`lib/player-name`·`lib/fee`를 직접 import.
+
+## `@/entities/push`
+- `usePushStatusQuery(userId)` / `pushKeys` / `PushStatus` — **이 기기에서 이 사용자**의 알림 상태. 브라우저(지원 여부·권한·구독)와 서버(그 구독이 내 행으로 있는가)를 함께 본다 — 브라우저에 구독이 있어도 내 행이 아니면 꺼진 것이다. 쓰기는 `features/push-notification`.
+  - 상태: 켤 수 없는 이유(`needs-install`·`in-app-browser`·`unsupported`) · `unconfigured`(서버에 알림 키가 없다 — 화면은 알림 자리를 그리지 않는다. 키는 빌드 상수라 화면은 조회를 기다리지 않고 `env.vapidPublicKey`로 먼저 가른다) · `denied` · `off` · `on`. ⚠ 화면이 이유마다 다른 안내를 낸다 — `Record<PushStatus, …>`로 두어 상태가 늘면 누락이 컴파일 에러가 되게 한다(`views/profile`의 `PushSettings`가 선례).
+  - ⚠ 브라우저 API에서 나오는 값이라 **서버가 미리 그릴 수 없다** — 도착 전 자리는 스켈레톤이 잡는다. 필요할 때만 조회한다(딜 상세는 방금 관심 목록에 담은 뒤에만 연다).
 
 ## `@/entities/comment`
 - `useCommentListQuery({ dealId, userId, enabled, initialData, initialDataUpdatedAt, placeholderData })` / `commentKeys` — 딜의 댓글(최신 `COMMENT_LIST_LIMIT`건, 화면에는 오래된 순). ⚠ **userId로 스코프된다**(내 표 `my_vote` 임베딩이 "내 행만"). 쓰기 뒤 무효화는 사용자 무관 prefix `commentKeys.deal(dealId)`로 잡고, 표의 낙관적 갱신은 **내 키**(`commentKeys.list(dealId, userId)`)만 고친다. ⚠ `initialDataUpdatedAt`에 서버가 읽은 시각을 넣는다 — 빼면 뒤로가기가 되살린 옛 서버 페이로드가 신선한 것으로 앉는다. 서버가 **다른 사용자**로 그린 목록은 `initialData`가 아니라 내 표를 지운 `placeholderData`로 넘긴다(`withoutMyVotes`).
@@ -146,8 +153,17 @@
 - ⚠ RPC가 없다 — 카운터가 없어 지킬 불변조건이 `(user_id, club_code)` 기본키 하나뿐이다. 23505는 흡수한다(멱등).
 - 고르는 화면은 `views/profile`의 구단 시트이고, 고른 구단은 보드의 구단 칩 맨 앞에 놓인다(`views/transfer-board`).
 
+## `@/features/push-notification`
+- `usePushToggle(source)` — 이 기기의 알림 켜기·끄기. `{ enable, disable, isPending, error }`를 돌려준다. `source`는 켠 자리(분석 이벤트용).
+- ⚠ **맨 `mutate`를 내보내지 않는다** — 가드가 훅 안에 있다(켜기는 행을 만들고 끄기는 행을 지운다).
+- ⚠ **`enable`은 클릭 핸들러에서 곧바로 부른다.** 권한 요청이 그 호출 안에서 동기로 시작된다 — 브라우저는 권한 요청이 사용자의 동작에서 곧바로 이어질 때만 물음을 띄운다. effect·타이머 뒤에서 부르지 말 것.
+- ⚠ 켤 때 브라우저에 남은 구독이 내 행이 아니면 버리고 새로 받는다(구독은 계정이 아니라 브라우저의 것이다 — `api-and-db.md` 웹 푸시 절). 저장에 실패하면 방금 받은 구독을 버린다.
+- 켜는 자리는 프로필의 알림 섹션(`PushSettings`)과 딜 상세에서 관심 목록에 담은 직후의 한 줄(`PushNudge`)이다. 권한은 맥락이 있는 자리에서만 묻는다(`nextjs.md`).
+- ⚠ 저장의 23505는 **내 행이면 흡수한다**(두 탭에서 동시에 켰다 — 방금 저장된 구독을 버리면 안 된다). 남의 행이거나 형식 위반(23514)이면 일반 문구 대신 "등록하지 못했어요"로 말한다 — 사용자가 입력한 값이 아니라서 "입력한 내용을 확인해 주세요"는 뜻이 어긋난다.
+- ⚠ "이 구독이 내 것인가"는 `buildOwnSubscriptionQuery`(`@/entities/push`) 하나가 판정한다 — 상태 조회와 켜기가 같은 조회를 써야 한다.
+
 ## `@/features/watch-transfer`
-- `WatchToggle({ dealId, watched, onSignInRequired })` — 상세 하단의 관심 토글 하나. 조회는 `@/entities/transfer`다.
+- `WatchToggle({ dealId, watched, onSignInRequired, onWatched })` — 상세 하단의 관심 토글 하나. 조회는 `@/entities/transfer`다. `onWatched`는 방금 **담았을 때** 불린다(뺀 것은 아니다) — 뷰가 그 순간에 알림 안내를 낸다.
 - ⚠ **훅(`useToggleTransferWatch`)은 배럴에 없다** — 토글은 상세 하나뿐이라 슬라이스 밖 호출부가 0이다(목록 행의 관심 표시는 표시일 뿐 토글이 아니다 — `WatchMark`는 `entities/transfer` 내부에서만 쓰인다).
 - ⚠ 세션 `status`를 **3분기**한다(`loading`을 비로그인과 같이 다루면 콜드 로드 직후 로그인 사용자가 안내를 본다).
 - ⚠ **비로그인에게도 버튼을 그대로 연결한다** — 눌러야 로그인 안내가 뜬다. 안내는 **뷰가 소유한다**(`onSignInRequired` 콜백). 컨트롤을 죽이고 옆에 "로그인하고 …하기" 링크를 다는 형태로 되돌리지 말 것: 사용자가 실제로 누르는 것은 컨트롤이라 **눌러도 아무 반응이 없는 UI**가 된다.
@@ -172,8 +188,11 @@
 - **`avatarUrl(path)` / `AVATAR_BUCKET`** — 아바타 **경로** → 공개 URL. ⚠ DB에는 전체 URL이 아니라 경로만 저장한다(호스트가 환경마다 다르다: 로컬 `127.0.0.1:64321` ↔ 원격 `*.supabase.co`). 조립은 이 함수 한 곳에서만. 버킷명 문자열도 여기서 가져다 쓴다(`features/update-profile`이 선례).
 - **`publicStorageUrl(bucket, path)`**(`shared/config/storage.ts` — 배럴에 없다) — 공개 버킷 경로 → URL 조립의 **단일 소스**. 새 공개 버킷이 생기면 이 함수를 감싸는 버킷별 함수를 `shared/config`에 두고 그것을 배럴로 노출한다(`avatarUrl`이 선례). 호출부가 버킷 URL을 직접 조립하지 않는다.
 - **`OG_IMAGE` / `OG_SITE` / `NOT_FOUND_TITLE` / `absoluteUrl(path)`** — 세그먼트가 `openGraph`를 채울 때 함께 싣는 이미지·사이트 공통 값(`siteName`·`locale`), 없는 리소스의 메타데이터 제목(404 화면과 같아야 한다), 그리고 앱 경로 → 절대 URL. ⚠ `new URL(path, env.siteUrl)`을 호출부가 각자 짜지 말 것 — 사이트맵·`robots.txt`·`og:url` 셋이 **같은 URL**을 가리켜야 검색엔진·공유 플랫폼이 한 주소를 대표로 본다(canonical과도 같은 경로여야 한다).
-- **`env`** — `NEXT_PUBLIC_*` 환경변수의 단일 소스(`supabaseUrl`·`supabaseAnonKey`·`siteUrl`·`googleSiteVerification`·`naverSiteVerification`). **`process.env`를 호출부에서 다시 읽지 말 것** — `proxy.ts`가 화면·훅과 같은 supabase 인스턴스를 봐야 세션 쿠키가 어긋나지 않는다.
+- **`env`** — `NEXT_PUBLIC_*` 환경변수의 단일 소스(`supabaseUrl`·`supabaseAnonKey`·`siteUrl`·`googleSiteVerification`·`naverSiteVerification`·`gaId`·`vapidPublicKey`). **`process.env`를 호출부에서 다시 읽지 말 것** — `proxy.ts`가 화면·훅과 같은 supabase 인스턴스를 봐야 세션 쿠키가 어긋나지 않는다.
   - `siteUrl`은 `og:image`를 절대 URL로 만드는 `metadataBase`(루트 layout)용이다. `NEXT_PUBLIC_SITE_URL` → `VERCEL_URL` → `localhost:3000` 순으로 폴백한다.
+  - `gaId`는 GA4 측정 ID다 — 형식(`G-…`)이 아니면 빈 값으로 접힌다(깨진 스크립트를 싣느니 측정을 끈다).
+  - `vapidPublicKey`는 웹 푸시의 **공개키**다 — 비어 있으면 화면이 알림 자리를 그리지 않는다. ⚠ 짝이 되는 비밀키를 여기 두지 않는다(이 모듈은 클라이언트 번들에 실린다 — 발송 스크립트의 환경에만 있다).
+- **`TOKEN_COLORS`** — 디자인 토큰과 같은 값의 JS 색 상수. **CSS를 읽지 못하는 자리 전용**이다(딜 공유 카드 이미지 · 웹 앱 매니페스트). 화면 컴포넌트의 `style`에 쓰지 않는다. 단일 소스는 `globals.css`의 `@theme`이고 이건 그 사본이다 — 토큰 값을 바꾸면 함께 고친다.
 - **`isSupabaseConfigured()`** — env가 채워졌는지. 값이 비어도 빌드는 성공해야 하므로 `env`는 throw하지 않는다 → **가드는 호출부의 책임**이고, 그 가드를 각자 짜지 말고 이걸 쓴다(`proxy.ts`가 선례).
 
 ## `@/shared/ui`

@@ -874,6 +874,7 @@ async function findOrphanDeals(supabase, keep) {
 /**
  * 파생 결과를 쓴다 — 구단 → 딜 → 보도 행의 `deal_id` 순서(FK 방향).
  * ⚠ 행 단위 실패도 실패다(종료 코드 1) — 읽는 화면이 없어 종료 코드가 유일한 신호다.
+ * 돌려주는 값은 저장 통계와 `changes`(이번 실행이 만든 새 딜·단계가 바뀐 딜 — 알림 단계가 읽는다)다.
  * ⚠ **값이 바뀐 구단·딜만 쓴다.** 매시간 전량을 upsert하면 값이 그대로인 행까지 트리거·인덱스 다섯 개가 갱신되고
  *   죽은 행 버전이 쌓인다 — 그리고 한 행만 실패해도 `upsertRows`가 **전량을 한 건씩** 다시 보낸다. 대조 기준은
  *   파생이 쓰는 컬럼 전부다(`DEAL_COLUMNS`·`CLUB_COLUMNS`). 그래서 `updated_at`은 "마지막으로 값이 바뀐 시각"이다
@@ -924,63 +925,110 @@ export async function writeDeals(supabase, derived, rows, opts = {}) {
     for (const d of data) idByKey.set(d.deal_key, d.id);
   }
 
-  // 관심 구단(자식 행) — 딜마다 저장된 집합과 대조해 바뀐 딜만 지우고 다시 넣는다(표 순 position)
-  const dealIds = [...idByKey.values()];
-  const storedSuitors = new Map();
-  for (const ids of chunks(dealIds)) {
-    const { data, error } = await supabase.from(SUITORS).select("deal_id, club_code, position").in("deal_id", ids);
-    if (error) throw new Error(`관심 구단 조회 실패: ${error.message}`);
-    for (const r of data) (storedSuitors.get(r.deal_id) ?? storedSuitors.set(r.deal_id, []).get(r.deal_id)).push(r);
-  }
-  for (const deal of derived.deals) {
-    const id = idByKey.get(deal.deal_key);
-    if (id == null) continue;
-    const want = deal.suitorCodes.map((club_code, position) => ({ deal_id: id, club_code, position }));
-    const have = (storedSuitors.get(id) ?? []).sort((a, b) => a.position - b.position);
-    if (JSON.stringify(have.map((r) => [r.club_code, r.position])) === JSON.stringify(want.map((r) => [r.club_code, r.position]))) continue;
-    const { error: delErr } = await supabase.from(SUITORS).delete().eq("deal_id", id);
-    if (delErr) { stats.failed++; log.error(`✗ 관심 구단 정리 실패(${deal.player}): ${delErr.message}`); continue; }
-    if (want.length) {
-      const { error: insErr } = await supabase.from(SUITORS).insert(want);
-      if (insErr) { stats.failed++; log.error(`✗ 관심 구단 저장 실패(${deal.player}): ${insErr.message}`); continue; }
-    }
-    stats.suitors += 1;
-  }
-
-  // 보도 행 → 딜. 이미 같은 값이면 건너뛴다(쓰기를 아낀다)
-  const assigned = new Set();
-  const current = new Map(rows.map((r) => [r.id, r.deal_id ?? null]));
-  for (const deal of derived.deals) {
-    const id = idByKey.get(deal.deal_key);
-    if (id == null) continue; // 저장 실패한 딜 — 행은 옛 배정을 유지한다
-    for (const rowId of deal.rowIds) assigned.add(rowId);
-    const changed = deal.rowIds.filter((rowId) => current.get(rowId) !== id);
-    for (const ids of chunks(changed)) {
-      const { error } = await supabase.from(NEWS).update({ deal_id: id }).in("id", ids);
-      if (error) { stats.failed += ids.length; log.error(`✗ deal_id 배정 실패(${deal.player}): ${error.message}`); continue; }
-      stats.linked += ids.length;
-    }
-  }
-  // 범위 안인데 이번 파생에서 어느 딜에도 속하지 않은 행은 배정을 푼다(범위 밖 행은 건드리지 않는다 — 그 딜을 지우지 않기 위해서다)
-  const stale = rows.filter((r) => r.deal_id != null && !assigned.has(r.id)).map((r) => r.id);
-  for (const ids of chunks(stale)) {
-    const { error } = await supabase.from(NEWS).update({ deal_id: null }).in("id", ids);
-    if (error) { stats.failed += ids.length; log.error(`✗ deal_id 해제 실패: ${error.message}`); continue; }
-    stats.unlinked += ids.length;
+  /*
+   * 이번 실행이 바꾼 것 — **새 딜과 단계가 바뀐 딜**. 알림 단계(`notify.mjs`)가 이 목록에서만 알림을 만든다
+   * (저장된 값과의 차이가 곧 "소식"이다 — 기록만 보고 만들면 처음 켠 날 보드 전체가 알림이 된다).
+   * 구단 약칭·최신 보도 요약처럼 알림 문구에 쓸 값을 여기서 함께 풀어 둔다 — 그 단계가 딜 파생의 내부 모양을 몰라도 되게.
+   */
+  const clubShort = new Map(derived.clubs.map((c) => [c.code, c.short_name]));
+  const rowById = new Map(rows.map((r) => [r.id, r]));
+  const derivedByKey = new Map(derived.deals.map((d) => [d.deal_key, d]));
+  const changes = [];
+  for (const saved of dealUp.saved) {
+    const prevStage = stored.get(saved.deal_key)?.stage ?? null;
+    const dealId = idByKey.get(saved.deal_key);
+    if (dealId == null || prevStage === saved.stage) continue;
+    const deal = derivedByKey.get(saved.deal_key);
+    const destinations = [deal.to_club_code, ...deal.suitorCodes].filter(Boolean);
+    const latestSummary = deal.rowIds
+      .map((id) => rowById.get(id))
+      .filter((r) => r?.summary_ko)
+      .sort((a, b) => Date.parse(b.published_at) - Date.parse(a.published_at))[0]?.summary_ko;
+    changes.push({
+      dealId,
+      prevStage,
+      stage: deal.stage,
+      player: deal.player,
+      playerKo: deal.player_ko ?? null,
+      fromShort: deal.from_club_code ? (clubShort.get(deal.from_club_code) ?? null) : null,
+      toShorts: destinations.flatMap((code) => clubShort.get(code) ?? []),
+      isFreeAgent: deal.is_free_agent === true,
+      clubCodes: [...new Set([deal.from_club_code, ...destinations].filter(Boolean))],
+      latestReportedAt: deal.latest_reported_at,
+      summary: latestSummary ?? null,
+    });
   }
 
-  // 어떤 보도 행도 가리키지 않는 딜만 지운다(관심은 cascade, 댓글이 달린 딜은 남긴다 — findOrphanDeals 주석)
-  const { orphans, kept } = await findOrphanDeals(supabase, savedKeys);
-  for (const d of kept) log.warn(`⚠ 보도가 끊겼지만 댓글이 있어 남긴 딜: ${d.player} (${d.deal_key})`);
-  for (const d of orphans) {
-    const { error: delErr } = await supabase.from(DEALS).delete().eq("id", d.id);
-    // 판정과 삭제 사이에 댓글이 달렸다(댓글 FK restrict) — 실패가 아니라 "남긴 딜"이다
-    if (delErr?.code === "23503" && `${delErr.message} ${delErr.details ?? ""}`.includes("transfer_deal_comment")) { log.warn(`⚠ 삭제하려던 사이 댓글이 달려 남긴 딜: ${d.player} (${d.deal_key})`); continue; }
-    if (delErr) { stats.failed++; log.error(`✗ 딜 삭제 실패(${d.player}): ${delErr.message}`); continue; }
-    stats.deleted++;
-    log.warn(`⚠ 보도 행이 하나도 남지 않은 딜을 지웠다: ${d.player} (${d.deal_key})`);
+  /*
+   * ⚠ **여기서부터의 실패는 변화 목록을 에러에 실어 던진다.** 딜은 이미 새 단계로 저장됐다 — 뒤 단계(관심 구단 · 보도 배정 ·
+   *   빈 딜 정리)가 던져 목록이 버려지면 다음 실행에는 차이가 없어 그 알림이 영영 나가지 않는다. 호출부(`sync-transfer-news.mjs`)가
+   *   에러의 `changes`로 알림을 마저 보낸다.
+   */
+  async function finishWrite() {
+    // 관심 구단(자식 행) — 딜마다 저장된 집합과 대조해 바뀐 딜만 지우고 다시 넣는다(표 순 position)
+    const dealIds = [...idByKey.values()];
+    const storedSuitors = new Map();
+    for (const ids of chunks(dealIds)) {
+      const { data, error } = await supabase.from(SUITORS).select("deal_id, club_code, position").in("deal_id", ids);
+      if (error) throw new Error(`관심 구단 조회 실패: ${error.message}`);
+      for (const r of data) (storedSuitors.get(r.deal_id) ?? storedSuitors.set(r.deal_id, []).get(r.deal_id)).push(r);
+    }
+    for (const deal of derived.deals) {
+      const id = idByKey.get(deal.deal_key);
+      if (id == null) continue;
+      const want = deal.suitorCodes.map((club_code, position) => ({ deal_id: id, club_code, position }));
+      const have = (storedSuitors.get(id) ?? []).sort((a, b) => a.position - b.position);
+      if (JSON.stringify(have.map((r) => [r.club_code, r.position])) === JSON.stringify(want.map((r) => [r.club_code, r.position]))) continue;
+      const { error: delErr } = await supabase.from(SUITORS).delete().eq("deal_id", id);
+      if (delErr) { stats.failed++; log.error(`✗ 관심 구단 정리 실패(${deal.player}): ${delErr.message}`); continue; }
+      if (want.length) {
+        const { error: insErr } = await supabase.from(SUITORS).insert(want);
+        if (insErr) { stats.failed++; log.error(`✗ 관심 구단 저장 실패(${deal.player}): ${insErr.message}`); continue; }
+      }
+      stats.suitors += 1;
+    }
+
+    // 보도 행 → 딜. 이미 같은 값이면 건너뛴다(쓰기를 아낀다)
+    const assigned = new Set();
+    const current = new Map(rows.map((r) => [r.id, r.deal_id ?? null]));
+    for (const deal of derived.deals) {
+      const id = idByKey.get(deal.deal_key);
+      if (id == null) continue; // 저장 실패한 딜 — 행은 옛 배정을 유지한다
+      for (const rowId of deal.rowIds) assigned.add(rowId);
+      const changed = deal.rowIds.filter((rowId) => current.get(rowId) !== id);
+      for (const ids of chunks(changed)) {
+        const { error } = await supabase.from(NEWS).update({ deal_id: id }).in("id", ids);
+        if (error) { stats.failed += ids.length; log.error(`✗ deal_id 배정 실패(${deal.player}): ${error.message}`); continue; }
+        stats.linked += ids.length;
+      }
+    }
+    // 범위 안인데 이번 파생에서 어느 딜에도 속하지 않은 행은 배정을 푼다(범위 밖 행은 건드리지 않는다 — 그 딜을 지우지 않기 위해서다)
+    const stale = rows.filter((r) => r.deal_id != null && !assigned.has(r.id)).map((r) => r.id);
+    for (const ids of chunks(stale)) {
+      const { error } = await supabase.from(NEWS).update({ deal_id: null }).in("id", ids);
+      if (error) { stats.failed += ids.length; log.error(`✗ deal_id 해제 실패: ${error.message}`); continue; }
+      stats.unlinked += ids.length;
+    }
+
+    // 어떤 보도 행도 가리키지 않는 딜만 지운다(관심은 cascade, 댓글이 달린 딜은 남긴다 — findOrphanDeals 주석)
+    const { orphans, kept } = await findOrphanDeals(supabase, savedKeys);
+    for (const d of kept) log.warn(`⚠ 보도가 끊겼지만 댓글이 있어 남긴 딜: ${d.player} (${d.deal_key})`);
+    for (const d of orphans) {
+      const { error: delErr } = await supabase.from(DEALS).delete().eq("id", d.id);
+      // 판정과 삭제 사이에 댓글이 달렸다(댓글 FK restrict) — 실패가 아니라 "남긴 딜"이다
+      if (delErr?.code === "23503" && `${delErr.message} ${delErr.details ?? ""}`.includes("transfer_deal_comment")) { log.warn(`⚠ 삭제하려던 사이 댓글이 달려 남긴 딜: ${d.player} (${d.deal_key})`); continue; }
+      if (delErr) { stats.failed++; log.error(`✗ 딜 삭제 실패(${d.player}): ${delErr.message}`); continue; }
+      stats.deleted++;
+      log.warn(`⚠ 보도 행이 하나도 남지 않은 딜을 지웠다: ${d.player} (${d.deal_key})`);
+    }
+    return { ...stats, changes };
   }
-  return stats;
+
+  try {
+    return await finishWrite();
+  } catch (e) {
+    throw Object.assign(e instanceof Error ? e : new Error(String(e)), { changes });
+  }
 }
 
 /**
