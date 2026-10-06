@@ -40,6 +40,8 @@ const DEEP_IMPORT_ALLOWED = new Set([
   // searchParams 첫 값 — 서버 page들이 같은 판정으로 읽는다
   "@/shared/lib/search-params",
   "@/entities/transfer/api/list-query",
+  // 딜 상세 SSR이 예측(집계·내 표)을 클라이언트 훅과 같은 조립으로 미리 받는다
+  "@/entities/prediction/api/list-query",
   // 댓글 조립 — 상세 SSR이 클라이언트 훅과 같은 select·정렬·상한으로 댓글을 프리페치한다
   "@/entities/comment/api/list-query",
   // 단계 → 상태 뱃지 톤·라벨 — 상세 SSR이 화면과 같은 매핑으로 상태 문구를 그린다

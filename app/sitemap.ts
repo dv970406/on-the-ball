@@ -76,7 +76,11 @@ function withLastModified(url: string, lastModified: Date | undefined) {
  *   그래서 그 목록에 실리는 항목의 최신 시각을 쓰고, 알 수 없으면 **생략한다.**
  */
 function staticEntries(transfers: Date | undefined): MetadataRoute.Sitemap {
-  return [withLastModified(absoluteUrl(ROUTES.transferList), transfers)];
+  return [
+    withLastModified(absoluteUrl(ROUTES.transferList), transfers),
+    // 예측 랭킹 — 행 시각(채점 시각)은 매시 움직여 실제 변경과 맞지 않으므로 lastModified를 생략한다
+    { url: absoluteUrl(ROUTES.ranking) },
+  ];
 }
 
 /** 가장 늦은 시각 — 비어 있으면 `undefined` */

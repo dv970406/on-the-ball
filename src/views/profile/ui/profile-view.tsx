@@ -16,6 +16,7 @@ import { useNicknameForm } from "../model/use-nickname-form";
 import { ClubPickerSheet } from "./club-picker-sheet";
 import { FollowedClubs } from "./followed-clubs";
 import { LinkedAccounts } from "./linked-accounts";
+import { PredictionSummary } from "./prediction-summary";
 import { PushSettings } from "./push-settings";
 
 interface ProfileViewProps {
@@ -29,7 +30,7 @@ interface ProfileViewProps {
 }
 
 /**
- * 프로필 화면 — 닉네임·사진 수정, 응원 구단, 알림, 로그인 수단 연결.
+ * 프로필 화면 — 닉네임·사진 수정, 응원 구단, 내 예측, 알림, 로그인 수단 연결.
  *
  * 닉네임은 가입 시 랜덤으로 배정되고(축구 테마 조합) 여기서 바꾼다.
  * 프로필 사진은 프로바이더 것을 쓰지 않고 직접 업로드받는다.
@@ -227,6 +228,9 @@ export function ProfileView({
 
         {/* 응원 구단 — 자기 쿼리를 갖고 프로필과 동시에 출발한다 */}
         <FollowedClubs userId={user?.id} onOpenPicker={() => setClubPickerOpen(true)} />
+
+        {/* 내 예측 — 예측 랭킹의 내 순위와 랭킹 화면의 진입점 */}
+        <PredictionSummary userId={user?.id} />
 
         {/* 알림 — 서버에 알림 키가 없는 배포에서는 섹션이 통째로 그려지지 않는다 */}
         <PushSettings userId={user?.id} />

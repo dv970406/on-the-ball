@@ -16,6 +16,11 @@ export const ROUTES = {
   signIn: "/sign-in",
   // 프로필 — 닉네임·사진 수정과 로그인 수단 연결
   profile: "/profile",
+  /**
+   * 예측 랭킹 — 딜 성사 예측의 점수 순위(공개). 탭이 아니라 딜 상세의 예측 카드·프로필에서 들어온다.
+   * ⚠ 탭바가 없다(`activeTabHref`가 세지 않는다) — 서브헤더 화면이다.
+   */
+  ranking: "/ranking",
 } as const;
 
 /**

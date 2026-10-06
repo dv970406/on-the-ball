@@ -45,6 +45,7 @@
 | `app/transfers/page.tsx` | 이적 보드 목록 SSR | 지금은 불필요(메타데이터가 정적). **감싸 둔 이유는 `generateMetadata`를 동적으로 바꾸는 순간 2회가 되기 때문**이다. ⚠ 인자를 받게 되면 **원시값**으로 받는다(객체는 매 호출 새 참조라 중복이 없어지지 않는다). ⚠ 세션이 없으면 **익명 클라이언트**다(`hasSessionCookie()` 갈림) — 관심 임베딩이 "내 행만"이라 익명은 항상 빈 배열(= `isWatched` false)로 모든 요청에 같다. ⚠ 보드 범위 시작(`boardScopeStartMs`)은 **분 단위로 내린 ISO**로 조회·쿼리 키에 싣는다(ms면 익명 Data Cache가 매번 미스한다). `nowMs`는 Data Cache 밖(요청마다)에서 찍는다. ⚠ **내 응원 구단은 세션이 있을 때만 함께 읽는다**(쿠키 클라이언트) — 익명에는 그 표의 SELECT grant가 없고, 익명 경로의 조회는 Data Cache를 타므로 사용자별 값을 실으면 안 된다 |
 | `app/transfers/[id]/page.tsx` | `<title>`·`og:*` + 404 판정 + **딜·보도 타임라인·댓글 SSR** | **필수** — `generateMetadata`와 `Page`가 같은 데이터를 쓴다. ⚠ **쿠키 클라이언트다**(익명 갈림이 없다) — `transfer_deal_watch(user_id)` 임베딩이 "내 행만"이라 응답이 사용자별이라 캐시할 수 없다 |
 | `app/sitemap.ts` | 목록·**이적 딜** URL 열거 | 불필요 — 소비자가 하나이고 `generateMetadata`가 없다. ⚠ **쿠키를 보지 않고 항상 익명 클라이언트다** — 크롤러가 읽는 문서라 누가 열든 공개분만 담아야 한다. 그래서 빌드 로그에 **`○`(정적) + `30s`** 로 찍힌다 — 쿠키를 읽지 않아 라우트가 통째로 프리렌더되고 `ANON_REVALIDATE`가 ISR 주기가 된다. **아래 "동적이어야 할 라우트가 `○`면 가드가 삼킨 것"의 예외가 이 행이다** — 쿠키를 읽지 않는 라우트만 `○`가 정상이다 |
+| `app/ranking/page.tsx` | 예측 랭킹 SSR(+ 로그인 사용자의 "나" 표시) | 지금은 불필요(메타데이터가 정적) — 보드와 같은 이유로 감싸 둔다. ⚠ **랭킹은 갈림 없이 항상 익명 클라이언트다** — 공개 표이고 `auth.uid()`를 보지 않는다(`sitemap.ts`와 같은 판단). 순위가 최대 `ANON_REVALIDATE`만큼 늦게 보인다(점수 자체가 매시 채점이다). 세션 쿠키가 있을 때만 쿠키 클라이언트로 `getUser()`해 `userId`를 내린다 — 그래서 라우트는 `ƒ`다 |
 | `app/transfers/[id]/opengraph-image.tsx` | 딜 공유 카드(이미지) | 불필요 — 소비자가 하나다. ⚠ **항상 익명 클라이언트다** — 카드는 누가 열든 같아야 하고 개인화 값을 그리지 않는다. 조회가 Data Cache를 타 `ANON_REVALIDATE`가 이미지의 재생성 주기가 된다. 없는 딜은 404, 조회 실패는 사이트 공통 이미지로 답한다 |
 
 **표의 모든 행이 아래 규약을 똑같이 지킨다.** 서버 조회를 새로 붙일 때도 마찬가지다.
@@ -164,7 +165,8 @@ Router Cache는 **URL로만 키가 잡히고 세션은 키에 들어가지 않�
 | 화면 | 서버가 조립하는 것 |
 |---|---|
 | `app/transfers/page.tsx` | 이적 딜 목록(범위 안 전부 — 필터와 무관하다. 리그·정렬·구단·관심은 뷰가 주소에서 읽어 계산한다) + 내 응원 구단(로그인 사용자만 — 구단 칩의 순서가 이 값을 본다) (+ `userId` · **서버 시각** · `scopeStartIso`) |
-| `app/transfers/[id]/page.tsx` | 딜 + 보도 타임라인 전체 + 댓글(최신 `COMMENT_LIST_LIMIT`건 — 탭 두 개를 모두 그린다) (+ `userId` · **서버 시각**) |
+| `app/transfers/[id]/page.tsx` | 딜 + 보도 타임라인 전체 + 댓글(최신 `COMMENT_LIST_LIMIT`건 — 탭 두 개를 모두 그린다) + 성사 예측(회차별 집계 + 내 표 — 서버가 다른 사용자로 그렸으면 내 표를 지운 사본을 `placeholderData`로) (+ `userId` · **서버 시각** — 예측 카드의 회차도 이 시각으로 고른다) |
+| `app/ranking/page.tsx` | 랭킹 상위 `RANKING_LIMIT`줄 (+ `userId` · 서버 시각) |
 
 - ⚠ **`initialData`에는 서버가 읽은 시각을 함께 준다**(`initialDataUpdatedAt: () => serverToClientTime(serverNowMs)` —
   댓글 목록이 선례. 서버 시각을 그대로 넣지 말고 기기 시계로 옮긴다 — 쿼리가 기기 시계와 빼서 신선도를 잰다).

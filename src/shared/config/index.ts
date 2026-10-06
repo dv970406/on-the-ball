@@ -19,5 +19,7 @@ export {
   openTransferWindow,
   trackedTransferWindow,
   boardScopeStartMs,
+  predictionRound,
+  transferWindowByKey,
   type TransferWindow,
 } from "./transfer-window";

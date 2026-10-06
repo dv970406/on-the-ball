@@ -70,3 +70,20 @@ export function trackedTransferWindow(nowMs: number): TransferWindow {
 export function boardScopeStartMs(nowMs: number): number {
   return Date.parse(trackedTransferWindow(nowMs).opensAt);
 }
+
+/**
+ * 예측의 회차 — `closesAt > now`인 **가장 이른** 창(창이 열려 있으면 그 창, 창 사이에는 다음 창). 다음 창 일정이
+ * 아직 없으면 `null`이다(그동안은 예측을 받지 않는다 — 시즌마다 사람이 `windows.json`을 갱신한다).
+ *
+ * ⚠ **DB 트리거(`transfer_deal_prediction_open`)와 같은 판정이다** — 표의 회차는 DB가 정하고, 화면은 이 값으로
+ *   "어느 창의 예측인가"를 그리고 낙관적 갱신의 자리를 고른다. 마감 순간의 1초 차이로 갈려도 저장값은 DB의 것이고
+ *   다음 조회가 맞춘다.
+ */
+export function predictionRound(nowMs: number): TransferWindow | null {
+  return TRANSFER_WINDOWS.find((w) => nowMs < Date.parse(w.closesAt)) ?? null;
+}
+
+/** 창 키(`2027-winter`)로 창을 찾는다 — 지난 회차의 이름을 그릴 때. 일정에서 빠진 키면 `null` */
+export function transferWindowByKey(key: string): TransferWindow | null {
+  return TRANSFER_WINDOWS.find((w) => w.key === key) ?? null;
+}

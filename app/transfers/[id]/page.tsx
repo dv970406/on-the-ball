@@ -18,6 +18,9 @@ import type { TransferDeal, TransferReport } from "@/entities/transfer/model/typ
 import { buildCommentListQuery } from "@/entities/comment/api/list-query";
 import { buildCommentList } from "@/entities/comment/api/mappers";
 import type { CommentList } from "@/entities/comment/model/types";
+import { buildMyPredictionsQuery, buildTallyQuery } from "@/entities/prediction/api/list-query";
+import { buildDealPrediction } from "@/entities/prediction/api/mappers";
+import type { DealPrediction } from "@/entities/prediction/model/types";
 import { TransferDetailView } from "@/views/transfer-detail";
 
 const FALLBACK_METADATA: Metadata = { title: "딜 상세" };
@@ -41,6 +44,11 @@ type DealHead =
        * ⚠ 키가 userId로 스코프된다(내 표 임베딩이 "내 행만") — 아래 `userId`와 한 쌍이다.
        */
       comments: CommentList | undefined;
+      /**
+       * 성사 예측(회차별 집계 + 내 표) — 곁다리다. 실패하면 `undefined`(클라이언트가 조회한다).
+       * ⚠ 내 표가 "내 행만"이라 키가 userId로 스코프된다 — 아래 `userId`와 한 쌍이다.
+       */
+      prediction: DealPrediction | undefined;
       /** ⚠ 쿼리 키가 userId로 스코프된다 — 그 값도 함께 내려야 캐시에 닿는다 */
       userId: string | undefined;
       /**
@@ -75,12 +83,17 @@ const fetchDealHead = cache(async (dealId: number): Promise<DealHead> => {
       { data, error },
       { data: reportRows, error: reportsError },
       { data: commentRows, error: commentsError },
+      { data: tallyRows, error: tallyError },
+      { data: myPredictionRows, error: myPredictionsError },
     ] = await Promise.all([
       supabase.auth.getUser(),
       buildDealQuery(supabase, dealId),
       buildReportsQuery(supabase, dealId),
       // ⚠ 조립·자르기·뒤집기는 클라이언트 훅과 같은 함수다 — 갈리면 하이드레이션 직후 목록이 흔들린다
       buildCommentListQuery(supabase, dealId),
+      // ⚠ 예측도 클라이언트 훅과 같은 조립이다. 내 표는 세션이 없으면 정책에서 걸려 빈 배열이다(세션으로 갈라 부르지 않는다)
+      buildTallyQuery(supabase, dealId),
+      buildMyPredictionsQuery(supabase, dealId),
     ]);
 
     if (error) return { state: "unknown" };
@@ -90,12 +103,17 @@ const fetchDealHead = cache(async (dealId: number): Promise<DealHead> => {
     //   `[]`로 접으면 "보도가 없다"는 다른 뜻이 되어 화면이 거짓말한다.
     const reports = reportsError ? undefined : (reportRows ?? []).map(buildReport);
     const comments = commentsError ? undefined : buildCommentList(commentRows ?? []);
+    const prediction =
+      tallyError || myPredictionsError
+        ? undefined
+        : buildDealPrediction(tallyRows ?? [], myPredictionRows ?? []);
 
     return {
       state: "found",
       deal: buildDeal(data),
       reports,
       comments,
+      prediction,
       userId: auth.user?.id,
       nowMs,
     };
@@ -183,6 +201,7 @@ export default async function Page(props: PageProps<"/transfers/[id]">) {
       initialDeal={head.state === "found" ? head.deal : undefined}
       initialReports={head.state === "found" ? head.reports : undefined}
       initialComments={head.state === "found" ? head.comments : undefined}
+      initialPrediction={head.state === "found" ? head.prediction : undefined}
       initialUserId={head.state === "found" ? head.userId : undefined}
       serverNowMs={head.state === "found" ? head.nowMs : undefined}
     />

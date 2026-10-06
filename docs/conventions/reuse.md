@@ -147,6 +147,18 @@
 - `CommentVoteButtons({ dealId, comment, onSignInRequired })` — 좋아요·싫어요. ⚠ 훅(`useVoteComment`)은 배럴에 없다(버튼이 유일한 호출부). 낙관적 갱신 + 같은 딜의 표를 `scope`로 직렬화 + "목표 표로 수렴"하는 요청 + 실패·0행만 줄 끝에서 한 번 재동기화(그때는 진행 중인 조회가 있어도 새로 받는다 — 표 때문에 조회를 취소하지는 않는다)(`data-and-state.md` 낙관적 업데이트 절). 가드도 `disabled`도 없다.
 - ⚠ 세 슬라이스 모두 비로그인 안내를 직접 띄우지 않는다 — `onSignInRequired`로 올리고 **뷰가 `SignInDialog` 한 벌**을 문구만 바꿔 쓴다.
 
+## `@/entities/prediction`
+- `useDealPredictionQuery({ dealId, userId, enabled, initialData, initialDataUpdatedAt, placeholderData })` / `predictionKeys` — 한 딜의 성사 예측(회차별 집계 + 내 표). ⚠ **userId로 스코프된다**(내 표가 "내 행만"). 서버가 다른 사용자로 그린 예측은 `withoutMyPredictions` 사본을 `placeholderData`로 넘긴다(댓글과 같은 규약). 조립은 `buildTallyQuery`·`buildMyPredictionsQuery`·`buildDealPrediction`(서버 안전)이 갖는다.
+- `useRankingQuery({ initialData, initialDataUpdatedAt })` / `useMyScoreQuery(userId)` — 예측 랭킹 상위 `RANKING_LIMIT`줄과 한 사람의 점수(채점된 표가 없으면 `null`). 점수·순위는 파생 스크립트가 매시 쓴다 — 화면은 읽기만 한다.
+- **`tallyOf` / `myPickOf` / `latestVotedRound` / `yesShare` / `applyPick`** — 집계 읽기와 낙관적 갱신이 **같은 계산**을 쓴다. 비율은 표가 `MIN_VOTES_FOR_SHARE`(슬라이스 내부)보다 적으면 `null`이다 — 세 표 중 두 표를 "67%"로 그리면 팬 다수의 의견처럼 읽힌다.
+- ⚠ 랭킹 select가 profiles를 임베딩한다 → `invalidateProfileConsumers`가 `predictionKeys.ranking()`·`scores()`를 함께 무효화한다.
+- 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/list-query`를 직접 import.
+
+## `@/features/predict-deal`
+- `PredictionCard({ dealId, settled, prediction, error, onRetry, userId, nowMs, onSignInRequired })` — 딜 상세의 성사 예측 카드. 고르기 전에는 참여 수만, 고른 뒤(또는 결과가 나온 뒤)에 비율을 보여 준다(먼저 본 비율을 따라 고르면 예측이 아니라 쏠림이다). 결과가 나오면(`settled` — 합의 완료·오피셜) 버튼을 걷는다. 다음 창 일정이 없으면 그리지 않는다.
+- ⚠ 훅(`usePredictDeal`)은 배럴에 없다 — 카드가 유일한 호출부다. 낙관적 갱신 + 같은 딜의 요청을 `scope`로 한 줄 + "목표 표로 수렴"하는 요청 + 실패만 줄 끝에서 재동기화(`useVoteComment`와 같은 형태). 가드는 없고 거두기도 없다(DB에 DELETE 경로가 없다 — `api-and-db.md` 딜 성사 예측 절).
+- ⚠ 회차는 DB 트리거가 정한다 — 화면의 `predictionRound(nowMs)`는 그릴 자리와 낙관적 갱신의 자리를 고를 뿐이다.
+
 ## `@/features/follow-club`
 - `useToggleClubFollow()` — 응원 구단 고르기·풀기(`mutate({ club, following, userId })`). 낙관적 갱신 + 요청을 `scope`로 한 줄 세우기 + 실패는 그 구단 하나만 되돌리기 + 줄 끝에서 한 번 재동기화(`data-and-state.md`). 가드도 `disabled`도 없고 성공 토스트도 없다 — 누른 줄의 체크가 곧 성공 표시다.
 - ⚠ **`userId`를 호출부가 넘긴다** — 낙관적 갱신이 그 사용자의 캐시 하나만 건드리고, 실행하는 순간의 세션과 대조해 줄 서 있는 동안 바뀐 계정의 요청을 보내지 않는다.
@@ -178,9 +190,11 @@
 
 ## `@/shared/config`
 - `ROUTES` — 경로 헬퍼. **경로 문자열 하드코딩 금지**(`"/transfers"` ❌ → `ROUTES.transferList`).
+  ⚠ 예측 랭킹은 `ROUTES.ranking`(`/ranking`)이다 — 탭이 아니라 서브헤더 화면이라 `activeTabHref`·`hasBottomBar`에 없다.
   ⚠ 이적시장은 **`ROUTES.transferList`**(`/transfers`) · `ROUTES.transfer(id)`(`/transfers/[id]`)다. 상세에는 탭바가 없다 — `activeTabHref`가 목록 경로만 센다.
   ⚠ `ROUTES.home`(`/`)은 화면이 아니라 이적시장으로의 리다이렉트다(`app/page.tsx`) — 링크 목적지로 쓰지 말고 실제 화면 경로를 쓴다.
 - **`openTransferWindow(nowMs)` / `trackedTransferWindow(nowMs)` / `boardScopeStartMs(nowMs)`**(`transfer-window.ts`) — 이적 창 일정. 창의 기간은 리그별 일정을 합친 것이다(개장 = 가장 먼저 여는 리그, 마감 = 가장 늦게 닫는 리그). `openTransferWindow`는 **지금 열려 있는 창**(없으면 `null`) — 헤더의 "마감까지" 카운트다운은 이 값이 있을 때만 그리고 마감에 닿으면 스스로 사라진다. `trackedTransferWindow`는 보드가 추적하는 창(개장한 가장 최근 창 — 창 사이에는 방금 닫힌 창)으로 헤더의 창 이름이 쓰고, `boardScopeStartMs`는 그 창의 개장 시각(보드에 실을 딜의 하한)이다. ⚠ **단일 소스는 `scripts/lib/transfer/windows.json`** 이다 — 딜 파생 스크립트(Node)가 이 TS를 import할 수 없어 JSON이 원본이고, 이 파일은 그 JSON을 그대로 읽는다. **시즌마다 사람이 갱신한다** — 엠블럼(`public/crests`)·`team-names-ko.json`과 같은 운영 모델이라 런타임에 늘지 않는다.
+- **`predictionRound(nowMs)` / `transferWindowByKey(key)`** — 예측의 회차(`closesAt > now`인 가장 이른 창 — 창 사이에는 다음 창, 일정이 없으면 `null`)와 키로 창 찾기. ⚠ 회차 판정은 DB 트리거(`transfer_deal_prediction_open`)와 **같은 규칙**이다 — 저장되는 회차는 DB가 정하고 화면은 그릴 자리를 고른다. DB 사본(`transfer_window`)은 파생 스크립트가 같은 JSON에서 맞춘다.
 - **`hasBottomBar(pathname)` / `activeTabHref(pathname)`** — 화면 아래에 고정 바(탭바 또는 딜 상세의 관심 토글 바)가 있는지와 활성인 탭. 탭바(`widgets`)는 `activeTabHref`를, 토스트(`shared/ui`)는 `hasBottomBar`를 본다. ⚠ 하단 고정 바를 새로 두는 화면이 생기면 `hasBottomBar`에 더한다 — 빠뜨리면 토스트가 그 바의 CTA를 덮는다. ⚠ 새 목록 경로가 생기면 여기부터 고친다 — 빠뜨리면 그 화면에서 **탭바가 사라지고 토스트가 탭바 자리로 내려간다.** 값이 유한하지 않은 경로(`/…/category/[slug]` 같은)가 생기면 정확 일치 배열이 아니라 접두 판정으로 둔다.
 - `signInWithNext(pathname)` / `withNext(path, next)` — 복귀 경로를 붙인 URL. 이 형태를 만드는 곳이 가드·`SignInDialog`·`AuthStatus`로 여럿이라 여기로 모았다. ⚠ 액션 컨트롤에서 이걸로 **직접 이동하지 않는다** — `SignInDialog`가 안내를 끼고 그 안에서 부른다(예외는 라벨이 "로그인"인 컨트롤).
 - **`safeNextPath(next, origin)`** — `?next=` 값을 앱 내부 경로로만 통과시킨다. **직접 문자열 검사를 짜지 말 것** — `startsWith("/") && !startsWith("//")`로는 `/\evil.com`도 `/..//evil.com`도 못 막는다(둘 다 실제로 뚫렸다).

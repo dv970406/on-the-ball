@@ -22,6 +22,8 @@ export interface AnalyticsEvents {
   comment_write: { deal_id: number; is_reply: boolean };
   /** 댓글에 표를 던졌다 — 1 좋아요 · -1 싫어요 · 0 거두기 */
   comment_vote: { deal_id: number; value: number };
+  /** 딜 성사를 예측했다(`will_happen` — true 성사 · false 불발). 같은 창에서 고른 것을 바꿔도 센다 */
+  deal_predict: { deal_id: number; will_happen: boolean };
   /** 링크를 공유했다(GA4 권장 이벤트) — `method`는 OS 공유 시트(`sheet`) 또는 복사(`clipboard`) */
   share: { method: "sheet" | "clipboard"; content_type: string };
   /** 알림을 켰다 — `source`는 켠 자리(프로필 · 딜 상세의 안내) */

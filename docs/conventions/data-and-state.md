@@ -162,7 +162,7 @@ const handleSubmit = (e) => {
 | 가드를 둔다 | 두지 않는다 |
 |---|---|
 | **행이 생긴다** — 작성·등록류 뮤테이션 전부(딜 댓글·답글 — `use-comment-composer`, 알림 켜기 — `usePushToggle`의 `enable`) | **소셜 로그인** — 버튼을 누르면 페이지가 프로바이더로 넘어가 화면 자체가 사라진다(단 아래 PKCE 예외) |
-| **행이 사라진다** — 연결 해제(`useUnlinkIdentity`), 삭제류 뮤테이션 전부(댓글 삭제 — `use-comment-deletion`의 항목별 가드. 성공한 댓글은 재조회를 기다리지 않고 화면에서 뺀다), 알림 끄기(`usePushToggle`의 `disable`) | **낙관적 업데이트** — 관심 토글(`useToggleTransferWatch`)·응원 구단 토글(`useToggleClubFollow`)·댓글 좋아요/싫어요(`useVoteComment`)(의도적으로 `disabled`조차 두지 않는다, 아래 절 참고) |
+| **행이 사라진다** — 연결 해제(`useUnlinkIdentity`), 삭제류 뮤테이션 전부(댓글 삭제 — `use-comment-deletion`의 항목별 가드. 성공한 댓글은 재조회를 기다리지 않고 화면에서 뺀다), 알림 끄기(`usePushToggle`의 `disable`) | **낙관적 업데이트** — 관심 토글(`useToggleTransferWatch`)·응원 구단 토글(`useToggleClubFollow`)·댓글 좋아요/싫어요(`useVoteComment`)·딜 성사 예측(`usePredictDeal` — 세션 복원 중에만 `disabled`)(의도적으로 `disabled`조차 두지 않는다, 아래 절 참고) |
 | | **멱등한 UPDATE** — 닉네임 변경은 연타해도 행이 늘지 않아 `isPending` 확인으로 족하다 |
 
 #### 자리는 **그 뮤테이션을 조립하는 곳**이다

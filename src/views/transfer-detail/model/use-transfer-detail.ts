@@ -9,6 +9,11 @@ import {
   useTransferReportsQuery,
 } from "@/entities/transfer";
 import { type CommentList, useCommentListQuery, withoutMyVotes } from "@/entities/comment";
+import {
+  type DealPrediction,
+  useDealPredictionQuery,
+  withoutMyPredictions,
+} from "@/entities/prediction";
 import { useSessionStore } from "@/entities/session";
 
 interface UseTransferDetailArgs {
@@ -23,7 +28,9 @@ interface UseTransferDetailArgs {
   initialReports?: TransferReport[];
   /** 서버가 미리 조회한 댓글 — `undefined`면 클라이언트가 조회한다 */
   initialComments?: CommentList;
-  /** 서버가 그 데이터를 읽은 시각 — 뒤로가기가 되살린 옛 페이로드를 stale로 보게 한다(딜·타임라인·댓글 공통) */
+  /** 서버가 미리 조회한 성사 예측 — `undefined`면 클라이언트가 조회한다 */
+  initialPrediction?: DealPrediction;
+  /** 서버가 그 데이터를 읽은 시각 — 뒤로가기가 되살린 옛 페이로드를 stale로 보게 한다(딜·타임라인·댓글·예측 공통) */
   serverNowMs?: number;
   initialUserId?: string;
 }
@@ -39,6 +46,7 @@ export function useTransferDetail({
   initialDeal,
   initialReports,
   initialComments,
+  initialPrediction,
   initialUserId,
   serverNowMs,
 }: UseTransferDetailArgs) {
@@ -49,7 +57,7 @@ export function useTransferDetail({
   const userId = sessionStatus === "loading" ? initialUserId : storeUserId;
 
   // 서버 시각을 기기 시계로 옮겨 넣는다 — 기기 시계와 빼서 신선도를 재기 때문이다(`serverToClientTime`).
-  // ⚠ 세 조회가 같은 값을 쓴다 — 뒤로가기가 되살린 옛 서버 페이로드를 신선한 것으로 앉히지 않는다
+  // ⚠ 모든 조회가 같은 값을 쓴다 — 뒤로가기가 되살린 옛 서버 페이로드를 신선한 것으로 앉히지 않는다
   const initialDataUpdatedAt = () =>
     serverNowMs === undefined ? undefined : serverToClientTime(serverNowMs);
 
@@ -101,6 +109,23 @@ export function useTransferDetail({
     placeholderData: commentsPlaceholder,
   });
 
+  /**
+   * 성사 예측 — 댓글과 같은 규약이다(내 표가 "내 행만"이라 키가 userId로 스코프된다). 서버가 다른 사용자로 그렸으면
+   * 내 표를 지운 사본을 자리 표시로만 쓴다 — 앞 사람의 표가 새 키에 "내 표"로 앉으면 안 된다.
+   */
+  const predictionPlaceholder = useMemo(
+    () => (!ownsPrefetch && initialPrediction ? withoutMyPredictions(initialPrediction) : undefined),
+    [ownsPrefetch, initialPrediction],
+  );
+  const predictionQuery = useDealPredictionQuery({
+    dealId,
+    userId,
+    enabled: initialPrediction !== undefined || sessionStatus !== "loading",
+    initialData: ownsPrefetch ? initialPrediction : undefined,
+    initialDataUpdatedAt,
+    placeholderData: predictionPlaceholder,
+  });
+
   /*
    * ⚠ 반환값을 조회별 묶음으로 둔다 — 낱값으로 펼치면 여섯 개를 넘는다(`code-quality.md`).
    */
@@ -129,6 +154,12 @@ export function useTransferDetail({
       error: commentsQuery.error,
       refetch: () => commentsQuery.refetch(),
     },
+    /** 성사 예측 — 타임라인과 같은 곁다리 규약이다(실패해도 본문을 가리지 않는다) */
+    prediction: {
+      data: predictionQuery.data,
+      error: predictionQuery.error,
+      refetch: () => predictionQuery.refetch(),
+    },
     /**
      * 세션 — 댓글 입력·표·답글이 3분기하고, `나` 뱃지·삭제 버튼은 **캐시 키와 같은 사용자**를 본다
      * (복원 전에는 서버가 본 사용자라 서버가 그린 HTML과 첫 렌더가 갈리지 않는다).
@@ -136,6 +167,11 @@ export function useTransferDetail({
     session: { status: sessionStatus, userId },
     // 재시도는 전부 다시 받는다 — 딜이 실패한 상황이면 같은 원인으로 곁다리도 실패했을 공산이 크다
     refetch: () =>
-      Promise.all([dealQuery.refetch(), reportsQuery.refetch(), commentsQuery.refetch()]),
+      Promise.all([
+        dealQuery.refetch(),
+        reportsQuery.refetch(),
+        commentsQuery.refetch(),
+        predictionQuery.refetch(),
+      ]),
   };
 }

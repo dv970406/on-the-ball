@@ -13,9 +13,11 @@ import {
   playerName,
 } from "@/entities/transfer";
 import { usePushStatusQuery } from "@/entities/push";
+import { PredictionCard } from "@/features/predict-deal";
 import { WatchToggle } from "@/features/watch-transfer";
 import { ROUTES } from "@/shared/config";
 import type { CommentList } from "@/entities/comment";
+import type { DealPrediction } from "@/entities/prediction";
 import { cn, formatCount, formatRelativeTime, useNowMs, useToastStore } from "@/shared/lib";
 import { Dialog, EmptyState, Icon, SignInDialog, Skeleton, StaleBanner } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
@@ -43,6 +45,10 @@ interface TransferDetailViewProps {
    *   `undefined`면 클라이언트가 조회한다.
    */
   initialComments?: CommentList;
+  /**
+   * 서버가 미리 조회한 성사 예측(회차별 집계 + 내 표). ⚠ 키가 userId로 스코프된다 — `initialUserId`와 한 쌍이다.
+   */
+  initialPrediction?: DealPrediction;
   /**
    * 서버가 본 로그인 사용자.
    * ⚠ **이게 없으면 프리페치가 무의미해진다** — `transferKeys.detail`이 userId로 스코프돼 있어
@@ -159,7 +165,8 @@ function InfoLine({ deal }: { deal: TransferDeal }) {
  * 이적 상세 — 선수 · 경로 · 이적료 · `댓글 | 보도 타임라인` 탭 + 관심 토글.
  *
  * 하단 탭바를 렌더하지 않는다(서브헤더 화면이다). 공유는 `SubHeader`가 갖는다.
- * 확률 카드·원화 환산은 두지 않는다(확률은 보류이고, 하드코딩 환율은 거짓 숫자다). 알림 안내는 관심 목록에 담은
+ * 모델이 계산한 확률 카드·원화 환산은 두지 않는다(확률은 보류이고, 하드코딩 환율은 거짓 숫자다) — 대신 팬의 성사
+ * 예측(`PredictionCard`)이 그 자리를 채운다. 팬 의견이라 사실처럼 읽히지 않는다. 알림 안내는 관심 목록에 담은
  * 직후에만 하단 바에 한 줄로 뜬다(`PushNudge`).
  *
  * ⚠ **두 탭 패널을 모두 렌더하고 `hidden`으로만 가린다** — 색인 대상 화면이라 비활성 탭을 조건부
@@ -173,6 +180,7 @@ export function TransferDetailView({
   initialDeal,
   initialReports,
   initialComments,
+  initialPrediction,
   initialUserId,
   serverNowMs,
 }: TransferDetailViewProps) {
@@ -181,6 +189,7 @@ export function TransferDetailView({
     deal: { data: deal, isLoading, error },
     reports,
     comments,
+    prediction,
     session,
     refetch,
   } = useTransferDetail({
@@ -188,6 +197,7 @@ export function TransferDetailView({
     initialDeal,
     initialReports,
     initialComments,
+    initialPrediction,
     initialUserId,
     serverNowMs,
   });
@@ -334,6 +344,18 @@ export function TransferDetailView({
             </section>
 
             <FeeCard deal={deal} />
+
+            {/* 성사 예측 — 결과가 나오면(합의 완료·오피셜) 닫힌다. 다음 창 일정이 없으면 카드가 그려지지 않는다 */}
+            <PredictionCard
+              dealId={deal.id}
+              settled={deal.stage === "here_we_go" || deal.stage === "official"}
+              prediction={prediction.data}
+              error={prediction.error}
+              onRetry={() => prediction.refetch()}
+              userId={session.userId}
+              nowMs={nowMs}
+              onSignInRequired={setSignInAction}
+            />
 
             <DetailTabs
               selected={tab}
