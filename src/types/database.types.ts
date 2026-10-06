@@ -145,6 +145,7 @@ export type Database = {
           position: string | null
           prev_fee_amount: number | null
           report_count: number
+          settled_at: string | null
           stage: Database["public"]["Enums"]["transfer_stage"]
           to_club_code: string | null
           updated_at: string
@@ -172,6 +173,7 @@ export type Database = {
           position?: string | null
           prev_fee_amount?: number | null
           report_count: number
+          settled_at?: string | null
           stage: Database["public"]["Enums"]["transfer_stage"]
           to_club_code?: string | null
           updated_at?: string
@@ -199,6 +201,7 @@ export type Database = {
           position?: string | null
           prev_fee_amount?: number | null
           report_count?: number
+          settled_at?: string | null
           stage?: Database["public"]["Enums"]["transfer_stage"]
           to_club_code?: string | null
           updated_at?: string
@@ -309,6 +312,88 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      transfer_deal_prediction: {
+        Row: {
+          deal_id: number
+          round_key: string
+          user_id: string
+          voted_at: string
+          will_happen: boolean
+        }
+        Insert: {
+          deal_id: number
+          round_key?: string
+          user_id: string
+          voted_at?: string
+          will_happen: boolean
+        }
+        Update: {
+          deal_id?: number
+          round_key?: string
+          user_id?: string
+          voted_at?: string
+          will_happen?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transfer_deal_prediction_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "transfer_deal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfer_deal_prediction_round_key_fkey"
+            columns: ["round_key"]
+            isOneToOne: false
+            referencedRelation: "transfer_window"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "transfer_deal_prediction_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transfer_deal_prediction_tally: {
+        Row: {
+          deal_id: number
+          no_count: number
+          round_key: string
+          yes_count: number
+        }
+        Insert: {
+          deal_id: number
+          no_count?: number
+          round_key: string
+          yes_count?: number
+        }
+        Update: {
+          deal_id?: number
+          no_count?: number
+          round_key?: string
+          yes_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transfer_deal_prediction_tally_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "transfer_deal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfer_deal_prediction_tally_round_key_fkey"
+            columns: ["round_key"]
+            isOneToOne: false
+            referencedRelation: "transfer_window"
+            referencedColumns: ["key"]
           },
         ]
       }
@@ -564,6 +649,62 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      transfer_prediction_score: {
+        Row: {
+          hits: number
+          points: number
+          rank: number
+          scored: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          hits: number
+          points: number
+          rank: number
+          scored: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          hits?: number
+          points?: number
+          rank?: number
+          scored?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transfer_prediction_score_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transfer_window: {
+        Row: {
+          closes_at: string
+          key: string
+          label: string
+          opens_at: string
+        }
+        Insert: {
+          closes_at: string
+          key: string
+          label: string
+          opens_at: string
+        }
+        Update: {
+          closes_at?: string
+          key?: string
+          label?: string
+          opens_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {

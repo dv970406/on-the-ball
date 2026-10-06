@@ -2051,6 +2051,239 @@ rollback to s;
 
 rollback to s41;
 
+-- ---------------------------------------------------------------------
+\echo ''
+\echo '=== 42. 딜 성사 예측 — 창 사본 · 예측 · 집계 · 점수 (20261006000001) ==='
+\echo '  설계 요약: transfer_deal_prediction은 한 창에 한 딜당 한 표(자기 행만 SELECT·INSERT·UPDATE(will_happen), DELETE 없음).'
+\echo '  회차(round_key)·시각(voted_at)은 트리거가 정한다 — 아직 닫히지 않은 가장 이른 창, 지금 시각.'
+\echo '  합의 완료·오피셜 딜과 마감된 회차는 받지도 바꾸지도 않는다(P0001). 집계는 definer 트리거가 단독 관리하고,'
+\echo '  transfer_window·transfer_prediction_score는 파생 스크립트만 쓰는 운영 데이터다(읽기 공개).'
+\echo '  ⚠ 창 키는 형식 CHECK(연도-summer|winter)가 있어 테스트 전용으로 먼 미래 연도를 쓴다.'
+savepoint s42;
+
+-- 열린 창(먼 미래 마감) — 실제 창이 비어 있는 DB에서도 회차가 정해지게. 닫힌 창 — 마감된 회차 검사용
+insert into public.transfer_window (key, label, opens_at, closes_at)
+values ('2099-summer', 'RLS 열린 창', now() - interval '1 day', '2099-09-01T00:00:00Z'),
+       ('2098-summer', 'RLS 닫힌 창', '2000-01-01T00:00:00Z', '2000-02-01T00:00:00Z');
+insert into public.transfer_club (code, canonical, name, short_name, league)
+values ('rlstest-r1', 'RLS Predict One', '예측 하나', 'R1', '프리미어리그');
+insert into public.transfer_deal (deal_key, player, from_club_code, stage, first_reported_at, latest_reported_at, report_count)
+values ('f0f0f0f0f0f0f0a1', 'Rlstest Predict Open', 'rlstest-r1', 'talks', now() - interval '1 day', now() - interval '1 hour', 1)
+returning id as rd1 \gset
+insert into public.transfer_deal (deal_key, player, from_club_code, stage, settled_at, first_reported_at, latest_reported_at, report_count)
+values ('f0f0f0f0f0f0f0a2', 'Rlstest Predict Done', 'rlstest-r1', 'official', now() - interval '2 hour', now() - interval '1 day', now() - interval '1 hour', 1)
+returning id as rd2 \gset
+select set_config('rls.rd1', :'rd1', true), set_config('rls.rd2', :'rd2', true);
+
+\echo ''
+\echo '-- 42a. 창 사본 — 앱에는 쓰기 경로가 없다 --'
+
+savepoint s; :login_alice
+\echo '[❌차단] 창을 직접 넣는다 — 회차가 이 표로 정해진다(넣을 수 있으면 마감을 미룰 수 있다)'
+insert into public.transfer_window (key, label, opens_at, closes_at) values ('2097-summer', 'x', now(), now() + interval '1 day');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 열린 창의 마감을 늦춘다'
+update public.transfer_window set closes_at = '2100-01-01T00:00:00Z' where key = '2098-summer';
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 마감이 개장보다 앞선 창 — CHECK(transfer_window_order)'
+insert into public.transfer_window (key, label, opens_at, closes_at) values ('2097-winter', 'x', now(), now() - interval '1 day');
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[2 기대] 창 일정은 비로그인도 읽는다(공개 일정)'
+select count(*) from public.transfer_window where key in ('2099-summer', '2098-summer');
+rollback to s;
+
+\echo ''
+\echo '-- 42b. 예측 — 자기 행만, 회차·시각은 트리거 --'
+
+savepoint s; :login_alice
+\echo '[❌차단] 회차를 실어 보낸다 — INSERT grant 밖이다(마감된 창에 표를 넣는 길)'
+insert into public.transfer_deal_prediction (user_id, deal_id, round_key, will_happen) values (:'alice', :rd1, '2098-summer', true);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 시각을 실어 보낸다 — INSERT grant 밖이다(결과 전에 던진 것처럼 꾸미는 길)'
+insert into public.transfer_deal_prediction (user_id, deal_id, will_happen, voted_at) values (:'alice', :rd1, true, now() - interval '1 year');
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 남(bob) 명의로 예측한다'
+insert into public.transfer_deal_prediction (user_id, deal_id, will_happen) values (:'bob', :rd1, true);
+rollback to s;
+
+savepoint s; :login_anon
+\echo '[❌차단] 비로그인 예측'
+insert into public.transfer_deal_prediction (user_id, deal_id, will_happen) values (:'alice', :rd1, true);
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_deal_prediction (user_id, deal_id, will_happen) values (:'alice', :rd1, true);
+\echo '[t 기대] 회차는 아직 닫히지 않은 가장 이른 창이고 시각은 지금이다(트리거가 정했다)'
+select round_key = (select key from public.transfer_window where closes_at > now() order by closes_at limit 1)
+       and voted_at = now() as ok
+  from public.transfer_deal_prediction where deal_id = :rd1;
+\echo '[❌차단] 같은 회차에 같은 딜을 두 번 — 복합 PK(23505, 클라이언트는 UPDATE로 이어 간다)'
+insert into public.transfer_deal_prediction (user_id, deal_id, will_happen) values (:'alice', :rd1, false);
+rollback to s;
+
+savepoint s;
+insert into public.transfer_deal_prediction (user_id, deal_id, will_happen) values (:'bob', :rd1, false);
+:login_alice
+insert into public.transfer_deal_prediction (user_id, deal_id, will_happen) values (:'alice', :rd1, true);
+\echo '[1 / 0 기대] 내 표는 보이고 남(bob)의 표는 0행이다 — 남의 표는 집계로만 드러난다'
+select (select count(*) from public.transfer_deal_prediction where user_id = :'alice') as mine,
+       (select count(*) from public.transfer_deal_prediction where user_id = :'bob')   as others;
+:login_anon
+\echo '[0 기대] 비로그인이 읽으면 빈 결과다(grant는 통로, 정책이 to authenticated)'
+select count(*) from public.transfer_deal_prediction;
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[❌차단] 결과가 나온(오피셜) 딜에 예측한다 — 트리거(P0001)'
+insert into public.transfer_deal_prediction (user_id, deal_id, will_happen) values (:'alice', :rd2, true);
+rollback to s;
+
+savepoint s; :login_alice
+\echo '[P0001 확인] 결과가 나온 딜의 거부 코드가 P0001이다(아니면 ERROR) — 화면이 한국어 사유를 그대로 낸다'
+do $$
+begin
+  begin
+    insert into public.transfer_deal_prediction (user_id, deal_id, will_happen)
+    values ((select auth.uid()), current_setting('rls.rd2')::bigint, true);
+  exception when others then
+    if sqlstate <> 'P0001' then
+      raise exception '결과가 나온 딜의 거부 코드가 P0001이 아니다: %', sqlstate;
+    end if;
+    return;
+  end;
+  raise exception '결과가 나온 딜에 예측이 들어갔다';
+end $$;
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_deal_prediction (user_id, deal_id, will_happen) values (:'alice', :rd1, true);
+\echo '[❌차단] 예측을 거둔다 — DELETE 경로가 없다(틀린 표를 결과 직전에 거둬 적중률을 지키는 길)'
+delete from public.transfer_deal_prediction where user_id = :'alice';
+rollback to s;
+
+savepoint s; :login_alice
+insert into public.transfer_deal_prediction (user_id, deal_id, will_happen) values (:'alice', :rd1, true);
+\echo '[❌차단] 회차를 옮긴다 — UPDATE grant는 will_happen 하나다'
+update public.transfer_deal_prediction set round_key = '2098-summer' where user_id = :'alice';
+rollback to s;
+
+savepoint s;
+-- superuser — 시각을 과거로 민다(같은 값 UPDATE라 트리거가 막지 않는다)
+insert into public.transfer_deal_prediction (user_id, deal_id, will_happen) values (:'alice', :rd1, true);
+update public.transfer_deal_prediction set voted_at = now() - interval '3 day' where user_id = :'alice';
+:login_alice
+update public.transfer_deal_prediction set will_happen = true where user_id = :'alice';
+\echo '[t 기대] 같은 값으로 다시 누르면 시각이 그대로다 — 다시 누른 것으로 "결과 뒤의 표"가 되면 안 된다'
+select voted_at = now() - interval '3 day' as kept from public.transfer_deal_prediction where user_id = :'alice';
+update public.transfer_deal_prediction set will_happen = false where user_id = :'alice';
+\echo '[0 / 1 / t 기대] 바꾸면 집계가 성사 → 불발로 옮겨 가고 시각이 다시 찍힌다'
+select t.yes_count, t.no_count,
+       (select voted_at = now() from public.transfer_deal_prediction where user_id = :'alice') as refreshed
+  from public.transfer_deal_prediction_tally t
+ where t.deal_id = :rd1 and t.round_key = (select round_key from public.transfer_deal_prediction where user_id = :'alice');
+rollback to s;
+
+savepoint s;
+-- superuser — 표를 마감된 회차로 옮겨 둔다(같은 값 UPDATE라 트리거가 막지 않는다)
+insert into public.transfer_deal_prediction (user_id, deal_id, will_happen) values (:'alice', :rd1, true);
+update public.transfer_deal_prediction set round_key = '2098-summer' where user_id = :'alice';
+:login_alice
+\echo '[❌차단] 마감된 회차의 예측을 바꾼다 — 트리거(P0001)'
+update public.transfer_deal_prediction set will_happen = false where user_id = :'alice';
+rollback to s;
+
+savepoint s;
+insert into public.transfer_deal_prediction (user_id, deal_id, will_happen) values (:'alice', :rd1, true);
+-- superuser — 파생이 딜을 오피셜로 올린 상황
+update public.transfer_deal set stage = 'official', settled_at = now() where id = :rd1;
+:login_alice
+\echo '[❌차단] 결과가 나온 뒤 예측을 바꾼다 — 트리거(P0001)'
+update public.transfer_deal_prediction set will_happen = false where user_id = :'alice';
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 결과 시각이 있는데 단계가 합의 완료·오피셜이 아닌 딜 — CHECK(transfer_deal_settled_stage)'
+update public.transfer_deal set settled_at = now() where id = :rd1;
+rollback to s;
+
+\echo ''
+\echo '-- 42c. 집계 — definer 트리거만 쓴다 --'
+
+savepoint s; :login_alice
+\echo '[❌차단] 집계를 직접 넣는다'
+insert into public.transfer_deal_prediction_tally (deal_id, round_key, yes_count, no_count) values (:rd1, '2099-summer', 99, 0);
+rollback to s;
+
+savepoint s;
+insert into public.transfer_deal_prediction (user_id, deal_id, will_happen) values (:'bob', :rd1, true);
+:login_alice
+\echo '[❌차단] 집계를 직접 부풀린다 — 쓰기 grant가 없다(42501)'
+update public.transfer_deal_prediction_tally set yes_count = 99 where deal_id = :rd1;
+rollback to s;
+
+savepoint s;
+insert into public.transfer_deal_prediction (user_id, deal_id, will_happen) values (:'bob', :rd1, true);
+:login_alice
+insert into public.transfer_deal_prediction (user_id, deal_id, will_happen) values (:'alice', :rd1, false);
+:login_anon
+\echo '[1 / 1 기대] 남의 표가 섞인 집계를 비로그인도 읽는다(성사 1 · 불발 1 — 남의 행에도 트리거가 쓴다)'
+select yes_count, no_count from public.transfer_deal_prediction_tally where deal_id = :rd1;
+rollback to s;
+
+savepoint s;
+insert into public.transfer_deal_prediction (user_id, deal_id, will_happen) values (:'alice', :rd1, true);
+insert into public.transfer_deal_prediction (user_id, deal_id, will_happen) values (:'bob', :rd1, true);
+\echo '    (superuser — 탈퇴 경로: auth.users → profiles → 예측 cascade)'
+delete from auth.users where id = :'bob';
+\echo '[1 기대] 탈퇴로 표가 사라지면 집계도 줄어든다(cascade도 행 삭제라 트리거가 돈다)'
+select yes_count from public.transfer_deal_prediction_tally where deal_id = :rd1;
+rollback to s;
+
+savepoint s;
+insert into public.transfer_deal_prediction (user_id, deal_id, will_happen) values (:'alice', :rd1, true);
+\echo '[❌차단] 예측이 걸린 딜을 지운다 — FK restrict(재파생이 사용자의 예측 기록을 지우지 못한다)'
+delete from public.transfer_deal where id = :rd1;
+rollback to s;
+
+\echo ''
+\echo '-- 42d. 점수 — 파생 스크립트만 쓴다 --'
+
+savepoint s; :login_alice
+\echo '[❌차단] 내 점수를 직접 넣는다'
+insert into public.transfer_prediction_score (user_id, points, hits, scored, rank) values (:'alice', 9999, 1, 1, 1);
+rollback to s;
+
+savepoint s;
+insert into public.transfer_prediction_score (user_id, points, hits, scored, rank) values (:'alice', 10, 1, 1, 1);
+:login_alice
+\echo '[❌차단] 내 점수를 고친다 — 쓰기 grant가 없다(42501)'
+update public.transfer_prediction_score set points = 9999 where user_id = :'alice';
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 적중이 채점보다 많은 점수 행 — CHECK(transfer_prediction_score_hits)'
+insert into public.transfer_prediction_score (user_id, points, hits, scored, rank) values (:'alice', 10, 2, 1, 1);
+rollback to s;
+
+savepoint s;
+insert into public.transfer_prediction_score (user_id, points, hits, scored, rank) values (:'alice', 10, 1, 1, 1);
+:login_anon
+\echo '[1 기대] 랭킹은 비로그인도 읽는다(공개 랭킹 화면)'
+select count(*) from public.transfer_prediction_score where user_id = :'alice';
+rollback to s;
+
+rollback to s42;
+
 rollback;
 \echo ''
 \echo '=== 끝 (전체 rollback — 행은 남기지 않는다. identity 시퀀스 값은 rollback되지 않는다) ==='
