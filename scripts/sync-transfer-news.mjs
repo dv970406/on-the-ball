@@ -14,7 +14,9 @@
  *   node scripts/sync-transfer-news.mjs --remote                 # 원격 프로젝트에 쓴다(명시적일 때만). 대상은 환경변수다 —
  *                                                                #   로컬에서는 `set -a; source .env.prod; set +a` 뒤에 붙인다(.env.local은 로컬 값)
  *
- * 단계: 수집 → 가십 칼럼을 항목 행으로 → 딜 파생 → 알림. 파생 안에서 이름 조회(위키데이터)와 **LLM 판정·요약**(`judge.mjs` —
+ * 단계: 수집 → 가십 칼럼을 항목 행으로 → 이적 창 사본 맞추기 → 딜 파생 → 예측 채점 → 알림.
+ * 창 사본(`transfer_window`)은 예측의 회차를 DB 트리거가 정하는 데 쓰고, 채점(`predictions.mjs`)은 파생이 새로 쓴 딜의
+ * 결과 시각(`settled_at`)으로 모든 예측을 다시 매겨 랭킹(`transfer_prediction_score`)을 쓴다 — 드라이런이 아니면 늘 돈다. 파생 안에서 이름 조회(위키데이터)와 **LLM 판정·요약**(`judge.mjs` —
  * 보도 한 건에 한 번, 이동 여부·출발·행선지·한국어 요약)이 돈다. `ANTHROPIC_API_KEY`가 없으면 판정 없이 파생한다 —
  * 판정을 받지 못한 **새** 딜은 열리지 않고 이미 있는 딜은 남는다(원격 실행은 키가 없으면 실패다).
  *
@@ -30,6 +32,7 @@ import { clampCp, createSyncClient, flag, guardTarget, loadEnv } from "./lib/syn
 import { runDerivation } from "./lib/transfer/derive-deals.mjs";
 import { JUDGE_MODEL, runJudgements } from "./lib/transfer/judge.mjs";
 import { runNotifications } from "./lib/transfer/notify.mjs";
+import { runScoring, syncWindows } from "./lib/transfer/predictions.mjs";
 import { expandRoundups, reprocessAll, syncSources } from "./lib/transfer/pipeline.mjs";
 import { SOURCES, enabledSources, findSource, maxRunIntervalMinutes } from "./lib/transfer/registry.mjs";
 import { inspectTelegramChannel, verifyBlueskyAccount } from "./lib/transfer/sources.mjs";
@@ -177,6 +180,16 @@ async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: rer
           }
         }
       : null;
+    // 창 사본을 먼저 맞춘다 — 예측의 회차를 DB 트리거가 이 표로 정한다(windows.json을 갱신한 첫 실행에 곧바로 반영되게)
+    if (!summaryOnly) {
+      try {
+        const w = await syncWindows(supabase, { log: console });
+        if (w.written) console.log(`\n이적 창 사본: ${w.written}개 갱신(전체 ${w.total})`);
+      } catch (e) {
+        console.error(`✗ 이적 창 사본 맞추기 실패: ${e instanceof Error ? e.message : String(e)}`);
+        process.exitCode = 1;
+      }
+    }
     const r = await runDerivation(supabase, { dryRun: summaryOnly, rejudge: again, replay: reread, judge });
     const s = r.summary;
     const stages = Object.entries(s.stages).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(" · ") || "—";
@@ -203,6 +216,7 @@ async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: rer
       const w = r.write;
       console.log(`  저장(값이 바뀐 것만): 구단 ${w.clubs} · 딜 ${w.deals}(그대로 ${w.unchanged}) · 배정 ${w.linked} · 해제 ${w.unlinked} · 삭제 ${w.deleted}${w.failed ? ` · 실패 ${w.failed}` : ""}`);
       if (w.failed) process.exitCode = 1;
+      await score();
       if (announce) await notify(w.changes);
     }
   } catch (e) {
@@ -211,6 +225,20 @@ async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: rer
     // 딜을 저장한 **뒤에** 실패했으면 변화 목록이 에러에 실려 온다(`writeDeals`) — 딜은 이미 새 단계라 다음 실행에는
     // 차이가 없다. 여기서 보내지 않으면 그 소식(오피셜 포함)은 영영 알림이 되지 못한다.
     if (announce && Array.isArray(e?.changes)) await notify(e.changes);
+  }
+}
+
+/**
+ * 예측 채점 — 파생이 쓴 딜의 결과 시각으로 모든 예측을 다시 매겨 랭킹을 쓴다(바뀐 행만). 실패는 종료 코드 1이다 —
+ * 랭킹이 멎어도 화면은 옛 점수를 그대로 그려 아무도 알아채지 못한다.
+ */
+async function score() {
+  try {
+    const s = await runScoring(supabase, { log: console });
+    if (s.predictions) console.log(`  예측 채점: 표 ${s.predictions} · 랭킹 ${s.users}명(갱신 ${s.written} · 제외 ${s.removed})`);
+  } catch (e) {
+    console.error(`✗ 예측 채점 실패: ${e instanceof Error ? e.message : String(e)}`);
+    process.exitCode = 1;
   }
 }
 

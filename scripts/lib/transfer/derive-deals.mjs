@@ -401,6 +401,35 @@ function resolveStage(items) {
   return dead.some((it) => it.stage === "collapsed" && ts(it.row) > ts(best.row)) ? "collapsed" : "denied";
 }
 
+/** 결과가 정해진 단계 — 예측 투표가 닫히고(DB 트리거) 채점이 "성사"로 보는 단계 */
+const SETTLED = new Set(["here_we_go", "official"]);
+
+/**
+ * 결과가 정해진 시각(`transfer_deal.settled_at`) — 딜 단계가 합의 완료·오피셜일 때만 값이 있다.
+ * 보도를 시간순으로 훑어 **마지막 결렬·부인 뒤로 처음 나온** 합의 완료·오피셜 보도의 게시 시각이다(되살아난 딜은
+ * 되살아난 뒤의 시각). 오피셜 보도를 본 뒤의 결렬·부인은 무시한다 — 오피셜은 뒤집히지 않는다(`resolveStage`와 같은 판정).
+ * ⚠ 수집 시각이 아니라 **게시 시각**이다 — 예측 채점이 이 시각 이후에 던진 표를 빼므로, 파이프라인 지연(최대 1시간) 사이에
+ *   소식을 보고 던진 표가 적중으로 세어지지 않는다.
+ */
+function resolveSettledAt(items, stage) {
+  if (!SETTLED.has(stage)) return null;
+  const sorted = [...items].sort((a, b) => ts(a.row) - ts(b.row));
+  let since = null;
+  let official = false;
+  for (const it of sorted) {
+    if (SETTLED.has(it.stage)) {
+      if (since === null) since = ts(it.row);
+      if (it.stage === "official") official = true;
+    } else if (isDead(it.stage) && !official) since = null;
+  }
+  // 폴백 — 판정 이력과 대표 단계가 갈린 드문 경우(합의 완료 보도 뒤에 결렬만 있는데 대표가 합의 완료)라도 값을 비우지 않는다
+  if (since === null) {
+    const first = sorted.find((it) => SETTLED.has(it.stage));
+    since = first ? ts(first.row) : Math.min(...items.map((it) => ts(it.row)));
+  }
+  return new Date(since).toISOString();
+}
+
 /**
  * 그 행에서 그 선수의 금액과 성격. **금액까지 읽는 형식으로 판정된 행(`verdict_raw`가 있다)은 판정자의 값이 전부다** — 판정자가
  * 금액이 없다고 했으면 없는 것이다. 규칙은 문장에서 가장 큰 금액을 집어 같은 기사의 남의 금액(다른 선수의 옵션 £47m)을 그 딜에 붙였다(운영).
@@ -733,6 +762,7 @@ export function deriveDeals(rows, opts) {
       // ⚠ 이적료가 확인되면 자유계약이 아니다(DB CHECK `transfer_deal_free_agent_no_fee`) — 화면은
       //   이적료가 있으면 금액, 없고 이 값이 켜졌으면 "FA(자유 계약)", 둘 다 아니면 "미공개"를 그린다
       is_free_agent: dir.isFree && !fee,
+      settled_at: resolveSettledAt(items, stage),
       first_reported_at: new Date(Math.min(...times)).toISOString(),
       latest_reported_at: new Date(Math.max(...times)).toISOString(),
       report_count: items.length,
@@ -814,10 +844,10 @@ const chunks = (arr) => Array.from({ length: Math.ceil(arr.length / CHUNK) }, (_
 const DEAL_COLUMNS = [
   "deal_key", "player", "player_ko", "position", "birth_year", "nationality", "from_club_code", "to_club_code", "stage",
   "fee_amount", "fee_currency", "fee_text", "fee_kind", "prev_fee_amount", "fee_low_amount", "fee_high_amount", "add_on_amount",
-  "contract_text", "wage_text", "is_free_agent", "first_reported_at", "latest_reported_at", "report_count",
+  "contract_text", "wage_text", "is_free_agent", "first_reported_at", "latest_reported_at", "report_count", "settled_at",
 ];
 const CLUB_COLUMNS = ["code", "canonical", "name", "short_name", "league"];
-const TIME_COLUMNS = new Set(["first_reported_at", "latest_reported_at"]);
+const TIME_COLUMNS = new Set(["first_reported_at", "latest_reported_at", "settled_at"]);
 const NUMERIC_COLUMNS = new Set(["fee_amount", "prev_fee_amount", "fee_low_amount", "fee_high_amount", "add_on_amount"]);
 const PAGE = 500;
 
@@ -863,23 +893,28 @@ async function readAll(supabase, table, columns, key, build = (q) => q) {
  *   참조 보도를 **최대 1건만** 임베딩해 보고(`transfer_news_deal_published_idx`를 탄다) 빈 딜만 고른다.
  * ⚠ 임베딩은 `limit 1`이라 결과가 잘려도 판정이 틀리지 않는다 — 1건이라도 오면 "참조됨", 0건이면 정말 0건이다.
  * ⚠ 보도 행을 사람이 지워 생긴 빈 딜도 여기서 잡힌다(이번 실행에 배정이 바뀐 딜만 보면 그 경로를 놓친다).
- * ⚠ **댓글이 달린 딜은 지우지 않는다**(`kept`로 따로 돌려준다). 댓글 FK가 `on delete restrict`라 지우려 하면
+ * ⚠ **댓글·예측이 걸린 딜은 지우지 않는다**(`kept`로 따로 돌려준다). 두 FK가 `on delete restrict`라 지우려 하면
  *   23503으로 실패하고, 그렇게 두면 매시간 같은 실패가 종료 코드 1로 남는다. 보도가 끊긴 딜이 보드에 남는 것은
- *   사용자가 쓴 글을 잃는 것보다 싸다고 판단했다(`api-and-db.md` "삭제 규칙"). 댓글도 같은 방식으로 1건만 본다.
+ *   사용자가 쓴 글·예측 기록을 잃는 것보다 싸다고 판단했다(`api-and-db.md` "삭제 규칙"). 댓글·예측도 같은 방식으로 1건만 본다.
  * @returns {{ orphans: object[], kept: object[] }}
  */
 async function findOrphanDeals(supabase, keep) {
   const deals = await readAll(
     supabase,
     DEALS,
-    "id, deal_key, player, refs:transfer_news!deal_id(id), comments:transfer_deal_comment!deal_id(id)",
+    "id, deal_key, player, refs:transfer_news!deal_id(id), comments:transfer_deal_comment!deal_id(id), predictions:transfer_deal_prediction!deal_id(deal_id)",
     "id",
-    (q) => q.limit(1, { referencedTable: "refs" }).limit(1, { referencedTable: "comments" }),
+    (q) =>
+      q
+        .limit(1, { referencedTable: "refs" })
+        .limit(1, { referencedTable: "comments" })
+        .limit(1, { referencedTable: "predictions" }),
   );
   const empty = deals.filter((d) => !keep.has(d.deal_key) && d.refs.length === 0);
+  const userData = (d) => d.comments.length > 0 || d.predictions.length > 0;
   return {
-    orphans: empty.filter((d) => d.comments.length === 0),
-    kept: empty.filter((d) => d.comments.length > 0),
+    orphans: empty.filter((d) => !userData(d)),
+    kept: empty.filter(userData),
   };
 }
 
@@ -1022,13 +1057,13 @@ export async function writeDeals(supabase, derived, rows, opts = {}) {
       stats.unlinked += ids.length;
     }
 
-    // 어떤 보도 행도 가리키지 않는 딜만 지운다(관심은 cascade, 댓글이 달린 딜은 남긴다 — findOrphanDeals 주석)
+    // 어떤 보도 행도 가리키지 않는 딜만 지운다(관심은 cascade, 댓글·예측이 걸린 딜은 남긴다 — findOrphanDeals 주석)
     const { orphans, kept } = await findOrphanDeals(supabase, savedKeys);
-    for (const d of kept) log.warn(`⚠ 보도가 끊겼지만 댓글이 있어 남긴 딜: ${d.player} (${d.deal_key})`);
+    for (const d of kept) log.warn(`⚠ 보도가 끊겼지만 댓글·예측이 있어 남긴 딜: ${d.player} (${d.deal_key})`);
     for (const d of orphans) {
       const { error: delErr } = await supabase.from(DEALS).delete().eq("id", d.id);
-      // 판정과 삭제 사이에 댓글이 달렸다(댓글 FK restrict) — 실패가 아니라 "남긴 딜"이다
-      if (delErr?.code === "23503" && `${delErr.message} ${delErr.details ?? ""}`.includes("transfer_deal_comment")) { log.warn(`⚠ 삭제하려던 사이 댓글이 달려 남긴 딜: ${d.player} (${d.deal_key})`); continue; }
+      // 판정과 삭제 사이에 댓글·예측이 달렸다(두 FK restrict) — 실패가 아니라 "남긴 딜"이다
+      if (delErr?.code === "23503" && /transfer_deal_(comment|prediction)/.test(`${delErr.message} ${delErr.details ?? ""}`)) { log.warn(`⚠ 삭제하려던 사이 댓글·예측이 달려 남긴 딜: ${d.player} (${d.deal_key})`); continue; }
       if (delErr) { stats.failed++; log.error(`✗ 딜 삭제 실패(${d.player}): ${delErr.message}`); continue; }
       stats.deleted++;
       log.warn(`⚠ 보도 행이 하나도 남지 않은 딜을 지웠다: ${d.player} (${d.deal_key})`);

@@ -101,6 +101,39 @@ const CASES = [
     expect: (r) => r.deals[0].stage,
     want: "agreement",
   },
+  (() => {
+    // 결과 시각(settled_at) — 합의 완료 → 결렬 → 다시 합의 완료면 **되살아난 뒤의** 합의 완료 시각이다
+    const rows = [
+      row("John Doe to Chelsea, here we go.", { stage: "here_we_go" }),
+      row("John Doe deal with Chelsea has collapsed.", { stage: "collapsed" }),
+      row("John Doe to Chelsea, here we go again.", { stage: "here_we_go" }),
+      row("Official: John Doe joins Chelsea.", { stage: "official" }),
+    ];
+    return {
+      name: "settled_at — 결렬 뒤 되살아난 딜은 되살아난 뒤 첫 합의 완료 보도의 시각",
+      rows,
+      expect: (r) => pick(r.deals[0], ["stage", "settled_at"]),
+      want: { stage: "official", settled_at: rows[2].published_at },
+    };
+  })(),
+  (() => {
+    const rows = [
+      row("Official: John Doe joins Chelsea.", { stage: "official" }),
+      row("John Doe move to Chelsea in doubt.", { stage: "collapsed" }),
+    ];
+    return {
+      name: "settled_at — 오피셜 뒤의 결렬 보도는 단계도 결과 시각도 바꾸지 못한다",
+      rows,
+      expect: (r) => pick(r.deals[0], ["stage", "settled_at"]),
+      want: { stage: "official", settled_at: rows[0].published_at },
+    };
+  })(),
+  {
+    name: "settled_at — 결과가 정해지지 않은 딜(루머·협상)은 null",
+    rows: [row("Chelsea agree deal for John Doe from Benfica.", { stage: "agreement" })],
+    expect: (r) => r.deals[0].settled_at,
+    want: null,
+  },
   {
     name: "부인 — 루머만 있다가 부인 보도가 오면 부인(denied)",
     rows: [

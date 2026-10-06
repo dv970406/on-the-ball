@@ -530,9 +530,13 @@ writer는 `scripts/lib/transfer/derive-deals.mjs`(`scripts/sync-transfer-news.mj
   ⚠ 빈 딜은 **딜마다 세지 않고** 딜 목록을 페이지로 읽으며 참조 보도를 1건만 임베딩해 찾는다 —
   범위 밖 옛 창의 딜은 옛 보도가 계속 가리켜 지워지지 않고 창마다 쌓이므로, 한 건씩 세면
   실행당 딜 수만큼 왕복이 붙는다.
-  ⚠ **댓글이 달린 딜은 보도가 끊겨도 지우지 않는다**(`findOrphanDeals`가 따로 걸러 경고만 남긴다).
-  사용자가 쓴 글이 재파생 한 번에 사라지는 것보다 보도가 끊긴 딜이 보드에 남는 편이 싸다고 판단했다 —
-  댓글 FK가 `on delete restrict`라 이 약속을 구조가 지킨다(지우려 하면 23503으로 실패한다).
+  ⚠ **댓글·예측이 걸린 딜은 보도가 끊겨도 지우지 않는다**(`findOrphanDeals`가 따로 걸러 경고만 남긴다).
+  사용자가 쓴 글·예측 기록이 재파생 한 번에 사라지는 것보다 보도가 끊긴 딜이 보드에 남는 편이 싸다고 판단했다 —
+  두 FK가 `on delete restrict`라 이 약속을 구조가 지킨다(지우려 하면 23503으로 실패한다).
+- **결과 시각(`settled_at`)**: 딜 단계가 합의 완료·오피셜일 때만, 보도를 시간순으로 훑어 **마지막 결렬·부인 뒤로 처음 나온**
+  합의 완료·오피셜 보도의 **게시 시각**이다(오피셜을 본 뒤의 결렬·부인은 무시 — 오피셜은 뒤집히지 않는다). 수집 시각이 아니라
+  게시 시각이라 예측 채점이 파이프라인 지연 사이에 소식을 보고 던진 표를 뺄 수 있다(아래 "딜 성사 예측" 절).
+  CHECK(`transfer_deal_settled_stage`)가 단계와 묶는다.
 - **쓰기는 값이 바뀐 것만**: 구단·딜은 저장된 값과 파생 값을 컬럼마다 대조해(`writeDeals`의
   `sameRow`) 다른 행만 upsert한다. 전량을 매시 쓰면 값이 그대로인 행까지 트리거·인덱스가
   갱신되고, 한 행만 실패해도 `upsertRows`가 전량을 한 건씩 다시 보낸다.
@@ -666,6 +670,41 @@ writer는 수집 스크립트 하나이고 쓰기 정책도 grant도 없다(아�
 - 목록 select의 `transfer_deal_comment_vote(value)` 임베딩이 곧 **내 표**다(관심과 같은 트릭 — 정책이 "내 행만").
   ⚠ 그래서 anon에도 `(user_id, comment_id, value)` SELECT를 연다(임베딩의 통로).
 - 작성자 표기는 `profiles` 임베딩이다 → 닉네임·아바타를 바꾸는 훅이 댓글 캐시도 무효화한다.
+
+### 딜 성사 예측 — "이번 창 안에 오피셜이 뜰까?"
+
+딜 상세의 원탭 투표와 그 채점(예측 랭킹)이다. 표가 넷이고 writer가 셋으로 갈린다.
+
+| 표 | 무엇 | writer |
+|---|---|---|
+| `transfer_window` | 이적 창 일정의 DB 사본(리그별 일정을 합친 기간) | 파생 스크립트(`syncWindows` — `windows.json`에서 맞춘다, 지우지 않는다) |
+| `transfer_deal_prediction` | 내 예측 — `(user_id, deal_id, round_key)` 복합 PK가 "한 창에 한 딜당 한 표" | 사용자(자기 행만 SELECT·INSERT·UPDATE(`will_happen`)) |
+| `transfer_deal_prediction_tally` | 딜·회차별 성사·불발 표 수 | definer 트리거(`sync_transfer_deal_prediction_tally`) |
+| `transfer_prediction_score` | 사람별 점수·적중·채점 수·순위 | 파생 스크립트(`runScoring` — 매시 처음부터 다시 채점, 바뀐 행만 쓴다) |
+
+- **회차(`round_key`)와 시각(`voted_at`)은 트리거가 정한다**(`transfer_deal_prediction_open`) — 둘 다 INSERT grant 밖이다.
+  회차 = 표를 던진 순간 **아직 닫히지 않은 가장 이른 창**이다(창 사이에 던진 표는 다음 창의 표). 클라이언트가 회차를 보내면
+  마감된 창에 표를 넣을 수 있고, 시각을 보내면 결과 전에 던진 것처럼 꾸밀 수 있다. 그래서 DB가 창 일정의 사본을 갖는다
+  (단일 소스는 여전히 `windows.json`이고 채점도 그 JSON을 읽는다 — 사본은 트리거 전용이다).
+  ⚠ `round_key`의 기본값 `''`는 트리거가 덮는 자리 채움이다 — 기본값이 없으면 생성 타입이 그 컬럼을 Insert 필수로 만든다.
+  다음 창 일정이 비어 있으면 P0001로 거부한다 → **시즌마다 `windows.json`을 갱신하는 것이 투표를 여는 일이기도 하다.**
+- **투표는 단계로 닫힌다** — 딜이 합의 완료·오피셜이면 insert·update가 P0001이다. 결렬·부인은 되살아날 수 있어 열어 둔다.
+  마감된 회차의 표도 바꿀 수 없다(`transfer_deal_prediction_change`). 같은 값으로의 UPDATE는 시각을 건드리지 않는다
+  (다시 누른 것으로 "결과 뒤의 표"가 되면 안 된다). 두 트리거는 invoker이고 명의 검사를 두지 않는다 — 말하는 값(딜 단계·창 일정)이
+  전부 공개 SELECT라 오라클이 될 것이 없다(댓글 깊이 트리거와 같은 예외).
+- ⚠ **거두기(DELETE)가 없다** — 정책도 grant도 없다. 지울 수 있으면 틀릴 것 같은 표를 결과 직전에 거둬 적중률을 지키는
+  길이 열린다. 바꾸기만 된다.
+- ⚠ 딜 FK는 **restrict**다(댓글과 같다) — 파생기가 예측 걸린 딜을 삭제 대상에서 뺀다(위 딜 파생의 삭제 규칙).
+- 남의 표는 보이지 않는다(SELECT 정책이 "내 행만") — "팬 N%"는 집계 표로만 그린다. anon에도 SELECT grant를 연다(통로 —
+  정책이 `to authenticated`라 빈 결과). 집계는 탈퇴 cascade에도 트리거가 돌아 맞는다.
+- **채점**(`scripts/lib/transfer/predictions.mjs`가 단독으로 갖는다): 회차의 판정 시각 = 창 마감 + `SETTLE_GRACE_MS`(2일 — 마감일
+  등록 이적의 발표 지연). 딜의 `settled_at`이 판정 시각 이전이면 성사, 아니면 판정 시각이 지났을 때 불발, 그 전엔 미정이다.
+  ⚠ 성사된 딜에서 **결과 시각 이후에 던진(바꾼) 표는 채점하지 않는다** — 투표는 단계로 닫히지만 파이프라인 지연(최대 1시간)
+  사이에는 열려 있어, 소식을 보고 고른 표를 거른다. 맞힌 표는 `max(1, round(100 × (1 − 같은 쪽 표 / 전체 표)))`점(소수 의견
+  가중 — 모두가 무산을 점치는 루머에 몰아서 "불발"을 찍는 점수 쌓기가 통하지 않는다), 틀린 표는 0점. 순위는 점수의 경쟁
+  순위(1, 2, 2, 4)다. 채점된 표가 한 건 이상인 사람만 점수 행이 있다.
+- ⚠ 채점은 **누적하지 않고 매번 처음부터** 다시 한다 — 규칙을 고치거나 표가 사라져도 다음 실행에 맞는다. 그래서 파생이
+  실패한 실행에서도 다음 실행이 따라잡는다. 채점 실패는 종료 코드 1이다(랭킹이 멎어도 화면은 옛 점수를 그대로 그린다).
 
 ### ⚠ enum 값은 **지울 수 없다**
 
@@ -999,6 +1038,7 @@ abuse bound를 10배로 푸는 대가가 크고, 20,000자 그래핌 계산이 *
 |---|---|---|
 | 트리거 | **`handle_new_user`** (`on_auth_user_created`, `after insert on auth.users`) | 가입 시 `profiles` 행 생성. **호출자 권한으로 돌면 `profiles` insert 권한이 없어 가입 자체가 실패한다** |
 | 트리거 | **`sync_transfer_deal_comment_vote_count`** (`after insert or update or delete on transfer_deal_comment_vote`) | 댓글 좋아요·싫어요 합계. 댓글에 UPDATE 정책도 grant도 없어 **호출자 권한으로 돌면 남의 댓글 합계가 0행으로 조용히 안 바뀐다** |
+| 트리거 | **`sync_transfer_deal_prediction_tally`** (`after insert or update or delete on transfer_deal_prediction`) | 딜 성사 예측 집계. 집계 표에 쓰기 grant가 없어 **호출자 권한으로는 집계를 만들 수도 바꿀 수도 없다** — 탈퇴 cascade로 표가 사라질 때도 이 트리거가 숫자를 맞춘다 |
 
 ⚠ **아래는 definer로 오해하기 쉽지만 아니다.**
 권한 없이도 도는 함수를 "RLS를 우회하는 함수"로 세어두면 보안 검토가 헛돈다. 위 검증 질의에서 `prosecdef = false`로 나오는 것이 전부이고, 아래 표는 그중 이유가 헷갈리는 것만 적는다.
@@ -1010,6 +1050,7 @@ abuse bound를 10배로 푸는 대가가 크고, 20,000자 그래핌 계산이 *
 | `transfer_news_freeze_collected` | 트리거지만 옛 행과 새 행을 비교해 거부할 뿐이다 → 권한 상승이 필요 없다(writer가 service_role이라 **어차피 grant가 아니라 이 트리거가** 방어다) |
 | `random_nickname` | 인자도 테이블 접근도 없는 순수 조합 생성기 |
 | `transfer_deal_comment_check_depth` | 트리거지만 부모 댓글을 **읽기만** 하고, 댓글은 전부 공개 SELECT라 RLS를 넘을 이유가 없다 |
+| `transfer_deal_prediction_open` · `transfer_deal_prediction_change` | 트리거지만 읽는 것(딜 단계·창 일정)이 전부 공개 SELECT이고, 바꾸는 것은 들어오는 자기 행(`new`)의 회차·시각뿐이다 |
 | `profiles_push_subscription_prune` | 트리거지만 지우는 것이 **호출자 자신의 구독**뿐이다 — DELETE·SELECT 정책이 "내 행만"이라 호출자 권한으로 충분하고, definer로 올리면 남의 명의로 넣는 시도가 그 사람의 구독을 밀어낼 수 있게 된다 |
 
 ⚠ **CHECK 제약 평가 함수(`has_visible_char`·`normalize_nickname`·`is_plain_nickname`)는 이 목록의 대상이 아니다.**
@@ -1059,7 +1100,7 @@ definer 함수를 새로 만들 때의 규약:
 
 ## 운영진만 쓰는 데이터는 **쓰기 경로를 만들지 않는다**
 
-사용자가 만드는 것이 아닌 데이터(`transfer_news`·`transfer_club`·`transfer_deal`·`transfer_name_ko`·`transfer_deal_push_log`)는
+사용자가 만드는 것이 아닌 데이터(`transfer_news`·`transfer_club`·`transfer_deal`·`transfer_name_ko`·`transfer_deal_push_log`·`transfer_window`·`transfer_prediction_score`)는
 **쓰기 정책도 grant도 두지 않는다.** 쓰는 것은 service_role로 도는 운영 스크립트 하나뿐이다
 (사람이 미리 써 두는 데이터라면 마이그레이션이 그 유일 경로다 — 테이블 소유자로 실행되어
 RLS를 지나지 않는다).
@@ -1116,6 +1157,10 @@ cascade 삭제는 RI(참조 무결성) **내부 트리거**가 수행하므로 �
   않는다 — 구단을 정리하는 작업을 만들려면 "누구의 응원 구단까지 지우는가"를 먼저 따진다.
 - `transfer_club_follow.user_id`·`profiles_push_subscription.user_id`(→ `profiles`) — 탈퇴하면 그 사람의 응원 구단과
   구독이 사라진다(남길 이유가 없는 본인 데이터다).
+- `transfer_deal_prediction.user_id`(→ `profiles`) — 탈퇴하면 그 사람의 예측이 사라지고 집계가 줄어든다(트리거가 맞춘다).
+  그 회차의 소수 의견 가중이 바뀌어 **남의 점수가 다음 채점에서 움직일 수 있다** — 채점이 매번 처음부터라 어긋나지 않고,
+  탈퇴한 사람의 표를 집계에 남길 방법이 없어 수용한다. `transfer_prediction_score.user_id`도 cascade다.
+- `transfer_deal_prediction_tally.deal_id` — cascade지만 예측 FK가 restrict라 표가 남은 딜은 애초에 지워지지 않는다.
 - `transfer_deal_watch` — 재파생이 딜을 지우면 모든 사용자의 관심이 함께 사라진다.
   딜이 없어졌으니 관심도 뜻을 잃는다는 판단으로 **수용한 트레이드오프**다.
   ⚠ 같은 딜에 매달린 **댓글은 반대로 `restrict`다** — 사용자가 쓴 글은 뜻을 잃지 않는다(위 댓글 절).
@@ -1208,7 +1253,7 @@ RLS 술어가 security-barrier 서브쿼리 안으로 들어가 바깥의 `fk = 
 
 | 파일 | 용도 |
 |---|---|
-| `supabase/tests/rls.sql` | RLS·컬럼 권한·함수 전량 검사 (전체 rollback이라 DB에 흔적 없음). ⚠ 여기에 **섹션 번호를 적지 않는다** — 섹션을 더하고 빼는 순간 거짓이 된다. 다루는 것: 프로필 편집(본인만 수정·아바타 경로·`created_at` 위조·스토리지 정책과 버킷 설정값), 닉네임 정규형·허용 문자·랜덤 배정 포화, 길이 한도, 이적 소식·보드·관심·요약·이동 판정·이름 캐시, 딜 댓글·답글 깊이·표 합계, 응원 구단, 웹 푸시 구독·발송 기록, 그리고 아래 전수 가드 |
+| `supabase/tests/rls.sql` | RLS·컬럼 권한·함수 전량 검사 (전체 rollback이라 DB에 흔적 없음). ⚠ 여기에 **섹션 번호를 적지 않는다** — 섹션을 더하고 빼는 순간 거짓이 된다. 다루는 것: 프로필 편집(본인만 수정·아바타 경로·`created_at` 위조·스토리지 정책과 버킷 설정값), 닉네임 정규형·허용 문자·랜덤 배정 포화, 길이 한도, 이적 소식·보드·관심·요약·이동 판정·이름 캐시, 딜 댓글·답글 깊이·표 합계, 응원 구단, 웹 푸시 구독·발송 기록, 딜 성사 예측(회차·시각 트리거·마감·거두기 없음·집계·점수), 그리고 아래 전수 가드 |
 | — **전수 가드는 테이블명을 하드코딩하지 않는다** | public 스키마 기본 권한이 anon/authenticated에 ALL이라, 새 마이그레이션이 `revoke`를 한 번만 잊어도 즉시 구멍이 된다. 고정 목록만 검사하면 **새 테이블은 검사 대상에 들어오지도 않는다** → RLS 미적용·anon 쓰기 권한·search_path 미고정·anon EXECUTE를 전수로 훑는다 |
 | — ⚠ **전수 가드는 `[0행 기대]` 라벨을 달아야 한다** | 라벨이 없으면 러너의 값 대조가 그 질의를 보지 않아, **행이 나와도 "✅ 통과"로 넘어간다.** 실제로 그랬다 — CHECK 평가 함수를 anon에 열었는데 가드가 그 이름을 뱉은 채 통과했다. 전수 가드가 러너에 안 잡히면 가드가 아니다 |
 | — **INSERT 시점 위조**도 따로 본다 | UPDATE만 보면 `grant insert` 목록이 넓어지는 회귀(카운터·타임스탬프 동봉)를 못 잡는다 |
@@ -1218,7 +1263,7 @@ RLS 술어가 security-barrier 서브쿼리 안으로 들어가 바깥의 `fk = 
 | — 시드 INSERT는 반드시 `begin;` **아래**에 | 위에 두면 오토커밋으로 새어나가 실행할 때마다 행이 쌓인다(실제로 그랬다) |
 | — 시각 비교 검사는 시드를 과거로 밀 것 | `now()`는 **트랜잭션 시작 시각**이라 한 트랜잭션 안에서 insert의 default와 트리거의 값이 같아진다 → "수정하면 updated_at이 바뀐다"를 증명할 수 없다 |
 | — 경합은 못 잡는다 | 두 세션이 필요한 회귀(`for update` 누락 등)는 이 파일이 한 트랜잭션이라 볼 수 없다 |
-| `pnpm test:transfer`(`scripts/test-transfer-extract.mjs` → `test-transfer-derive.mjs` → `test-transfer-judge.mjs` → `test-transfer-names.mjs` → `test-transfer-sources.mjs` → `test-transfer-notify.mjs`) | DB 없이 도는 파이프라인 회귀 — 추출(주급·옵션·선수 앵커·사전 형식) → **딜 파생**(`deriveDeals`가 순수 함수라 픽스처 행 배열만으로 검증한다: 방향 투표와 LLM 구단 표, 5대 리그·구단 미확인 관문, `collapsed`가 진전 보도보다 나중에 오면 무산으로 뒤집기, 직전 보도 이적료·통화 혼합, 한 토큰 이름 합치기·동성이인 분리, 라운드업·관련성 미달 제외). **LLM 판정·요약**은 API를 부르지 않고 해석(근거·구단 원문 대조, 요약 검증)과 요청 조립·저장 흐름만 검사한다 — 모델 출력은 비결정적이라 회귀 대상이 아니다. **알림**은 가짜 DB·가짜 발송으로 계획(누구에게 무엇을)·중복 방지·죽은 구독 정리를 보고, 화면의 상태 톤 표(`stage.ts`)와 스크립트의 사본이 같은지 대조한다 |
+| `pnpm test:transfer`(`scripts/test-transfer-extract.mjs` → `test-transfer-derive.mjs` → `test-transfer-judge.mjs` → `test-transfer-names.mjs` → `test-transfer-sources.mjs` → `test-transfer-notify.mjs` → `test-transfer-predictions.mjs`) | DB 없이 도는 파이프라인 회귀 — 추출(주급·옵션·선수 앵커·사전 형식) → **딜 파생**(`deriveDeals`가 순수 함수라 픽스처 행 배열만으로 검증한다: 방향 투표와 LLM 구단 표, 5대 리그·구단 미확인 관문, `collapsed`가 진전 보도보다 나중에 오면 무산으로 뒤집기, 직전 보도 이적료·통화 혼합, 한 토큰 이름 합치기·동성이인 분리, 라운드업·관련성 미달 제외). **LLM 판정·요약**은 API를 부르지 않고 해석(근거·구단 원문 대조, 요약 검증)과 요청 조립·저장 흐름만 검사한다 — 모델 출력은 비결정적이라 회귀 대상이 아니다. **알림**은 가짜 DB·가짜 발송으로 계획(누구에게 무엇을)·중복 방지·죽은 구독 정리를 보고, 화면의 상태 톤 표(`stage.ts`)와 스크립트의 사본이 같은지 대조한다. **예측 채점**은 순수 함수(`scorePredictions`)로 성사·불발·미정·결과 뒤의 표·소수 의견 가중·동점 순위·유예 경계를 본다 |
 | `node scripts/eval-transfer.mjs`(정답 `scripts/fixtures/transfer-golden.json`) | **실제 기사로 매긴 정답 세트로 채점한다** — 보드 딜의 정밀도, 이동 보도 선수의 재현율, 이름 추출 재현율, 이번 실행의 LLM 토큰. 운영 보도 101건을 파이프라인 결과를 보지 않은 채점자 둘이 원문을 읽고 매겼다. 규칙만 고쳤으면 **LLM 토큰 0**으로 돈다(운영에 저장된 판정을 스냅샷과 함께 받아 쓰고, 없는 판정만 `--judge`가 묻는다). ⚠ **품질 검증에 API를 먼저 쓰지 않는다** — 채점은 파이프라인의 답을 보지 않은 독립 채점자(사람·서브에이전트)가 원문만 읽고 하고, 그 결과를 정답 세트에 더한다. API가 필요한 것은 지시문을 고쳤을 때뿐이고 그때도 고정된 소규모 세트만 묻는다. ⚠ 저장소가 공개라 **본문을 커밋하지 않는다** — 정답에는 id·URL·정답뿐이고 본문은 `--export --remote`로 받은 `.cache/transfer-eval/`(gitignore)에서 읽는다. ⚠ 기준 시각을 스냅샷에 고정한다(파생 범위가 지금 시각을 따라 움직이면 같은 데이터로도 결과가 바뀐다). 직접 만든 예문(`test-transfer-*`)이 회귀를 막는다면, 실제 기사에서 좋아졌는지는 이 채점이 말한다 |
 | **`supabase/seed.sql`** | `db reset`이 **자동 실행**한다 — 개발 계정(alice/bob)과 프로필. ⚠ 시드가 없으면 마이그레이션을 고칠 때마다 reset이 개발 데이터를 통째로 날린다. 닉네임을 명시적으로 고정하는 이유는 랜덤 배정이면 유일성 검사가 부딪힐 상대를 잃어 **조용히 무의미해지기** 때문이다 |
 | **`supabase/tests/run-rls.sh`** | rls.sql을 돌리고 **양방향으로** 대조한다 — ① 기대하지 않은 ERROR ② **차단 기대인데 통과한 것** ③ 값 기대 라벨(`[0행 기대]` 등)의 실제 값. ②를 안 보면 로그가 깨끗한 채로 검사가 죽어 있다(실제로 2건이 그랬다) |
