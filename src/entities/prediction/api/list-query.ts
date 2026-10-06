@@ -21,14 +21,16 @@ export function buildMyPredictionsQuery(supabase: SupabaseClient<Database>, deal
 }
 
 /**
- * 랭킹 — 순위순 상위 `RANKING_LIMIT`줄. 같은 순위는 사용자 id 순으로 고정한다(정렬이 불안정하면 하이드레이션 직후
- * 동점자의 자리가 바뀐다).
+ * 랭킹 — 순위순 상위 `RANKING_LIMIT`줄. 같은 순위 안의 순서는 **채점(`scorePredictions`)과 같다** — 적중 많은 순 →
+ * 채점 적은 순 → 사용자 id. 마지막 키가 순서를 고정한다(불안정하면 하이드레이션 직후 동점자의 자리가 바뀐다).
  */
 export function buildRankingQuery(supabase: SupabaseClient<Database>) {
   return supabase
     .from("transfer_prediction_score")
     .select(SCORE_SELECT)
     .order("rank")
+    .order("hits", { ascending: false })
+    .order("scored")
     .order("user_id")
     .limit(RANKING_LIMIT);
 }

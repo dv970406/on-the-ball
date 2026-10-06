@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { ROUTES, predictionRound, transferWindowByKey } from "@/shared/config";
@@ -53,6 +54,9 @@ const labelClassName = "font-mono text-[10px] uppercase tracking-[0.5px] text-in
  * ⚠ **세션 `status`를 3분기한다**(`WatchToggle`과 같다) — `loading`에 비로그인 안내를 띄우면 복원 중인 로그인 사용자가
  *   안내를 본다. 그동안은 서버가 그린 내 표를 그대로 보여 주고 누르는 것만 막는다.
  * ⚠ 중복 가드는 없다 — 낙관적 갱신이다(`usePredictDeal` 주석). `disabled`는 세션 복원 중에만 건다.
+ * ⚠ **같은 tick의 연타를 prop으로 판정하지 않는다**(`CommentVoteButtons`와 같다) — 낙관적 갱신은 캐시를 곧바로 고치지만
+ *   `prediction` prop은 다음 렌더에야 바뀌어, 그 사이 들어온 두 번째 클릭은 옛 표를 보고 같은 요청을 한 번 더 만든다
+ *   (분석 이벤트도 두 번 센다). 마지막으로 요청한 표를 ref에 적어 두고 캐시가 따라오면(`pick`이 바뀌면) 비운다.
  */
 export function PredictionCard({
   dealId,
@@ -66,6 +70,7 @@ export function PredictionCard({
 }: PredictionCardProps) {
   const status = useSessionStore((s) => s.status);
   const predict = usePredictDeal(dealId);
+  const requestedRef = useRef<boolean | null>(null);
 
   // 닫힌 딜은 표가 있는 마지막 회차를, 열린 딜은 지금 받는 회차를 그린다
   const round = settled
@@ -76,10 +81,16 @@ export function PredictionCard({
     : nowMs === null
       ? null
       : predictionRound(nowMs);
+  const pick = round ? myPickOf(prediction, round.key) : null;
+
+  // 캐시가 따라오면(낙관적 갱신·롤백·재조회로 내 표가 바뀌면) 다시 캐시를 믿는다
+  useEffect(() => {
+    requestedRef.current = null;
+  }, [pick]);
+
   if (!round) return null;
 
   const tally = tallyOf(prediction, round.key);
-  const pick = myPickOf(prediction, round.key);
   const revealed = settled || pick !== null;
 
   const choose = (next: boolean) => {
@@ -88,9 +99,11 @@ export function PredictionCard({
       onSignInRequired("성사 여부를 예측하려면");
       return;
     }
+    const current = requestedRef.current ?? pick;
     // 고른 것을 다시 누르면 아무 일도 하지 않는다(거두기가 없다)
-    if (pick === next) return;
-    predict.mutate({ userId, roundKey: round.key, next });
+    if (current === next) return;
+    requestedRef.current = next;
+    predict.mutate({ userId, roundKey: round.key, current, next });
   };
 
   return (
@@ -153,7 +166,7 @@ export function PredictionCard({
         <p className="mt-2 text-[12px] leading-[1.5] text-ink-mute-2">
           {settled
             ? pick === null
-              ? "이 이적은 예측하지 않았어요."
+              ? "결과가 나와 더는 예측을 받지 않아요."
               : `내 예측: ${pick ? "성사" : "불발"} · 점수는 매시 랭킹에 반영돼요.`
             : `${round.label} 창이 닫힐 때까지 바꿀 수 있어요. 남들과 다른 예측을 맞힐수록 점수가 커요.`}
         </p>

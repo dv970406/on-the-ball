@@ -5,6 +5,7 @@ import { requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
 import { track, useToast } from "@/shared/lib";
 import { applyPick, myPickOf, predictionKeys, type DealPrediction } from "@/entities/prediction";
 import { useSessionStore } from "@/entities/session";
+import { transferKeys } from "@/entities/transfer";
 
 export interface PredictDealVariables {
   /**
@@ -17,6 +18,13 @@ export interface PredictDealVariables {
    * ⚠ **저장되는 회차는 DB 트리거가 정한다** — 마감 순간에 갈려도 저장값은 DB의 것이고 다음 조회가 맞춘다.
    */
   roundKey: string;
+  /**
+   * 누르기 직전의 내 표(`null`이면 처음 고른다) — **어느 요청을 먼저 보낼지 고르는 힌트일 뿐이다.** 틀려도 결과는
+   * `next`로 수렴한다(아래 mutationFn의 폴백). 다른 탭에서 골랐거나 연타가 겹치면 실제로 틀린다.
+   * ⚠ 호출부가 넘긴다 — mutationFn이 캐시를 다시 읽으면 **낙관적 갱신이 이미 내 표를 넣어 둔 뒤라** 늘 "이미 골랐다"가
+   *   되어, 첫 표가 바꾸기(0행) → 넣기로 요청을 두 번 보낸다.
+   */
+  current: boolean | null;
   /** 목표 — true 성사 · false 불발. 거두기는 없다(DB에 DELETE 경로가 없다) */
   next: boolean;
 }
@@ -49,7 +57,7 @@ export function usePredictDeal(dealId: number) {
   return useMutation<void, Error, PredictDealVariables, { prevPick: boolean | null }>({
     mutationKey: predictionKeys.predictMutation(dealId),
     scope: { id: `predict-deal:${dealId}` },
-    mutationFn: async ({ userId, roundKey, next }) => {
+    mutationFn: async ({ userId, roundKey, current, next }) => {
       const supabase = requireBrowserSupabase();
       // ⚠ 세션은 **실행하는 순간에** 읽는다 — 줄 서 있는 동안 로그아웃·계정 전환이 끼면 다른 명의로 보내지 않는다
       const user = useSessionStore.getState().user;
@@ -71,9 +79,7 @@ export function usePredictDeal(dealId: number) {
           // ⚠ RLS·행 없음은 에러가 아니라 0행이다 — 영향 행을 받아 "표가 없었다"를 가린다
           .select("deal_id");
 
-      // 처음 고르는 것인지는 **캐시의 내 표**로 판정한다 — 틀려도 아래 폴백이 목표 상태로 수렴시킨다
-      const cached = queryClient.getQueryData<DealPrediction>(predictionKeys.deal(dealId, userId));
-      if (myPickOf(cached, roundKey) === null) {
+      if (current === null) {
         const { error } = await insert();
         if (!error) return;
         if (error.code !== "23505") throw await fail(error, "예측");
@@ -120,6 +126,8 @@ export function usePredictDeal(dealId: number) {
       const last = queryClient.isMutating({ mutationKey: predictionKeys.predictMutation(dealId) }) === 1;
       if (last && needsResync.delete(dealId)) {
         queryClient.invalidateQueries({ queryKey: scope });
+        // 실패의 흔한 사유가 "결과가 나왔다"(P0001)다 — 화면이 연 사이 딜이 오피셜이 됐으면 카드를 닫으려면 딜 단계도 다시 받아야 한다
+        queryClient.invalidateQueries({ queryKey: transferKeys.details() });
         return;
       }
       queryClient.invalidateQueries({ queryKey: scope, refetchType: "none" });

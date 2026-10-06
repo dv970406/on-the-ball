@@ -52,8 +52,9 @@ export function RankingView({ initialRanking, initialUserId, serverNowMs }: Rank
       <SubHeader title="예측 랭킹" fallbackHref={ROUTES.transferList} />
       <main className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(32px+env(safe-area-inset-bottom))]">
         <header className="pt-4">
-          <h1 className="text-[24px] font-medium leading-[1.2] tracking-[-0.8px] text-ink">예측 랭킹</h1>
-          <p className="mt-2 text-[13px] leading-[1.6] text-ink-mute">
+          {/* 제목은 서브헤더가 이미 보여 준다 — 같은 말을 두 번 그리지 않고 문서 구조에만 둔다(프로필과 같다) */}
+          <h1 className="sr-only">예측 랭킹</h1>
+          <p className="text-[13px] leading-[1.6] text-ink-mute">
             딜 상세에서 &quot;이번 창 안에 오피셜이 뜰까?&quot;를 예측하면, 창이 닫힌 뒤(오피셜이 뜨면 그때) 채점돼요.
             남들과 다른 예측을 맞힐수록 점수가 커요 — 맞히면 (100 − 같은 쪽을 고른 비율%)점이에요.
           </p>
