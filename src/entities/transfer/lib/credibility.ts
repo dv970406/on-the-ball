@@ -40,3 +40,12 @@ export function credibilityOf(report: Pick<TransferReport, "sourceId" | "attribu
 export function isTopCredibility(c: Credibility | null): boolean {
   return c !== null && (c.kind === "medal" || c.level >= 4);
 }
+
+/**
+ * 공신력의 **순위 값** — 클수록 믿을 만하다(🎖️ > 🌕 … 🌑 > 등재되지 않은 출처). 정렬(`sortReports`)이 쓴다.
+ * 🎖️는 달 5단계 위다 — "오피셜에 육박하는 매체"라 어떤 기자 등급보다 앞에 둔다.
+ */
+export function credibilityRank(c: Credibility | null): number {
+  if (c === null) return 0;
+  return c.kind === "medal" ? 6 : c.level;
+}

@@ -504,6 +504,30 @@ const VERDICT = {
     row("Arsenal, Brighton and Aston Villa are monitoring Sturm Graz midfielder John Doe.", { stage: "rumour", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_from: "Sturm Graz", verdict_to: "Arsenal", verdict_suitors: ["Brighton", "Aston Villa"] }),
     row("Brighton keep tabs on John Doe of Sturm Graz.", { stage: "rumour", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_from: "Sturm Graz", verdict_to: "Brighton", verdict_suitors: ["Arsenal"] }),
   ]),
+  // 유력한 순 — 서로 다른 세 보도(본문이 같으면 한 보도로 합쳐진다)가 같은 구단들을 나열해 표가 전부 같으면 보도 안에서 먼저 적힌 구단이 앞이다(누사 딜의 형태)
+  suitorsTie: judged(
+    [
+      ["Aston Villa", "Tottenham Hotspur", "Newcastle United"],
+      ["Tottenham Hotspur", "Newcastle United", "Aston Villa"],
+      ["Tottenham Hotspur", "Aston Villa", "Newcastle United"],
+    ].map((suitors, i) => row(`Report ${i + 1}: Arsenal lead Tottenham, Aston Villa and Newcastle in the race for Leipzig winger John Doe.`, { stage: "rumour", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", summary_ko: "요약", verdict_from: "RB Leipzig", verdict_to: "Arsenal", verdict_suitors: suitors })),
+  ),
+  // 유력한 순 — 최신 보도(2배)에 든 구단이 옛 보도 한 건에만 든 구단보다 앞이다
+  suitorsRecent: judged([
+    row("Arsenal and Tottenham watch Leipzig winger John Doe.", { stage: "rumour", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", summary_ko: "요약", verdict_from: "RB Leipzig", verdict_to: "Arsenal", verdict_suitors: ["Tottenham Hotspur"] }),
+    row("Arsenal lead Newcastle for Leipzig winger John Doe.", { stage: "rumour", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", summary_ko: "요약", verdict_from: "RB Leipzig", verdict_to: "Arsenal", verdict_suitors: ["Newcastle United"] }),
+  ]),
+  // 유력한 순 — 부인 보도의 행선지(첼시)는 표가 아니다. 표가 같은 뉴캐슬·첼시는 먼저 적힌 뉴캐슬이 앞이다
+  suitorsDead: judged([
+    row("Chelsea deny interest in Leipzig winger John Doe.", { stage: "denied", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", summary_ko: "요약", verdict_from: "RB Leipzig", verdict_to: "Chelsea", verdict_suitors: [], verdict_stage: "denied" }),
+    row("Arsenal are keen on Leipzig winger John Doe.", { stage: "rumour", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", summary_ko: "요약", verdict_from: "RB Leipzig", verdict_to: "Arsenal", verdict_suitors: [], verdict_stage: "rumour" }),
+    row("Arsenal lead Newcastle and Chelsea for Leipzig winger John Doe.", { stage: "rumour", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", summary_ko: "요약", verdict_from: "RB Leipzig", verdict_to: "Arsenal", verdict_suitors: ["Newcastle United", "Chelsea"], verdict_stage: "rumour" }),
+  ]),
+  // 유력한 순은 순서만 정한다 — 행선지로만 적히고 투표에서 진 구단(첼시)을 관심 구단에 새로 넣지 않는다
+  suitorsNoNew: judged([
+    row("Chelsea want Leipzig winger John Doe.", { stage: "rumour", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", summary_ko: "요약", verdict_from: "RB Leipzig", verdict_to: "Chelsea", verdict_suitors: [] }),
+    row("Arsenal lead Newcastle for Leipzig winger John Doe.", { stage: "rumour", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", summary_ko: "요약", verdict_from: "RB Leipzig", verdict_to: "Arsenal", verdict_suitors: ["Newcastle United"] }),
+  ]),
 };
 // ── 넓힌 후보 · 확인되지 않은 선수의 예외 · 판정자의 금액 · 옛 형식 판정 ──
 const MOVE = (extra = {}) => ({ verdict: "move", verdict_player: "john doe", verdict_player_name: "John Doe", verdict_at: "2026-09-24T00:00:00Z", verdict_raw: "{}", summary_ko: "요약", ...extra });
@@ -634,7 +658,11 @@ const UNIT = [
   { name: "선수 없음 — LLM이 읽은 선수(verdict_player_name)로 딜이 묶이고 LLM 단계·구단을 쓴다", got: pick(VERDICT.unnamedJudged.deals[0] ?? {}, ["player", "from_club_code", "to_club_code", "stage"]), want: { player: "John Doe", from_club_code: "sc-freiburg", to_club_code: "aston-villa", stage: "official" } },
   { name: "선수 없음 — 이동 아님으로 판정된 보도는 다시 묻지 않는다", got: [VERDICT.unnamedNotMove.judgeNeeds.length, VERDICT.unnamedNotMove.deals.length], want: [0, 0] },
   { name: "단계 — 다선수 기사에서 규칙이 그 선수의 단계를 못 읽으면 LLM 단계(talks)를 쓴다", got: [VERDICT.llmStage.deals[0]?.stage, VERDICT.llmStage.skipped["그 선수의 단계 없음"] ?? 0], want: ["talks", 0] },
-  { name: "관심 구단 — 행선지는 최신 보도(2배)의 브라이턴, 나머지가 표 순으로 suitorCodes에 모이고 구단 행도 만든다", got: [VERDICT.suitors.deals[0]?.to_club_code, VERDICT.suitors.deals[0]?.suitorCodes, VERDICT.suitors.clubs.map((c) => c.code).sort()], want: ["brighton-hove", ["aston-villa", "arsenal"], ["arsenal", "aston-villa", "brighton-hove", "sturm-graz"]] },
+  { name: "관심 구단 — 행선지는 최신 보도(2배)의 브라이턴, 옛 보도가 행선지로도 적은 아스날이 관심 구단 맨 앞이고 구단 행도 만든다", got: [VERDICT.suitors.deals[0]?.to_club_code, VERDICT.suitors.deals[0]?.suitorCodes, VERDICT.suitors.clubs.map((c) => c.code).sort()], want: ["brighton-hove", ["arsenal", "aston-villa"], ["arsenal", "aston-villa", "brighton-hove", "sturm-graz"]] },
+  { name: "관심 구단 유력한 순 — 표가 같으면 보도 안에서 먼저 적힌 구단이 앞이다", got: [VERDICT.suitorsTie.deals[0]?.to_club_code, VERDICT.suitorsTie.deals[0]?.suitorCodes], want: ["arsenal", ["tottenham", "aston-villa", "newcastle"]] },
+  { name: "관심 구단 유력한 순 — 최신 보도(2배)의 구단이 옛 보도 한 건의 구단보다 앞이다", got: VERDICT.suitorsRecent.deals[0]?.suitorCodes, want: ["newcastle", "tottenham"] },
+  { name: "관심 구단 유력한 순 — 부인 보도의 행선지는 표가 아니다(첼시가 뉴캐슬 위로 오르지 않는다)", got: [VERDICT.suitorsDead.deals[0]?.to_club_code, VERDICT.suitorsDead.deals[0]?.suitorCodes], want: ["arsenal", ["newcastle", "chelsea"]] },
+  { name: "관심 구단 유력한 순 — 행선지 투표에서 진 구단을 관심 구단에 새로 넣지 않는다", got: [VERDICT.suitorsNoNew.deals[0]?.to_club_code, VERDICT.suitorsNoNew.deals[0]?.suitorCodes], want: ["arsenal", ["newcastle"]] },
   { name: "관심 구단 — 저장된 판정의 별칭(\"Hull\")을 지금의 사전으로 맞춰 헐 시티가 한 코드로만 실린다", got: [VERDICT.suitorsAlias.deals[0]?.suitorCodes, VERDICT.suitorsAlias.clubs.map((c) => c.code).sort()], want: [["arsenal", "hull-city"], ["arsenal", "hull-city", "sturm-graz"]] },
   { name: "관심 구단 — 행선지 없이 관심 구단만 있는 루머(비5대 리그 소속, 5대 리그 구단들이 관심)도 딜이고 이름 조회 대상에 관심 구단이 든다", got: [VERDICT.suitorsOnly.deals[0]?.to_club_code ?? null, VERDICT.suitorsOnly.deals[0]?.suitorCodes, VERDICT.suitorsOnly.nameNeeds[0]?.suitorCanonicals], want: [null, ["arsenal", "brighton-hove"], ["Arsenal", "Brighton"]] },
   { name: "폴백 — 보도에 소속이 없으면 현 소속 캐시가 출발 구단이다(행선지는 그대로)", got: [FALLBACK.used.deals[0]?.from_club_code, FALLBACK.used.deals[0]?.to_club_code, FALLBACK.used.fromFallback, FALLBACK.used.clubNeeds.length], want: ["bayern-munchen", "chelsea", 1, 0] },

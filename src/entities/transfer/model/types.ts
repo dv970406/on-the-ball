@@ -32,6 +32,13 @@ export type TransferStatus = Database["public"]["Enums"]["transfer_status_tone"]
 export type TransferSort = "latest" | "fee";
 
 /**
+ * 상세 보도 타임라인의 정렬 — 화면 안 토글이라 URL에 싣지 않는다(댓글 정렬과 같은 성격). 계산은 `lib/sort.ts`의 `sortReports`
+ * - `credibility`: 출처의 공신력이 높은 순, 같은 등급끼리는 최신순
+ * - `latest`: 게시 시각 최신순(서버가 준 순서와 같다)
+ */
+export type ReportSort = "credibility" | "latest";
+
+/**
  * 5대 리그 — `transfer_club.league`의 CHECK와 **글자 하나까지 같아야 한다**
  * (마이그레이션 20260925000001). DB 컬럼이 enum이 아니라 `text + check`라 생성 타입에서
  * 뽑을 수 없어 여기 손으로 적는다 — 그래서 아래 배열과 이 유니온을 서로 대조한다.
@@ -124,7 +131,7 @@ export interface TransferDeal {
   fromClub: TransferClub | null;
   toClub: TransferClub | null;
   /**
-   * 행선지 밖의 관심 구단(언급 순, `transfer_deal_suitor`) — 여러 구단이 노리는 루머에서 화면이 전부 엠블럼·이름으로 그린다.
+   * 행선지 밖의 관심 구단(유력한 순 — 파생의 `rankSuitors`, `transfer_deal_suitor.position`) — 여러 구단이 노리는 루머에서 화면이 전부 엠블럼·이름으로 그린다.
    * `toClub`이 있으면 확실한 행선지 하나 + 그 밖의 관심 구단, 없으면 관심 구단들뿐인 루머(행선지 미정)다.
    */
   suitors: TransferClub[];

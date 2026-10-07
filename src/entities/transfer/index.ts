@@ -7,6 +7,7 @@
 //    없지만 서버 page가 `lib/stage` 직접 경로로 쓴다(og description). `check:conventions`가 이 유형을
 //    **잡지 못하므로**(상대 경로 소비도 "현역"으로 센다) 손으로 지킨다.
 export type {
+  ReportSort,
   // 응원 구단(조회·고르는 화면·쓰기 훅)이 구단 한 건을 주고받는다
   TransferClub,
   TransferDeal,
@@ -36,7 +37,7 @@ export { compareClubs } from "./api/mappers";
 // ⚠ 구간 순서·라벨은 구간 점프 칩(빈 구간도 0건으로 그린다)이 직접 돈다 — `groupDeals`는 빈 구간을 뺀다
 export { GROUP_LABEL, GROUP_ORDER } from "./lib/stage";
 // ⚠ 정렬 → 분류 순서다. 안정 정렬·빈 구간 제외 규칙을 이 둘이 단독으로 소유한다
-export { groupDeals, sortDeals } from "./lib/sort";
+export { groupDeals, sortDeals, sortReports } from "./lib/sort";
 // ⚠ 캐러셀 판정(T1 · 3일 이내)의 단일 소스 — 서버 프리페치와 뷰가 같은 함수를 부른다
 export { pickRecentRumors } from "./lib/rumors";
 // ⚠ URL 파라미터 해석과 리그·구단 필터 — 링크가 만드는 주소와 보드가 읽는 주소가 같은 판정을 써야 한다

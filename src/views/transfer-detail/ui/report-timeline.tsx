@@ -1,10 +1,13 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
+import { useMemo, useState } from "react";
 import {
   CredibilityBadge,
+  type ReportSort,
   type TransferReport,
   reporterName,
+  sortReports,
 } from "@/entities/transfer";
 import { cn, formatRelativeTime } from "@/shared/lib";
 import { Icon, Skeleton, StaleBanner } from "@/shared/ui";
@@ -19,19 +22,32 @@ interface ReportTimelineProps {
   nowMs: number | null;
 }
 
+const SORT_OPTIONS: { key: ReportSort; label: string }[] = [
+  { key: "credibility", label: "공신력순" },
+  { key: "latest", label: "최신순" },
+];
+
 /**
- * 보도 타임라인 탭의 내용 — 최신순, 항목마다 Tier · 보도 주체 · 매체 · 시간 / 요지 / 원문 보기.
+ * 보도 타임라인 탭의 내용 — 정렬(공신력순 · 최신순) + 목록, 항목마다 Tier · 보도 주체 · 매체 · 시간 / 요지 / 원문 보기.
  *
  * - 요지는 한국어 요약(없으면 영문 발췌 — 매퍼가 고른다)이고 두 줄에서 자른다. 없으면 그 행을 생략한다.
  * - 원문 주소는 `originalUrl`(원저자 주소 우선 — 매퍼가 정한다). 없으면 링크를 그리지 않는다.
  *   ⚠ `target=_blank`에는 `rel="noopener noreferrer"`가 필수다(탭 납치).
  * - 좌측 7px 점은 컨트롤이 아니라 **레일의 표시 요소**라 `rounded-full`이 알약 규칙의 대상이 아니다
- *   (`styling.md` "대상이 아닌 것"). 첫 항목(최신)만 잉크다.
+ *   (`styling.md` "대상이 아닌 것"). **가장 최근 보도**만 잉크다 — 공신력순에서는 첫 항목이 최신이 아니므로
+ *   자리가 아니라 보도로 고른다(어느 정렬에서든 같은 보도가 잉크다).
+ * - 정렬은 받아 온 목록에서 이 컴포넌트가 한다(`sortReports`) — 쿼리 키에 넣으면 서버 프리페치와 키가 갈린다
+ *   (댓글 정렬과 같은 이유). 공신력이 같으면 최신순이다. 보도가 하나뿐이면 정렬이 아무 일도 하지 않으므로 그리지 않는다.
  *
  * ⚠ **제목 줄(`보도 타임라인 · N REPORTS`)이 없다** — 탭이 제목과 건수를 대신한다.
  *   패널의 접근성 이름도 탭이 준다(`aria-labelledby` — 뷰가 패널을 감싼다).
  */
 export function ReportTimeline({ reports, error, onRetry, nowMs }: ReportTimelineProps) {
+  const [sort, setSort] = useState<ReportSort>("credibility");
+  const sorted = useMemo(() => (reports ? sortReports(reports, sort) : undefined), [reports, sort]);
+  // 레일의 잉크 점 — 정렬과 무관하게 가장 최근 보도 하나(서버가 최신순으로 주지만 순서에 기대지 않는다)
+  const latestId = useMemo(() => (reports ? sortReports(reports, "latest")[0]?.id : undefined), [reports]);
+
   return (
     // ⚠ 첫 항목 위에는 선이 없다 — 탭 바의 아래 선이 그 자리를 맡는다(두 줄이 겹쳐 굵어 보인다)
     <>
@@ -61,9 +77,31 @@ export function ReportTimeline({ reports, error, onRetry, nowMs }: ReportTimelin
         </p>
       )}
 
-      {reports !== undefined && reports.length > 0 && (
+      {sorted !== undefined && sorted.length > 1 && (
+        // 정렬 — 댓글 탭과 같은 형태(제자리에서 다시 늘어놓는 선택 토글이라 `aria-pressed`)
+        // gap 16 — 두 버튼의 히트 영역(좌우 8px씩)이 겹치지 않는 간격
+        <div className="flex gap-4 pb-1 pt-4">
+          {SORT_OPTIONS.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              aria-pressed={sort === option.key}
+              onClick={() => setSort(option.key)}
+              className={cn(
+                // 글자는 12px이지만 히트 영역은 투명 의사요소로 44px 이상(세로 18+28, 가로 글자+16)
+                "relative text-[12px] text-ink-mute-2 transition-colors duration-150 ease-otb after:absolute after:-inset-x-2 after:-inset-y-3.5 after:content-['']",
+                sort === option.key && "font-medium text-ink",
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {sorted !== undefined && sorted.length > 0 && (
         <ol>
-          {reports.map((report, index) => {
+          {sorted.map((report) => {
             return (
               <li
                 key={report.id}
@@ -73,7 +111,7 @@ export function ReportTimeline({ reports, error, onRetry, nowMs }: ReportTimelin
                   <span
                     className={cn(
                       "size-[7px] rounded-full",
-                      index === 0 ? "bg-ink" : "bg-hairline-strong",
+                      report.id === latestId ? "bg-ink" : "bg-hairline-strong",
                     )}
                   />
                 </span>

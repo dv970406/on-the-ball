@@ -378,6 +378,54 @@ function resolveDirection(items, player, key) {
   return { from: origin ?? (formerClub && formerClub !== destination ? formerClub : null), to: destination, isFree };
 }
 
+/** 관심 구단 순위에서 보도가 그 구단을 **행선지로** 적은 표 — 관심 구단 목록에 든 것(1)보다 크다 */
+const SUITOR_DEST_VOTE = 2;
+
+/**
+ * 행선지 밖의 관심 구단을 **유력한 순**으로 — 화면의 TO 목록이 이 순서(`transfer_deal_suitor.position`)로 그린다.
+ * 구단 **목록**은 판정이 관심 구단으로 적은 구단(`verdict_suitors`)이고, 이 함수는 그 순서만 정한다.
+ *
+ * 1. 표: 관심 구단으로 적은 판정 1표 + 그 구단을 행선지로 적은 판정 `SUITOR_DEST_VOTE`표, 최신 보도는 2배(`resolveDirection`과 같은 가중).
+ * 2. 동률이면 보도 안에서 먼저 적힌 구단(평균 자리). 판정자는 원문의 언급 순으로 적는데(`judge.mjs` 지시문), 이적 기사는 앞선 구단을
+ *    먼저 쓴다. 표만 세면 한 기사가 일곱 구단을 나열하는 흔한 형태에서 전부 동률이라 순서가 나열의 우연이 됐다(운영: 누사 딜).
+ * 3. 그래도 같으면 가장 최근에 언급된 구단, 마지막으로 이름순(실행마다 같은 순서 — 순서가 흔들리면 자식 행을 매번 다시 쓴다).
+ *    이름은 코드포인트로 비교한다 — `localeCompare`는 실행 환경의 로케일을 타 로컬과 원격 실행의 순서가 갈릴 수 있다.
+ *
+ * ⚠ 행선지 표는 **목록에 이미 든 구단의 순위에만** 더한다 — 행선지로만 적히고 딜의 행선지 투표에서 진 구단을 목록에 새로 넣으면
+ *   출발·행선지 충돌로 버린 구단이 되살아나고, 오피셜 딜의 TO에 옛 루머 구단이 붙고, 그 구단의 응원 팬에게 알림이 간다.
+ * ⚠ 결렬·부인 보도의 행선지는 표가 아니다 — "관심 없다"고 부인한 구단이 유력한 쪽으로 올라간다. 그 보도가 적은 관심 구단은
+ *   센다(지시문이 "이 글이 지금 관심을 보인다고 말하는 구단만" 적게 한다).
+ * ⚠ 출처의 공신력은 보지 않는다 — 등급의 단일 소스(`reporters.json`)를 읽는 판정이 화면(TS) 쪽에만 있어 여기서 다시 짜면 갈린다.
+ */
+function rankSuitors(items, key) {
+  const stats = new Map();
+  const destVotes = new Map();
+  const last = items.at(-1);
+  for (const it of items) {
+    if (verdictOf(it.row, key) !== "move") continue;
+    const w = it === last ? 2 : 1;
+    (it.row.verdict_suitors ?? []).forEach((club, slot) => {
+      const s = stats.get(club) ?? { votes: 0, slots: 0, mentions: 0, lastTs: 0 };
+      s.votes += w;
+      s.slots += slot;
+      s.mentions += 1;
+      s.lastTs = Math.max(s.lastTs, ts(it.row));
+      stats.set(club, s);
+    });
+    const to = it.row.verdict_to;
+    if (to && !isDead(it.stage)) destVotes.set(to, (destVotes.get(to) ?? 0) + SUITOR_DEST_VOTE * w);
+  }
+  for (const [club, votes] of destVotes) {
+    const s = stats.get(club);
+    if (s) s.votes += votes;
+  }
+  const slot = (s) => s.slots / s.mentions;
+  const byName = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  return [...stats.entries()]
+    .sort(([ca, a], [cb, b]) => b.votes - a.votes || slot(a) - slot(b) || b.lastTs - a.lastTs || byName(ca, cb))
+    .map(([club]) => club);
+}
+
 /**
  * 대표 단계 — 진전 최대. 단 **가장 나중 보도가 죽은 보도(결렬·부인)면** 죽은 단계다(그 뒤에 살아 있는 보도가 다시 나오면
  * 되살아난 것이라 그 뒤 보도의 진전 최대다). 공식 발표는 뒤집히지 않는다.
@@ -650,18 +698,16 @@ export function deriveDeals(rows, opts) {
      * (아스날 → 알힐랄)는 출발 구단이 걸려 통과한다.
      */
     const mentioned = mentionedClubs(story);
-    const suitorVotes = new Map();
     for (const it of items) {
       if (verdictOf(it.row, key) !== "move") continue;
       for (const c of [it.row.verdict_from, it.row.verdict_to, ...(it.row.verdict_suitors ?? [])]) if (c) mentioned.add(c);
-      for (const c of it.row.verdict_suitors ?? []) suitorVotes.set(c, (suitorVotes.get(c) ?? 0) + 1);
     }
     if (![...mentioned].some(isTopLeague)) {
       skip("5대 리그 밖");
       continue;
     }
-    // 행선지 밖의 관심 구단(정규명, 표 순) — 이름 조회 대상이고 관문·자식 행의 근거다
-    const suitorCanonicals = [...suitorVotes.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c).filter((c) => c !== dir.from && c !== dir.to);
+    // 행선지 밖의 관심 구단(정규명, 유력한 순) — 이름 조회 대상이고 관문·자식 행의 근거다
+    const suitorCanonicals = rankSuitors(items, key).filter((c) => c !== dir.from && c !== dir.to);
     const stage = resolveStage(items);
     const { fee, prev, low, high } = resolveFee(items);
     const addOn = fee ? firstOf(items.flatMap((it) => it.storySentences), (ex) => (ex.addOnAmount != null && ex.addOnCurrency === fee.currency ? ex.addOnAmount : null), memo) : null;
@@ -767,7 +813,7 @@ export function deriveDeals(rows, opts) {
       latest_reported_at: new Date(Math.max(...times)).toISOString(),
       report_count: items.length,
       rowIds: items.map((it) => it.row.id),
-      // 관심 구단 코드(표 순) — `transfer_deal` 컬럼이 아니라 자식 행(`transfer_deal_suitor`)으로 쓴다
+      // 관심 구단 코드(유력한 순 — `rankSuitors`) — `transfer_deal` 컬럼이 아니라 자식 행(`transfer_deal_suitor`)으로 쓴다
       suitorCodes: suitorClubs.map((c) => c.code),
     });
     for (const it of items) assignments.set(it.row.id, dealKey(key));
@@ -1012,7 +1058,7 @@ export async function writeDeals(supabase, derived, rows, opts = {}) {
    *   에러의 `changes`로 알림을 마저 보낸다.
    */
   async function finishWrite() {
-    // 관심 구단(자식 행) — 딜마다 저장된 집합과 대조해 바뀐 딜만 지우고 다시 넣는다(표 순 position)
+    // 관심 구단(자식 행) — 딜마다 저장된 집합과 대조해 바뀐 딜만 지우고 다시 넣는다(유력한 순 position)
     const dealIds = [...idByKey.values()];
     const storedSuitors = new Map();
     for (const ids of chunks(dealIds)) {

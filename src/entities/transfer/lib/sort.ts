@@ -1,4 +1,5 @@
-import type { TransferDeal, TransferGroupKey, TransferSort } from "../model/types";
+import type { ReportSort, TransferDeal, TransferGroupKey, TransferReport, TransferSort } from "../model/types";
+import { credibilityOf, credibilityRank } from "./credibility";
 import { GROUP_LABEL, GROUP_ORDER, STAGE_GROUP } from "./stage";
 
 /**
@@ -53,4 +54,20 @@ export function groupDeals<T extends Pick<TransferDeal, "stage">>(
     label: GROUP_LABEL[key],
     deals: buckets.get(key) ?? [],
   }));
+}
+
+/**
+ * 보도 타임라인 정렬 — `credibility`는 공신력 높은 순(🎖️ > 🌕 … 🌑 > 등재되지 않은 출처), 같은 등급끼리는 최신순.
+ * `latest`는 게시 시각 최신순이다.
+ * ⚠ 시계를 읽지 않는 순수 계산이라 서버 HTML과 하이드레이션의 순서가 같다 — 등급도 같은 JSON(`reporters.json`)에서 온다.
+ * ⚠ 원본 배열을 바꾸지 않는다 — 쿼리 캐시의 배열이 그대로 들어온다.
+ */
+export function sortReports<
+  T extends Pick<TransferReport, "sourceId" | "attribution" | "attributedTo" | "publishedAt">,
+>(reports: readonly T[], sort: ReportSort): T[] {
+  // 시각으로 비교한다 — 문자열 비교는 같은 초 안의 "06+00:00"·"06.45+00:00"(소수 초를 생략한 표기)를 로케일 정렬 규칙에 따라 뒤집는다
+  const latestFirst = (a: T, b: T) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt);
+  if (sort === "latest") return reports.slice().sort(latestFirst);
+  const rank = new Map(reports.map((r) => [r, credibilityRank(credibilityOf(r))]));
+  return reports.slice().sort((a, b) => (rank.get(b) ?? 0) - (rank.get(a) ?? 0) || latestFirst(a, b));
 }
