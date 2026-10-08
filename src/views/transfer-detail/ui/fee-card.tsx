@@ -11,6 +11,7 @@ const labelClassName = "font-mono text-[10px] uppercase tracking-[0.5px] text-in
 
 interface FeeCardProps {
   deal: TransferDeal;
+  className?: string;
 }
 
 /**
@@ -24,7 +25,7 @@ interface FeeCardProps {
  * ⚠ 이 KV의 모든 칸은 **라벨 위 · 값 아래**다. 칸 구분은 헤어라인이고 그림자는 없다.
  * ⚠ 숫자는 전부 `font-mono tabular-nums` — `FeeDelta`는 안에서 그 클래스를 갖는다.
  */
-export function FeeCard({ deal }: FeeCardProps) {
+export function FeeCard({ deal, className }: FeeCardProps) {
   const fee = formatFee({ amount: deal.feeAmount, currency: deal.feeCurrency });
   const addOn =
     deal.feeAmount !== null && deal.addOnAmount !== null
@@ -49,7 +50,7 @@ export function FeeCard({ deal }: FeeCardProps) {
   return (
     <section
       aria-label="이적료"
-      className="mt-3 overflow-hidden rounded-lg border border-hairline"
+      className={cn("mt-3 overflow-hidden rounded-lg border border-hairline", className)}
     >
       <div className="p-3.5">
         {/* 제목이 금액의 성격을 말한다(제안액·요구액…) — 금액이 없으면(FA·미공개) 성격도 없다 */}

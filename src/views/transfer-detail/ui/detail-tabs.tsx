@@ -16,6 +16,7 @@ interface DetailTabsProps {
   tabs: DetailTab[];
   selected: DetailTabKey;
   onSelect: (key: DetailTabKey) => void;
+  className?: string;
 }
 
 /** 탭 버튼·패널을 잇는 id — 두 곳이 같은 문자열을 써야 `aria-controls`·`aria-labelledby`가 성립한다 */
@@ -29,9 +30,11 @@ export const detailPanelId = (key: DetailTabKey) => `transfer-detail-panel-${key
  *   화살표로 옆 탭에 옮겨 가는 roving tabindex를 함께 구현한다. 선택된 탭만 Tab 순서에 들어가고
  *   (`tabIndex 0`), 화살표·Home·End가 포커스와 선택을 **함께** 옮긴다(자동 활성화 — 패널이 이미
  *   렌더돼 있어 전환 비용이 없다).
- * ⚠ 전환에 애니메이션이 없다 — 색만 150ms. 패널은 뷰가 `hidden`으로만 가린다.
+ * ⚠ 전환에 애니메이션이 없다 — 색만 150ms. 패널은 뷰가 `hidden` 속성이 아니라 `max-lg:hidden` **클래스**로 가린다 — 넓은 화면은
+ *   탭 없이 두 패널을 다 보여야 해서다(사유는 뷰의 패널 주석). 그래서 이 탭 목록도 넓은 화면에서는 숨고, 패널의 `tabpanel` 역할도
+ *   뷰가 좁은 화면에서만 단다.
  */
-export function DetailTabs({ tabs, selected, onSelect }: DetailTabsProps) {
+export function DetailTabs({ tabs, selected, onSelect, className }: DetailTabsProps) {
   const buttonsRef = useRef<(HTMLButtonElement | null)[]>([]);
 
   const move = (index: number) => {
@@ -50,7 +53,7 @@ export function DetailTabs({ tabs, selected, onSelect }: DetailTabsProps) {
   };
 
   return (
-    <div role="tablist" className="mt-7 flex gap-5 border-b border-hairline-cool">
+    <div role="tablist" className={cn("mt-7 flex gap-5 border-b border-hairline-cool", className)}>
       {tabs.map((tab, index) => {
         const isSelected = tab.key === selected;
         return (
