@@ -4,6 +4,12 @@
 
 - 클라이언트 데이터는 **TanStack Query 훅**으로만 가져온다(`entities/*/api`의 `use*Query`). 컴포넌트에서 `fetch`나 `supabase.from()`을 직접 부르지 않는다.
 - 로딩은 **Skeleton**(화면 구조 유지), 에러·빈 상태는 **EmptyState**. 로딩 중 레이아웃이 튀지 않게 한다.
+- **CSS로 숨겨질 수 있는 자리의 컴포넌트는 조회를 렌더가 아니라 "보이는가"에 묶는다**(`enabled`). 서버가 모든 폭에 그리고
+  좁은 화면에서 `hidden`으로 가리는 판이 렌더만으로 조회를 열면, 보이지도 않는 화면에서 요청이 나간다. 사용자가 빠르게 훑는
+  자리(키보드로 목록을 넘기면 판이 딜마다 바뀐다)라면 잠깐 머문 뒤에 연다 — 보드의 오른쪽 판(`DealPanel`의 `active`)이 선례다.
+- **응답이 정책상 늘 비는 조회는 보내지 않는다** — 비로그인의 "내 행만" 조회(내 예측 등)는 빈 배열이 정해져 있어 왕복(브라우저는
+  OPTIONS까지 둘)만 는다. 조립 함수가 요청 없이 같은 모양의 빈 결과를 돌려주고, 판정 근거는 **쿼리 키와 같은 값**이어야 한다
+  (훅은 키의 `userId`, SSR은 세션 쿠키) — 근거가 갈리면 같은 키에 다른 모양이 앉는다.
 - 에러 메시지는 훅이 이미 한국어로 바꿔 던진다 → 컴포넌트는 `error.message`를 노출만 한다. 변환기는 아래가 전부이고 **일부러 합치지 않았다**(데이터가 다르다):
   - `toAuthErrorMessage` (`@/entities/session`) — supabase `AuthError`
   - `toDbErrorMessage` (`@/shared/api`) — PostgREST/RPC 에러
@@ -113,6 +119,10 @@ TanStack Query는 성공 후 리페치가 실패해도 `data`를 유지한다(`s
     먼저 무조건 부르고 값만 고른다.
 - `suppressHydrationWarning`으로 덮지 않는다(원인 은폐). Vercel 스킬 `rendering-hydration-suppress-warning`도 이 규칙보다 우선하지 않는다.
 - 목/시드 값도 정적 상수로 둔다(렌더마다 값이 바뀌면 안 됨).
+- ⚠ **SVG `<title>`(마우스를 올리면 뜨는 설명)의 자식은 템플릿 문자열 하나로 만든다.** `{a} · {b}건`처럼 조각을 이으면
+  하이드레이션이 깨진다(React #418 — 실측). 선례는 보도 흐름 차트(`ReportFlowChart`)다.
+- ⚠ **날짜로 묶는 계산은 한국 시각 고정 오프셋으로 한다.** `getDate()` 같은 지역 시각 메서드는 서버(UTC)와 브라우저(기기
+  시간대)가 다른 날로 묶어 SSR 화면이 갈린다(`entities/transfer/lib/report-flow.ts`).
 
 ## 뮤테이션
 

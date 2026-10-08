@@ -44,7 +44,8 @@
 - **`useItemGuard<K>()`** — 목록의 **항목별** 중복 실행 가드(`run(id, task)` · `isBusy(id)`). 뮤테이션 하나를 여러 항목이 나눠 쓰는 자리(댓글 삭제)용이다. ⚠ `ref` + `state` + `.finally()`를 호출부마다 다시 짜지 말 것 — 사유는 그 파일 주석과 `data-and-state.md`. ⚠ "항목 수 자체가 불변조건"인 목록(로그인 수단 해제)에는 쓰지 않는다.
 - **`serverToClientTime(serverMs)`** — 서버 시각을 **이 기기 시계** 기준으로 옮긴다(잰 오차의 최솟값을 쓴다 — 지연은 늘 양수라 최솟값이 참 오차에 가깝다). TanStack `initialDataUpdatedAt`처럼 기기 시계와 빼서 신선도를 재는 자리에 쓴다 — 서버 시각을 그대로 넣으면 기기 시계 오차만큼 방금 그린 SSR이 stale이 되거나 옛 페이로드가 신선해진다. ⚠ **화면에 그리는 값에는 쓰지 않는다** — 잰 오차가 기기마다 달라 서버 HTML과 갈린다. 신선도처럼 그려지지 않는 값에만 쓰고, 부르는 자리는 옵션 함수(`initialDataUpdatedAt: () => …` — Query가 만들어질 때 한 번)다.
 - `useScrollRestore` — 목록 스크롤 위치 저장/복원
-- `useFocusTrap` — 오버레이(`Dialog`·`Sheet`) 안에 포커스를 가둔다. ⚠ 초기 포커스는 **`preventScroll: true`** 로 준다 — 화면 밖에서 올라오는 시트에 그냥 `focus()`하면 브라우저가 `overflow-hidden`인 430px 프레임을 스크롤시켜 **되돌릴 수 없게** 화면이 밀린다(실측)
+- `useFocusTrap` — 오버레이(`Dialog`·`Sheet`) 안에 포커스를 가둔다. ⚠ 초기 포커스는 **`preventScroll: true`** 로 준다 — 화면 밖에서 올라오는 시트에 그냥 `focus()`하면 브라우저가 `overflow-hidden`인 앱 프레임을 스크롤시켜 **되돌릴 수 없게** 화면이 밀린다(실측)
+  - ⚠ **복귀점은 "열기 직전 포커스"만이 아니다.** 사파리는 마우스 클릭으로 버튼에 포커스를 주지 않아 그 순간 `activeElement`가 `body`다 — 트랩이 문서의 마지막 `pointerdown`(1초 안)에서 포커스 가능한 조상을 찾아 복귀점으로 삼는다. 호출부가 트리거 ref를 넘기지 않는다. 그 리스너가 여는 클릭보다 먼저 있어야 하므로 **트랩을 쓰는 오버레이는 닫힌 채로도 마운트해 둔다**(`Sheet`·`Dialog`는 훅을 부른 뒤 `null`을 돌려준다 — 조건부 렌더로 감싸지 않는다).
 - **`detectPushSupport()` / `getPushSubscription()` / `subscribePush(vapidPublicKey)` / `unsubscribePush()` / `serializePushSubscription(sub)` / `pushSubscriptionUsesKey(sub, key)`** — 브라우저 푸시 구독의 순수 메커니즘(`web-push.ts`). 누구의 구독인지·어디에 저장하는지는 모른다 — 그건 `entities/push`(조회)와 `features/push-notification`(쓰기)이 갖는다. `shared`에 있는 이유는 `entities/session`(세션이 사라질 때 구독을 버린다)과 그 둘이 함께 써야 하는데 서로 import할 수 없어서다. ⚠ **전부 브라우저에서만 부른다**(이벤트 핸들러·effect·queryFn) — 렌더 중에 부르면 서버 HTML과 갈린다. ⚠ `detectPushSupport`의 UA 판정은 "왜 안 되는가"의 안내용이다 — 기능이 있으면 UA를 보지 않는다(되는 곳을 UA로 막지 않는다).
 - **`track(name, params)`** — 분석 이벤트(GA4). **이벤트는 이것으로만 보낸다** — 이름·파라미터는 같은 파일의 `AnalyticsEvents`가 단일 소스라 없는 이름·빠진 파라미터가 컴파일 에러다. 측정 ID(`env.gaId`)가 없으면 아무것도 하지 않는다. 뮤테이션의 성공은 그 훅의 `onSuccess`에서 센다(`nextjs.md` 분석 절). ⚠ 사람을 가리키는 값·사용자가 쓴 글을 싣지 않는다.
 - `useToast` / `useToastStore` — 토스트 발행. **표시 영역(`ToastViewport`)은 `@/shared/ui`에 있고 루트에 하나만 둔다** — 상태와 UI가 레이어를 달리한다
@@ -108,7 +109,7 @@
 - `TRANSFER_DEAL_LIMIT` — 목록 상한(`api/mappers.ts` — SSR과 공유해야 해서 `"use client"`가 아닌 파일에 있다). **화면이 잘림을 안내해야 한다** — 조용히 자르면 그 뒤 항목은 URL을 아는 사람 말고는 도달할 방법이 없다.
 - **`pickRecentRumors(deals, nowMs)`** — "최근 3일 소식" 캐러셀 대상(믿을 만한 출처 · 3일 이내). 믿을 만한 출처는 🎖️ 매체와 🌕·🌖 기자다(`isTopCredibility` — 화면 뱃지와 같은 등급이라 표시와 채택 기준이 갈리지 않는다). ⚠ **최신 보도의 출처로 판정한다** — 목록 select의 최신 보도 임베딩(`limit 1`)만 보므로, 최신 보도의 등급이 낮으면 그 앞의 믿을 만한 보도가 있어도 그 딜은 빠진다(딜마다 보도 전체를 싣는 비용을 들이지 않기로 한 트레이드오프). 결렬 딜도 포함한다. ⚠ `nowMs`를 인자로 받는다(`formatRelativeTime`과 같은 이유) — 매퍼에 넣으면 순수·서버 안전이 깨지고 같은 행이 호출 시점마다 달라진다. 서버 시각이 있으면 그 값을 넘긴다.
 - **`FeeValue`** — 이적료 칸의 값. 금액이면 `€95M`(mono), 자유계약이 **확인된** 딜이면 `FA(자유 계약)`, 아니면 `미공개`(흐리게). 실제 이적료가 아닌 금액에는 성격을 작게 붙인다(`£86M 요구액`) — 금액만 두면 그 값에 이적한 것으로 읽힌다. 칸의 제목이 성격을 말하는 자리(상세 카드 — **`feeKindLabel(deal.feeKind)`**)만 `caption={false}`로 끈다. ⚠ 성격 라벨을 호출부가 다시 적지 말 것 — `Record<transfer_fee_kind, string>` 한 곳이 갖는다(`lib/fee.ts`). ⚠ **빈 이적료를 FA로 추정하지 않는다** — 판정은 `feeLabel`이 단독으로 갖고 근거는 파생기의 `is_free_agent`다(`api-and-db.md`). 이적료 칸을 새로 그릴 때 `formatFee(...) ?? "—"`를 직접 짜지 말 것.
-- **`formatFee({amount, currency})`** — 이적료 표기(`€95M`). **`formatFeeRange(deal)`** 은 그 딜의 보도 이적료 최소–최대(`€58–95M`, 같으면 한 값). ⚠ `min(prev,fee)–(fee+add)` 공식을 쓰지 않는다 — 하락 딜에서 `€58–58M`로 퇴화한다. 직전 보도 대비 변동폭은 `FeeDelta`가 그린다 — 통화 변환은 하지 않는다(파생기가 `prevFeeAmount`에 같은 통화 값만 넣는다).
+- **`formatFee({amount, currency})`** — 이적료 표기(`€95M`). 백만 미만은 **천 단위**다(`£250K`) — 백만 단위 소수 1자리로 그리면 `0.25`·`0.3`이 둘 다 `0.3M`이 되고 그 차이가 `0.0M`이 된다. 변동폭(`FeeDelta`)·범위·계약 조건이 전부 이 함수를 지나므로 단위를 호출부가 따로 정하지 않는다. 서버(메타데이터·공유 카드)도 쓰는 순수 함수다. **`formatFeeRange(deal)`** 은 그 딜의 보도 이적료 최소–최대(`€58–95M`, 같으면 한 값, 두 끝의 단위가 다르면 끝마다 — `€500K–1.5M`). 백만 이상은 **저장된 정밀도 그대로**(소수 둘째 자리까지, 꼬리 0은 걷는다 — `€95M`·`€12.5M`·`€1.25M`)다. 자리수를 반올림해 줄이지 않는다 — 줄이면 서로 다른 금액이 같은 글자가 되어 범위 바의 양 끝·헤드라인 금액·범위·변동폭이 서로 다른 말을 한다(`1.25`·`1.3` → 둘 다 `1.3M`). ⚠ `min(prev,fee)–(fee+add)` 공식을 쓰지 않는다 — 하락 딜에서 `€58–58M`로 퇴화한다. 직전 보도 대비 변동폭은 `FeeDelta`가 그린다 — 통화 변환은 하지 않는다(파생기가 `prevFeeAmount`에 같은 통화 값만 넣는다).
 - **`reporterName(report)`** — 보도 주체의 한국어 표기(기자는 전체 이름 "벤 제이콥스", 매체는 매체명 "BBC"). 캐러셀·목록·타임라인이 **이것 하나**를 쓴다 — 소스 등록용 영어 라벨을 화면에 따로 그리면 같은 기자가 화면마다 "Fabrizio Romano"·"파브리지오 로마노"로 갈린다. ⚠ **단일 소스는 `scripts/lib/transfer/reporters.json`** 이다(파이프라인이 TS를 못 읽어 JSON이 원본이다). 우선순위는 `bylines → sources → journalists → attributed_to 원문 → source_id`다. ⚠ **가십 칼럼이 인용한 신문의 보도(`attribution = 'cited'`)는 그보다 먼저 `cited` 표기(없으면 칼럼이 적은 원문 표기)다** — 소스가 BBC Sport 피드여도 BBC의 보도가 아니라서, 소스 표기로 떨어뜨리면 팀토크의 이적설이 "BBC"로 그려진다(운영 실측). 접는 규칙(`citedKey`)은 `reporter.ts` 하나가 갖는다.
 - **`TRANSFER_LEAGUES`** — 리그 시트의 노출 순서(5대 리그). `TransferLeague` 유니온과 `as const satisfies` + 망라성 가드로 서로 대조한다 — DB `transfer_club.league`가 enum이 아니라 `text + check`라 생성 타입에서 못 뽑아 손으로 적었기 때문이다.
 - **`dealInLeague(deal, league)` / `dealHasClub(deal, code)` / `dealIsWatched(deal, watchOnly)` / `parseTransferLeague(value)` / `parseTransferSort(value)` / `parseTransferClub(value)` / `parseTransferWatch(value)`** — 리그 필터(출발 **또는** 도착 일치, `null`은 전체) · 구단 필터(출발·행선지·관심 구단 어느 자리든) · 관심 필터(내가 담은 딜만 — `?watch=1`일 때만 켜진다) · URL `?league=`·`?sort=`·`?club=`·`?watch=` 해석. 구단은 형식만 검사하고 보드에 없는 코드는 뷰가 전체로 폴백한다(창이 지나 사라진 구단의 공유 링크). ⚠ **모르는 리그는 `null`(전체로 폴백), 모르는 정렬은 `latest`로 폴백** — 파라미터 오염이 404를 양산하면 안 된다(`nextjs.md`의 필터 절). 링크를 만드는 곳과 URL을 해석하는 곳이 갈리면 조용히 어긋나므로 **역방향 판정을 호출부가 직접 짜지 말 것**. 보드는 이 판정을 서버가 아니라 뷰가 주소에서 한다(`views/transfer-board`의 `useBoardFilters`).
@@ -118,12 +119,24 @@
 - **`sortReports(reports, sort)`** — 상세 보도 타임라인 정렬(`ReportSort`: `credibility` 공신력순 — 🎖️ > 🌕 … 🌑 > 등재되지 않은 출처, 같은 등급은 최신순 · `latest` 최신순). 등급은 배지와 같은 `credibilityOf`다 — 정렬과 배지가 다른 등급을 말하면 안 된다. 정렬은 쿼리 키에 넣지 않는다(댓글 정렬과 같은 이유).
 - `GROUP_LABEL` / `GROUP_ORDER` — 보드 구간(오피셜·합의 완료·진행 중·루머·결렬·부인)의 라벨·고정 순서. 결렬(`collapsed`)과 부인(`denied`)은 같은 구간이고 뱃지·아이콘(⊗/⊘)이 가른다 — 판정은 `isDeadStage`와 `stage === "denied"` 둘뿐이다.
 - **`CredibilityBadge`** — 출처 공신력: 🎖️(오피셜에 육박하는 매체에만) 또는 🌑~🌕(그 밖의 매체와 기자 — 5단계). 등급의 단일 소스는 `scripts/lib/transfer/reporters.json`의 `credibility`다 — 매체는 **소스 id**로(같은 "BBC" 표기를 BBC Sport와 BBC 이적 가십이 함께 쓴다), 기자는 보도 주체 표기로 매긴다. 가십 칼럼이 인용한 신문의 보도(`cited`)는 소스 id보다 먼저 **`cited`의 등급(1~5, 🎖️ 없음)** 이다 — 칼럼 소스의 🎖️는 칼럼의 것이지 옮겨 적은 타블로이드의 것이 아니다. 등재되지 않은 출처는 그리지 않는다. ⚠ 🎖은 **U+FE0F를 붙여야** Windows에서 컬러로 그려진다(기본 표시가 글자다). ⚠ 이모지는 `aria-hidden`이고 뜻은 `sr-only` 글자가 진다 — 스크린리더는 이모지를 모양 이름("보름달")으로 읽는다. DB의 `tier`(1·2)는 수집기의 귀속 판정용이라 화면에 쓰지 않는다.
-- **`routeLabels(deal, { full })` / `destinationClubs(deal)`** — 경로 두 칸의 글자와 행선지 자리의 구단들. 빈 칸의 문구(자유계약 출발 `FA` · 모르는 출발 `미확인` · 아직 정해지지 않은 행선지 `미정`)를 **여기 하나가** 정하고, 관심 구단이 여럿이면 앞 `ROUTE_CLUB_LIMIT`개를 `·`로 잇고 나머지를 `외 N`으로 센다(전부 이으면 목록 행이 세 줄로 부풀어 이적료 칸을 밀어냈다). 엠블럼은 슬라이스 내부의 `CrestStack`이 같은 수만큼 겹치고 나머지를 `+N`으로 접는다 — 이름과 엠블럼이 같은 구단을 가리켜야 한다. ⚠ **상세 경로 카드만 전부 적는다** — 폭을 이름에 전부 내줄 수 있는 유일한 자리라 접지 않고, `·`로 잇는 대신 **한 줄에 엠블럼 하나 + 정식명 하나**로 세운다(`views/transfer-detail`의 `RouteCell`). 그 밖의 자리(목록 행·미니 카드·캐러셀)는 이 글자를 그대로 쓴다. `full`이면 정식명, 아니면 약칭.
-- `DealRow` / `DealMiniCard` / `RumorCard` / `StatusBadge` / `FeeDelta` / `TransferCrest` — 목록 행 · 미니 카드 · 캐러셀 카드 · 상태 뱃지 · 변동폭 · 구단 엠블럼(`Crest`의 얇은 래퍼 — 코드로 경로를 조립하는 도메인 지식만 갖는다). ⚠ `CrestStack`(엠블럼 겹치기)은 배럴에 없다 — 슬라이스 밖 소비자가 0이다.
+- **`routeLabels(deal, { full })` / `destinationClubs(deal)`** — 경로 두 칸의 글자와 행선지 자리의 구단들. 빈 칸의 문구(자유계약 출발 `FA` · 모르는 출발 `미확인` · 아직 정해지지 않은 행선지 `미정`)를 **여기 하나가** 정하고, 관심 구단이 여럿이면 앞 `ROUTE_CLUB_LIMIT`개를 `·`로 잇고 나머지를 `외 N`으로 센다(전부 이으면 목록 행이 세 줄로 부풀어 이적료 칸을 밀어냈다). 엠블럼은 슬라이스 내부의 `CrestStack`이 같은 수만큼 겹치고 나머지를 `+N`으로 접는다 — 이름과 엠블럼이 같은 구단을 가리켜야 한다. ⚠ **경로 카드(`DealRouteCard`)만 전부 적는다** — 폭을 이름에 전부 내줄 수 있는 자리라 접지 않고, `·`로 잇는 대신 **한 줄에 엠블럼 하나 + 정식명 하나**로 세운다. 넓은 화면의 상세 히어로는 가장 유력한 하나만 크게 그리고 `외 N곳`을 단다(전부는 곁 칸의 `SuitorList`가 적는다). 그 밖의 자리(목록 행·미니 카드·캐러셀)는 이 글자를 그대로 쓴다. `full`이면 정식명, 아니면 약칭.
+- `DealRow` / `DealMiniCard` / `RumorCard` / `StatusBadge` / `FeeDelta` / `TransferCrest` — 목록 행 · 미니 카드 · 캐러셀 카드 · 상태 뱃지 · 변동폭 · 구단 엠블럼(`Crest`의 얇은 래퍼 — 코드로 경로를 조립하는 도메인 지식만 갖는다). ⚠ **`DealRow`는 md+에서 표의 한 줄이고, `DealTable` 안에서만 그린다** — 열(상태·선수·경로·이적료·업데이트, `min-[90rem]`에서 변동·보도 추가)의 폭·행 사이 디바이더·md+ 행 상자는 **`DealTable`(범위)이 한 번** 건다(행은 표지 `data-deal-row`·`data-deal-cols`만 단다 — 백여 행마다 같은 클래스를 싣지 않는다). 열 머리 `DealTableHead`도 같은 표지라 열 폭의 리터럴은 `ui/deal-table.tsx` 한 곳뿐이다. **칸 배치도 범위가 건다** — 행은 칸 표지(`data-col`)와 모바일 묶음 표지(`data-g` — 범위가 묶음 안의 순서로 이적료·변동폭·상태 뱃지를 찾는다)만 달고 md+ 전용 클래스를 갖지 않는다. 열이나 묶음 안 순서를 바꾸면 `deal-table.tsx`를 함께 고친다. 모바일 묶음은 `md:contents`로 풀어 같은 요소를 열에 놓는다(두 벌 그리지 않는다). ⚠ **표에서는 이름을 자르지 않는다** — 선수명·출발·행선지 약칭(`data-name`)은 md+에서 말줄임 대신 낱말 단위로 줄을 바꾸고, 경로 칸은 행선지 덩어리를 다음 줄로 넘긴다(약칭도 잘리면 어느 구단인지 알 수 없다 — `api-and-db.md`). ⚠ 세 항목 컴포넌트의 링크는 `data-deal-id`를 단다 — 2분할 폭에서 보드가 클릭을 위임으로 가로채는 표지다(`nextjs.md` 2분할 절). ⚠ 세 항목 컴포넌트는 `memo`다 — 보드는 행을 고를 때마다 다시 그려지므로 넘기는 값은 원시값이거나 목록 캐시의 같은 참조로 둔다. 링크는 `prefetch={false}`다(loading 경계 없는 동적 상세라 뷰포트 프리페치가 받아 오는 것이 거의 없고, 2분할 폭에서는 클릭이 선택으로 가로채진다). ⚠ `CrestStack`(엠블럼 겹치기)은 배럴에 없다 — 슬라이스 밖 소비자가 0이다.
   ⚠ **엠블럼을 직접 `<img>`로 그리지 말 것** — 폴백이 두 갈래인데 둘 다 필요하다: 코드가 비었을 때와, **파일이 없어 404일 때**(새 구단이 생기면 반드시 겪는다). 메커니즘은 `@/shared/ui`의 `Crest`가 갖는다.
+- **딜 상세와 보드의 오른쪽 판(`widgets/deal-panel`)이 함께 그리는 조각** — views와 widgets는 서로 import할 수 없어 여기 둔다. 데이터를 받아 그리기만 하고 features를 모른다(토글·예측은 호출부가 옆에 놓는다). 같은 내용을 새로 짜지 말고 이것을 쓴다.
+  - `DealInfoLine` — 정보줄(`영문 대문자 이름 · 포지션 · 출생연도 · 국기 국적`, 있는 항목만). `englishName={false}`는 영문 이름을 제목 옆에 따로 그리는 자리만.
+  - `DealRouteCard` — FROM/TO 경로 카드(엠블럼 + 정식명 + 리그, 행선지 자리의 구단은 전부).
+  - `ReportItem` — 보도 타임라인의 항목 하나(`<li>` — 부모는 `<ol>`). 레일의 잉크 점(`latest`)은 **가장 최근 보도** 하나에만.
+  - `FeeHighlight` — 금액의 성격 · 큰 금액 · 직전 보도 대비 · 보도 범위 바. 범위 바는 범위가 없거나 한 값이면 그리지 않는다.
+  - `ContractTerms` — 이적료 성격 · 옵션 · 주급 · 계약 · 직전 보도 금액(`<dl>`). ⚠ 직전 보도는 **금액만**이다 — 그 보도의 시각은 딜에 없다.
+  - `SuitorList` — 행선지 + 관심 구단을 유력한 순으로. ⚠ 비중(%)·막대를 그리지 않는다 — 저장된 것은 순서뿐이다.
+  - `ReportFlowChart` — 보도 흐름(하루 보도 수, 믿을 만한 출처는 채운 막대 · 그 밖은 빈 막대, 기간 1주·3주·전체).
+    "전체"가 그리는 날 수에 상한(`MAX_DAYS`)이 있고, 넘으면 **끝을 가장 최근 보도의 날로 당긴다**(기준 시각에 묶으면 오래 조용한 딜의 막대가 전부 빈다). 1주·3주는 "최근"이라 기준 시각에서 끝난다. 날짜는 한국 시각으로 묶는다(서버·클라이언트가 같은 날로 묶어야 한다 — `Date`의 지역 시각 메서드 금지).
+    스크린리더에는 그림 전체를 `reportFlowSummary`의 한 문장으로 준다 — 기간 이름이 아니라 실제로 그린 날짜를 말한다("최근 3주 동안 …", "6월 2일부터 9월 30일까지 …"). 보도가 없는 날은 칸을 그리지 않는다(서버 HTML이 날 수만큼 무거워진다).
+    ⚠ **보도별 단계·이적료를 그리지 않는다** — 공개된 `transfer_news.stage`·`fee_amount`는 규칙 판정이고 딜 단계는 비공개 LLM 판정이라 뱃지와 갈린다.
+    출처 등급은 배지와 같은 `credibilityOf`·`isTopCredibility`다.
 - ⚠ **한국어로는 "이적시장"·"딜"로 부른다.** URL(`/transfers`)·테이블(`transfer_deal`)·식별자(`transfer`)는 그대로 두고 화면·주석의 한국어만 통일한다.
 - **`useTransferClubListQuery({ enabled })` / `useFollowedClubsQuery({ userId, enabled, initialData, initialDataUpdatedAt })`** — 5대 리그 구단 전부(정식명순, "나"와 무관) · 내 응원 구단(`userId`로 스코프 — 로그인해야만 성립해 비로그인이면 조회하지 않는다). 쓰기는 `features/follow-club`. ⚠ 보드는 응원 구단으로 구단 칩의 순서를 정하므로 **보드 page가 쿠키 세션으로 함께 읽어 `initialData`로 내린다** — 클라이언트에서만 받으면 하이드레이션 뒤에 칩이 자리를 바꾼다. 조립은 `buildClubListQuery`·`buildFollowedClubsQuery`(`api/list-query.ts`)가 갖고, 순서는 **`compareClubs`** 하나가 정한다(낙관적 갱신이 조회와 같은 순서로 끼워 넣어야 항목이 튀지 않는다). ⚠ `buildFollowedClubsQuery`는 유저 필터를 걸지 않는다 — SELECT 정책이 "내 행만"이다. anon에는 그 표의 grant가 없어 세션이 실린 클라이언트로만 부른다.
-- ⚠ **`STAGE_GROUP`·`isDeadStage`·`feeDelta`·`ClubRoute`·`WatchMark`는 배럴에 없다** — 슬라이스 밖 소비자가 0이라 올리지 않았다. `STAGE_STATUS`·`STATUS_LABEL`도 배럴에는 없지만 서버 page가 `lib/stage` 직접 경로로 쓴다(og description). `check:conventions`는 상대 경로 소비를 현역으로 세어 이 유형을 잡지 못하므로 손으로 지킨다.
+- ⚠ **`STAGE_GROUP`·`isDeadStage`·`feeDelta`·`ClubRoute`·`WatchMark`는 배럴에 없다** — 슬라이스 밖 소비자가 0이라 올리지 않았다. `STAGE_STATUS`·`STATUS_LABEL`(+ `TransferStatus`)은 배럴에 있다 — 보드의 지수 띠(클라이언트)가 톤별 건수를 센다. 서버 page(og description)는 배럴이 아니라 `lib/stage` 직접 경로로 쓴다. `check:conventions`는 상대 경로 소비를 현역으로 세어 이 유형을 잡지 못하므로 손으로 지킨다.
 - 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/keys`·`api/list-query`·`lib/stage`·`lib/route-label`·`lib/player-name`·`lib/fee`를 직접 import.
 
 ## `@/entities/push`
@@ -149,14 +162,14 @@
 - ⚠ 세 슬라이스 모두 비로그인 안내를 직접 띄우지 않는다 — `onSignInRequired`로 올리고 **뷰가 `SignInDialog` 한 벌**을 문구만 바꿔 쓴다.
 
 ## `@/entities/prediction`
-- `useDealPredictionQuery({ dealId, userId, enabled, initialData, initialDataUpdatedAt, placeholderData })` / `predictionKeys` — 한 딜의 성사 예측(회차별 집계 + 내 표). ⚠ **userId로 스코프된다**(내 표가 "내 행만"). 서버가 다른 사용자로 그린 예측은 `withoutMyPredictions` 사본을 `placeholderData`로 넘긴다(댓글과 같은 규약). 조립은 `buildTallyQuery`·`buildMyPredictionsQuery`·`buildDealPrediction`(서버 안전)이 갖는다.
+- `useDealPredictionQuery({ dealId, userId, enabled, initialData, initialDataUpdatedAt, placeholderData })` / `predictionKeys` — 한 딜의 성사 예측(회차별 집계 + 내 표). ⚠ **userId로 스코프된다**(내 표가 "내 행만"). 서버가 다른 사용자로 그린 예측은 `withoutMyPredictions` 사본을 `placeholderData`로 넘긴다(댓글과 같은 규약). 조립은 `buildTallyQuery`·`buildMyPredictionsQuery`·`buildDealPrediction`(서버 안전)이 갖는다. ⚠ **비로그인이면 내 표를 묻지 않는다** — `buildMyPredictionsQuery(…, signedIn)`이 요청 없이 빈 결과를 돌려준다(정책상 늘 빈 배열). 훅은 키의 `userId`로, SSR은 세션 쿠키 유무로 판정해 결과 모양이 갈리지 않는다.
 - `useRankingQuery({ initialData, initialDataUpdatedAt })` / `useMyScoreQuery(userId)` — 예측 랭킹 상위 `RANKING_LIMIT`줄과 한 사람의 점수(채점된 표가 없으면 `null`). 점수·순위는 파생 스크립트가 매시 쓴다 — 화면은 읽기만 한다.
 - **`tallyOf` / `myPickOf` / `latestVotedRound` / `yesShare` / `applyPick`** — 집계 읽기와 낙관적 갱신이 **같은 계산**을 쓴다. 비율은 표가 `MIN_VOTES_FOR_SHARE`(슬라이스 내부)보다 적으면 `null`이다 — 세 표 중 두 표를 "67%"로 그리면 팬 다수의 의견처럼 읽힌다.
 - ⚠ 랭킹 select가 profiles를 임베딩한다 → `invalidateProfileConsumers`가 `predictionKeys.ranking()`·`scores()`를 함께 무효화한다.
 - 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/list-query`를 직접 import.
 
 ## `@/features/predict-deal`
-- `PredictionCard({ dealId, settled, prediction, error, onRetry, userId, nowMs, onSignInRequired })` — 딜 상세의 성사 예측 카드. 고르기 전에는 참여 수만, 고른 뒤(또는 결과가 나온 뒤)에 비율을 보여 준다(먼저 본 비율을 따라 고르면 예측이 아니라 쏠림이다). 결과가 나오면(`settled` — 합의 완료·오피셜) 버튼을 걷는다. 다음 창 일정이 없으면 그리지 않는다.
+- `PredictionCard({ dealId, settled, prediction, error, onRetry, userId, nowMs, onSignInRequired, headingLevel })` — 딜 상세(와 보드의 오른쪽 판)의 성사 예측 카드. 제목 단계는 놓인 자리를 따른다 — 기본 `h2`, 판 안은 `h3`. 고르기 전에는 참여 수만, 고른 뒤(또는 결과가 나온 뒤)에 비율을 보여 준다(먼저 본 비율을 따라 고르면 예측이 아니라 쏠림이다). 결과가 나오면(`settled` — 합의 완료·오피셜) 버튼을 걷는다. 다음 창 일정이 없으면 그리지 않는다.
 - ⚠ 훅(`usePredictDeal`)은 배럴에 없다 — 카드가 유일한 호출부다. 낙관적 갱신 + 같은 딜의 요청을 `scope`로 한 줄 + "목표 표로 수렴"하는 요청 + 실패만 줄 끝에서 재동기화(`useVoteComment`와 같은 형태). 가드는 없고 거두기도 없다(DB에 DELETE 경로가 없다 — `api-and-db.md` 딜 성사 예측 절).
 - ⚠ 회차는 DB 트리거가 정한다 — 화면의 `predictionRound(nowMs)`는 그릴 자리와 낙관적 갱신의 자리를 고를 뿐이다.
 
@@ -171,7 +184,7 @@
 - ⚠ **맨 `mutate`를 내보내지 않는다** — 가드가 훅 안에 있다(켜기는 행을 만들고 끄기는 행을 지운다).
 - ⚠ **`enable`은 클릭 핸들러에서 곧바로 부른다.** 권한 요청이 그 호출 안에서 동기로 시작된다 — 브라우저는 권한 요청이 사용자의 동작에서 곧바로 이어질 때만 물음을 띄운다. effect·타이머 뒤에서 부르지 말 것.
 - ⚠ 켤 때 브라우저에 남은 구독이 내 행이 아니면 버리고 새로 받는다(구독은 계정이 아니라 브라우저의 것이다 — `api-and-db.md` 웹 푸시 절). 저장에 실패하면 방금 받은 구독을 버린다.
-- 켜는 자리는 프로필의 알림 섹션(`PushSettings`)과 딜 상세에서 관심 목록에 담은 직후의 한 줄(`PushNudge`)이다. 권한은 맥락이 있는 자리에서만 묻는다(`nextjs.md`).
+- 켜는 자리는 프로필의 알림 섹션(`PushSettings`)과 관심 목록에 담은 직후의 한 줄(`PushNudge` — 딜 상세와 보드의 오른쪽 판)이다. 그 한 줄을 낼지는 **`usePushNudge`가 단독으로 정한다**(방금 담았고 · "담았어요" 토스트가 걷혔고 · 알림이 꺼져 있을 때 — 판정을 화면마다 다시 짜지 않는다). 권한은 맥락이 있는 자리에서만 묻는다(`nextjs.md`).
 - ⚠ 저장의 23505는 **내 행이면 흡수한다**(두 탭에서 동시에 켰다 — 방금 저장된 구독을 버리면 안 된다). 남의 행이거나 형식 위반(23514)이면 일반 문구 대신 "등록하지 못했어요"로 말한다 — 사용자가 입력한 값이 아니라서 "입력한 내용을 확인해 주세요"는 뜻이 어긋난다.
 - ⚠ "이 구독이 내 것인가"는 `buildOwnSubscriptionQuery`(`@/entities/push`) 하나가 판정한다 — 상태 조회와 켜기가 같은 조회를 써야 한다.
 
@@ -191,13 +204,15 @@
 
 ## `@/shared/config`
 - `ROUTES` — 경로 헬퍼. **경로 문자열 하드코딩 금지**(`"/transfers"` ❌ → `ROUTES.transferList`).
-  ⚠ 예측 랭킹은 `ROUTES.ranking`(`/ranking`)이다 — 탭이 아니라 서브헤더 화면이라 `activeTabHref`·`hasBottomBar`에 없다.
+  ⚠ 예측 랭킹은 `ROUTES.ranking`(`/ranking`)이다 — 탭이 아니라 서브헤더 화면이라 `activeTabHref`·`hasBottomBar`에 없다(데스크톱 상단 바의 내비에는 있다 — `activeNavHref`).
   ⚠ 이적시장은 **`ROUTES.transferList`**(`/transfers`) · `ROUTES.transfer(id)`(`/transfers/[id]`)다. 상세에는 탭바가 없다 — `activeTabHref`가 목록 경로만 센다.
   ⚠ `ROUTES.home`(`/`)은 화면이 아니라 이적시장으로의 리다이렉트다(`app/page.tsx`) — 링크 목적지로 쓰지 말고 실제 화면 경로를 쓴다.
 - **`openTransferWindow(nowMs)` / `trackedTransferWindow(nowMs)` / `boardScopeStartMs(nowMs)`**(`transfer-window.ts`) — 이적 창 일정. 창의 기간은 리그별 일정을 합친 것이다(개장 = 가장 먼저 여는 리그, 마감 = 가장 늦게 닫는 리그). `openTransferWindow`는 **지금 열려 있는 창**(없으면 `null`) — 헤더의 "마감까지" 카운트다운은 이 값이 있을 때만 그리고 마감에 닿으면 스스로 사라진다. `trackedTransferWindow`는 보드가 추적하는 창(개장한 가장 최근 창 — 창 사이에는 방금 닫힌 창)으로 헤더의 창 이름이 쓰고, `boardScopeStartMs`는 그 창의 개장 시각(보드에 실을 딜의 하한)이다. ⚠ **단일 소스는 `scripts/lib/transfer/windows.json`** 이다 — 딜 파생 스크립트(Node)가 이 TS를 import할 수 없어 JSON이 원본이고, 이 파일은 그 JSON을 그대로 읽는다. **시즌마다 사람이 갱신한다** — 엠블럼(`public/crests`)·`team-names-ko.json`과 같은 운영 모델이라 런타임에 늘지 않는다.
 - **`predictionRound(nowMs)` / `transferWindowByKey(key)`** — 예측의 회차(`closesAt > now`인 가장 이른 창 — 창 사이에는 다음 창, 일정이 없으면 `null`)와 키로 창 찾기. ⚠ 회차 판정은 DB 트리거(`transfer_deal_prediction_open`)와 **같은 규칙**이다 — 저장되는 회차는 DB가 정하고 화면은 그릴 자리를 고른다. DB 사본(`transfer_window`)은 파생 스크립트가 같은 JSON에서 맞춘다.
 - **`hasBottomBar(pathname)` / `activeTabHref(pathname)`** — 화면 아래에 고정 바(탭바 또는 딜 상세의 관심 토글 바)가 있는지와 활성인 탭. 탭바(`widgets`)는 `activeTabHref`를, 토스트(`shared/ui`)는 `hasBottomBar`를 본다. ⚠ 하단 고정 바를 새로 두는 화면이 생기면 `hasBottomBar`에 더한다 — 빠뜨리면 토스트가 그 바의 CTA를 덮는다. ⚠ 새 목록 경로가 생기면 여기부터 고친다 — 빠뜨리면 그 화면에서 **탭바가 사라지고 토스트가 탭바 자리로 내려간다.** 값이 유한하지 않은 경로(`/…/category/[slug]` 같은)가 생기면 정확 일치 배열이 아니라 접두 판정으로 둔다.
-- `signInWithNext(pathname)` / `withNext(path, next)` — 복귀 경로를 붙인 URL. 이 형태를 만드는 곳이 가드·`SignInDialog`·`AuthStatus`로 여럿이라 여기로 모았다. ⚠ 액션 컨트롤에서 이걸로 **직접 이동하지 않는다** — `SignInDialog`가 안내를 끼고 그 안에서 부른다(예외는 라벨이 "로그인"인 컨트롤).
+- **`activeNavHref(pathname)`** — 데스크톱 상단 바(`TopBar`)에서 활성인 내비 항목. 탭바 판정(`activeTabHref`)과 다르다 — 딜 상세(`/transfers/[id]`)도 "이적시장"이다(상세는 이적시장 안의 화면이고, 상단 바는 상세에서도 남는다). 내비 항목을 더하면 여기도 함께 고친다.
+- ⚠ **`hasBottomBar`는 폭을 모른다.** 하단 고정 바는 `lg`(1024px)부터 없으므로(탭바는 상단 바로 올라가고 딜 상세의 하단 바도 숨는다) 폭 조건은 소비자가 클래스로 건다(`ToastViewport`의 `lg:` 위치). 경로 판정에 폭을 섞지 않는다 — 서버 렌더에는 폭이 없다.
+- `signInWithNext(pathname)` / `withNext(path, next)` — 복귀 경로를 붙인 URL. 이 형태를 만드는 곳이 가드·`SignInDialog`·`AuthStatus`로 여럿이라 여기로 모았다. ⚠ **OAuth 복귀 파라미터(`code`·`error`·`error_code`·`error_description`·`state`)는 실을 때 걷는다**(슬라이스 내부 `withoutAuthReturnParams` — 나머지 쿼리는 그대로). `next` 안에 감싸인 `code`는 분석의 `code` 걷어내기를 피해 가고, 로그인 뒤 끝난 복귀를 화면이 다시 읽는다. `safeNextPath`도 돌려줄 때 같은 함수로 한 번 더 걷는다 — 파라미터 목록을 호출부에 다시 적지 않는다. ⚠ 액션 컨트롤에서 이걸로 **직접 이동하지 않는다** — `SignInDialog`가 안내를 끼고 그 안에서 부른다(예외는 라벨이 "로그인"인 컨트롤).
 - **`safeNextPath(next, origin)`** — `?next=` 값을 앱 내부 경로로만 통과시킨다. **직접 문자열 검사를 짜지 말 것** — `startsWith("/") && !startsWith("//")`로는 `/\evil.com`도 `/..//evil.com`도 못 막는다(둘 다 실제로 뚫렸다).
 - **`OAUTH_PROVIDERS` / `OAUTH_PROVIDER_LABEL`** — 지원 소셜 프로바이더의 단일 소스. `supabase/config.toml`의 `[auth.external.*]`와 갈리면 안 된다. ⚠ `shared`에 있는 이유는 로그인(`features/sign-in`)과 계정 연결(`features/link-identity`)이 같은 목록을 써야 하는데 features끼리는 import할 수 없어서다.
 - **`avatarUrl(path)` / `AVATAR_BUCKET`** — 아바타 **경로** → 공개 URL. ⚠ DB에는 전체 URL이 아니라 경로만 저장한다(호스트가 환경마다 다르다: 로컬 `127.0.0.1:64321` ↔ 원격 `*.supabase.co`). 조립은 이 함수 한 곳에서만. 버킷명 문자열도 여기서 가져다 쓴다(`features/update-profile`이 선례).
@@ -212,7 +227,7 @@
 
 ## `@/shared/ui`
 **현역(지금 화면이 실제로 쓰는 것)** — 새로 만들기 전 여기부터 확인:
-`Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·`chipClassName`·`Dialog`·`SignInDialog`·`Sheet`·`SheetItem`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`·`StaleBanner`·`Crest`
+`Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·`chipClassName`·`Dialog`·`SignInDialog`·`SignInLink`·`Sheet`·`SheetItem`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`·`StaleBanner`·`Crest`
 
 **현재 미사용인 자산은 두지 않는다** — 호출부가 0인 export는 `pnpm check:conventions`가 막는다. 남겨야 할 이유가 있으면 사유와 함께 `scripts/check-conventions.mjs`의 `DOCUMENTED_UNUSED`에 적는다.
 
@@ -222,24 +237,34 @@
 - **`Crest`** — 엠블럼류 이미지 + 하이드레이션 전 실패 감지 + 모노그램 폴백의 **공통 메커니즘**. `entities/transfer`의 `TransferCrest`가 이걸 감싼다(도메인 지식은 호출부가 `src`·`label`로 넘긴다). `"use client"` — 실패 감지가 `useEffect` + `onError`를 함께 쓴다. ⚠ `onError`만으로는 부족하다 — SSR HTML의 `<img>`는 **하이드레이션 전에** 실패할 수 있고 그러면 이벤트가 지나가 버린다(마운트 시 `complete && naturalWidth === 0`을 함께 확인하는 이유). `next/image`가 아니라 `<img>`다(`avatar.tsx`와 같은 판단 — 자산이 이미 목표 크기라 최적화 파이프라인이 줄 이득이 없다). ⚠ `Avatar`로 대신하지 말 것 — `rounded-full` + `object-cover`라 방패 모양 엠블럼의 모서리가 잘린다.
 - `chipClassName(selected)` — 칩의 클래스만. **`rounded-sm`(6px)** 이다 — 칩이라고 알약이 아니다(`styling.md`). 이동이면 링크(`<Link>`, 이적 보드 필터는 `BoardLink`)에, 선택이면 `button`에 이 클래스를 입힌다(앵커 안에 `button`을 넣지 않는다). 분리 사유는 `Button`↔`buttonClassName`과 같다.
 - `Dialog` / `Sheet`(+`SheetItem`) — 확인 대화상자 / 하단 시트. 포커스 가둠은 `@/shared/lib`의 `useFocusTrap`.
-  - `Sheet`는 화면 하단에 붙는 **edge-to-edge** 시트다(`styling.md`). "닫기" 행을 두지 않는다.
+  - `Sheet`는 화면 하단에 붙는 **edge-to-edge** 시트다(`styling.md`). "닫기" 행을 두지 않는다. 넓은 프레임(768px~)에서는 하단 가운데 최대폭 패널이 된다(`Dialog`도 가운데 최대폭 카드).
   - ⚠ 닫기 수단은 스크림 탭 · Escape · 스와이프인데 **셋 다 포인터이거나 물리 키보드다.** 그래서 그래버가 `button aria-label="닫기"`를 겸한다 — 시트 안 항목이 전부 비활성인 메뉴가 생기면 **활성 컨트롤이 0개**가 되고, 그때 스크린리더·키보드의 유일한 탈출구가 이 버튼이다. `div`로 되돌리지 말 것.
   - ⚠ 진입·퇴장 애니메이션은 **바깥 요소**, 드래그 오프셋은 **안쪽 래퍼**가 갖는다. 한 요소에 겹치면 CSS animation이 캐스케이드에서 inline style을 이겨 드래그가 통째로 무시된다. 새 오버레이에 드래그를 붙일 때 같은 함정을 밟지 말 것.
   - ⚠ 시트 위에 시트를 겹치지 않는다 — `useFocusTrap`이 이중이 되어 Escape·Tab 가둠이 둘이 되고 `aria-modal` 노드도 둘이 된다. 한 시트의 **children만 바꾼다**(한 상태로 `"none" | "menu" | …`를 갖는다).
 - **`SignInDialog`** — "로그인이 필요해요" 안내. **로그인이 필요한 액션을 비로그인이 눌렀을 때 `router.push(signInWithNext(...))`로 곧바로 화면을 갈아치우지 않는다** — 무엇 때문에 화면을 잃는지 모른 채 이동하게 되고, 되돌아올 길도 없다. 문구는 `action`(`"관심 목록에 담으려면"`처럼 **`~하려면`으로 끝나는 구절**) 하나만 받고 나머지 문장은 컴포넌트가 갖는다.
-  - ⚠ **예외는 대놓고 "로그인"이라고 쓰인 컨트롤이다** — `AuthStatus`의 로그인 버튼은 목적지가 라벨에 적혀 있어 한 단계 더 묻는 것이 방해다. 그대로 `signInWithNext`로 보낸다.
+  - ⚠ **예외는 대놓고 "로그인"이라고 쓰인 컨트롤이다** — `AuthStatus`·`TopBar`의 로그인 버튼은 목적지가 라벨에 적혀 있어 한 단계 더 묻는 것이 방해다. 곧바로 보낸다(`SignInLink`).
+  - 기본 복귀 경로(`next` 미지정)는 **쿼리까지 포함한** 지금 주소다 — 이적 보드의 필터·고른 딜은 주소에만 있다. 주소는 누르는 순간에 읽는다.
   - ⚠ **화면을 떠나는 동작에는 `next`를 준다**(프로필 탭 → `/profile`). 기본값(지금 화면)으로 두면 로그인하고 돌아와서 그 동작을 처음부터 다시 눌러야 한다.
   - ⚠ **열림 상태는 호출부가 갖고, 렌더 자리는 스크롤 영역 밖이다.** `Dialog`가 `absolute`라 스크롤 컨테이너 안에 두면 스크롤한 만큼 화면 밖에 뜨고, 목록에서는 항목 수만큼 생긴다 → 액션 컴포넌트(`WatchToggle`)는 `onSignInRequired` 콜백만 올리고 **뷰가 한 벌** 렌더한다. 한 화면의 여러 액션은 **문구만 다른 한 벌**을 공유한다.
   - ⚠ **앵커는 앵커로 남긴다.** 크롤 가능한 링크(프로필 탭)는 `<Link>`를 유지하고 `onClick`에서 비로그인일 때만 `preventDefault`한다 — 그 앵커가 크롤러의 발견 경로이고 `robots.txt`가 아무것도 막지 않는 근거다(`nextjs.md`).
   - ⚠ 세션 `status`는 **3분기**한다 — `loading`에 가로채면 복원 중인 로그인 사용자가 안내를 본다.
+- **`SignInLink`** — 라벨이 "로그인"인 링크(`AuthStatus`·`TopBar`). 로그인 후 **쿼리까지 포함한** 지금 주소로 돌아온다. ⚠ `href`는 경로만 싣고(서버 HTML과 같게) 쿼리는 클릭 순간에 `location.search`로 더한다 — href에 쿼리를 넣으려고 `useSearchParams`를 쓰면 프리렌더가 CSR로 떨어지고, 렌더 중 `location`을 읽으면 하이드레이션이 갈린다. ⚠ 그 보정은 일반 클릭만이 아니라 **브라우저가 href를 그대로 쓰는 모든 길**(수정 키 클릭·가운데 클릭 = `auxclick`·우클릭 복사·hover)에서, **쿼리 유무와 무관하게** 한다 — React는 prop이 같으면 DOM 속성을 되돌리지 않아 한 번 고친 href가 남는다. 로그인 링크를 새로 그릴 때 `signInWithNext(pathname)` 링크를 직접 짜지 말 것.
 - `StaleBanner` — 리페치 실패를 **데이터를 유지한 채** 알리는 배너. ⚠ 호출부의 조건은 반드시 `error && data`다 — `error`를 데이터 렌더보다 먼저 보면 네트워크가 잠깐 끊겨도 읽고 있던 목록이 통째로 사라진다(`data-and-state.md`). 목적격 조사(을/를)는 컴포넌트가 받침으로 판정하므로 **명사만** 넘긴다.
 - `ToastViewport` — 루트(`AppProviders`)에 **하나만** 둔다. 발행 API(`useToast`)는 `@/shared/lib`에 있다.
   - ⚠ **앱의 유일한 라이브 리전이다.** 문구가 없어도 언마운트하지 않는다(리전과 내용이 함께 마운트되면 발화가 불안정하다) — `if (!message) return null`로 되돌리지 말 것. 화면마다 `role="status"`를 새로 만들지 않는 이유는 `code-quality.md`에.
 - ⚠ `Link` 안에 `Button`을 넣지 않는다(`<a>` 안의 `<button>`). 버튼형 링크는 `buttonClassName({...})`을 `Link`의 className에 준다.
 
 ## `@/widgets`
-- `AppBar` — 목록 화면 상단(워드마크 + `leading` 슬롯).
-- `BottomTabBar` — 하단 탭바. **`backdrop-blur`가 허용된 유일한 요소**다(`styling.md`).
+- **`TopBar`** — 데스크톱 상단 바(워드마크 · 내비 · 로그인/프로필 링크). 루트 layout이 프레임의 첫 자식으로 렌더하고 **`lg`(1024px)부터만 보인다** — 그 폭에서 `AppBar`·`BottomTabBar`를 대신한다(둘은 `lg:hidden`).
+  - ⚠ **높이는 `calc(56px + env(safe-area-inset-top))`이다**(내용 줄 56px + 위 safe-area — 보통 브라우저에서는 0) — 이적 보드의 sticky 판·레일이 `100dvh`에서 같은 식을 빼고 잡는다. 바꾸면 그쪽도 함께 바꾼다(딜 상세의 곁 칸은 스크롤 영역 높이(`100cqh`)를 재서 이 식과 무관하다).
+  - ⚠ **모든 폭에서 마운트되고 CSS로만 숨는다** → 조회 훅(`useProfileQuery` 등)을 부르지 않는다(부르면 바가 보이지 않는 모바일에서도 요청이 나간다). 세션 스토어만 본다.
+  - ⚠ 그 폭에서 **유일한 `banner` 랜드마크**다 — 그래서 `SubHeader`는 `<header>`가 아니라 `<div>`다(둘 다 프레임 직속이라 banner가 둘이 된다).
+  - ⚠ 로그인 화면(`/sign-in`)에서는 그리지 않는다 — 인증 화면은 목적 하나만 드러낸다(`AuthShell`).
+  - 활성 내비는 **잉크 밑줄**이다(에메랄드 자리 표 밖). 판정은 `activeNavHref`(`@/shared/config`).
+  - 비로그인의 로그인 링크는 `AuthStatus`와 같은 `SignInLink`다(라벨이 "로그인"이라 곧바로 이동한다).
+- `AppBar` — 목록 화면 상단(워드마크 + `leading` 슬롯). `lg`부터 숨는다(`TopBar`가 대신한다).
+- `BottomTabBar` — 하단 탭바. **`backdrop-blur`가 허용된 유일한 요소**다(`styling.md`). 넓은 프레임(768px~)에서는 가운데 최대폭 알약이고, `lg`부터 숨는다(`TopBar`의 내비가 대신한다).
+  - ⚠ 탭바를 렌더하는 화면은 스크롤 영역 하단을 탭바 몫만큼 비우는데, 그 여백도 `lg`에서 걷는다(`TabScrollArea`가 선례).
   - 탭 목록은 이적시장(`ROUTES.transferList`, 아이콘 `ArrowLeftRight`)·프로필 순이다.
   - ⚠ **로그인해야 열리는 탭을 추가하면 `signInAction` 문구를 함께 적는다.** 그 값이 있는 탭만 비로그인의 이동을 가로채 `SignInDialog`를 띄운다 — 앵커는 그대로 두고 `preventDefault`만 한다. 빠뜨리면 그 탭은 안내 없이 이동했다가 `AuthRequired`에 막혀 로그인 화면으로 떨궈진다.
   - ⚠ 그 다이얼로그는 `<nav>`의 **형제**여야 한다. 탭바가 `absolute`라 자기 안의 `Dialog`에게 컨테이닝 블록이 되어, 안에 두면 알약 한가운데에 뜬다.
@@ -247,4 +272,12 @@
 - `TabScrollArea` — 목록 스크롤 영역(`<main>` 제공 + 스크롤 복원).
 - `AuthShell` — 인증 화면의 공통 껍데기.
 - `AuthStatus` — **비로그인일 때의 로그인 링크**만 그린다(로그인 상태에서는 `null`). ⚠ 라벨이 "로그인"이라 `SignInDialog`를 거치지 않고 곧바로 이동한다 — 목적지가 라벨에 적혀 있어 한 단계 더 묻는 것이 방해다.
-  ⚠ 계정 관련 동작(닉네임 표시·로그아웃)을 여기 되넣지 않는다 — 프로필 화면과 두 곳으로 갈린다. 프로필 진입은 하단 탭바가 상시 제공하고, **로그아웃은 `views/profile`이 단독으로 갖는다.**
+  ⚠ 계정 관련 동작(닉네임 표시·로그아웃)을 여기 되넣지 않는다 — 프로필 화면과 두 곳으로 갈린다. 프로필 진입은 하단 탭바(`lg`부터는 `TopBar`)가 상시 제공하고, **로그아웃은 `views/profile`이 단독으로 갖는다.**
+- `DealPanel({ deal, userId, nowMs, active, onSignInRequired })` — 넓은 화면의 이적 보드에서 고른 딜을 오른쪽에 펼치는 판. 부모 높이를 채우고 본문은 스스로 스크롤(스크롤바를 숨기지 않는다), 아래에 "전체 화면" 링크와 관심 토글을 고정한다.
+  - 상세로 가는 링크("전체 보기"·"전체 화면")는 `prefetch={false}`다 — 보드 행(`DealRow`)과 같은 사유(loading 경계 없는 동적 상세라 뷰포트 프리페치가 받아 오는 것이 없다).
+  - `deal`은 **보드 목록 캐시의 딜**이다 — 관심 토글의 낙관적 갱신이 목록 캐시를 고치므로 판이 곧바로 따라온다. 판이 딜을 다시 받지 않는다.
+  - **보드가 판을 늘 렌더한다(SSR 포함 — 좁은 화면은 CSS로 숨긴다).** 그래서 판의 머리(뱃지·이름·정보줄·경로·이적료·계약·관심 구단)는 `deal`만으로 그리고, 렌더 중에 창 폭·미디어 쿼리·시계를 읽지 않는다 — 시각은 `nowMs` prop뿐이다. 판에 무엇을 더하든 서버 HTML과 첫 클라이언트 렌더가 같아야 한다.
+  - 판 안의 조회(보도 타임라인·성사 예측)는 프리페치 없는 **클라이언트 조회**이고, **`active`가 참인 채 같은 딜에 잠깐 머문 뒤에만** 연다(`DWELL_MS` — 판 옆 `useDwell`). `active`는 "판이 실제로 보이는가"(2분할 폭)다 — 거짓이면 조회가 하나도 나가지 않는다. 머무는 시간은 목록을 키보드로 훑을 때 지나가는 딜마다 조회가 쌓이지 않게 하는 장치다. 열리기 전에는 Skeleton이고, 받아 둔 캐시가 있으면 기다리지 않고 그린다. ⚠ 판에 조회를 더하면 같은 `enabled`에 묶는다.
+  - 판 안 제목은 판 제목(h2) 아래 단계(h3)다 — 제목을 갖는 조각을 넣으면 단계를 맞춘다(`PredictionCard`의 `headingLevel`).
+  - ⚠ 로그인 안내를 판 안에 그리지 않는다 — `onSignInRequired`로 올리고 보드 뷰가 `SignInDialog` 한 벌을 연다(`Dialog`가 `absolute`라 판 기준으로 뜬다).
+  - 판의 에메랄드는 관심 토글 하나다 — 다른 CTA를 더하면 잉크로 둔다.

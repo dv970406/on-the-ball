@@ -9,7 +9,7 @@
 - `app` — FSD app 레이어: `providers`(QueryClient + AuthProvider), `fonts`, `styles/globals.css`
 - `views` — 화면 조립. ⚠ **`pages` 금지** (Next Pages Router로 오감지됨 → 반드시 `views`)
   sign-in / profile / transfer-board / transfer-detail / ranking
-- `widgets` — app-bar / bottom-tab-bar / sub-header / tab-scroll-area / auth-shell / auth-status
+- `widgets` — top-bar / app-bar / bottom-tab-bar / sub-header / tab-scroll-area / auth-shell / auth-status / deal-panel
 - `features` — 사용자 액션 1개 = 슬라이스 1개
   sign-in(소셜 OAuth) / sign-out / link-identity / update-profile / watch-transfer /
   follow-club / push-notification / write-comment / delete-comment / vote-comment /
@@ -63,6 +63,7 @@ shared ← entities ← features ← widgets ← views
   - ⚠ **`"use client"`를 붙이지 않은 `shared/ui` 컴포넌트도 서버 소비자다.** 배럴을 거치면 서버 렌더 여지를 잃는다 — `empty-state`·`avatar`·`pill`·`skeleton`과 클래스 함수들(`button-class`·`chip-class`)이 `@/shared/lib/cn` 직접 경로를 쓰는 이유다(사유는 `empty-state.tsx` 주석에).
 - `@/entities/profile` — `"use client"` 쿼리 훅 포함. **서버는 `model/types`·`api/mappers`·`api/keys`를 직접 import**(이 세 접미사는 모든 엔티티에 공통으로 열려 있다).
 - `@/entities/transfer` — `"use client"` 쿼리 훅·UI 포함. **서버는 `model/types`·`api/mappers`·`api/keys`·`api/list-query`·`lib/stage`·`lib/route-label`·`lib/player-name`·`lib/fee`를 직접 import** — `app/transfers/[id]/page.tsx`가 상태 뱃지 라벨(`lib/stage`)·경로 문구(`lib/route-label`)·선수 표시명(`lib/player-name`)을 `<title>`·og description에 쓰고, 같은 폴더의 `opengraph-image.tsx`(딜 공유 카드)가 거기에 이적료 표기(`lib/fee`)를 더해 화면과 같은 말을 그린다.
+  ⚠ 직접 경로는 **서버 소비자의 것이다.** 훅(`memo`·`useMemo` 포함)을 쓰는 화면 조각은 서버에서 렌더되지 않으므로 `"use client"`를 달고 배럴로 가져온다 — 지시어 없이 직접 경로를 쓰면 클라이언트 모듈인데도 `check:conventions`의 `deep-import-client`를 비켜 간다. 필요한 값이 배럴에 없으면 배럴로 올린다(이적 보드의 지수 띠가 상태 톤·라벨을 그렇게 쓴다).
 - `@/entities/prediction` — `"use client"` 쿼리 훅 포함. **서버는 `model/types`·`api/mappers`·`api/list-query`를 직접 import** — `app/transfers/[id]/page.tsx`가 성사 예측(집계 + 내 표)을, `app/ranking/page.tsx`가 랭킹을 클라이언트 훅과 같은 조립으로 프리페치한다.
 - `@/entities/comment` — `"use client"` 쿼리 훅 포함. **서버는 `model/types`·`api/mappers`·`api/list-query`를 직접 import** — `app/transfers/[id]/page.tsx`가 댓글을 클라이언트 훅과 같은 조립(`buildCommentListQuery`)·자르기(`buildCommentList`)로 프리페치한다.
 - `@/entities/push` — 전부 클라이언트다. 알림 상태가 브라우저 API(권한·구독)에서 나와 서버가 쓸 것이 없다.

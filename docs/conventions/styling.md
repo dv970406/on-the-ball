@@ -19,7 +19,25 @@
   - arbitrary **property**: `[clip-path:polygon(...)]`, `[transform:...]`, `[transition:...]`
 - ⚠ **`bg-linear-*` 그라데이션 유틸은 `in oklab` 보간이다.** sRGB `linear-gradient(...)`를 그대로 옮길 땐 `bg-[linear-gradient(...)]` arbitrary를 쓴다(중간색이 달라진다).
 - ⚠ **`[vertical-align:...]`·`[font-family:...]` arbitrary property는 생성되지 않는다(실측)** — Tailwind가 이미 그 이름의 표준 유틸(`align-*`·`font-*`)을 갖고 있으면 arbitrary property 형태를 스캐너가 인식하지 못한다. 대신 그 표준 유틸에 arbitrary **value**를 준다: `align-[-1px]`·`font-['Apple_Color_Emoji','Segoe_UI_Emoji','Noto_Color_Emoji',sans-serif]`(이적시장 상세의 국기 이모지 폰트 스택이 선례 — `views/transfer-detail/ui/transfer-detail-view.tsx`).
-- ⚠ 벤더 prefix는 자동 생성되지 않는다(browserslist 미설정 → Lightning CSS 기본 타깃). 구형 사파리 지원이 필요한 속성은 `[-webkit-clip-path:...]`처럼 병기한다.
+- ⚠ **임의 브레이크포인트는 rem으로 쓴다**(`min-[90rem]:` — 1440px). `min-[1440px]:`처럼 단위가 다르면 Tailwind v4가 `md:`·`lg:`(rem)보다
+  **앞에** 정렬해, 같은 속성을 `md:`·`lg:`로도 준 요소에서 넓은 폭의 값이 진다(실측: 3분할 격자가 2분할 값으로 그려졌다). `@theme` 동결이라
+  브레이크포인트 토큰은 더하지 않는다.
+- ⚠ **목록 항목마다 똑같이 되풀이되는 넓은 화면 전용 규칙은 항목이 아니라 범위에 한 번 건다** — 자손 선택자 arbitrary
+  variant(`[&_[data-deal-cols]]` 꼴)로 범위 요소에 적고 항목은 표지(`data-*`)만 단다(`entities/transfer/ui/deal-table.tsx`).
+  열 폭뿐 아니라 **칸 배치(`col-start-*`)·넓은 폭의 글자 크기·흐림까지** 범위의 몫이다 — 항목에는 모바일 클래스만 남긴다.
+  다른 컴포넌트가 그리는 칸은 그 컴포넌트에 표지 prop을 열지 않고 항목의 묶음 안 순서(`>:first-child`)로 찾을 수 있다 —
+  그때는 항목 쪽에 "이 순서를 범위가 쓴다"를 주석으로 남긴다.
+  항목에 적으면 같은 문자열이 항목 수만큼 HTML에 실리고, 그 규칙을 쓰지 않는 모바일도 그 무게를 받는다. 범위 밖에 둔 항목에는
+  규칙이 걸리지 않으므로 그 항목 컴포넌트가 "범위 안에서만 그린다"를 주석으로 진다.
+- ⚠ **`overflow-x-auto`만 주면 세로도 `auto`가 된다** — 스크롤바가 보이는 환경에서 내용이 1px만 넘쳐도 세로 스크롤바 토막이 선다.
+  가로로만 흐르는 줄(칩 레일·탭 줄)은 `overflow-y-hidden`을 함께 준다.
+- **좁은 칸의 한국어 이름은 낱말 단위로 꺾는다**(`break-keep`) — 기본 줄바꿈은 한글을 글자 사이에서 꺾어 "토트/넘"이 된다.
+  여러 줄로 흘리는 이름 칸(`line-clamp-*`)에 건다. 모바일 결과를 바꾸지 않아야 하는 자리면 넓은 폭 접두어로만 준다.
+  - ⚠ **표의 구단·선수 이름은 말줄임하지 않고 줄을 바꾼다** — 2분할 폭의 표에서 경로 칸이 200px 안팎이라 엠블럼 겹치기가 폭을
+    가져가 출발 약칭이 "맨"·"라…"로 잘렸다. 잘린 약칭은 어느 구단인지 알 수 없다(`api-and-db.md`). 덩어리(엠블럼 + 이름)째
+    다음 줄로 넘기고(`flex-wrap`), 한 낱말이 칸보다 길 때만 그 안에서 꺾는다(`[overflow-wrap:anywhere]`). 확인은 표 안의
+    `truncate`·`line-clamp`가 실제로 자른 요소 수를 넓은 폭마다 세는 것이다(스크롤바가 폭을 차지하는 환경 포함).
+- ⚠ 벤더 prefix가 붙는지는 **속성마다 다르다**(browserslist 미설정 → Lightning CSS 기본 타깃이 정한다 — `mask-image`에는 `-webkit-`이 붙고 `clip-path`에는 붙지 않는다). 구형 사파리가 접두어를 요구하는 속성은 **빌드된 CSS에서 붙었는지 확인**하고, 붙지 않으면 `[-webkit-clip-path:...]`처럼 병기한다.
 
 ### `style` prop이 허용되는 유일한 경우 — 런타임에 결정되는 동적 값
 
@@ -192,7 +210,7 @@ function cardClassName(peek: boolean) {
 | 원형 아이콘 **컨테이너**(클릭 불가) | 히트 영역도 아닌 순수 장식 | `shared/ui/empty-state.tsx` |
 | 아바타·`Pill`·워드마크의 볼 | 컨트롤이 아닌 **표시 요소** | `avatar` · `pill` · `wordmark` · `profile-view`의 아바타 스켈레톤·업로드 스피너 |
 | 바텀시트 **그래버**(36×4px 바) | 누르는 컨트롤이 아니라 **드래그 어포던스** — 아래로 끌면 시트가 따라 내려간다 | `shared/ui/sheet.tsx` |
-| 이적시장 **상태 뱃지**·**관심 표시 원**·**결렬 X 원·부인 빗금 원**·**보도 타임라인 점** | 누르는 컨트롤이 아니라 상태·경로·시간순을 그리는 표시 요소다 | `entities/transfer/ui/status-badge.tsx` · `watch-mark.tsx` · `club-route.tsx` · `views/transfer-detail/ui/report-timeline.tsx` |
+| 이적시장 **상태 뱃지**·**관심 표시 원**·**결렬 X 원·부인 빗금 원**·**보도 타임라인 점** | 누르는 컨트롤이 아니라 상태·경로·시간순을 그리는 표시 요소다 | `entities/transfer/ui/status-badge.tsx` · `watch-mark.tsx` · `club-route.tsx` · `report-item.tsx` |
 
 ⚠ 위의 알약 예외 표와 이 "대상이 아닌 것" 표는 **`pnpm check:conventions`가 대조한다** — 목록에 없는 `rounded-full`이 생기면 검사가 실패한다. 그림자·`backdrop-blur` 예외도 같다.
 ⚠ 다만 검사가 대조하는 것은 **파일 경로**이고 행 수가 아니다. 여기에 "세 목록"·"4곳" 같은 **개수를 적지 않는다** — 표에 행을 더하면 그 개수가 곧바로 거짓이 된다.
@@ -265,3 +283,34 @@ resting 상태의 카드·목록·헤더는 **여전히 flat + 1px 헤어라인*
   높이도 44px(`py-5` + 바 4px)로 잡는다 — 짚어야 끌 수 있는 띠라 히트 영역 기준을 지킨다.
 - 항목 사이에 **헤어라인을 긋지 않는다.** 좌우 여백이 없어 구분선이 화면을 가로지르는 선이 된다.
 - ⚠ 라운드 20px은 **서피스** 값이라 "버튼 6px" 규칙과 무관하다(카드 14px · `Dialog` 16px과 같은 계열).
+- 넓은 프레임(768px~)에서는 화면 전체 폭으로 깔지 않고 **하단 가운데 최대폭 패널**이 된다(`md:mx-auto md:max-w-[480px]`).
+  하단에 붙고 상단만 둥근 형태는 그대로다.
+
+### 넓은 화면 — 크롬과 오버레이
+
+폭 구간은 `md`(768px)·`lg`(1024px)와 rem으로 쓴 arbitrary variant(`min-[90rem]:` — 1440px, 위 className 절)다 — 브레이크포인트 토큰을 더하지 않는다(`@theme` 동결).
+
+- **768px 미만의 결과를 바꾸지 않는다.** 넓은 화면용 스타일은 `md:`·`lg:` 접두어로만 더한다.
+- **`lg`부터 크롬이 위로 올라간다** — 데스크톱 상단 바(`TopBar`, 높이 `calc(56px + env(safe-area-inset-top))`)가 앱바·하단 탭바를 대신하고, 둘은 `lg:hidden`이다.
+  탭바 몫으로 비워 둔 스크롤 영역 하단 여백도 `lg`에서 걷는다. `SubHeader`(뒤로·제목·공유)는 상단 바 아래 화면 맥락 줄로 남는다.
+  - ⚠ 위 safe-area는 `lg`에서 상단 바가 받는다 — 그 아래 `SubHeader`는 `lg:pt-4`로 되돌려 한 번 더 받지 않는다
+    (홈 화면에 추가한 앱은 iPad의 넓은 폭에서도 상태 표시줄 아래까지 그려진다 — `viewportFit: cover`).
+- **스크롤바는 768px부터 보인다** — `no-scrollbar`는 768px 미만에서만 숨긴다(사유는 `globals.css`의 그 유틸 주석).
+  - ⚠ **예외: 늘 넘치는 가로 칩 줄은 md+에서도 막대를 숨기고 "넘친 쪽 끝 흐림 + 넘기기 버튼(‹ ›)"으로 대신한다**
+    (`views/transfer-board/ui/filter-rail.tsx`). 구단 칩이 흐르는 줄은 거의 늘 넘쳐, 스크롤바가 자리를 차지하는 환경에서는 막대 한 줄이 상시 보였다.
+    마우스 사용자가 숨은 칩에 닿는 수단은 버튼이 진다(트랙패드는 그대로 밀고, 키보드는 Tab이 칩마다 멈춰 브라우저가 끌어온다 —
+    그래서 버튼은 포커스 순서에 넣지 않는다). 흐림은 넘친 쪽에만 걸고(끝에 닿으면 걷는다), 버튼도 그쪽에만 선다.
+    줄바꿈으로 넘침을 없애는 길은 칩이 세 줄로 쌓여 목록을 밀어서 택하지 않았다 — 칩이 한두 줄에 드는 줄이면 줄바꿈이 낫다.
+    흐림은 `mask-image`다 — 내용의 끝을 지우는 것이지 배경 그라데이션(금지)이 아니다.
+  - 넘침이 생겼다 사라지는 세로 스크롤 영역(스켈레톤 ↔ 내용, 창 높이)은 `md:[scrollbar-gutter:stable]`로 스크롤바 자리를
+    늘 잡아 둔다 — 안 잡으면 가운데 열이 스크롤바 폭만큼 옆으로 흔들린다(`views/profile`·`views/ranking`·`AuthShell`).
+  - ⚠ **가로 레일(`overflow-x-auto`)은 세로도 스크롤 영역이 된다**(`overflow-x`가 `visible`이 아니면 `overflow-y`도 `auto`로
+    계산된다). 밑줄의 `-mb-px`처럼 1px만 아래로 넘쳐도 레일 옆에 **세로 스크롤바**가 생긴다 → 가로 레일에는 `overflow-y-hidden`을
+    함께 준다.
+- 상단 바의 활성 내비는 **잉크 밑줄**이다 — 크롬의 선택 상태라 에메랄드 자리 표에 들어가지 않는다.
+- **떠 있는 레이어는 화면 끝까지 늘어나지 않는다** — `Dialog`·`Sheet`·`BottomTabBar`는 넓은 프레임에서 가운데 최대폭으로 묶는다.
+  ⚠ 가운데 정렬은 `inset-x-*` + `max-w-*` + `mx-auto`로 한다. `Dialog`·`Sheet`는 transform 키프레임·`[transform:…]`을 쓰는
+  요소라 translate 유틸로 가운데를 잡으면 합성되어 어긋난다(위 transform 절). `BottomTabBar`는 transform이 없지만
+  같은 방식으로 맞춘다 — 떠 있는 레이어의 가운데 정렬을 한 형태로 두어야 다음 레이어가 따라 쓴다.
+- **보드·딜 상세 밖의 화면은 가운데 열로 모은다**(`md:mx-auto md:max-w-[…]`). ⚠ 좁히는 것은 스크롤 영역(`<main>`)의
+  **안쪽**이다 — `<main>`을 좁히면 열 바깥에서 휠을 굴려도 스크롤되지 않는다.

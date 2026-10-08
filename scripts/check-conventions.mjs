@@ -95,7 +95,8 @@ const SEARCH_PARAMS_ALLOWED = new Map([
   [
     "src/views/transfer-board/model/use-board-filters.ts",
     "이적 보드 필터는 화면 안에서 주소만 바꾼다(`history.pushState`). Next가 직접 한 이동(탭바의 목록 링크)까지 " +
-      "따라가려면 Next 라우터의 주소를 읽어야 하고, 그 통로가 이 훅뿐이다. `/transfers`는 쿠키를 읽는 동적 라우트다",
+      "따라가려면 Next 라우터의 주소를 읽어야 하고, 그 통로가 이 훅뿐이다. `/transfers`는 쿠키를 읽는 동적 라우트다. " +
+      "목록·상세 2분할의 고른 딜(`?deal=`)도 같은 이유로 같은 훅이 읽는다(주소를 읽는 자리를 하나로 둔다)",
   ],
 ]);
 
@@ -118,7 +119,7 @@ const STYLE_ALLOWED = {
     "src/entities/transfer/ui/status-badge.tsx",
     "src/entities/transfer/ui/watch-mark.tsx",
     "src/entities/transfer/ui/club-route.tsx",
-    "src/views/transfer-detail/ui/report-timeline.tsx",
+    "src/entities/transfer/ui/report-item.tsx",
   ],
   // 그림자는 "떠 있는 레이어"만 — resting 카드·목록·헤더는 flat + 1px 헤어라인
   "shadow-": [
