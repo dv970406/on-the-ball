@@ -20,5 +20,7 @@ export { Sheet, SheetItem } from "./sheet";
 export { Dialog } from "./dialog";
 // 액션을 누른 비로그인 사용자에게 한 단계 안내를 끼운다 — 곧바로 로그인 화면으로 갈아치우지 않는다
 export { SignInDialog } from "./sign-in-dialog";
+// 라벨이 "로그인"인 링크 — 쿼리까지 복귀 경로에 싣는다(사유는 sign-in-link.tsx 주석)
+export { SignInLink } from "./sign-in-link";
 // 토스트의 상태(useToast·useToastStore)는 @/shared/lib에 있다 — ui는 뷰포트만 노출한다
 export { ToastViewport } from "./toast";

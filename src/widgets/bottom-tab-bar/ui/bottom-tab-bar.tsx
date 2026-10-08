@@ -68,6 +68,10 @@ export function BottomTabBar() {
         aria-label="주요 메뉴"
         className={cn(
           "absolute inset-x-3 bottom-[max(18px,env(safe-area-inset-bottom))] z-70",
+          // 넓은 프레임(768px~)에서 화면 끝까지 늘어나지 않게 가운데 알약으로 묶는다(transform 없이 — 가운데는 mx-auto)
+          "md:mx-auto md:max-w-[406px]",
+          // `lg`부터는 데스크톱 상단 바(`widgets/top-bar`)의 내비가 대신한다
+          "lg:hidden",
           "flex items-center justify-between rounded-[28px] bg-ink/92 p-2",
           // backdrop-blur/saturate 유틸은 Tailwind가 -webkit-backdrop-filter를 함께 출력한다
           // (빌드 CSS에서 확인) — styling.md의 "벤더 prefix 수동 병기"는 clip-path처럼

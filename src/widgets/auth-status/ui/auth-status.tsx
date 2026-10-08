@@ -1,9 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { signInWithNext } from "@/shared/config";
-import { buttonClassName } from "@/shared/ui";
+import { SignInLink } from "@/shared/ui";
 import { useSessionStore } from "@/entities/session";
 
 /**
@@ -11,25 +8,15 @@ import { useSessionStore } from "@/entities/session";
  * status가 확정되기 전에는 아무것도 그리지 않는다(비로그인 UI가 잠깐 보이는 깜빡임 방지).
  *
  * ⚠ 로그인 상태에서는 아무것도 그리지 않는다. 닉네임·로그아웃을 여기 두면 계정 관련 동작이
- *   목록 헤더와 프로필 화면 두 곳으로 갈리는데, 프로필로 가는 진입점은 하단 탭바가 이미
- *   상시 제공한다 → 계정은 프로필 화면이 단독으로 갖는다(로그아웃도 거기 있다).
+ *   목록 헤더와 프로필 화면 두 곳으로 갈리는데, 프로필로 가는 진입점은 늘 따로 있다(1024px 미만은
+ *   하단 탭바, 그 이상은 데스크톱 상단 바) → 계정은 프로필 화면이 단독으로 갖는다(로그아웃도 거기 있다).
+ * ⚠ 로그인 후 보던 화면(쿼리 포함)으로 돌아오는 목적지는 `SignInLink`가 싣는다 — 라벨이 "로그인"이라
+ *   `SignInDialog`를 끼지 않고 곧바로 이동한다(목적지가 라벨에 이미 적혀 있다).
  */
 export function AuthStatus() {
   const status = useSessionStore((s) => s.status);
-  const pathname = usePathname();
 
   if (status !== "guest") return null;
 
-  return (
-    // 로그인 후 보던 화면으로 돌아오도록 목적지를 싣는다(`signInWithNext` — 가드·proxy와 같은 형태).
-    // ⚠ **여기는 곧바로 이동한다.** 관심 담기처럼 라벨이 동작을 말하는
-    //   컨트롤은 `SignInDialog`로 한 단계 안내를 끼지만, 라벨이 "로그인"이면 목적지가 이미
-    //   적혀 있어 되묻는 것이 방해다
-    <Link
-      href={signInWithNext(pathname)}
-      className={buttonClassName({ variant: "secondary", size: "sm" })}
-    >
-      로그인
-    </Link>
-  );
+  return <SignInLink />;
 }

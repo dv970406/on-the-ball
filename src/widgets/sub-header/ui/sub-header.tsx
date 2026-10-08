@@ -28,7 +28,13 @@ export function SubHeader({ title, fallbackHref = ROUTES.transferList }: SubHead
   return (
     // ⚠ 배경은 불투명이다. blur는 하단 탭바에서만 허용된다(`styling.md`).
     // ⚠ z 스케일: 앱바 5 < 서브헤더 20 < 하단바 70 < 오버레이 80.
-    <header className="sticky top-0 z-20 flex items-center gap-0.5 border-b border-hairline-cool bg-canvas px-2 pb-2.5 pt-[max(16px,env(safe-area-inset-top))]">
+    // ⚠ **`<header>`가 아니라 `<div>`다.** 이 줄은 `<main>` 밖 프레임 직속이라 `<header>`면 `banner` 랜드마크가 되는데,
+    //   1024px부터는 데스크톱 상단 바(`TopBar`)의 `<header>`도 같은 자리에 있어 banner가 둘이 된다(실측).
+    //   요소는 폭으로 바꿀 수 없으므로 한쪽을 내려놓는다 — 사이트 전체의 머리는 상단 바이고, 이 줄은
+    //   그 화면의 뒤로가기·공유 도구 줄일 뿐이다. 1024px 미만에서 이 화면들의 banner가 사라지는 것은
+    //   수용한다(제목은 각 뷰의 h1이, 두 버튼은 자기 이름으로 찾힌다).
+    // ⚠ 위 safe-area는 1024px부터 상단 바가 받는다 — 여기서 한 번 더 받지 않게 `lg:pt-4`로 되돌린다.
+    <div className="sticky top-0 z-20 flex items-center gap-0.5 border-b border-hairline-cool bg-canvas px-2 pb-2.5 pt-[max(16px,env(safe-area-inset-top))] lg:pt-4">
       <button
         type="button"
         onClick={handleBack}
@@ -50,6 +56,6 @@ export function SubHeader({ title, fallbackHref = ROUTES.transferList }: SubHead
           <Icon as={Share2} size={18} />
         </button>
       </div>
-    </header>
+    </div>
   );
 }

@@ -8,6 +8,7 @@ import { useScrollRestore } from "@/shared/lib";
  * - 디테일 라우트 왕복 시 스크롤 위치 복원
  * - 하단 패딩 = 플로팅 탭바(높이 72 + 하단 18) + 여유.
  *   ⚠ 마지막 행이 탭바에 가리면 안 된다.
+ *   `lg`부터는 탭바가 없으므로(상단 바가 대신한다) 이 여백을 걷는다 — 바닥 여백은 그 화면이 정한다.
  */
 export function TabScrollArea({ children }: { children: ReactNode }) {
   const scrollRef = useRef<HTMLElement>(null);
@@ -23,7 +24,7 @@ export function TabScrollArea({ children }: { children: ReactNode }) {
           포커스 이동에 화면이 밀리고 되돌릴 수 없다.
         ⚠ `h-full`이 아니라 `min-h-0 flex-1` — 프레임이 flex 컬럼이다(app/layout.tsx).
       */
-      className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-[calc(122px+env(safe-area-inset-bottom))]"
+      className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-[calc(122px+env(safe-area-inset-bottom))] lg:pb-0"
     >
       {children}
     </main>

@@ -18,7 +18,7 @@ interface SheetProps {
  * 하단 바텀시트 — 화면 하단에 **붙는**(좌·우·하단 여백 0) edge-to-edge 형태.
  * 오버플로 메뉴(···)에 쓴다.
  *
- * 루트 layout의 430px 프레임이 `relative`+`overflow-hidden`이라 absolute가 프레임 안쪽에 얹히고,
+ * 루트 layout의 앱 프레임이 `relative`+`overflow-hidden`이라 absolute가 프레임 안쪽에 얹히고,
  * 퇴장 애니메이션으로 프레임 밖까지 내려간 부분은 프레임이 잘라 준다.
  * 스크림은 불투명 `ink/50` — 블러를 쓰지 않는다(blur는 하단 탭바에서만 허용).
  *
@@ -88,6 +88,10 @@ export function Sheet({ open, onClose, label, children }: SheetProps) {
         onAnimationEnd={exit.onAnimationEnd}
         className={cn(
           "absolute inset-x-0 bottom-0 z-[81] flex max-h-[85%] flex-col outline-none",
+          // 넓은 프레임(768px~)에서는 화면 전체 폭으로 깔지 않고 하단 가운데 패널로 둔다.
+          // ⚠ 센터링은 `mx-auto` + `max-w`다 — 이 요소는 transform 키프레임(cm-sheet-in/out)을 돌리므로
+          //   translate 유틸로 가운데를 잡으면 합성되어 어긋난다(styling.md transform 절)
+          "md:mx-auto md:max-w-[480px]",
           // ⚠ 퇴장은 **accelerate**(0.4,0,1,1)다 — 진입용 ease-otb는 감속 커브라 마지막 10%에
           //   전체 시간의 절반을 써서, 다 닫힌 것처럼 보이는 잔상이 100ms 가까이 남았다(styling.md).
           closing

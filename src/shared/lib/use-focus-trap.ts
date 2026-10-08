@@ -9,12 +9,48 @@ const FOCUSABLE =
  * 모달·시트용 포커스 트랩 + Escape 닫힘 + 트리거로 포커스 복귀.
  *
  * ⚠ native `<dialog showModal>`을 쓰지 않는 이유: top-layer로 올라가 루트 layout의
- *   430px 모바일 프레임 **바깥**에 그려진다. 이 앱의 시트·다이얼로그는 프레임 안쪽에
- *   absolute로 얹히는 물건이라 형태가 달라진다.
+ *   앱 프레임 **바깥**에 그려진다(768px 미만은 430px 열이라 그 밖까지 덮는다). 이 앱의 시트·다이얼로그는
+ *   프레임 안쪽에 absolute로 얹히는 물건이라 형태가 달라진다.
  *
  * ⚠ Escape는 keydown에서 잡는다(keyup이면 다른 핸들러가 먼저 먹는다).
  *   스크림 클릭과 Escape 모두 **취소**로 처리해야 한다 — 파괴적 액션이 기본값이 되면 안 된다.
  */
+/**
+ * 마지막 `pointerdown`의 대상과 시각 — **포커스를 주지 않는 클릭**의 복귀점이다.
+ *
+ * ⚠ 사파리(macOS)는 마우스 클릭으로 `<button>`에 포커스를 주지 않는다. 그래서 버튼을 눌러 연 오버레이가
+ *   열리는 순간 `document.activeElement`는 `body`이고, 그것을 복귀점으로 삼으면 닫은 뒤 포커스가 문서 처음으로
+ *   떨어진다(WebKit 실측 — 키보드 사용자는 탭을 처음부터 다시 밟는다). 호출부마다 트리거 ref를 넘기게 하면
+ *   다음 호출부가 빠뜨리므로, 트랩이 스스로 "방금 누른 컨트롤"을 기억한다.
+ * 문서에 리스너 하나(캡처 단계)를 처음 트랩이 쓰일 때 단다 — 모든 트랩이 같은 값을 읽는다.
+ */
+const lastPointer: { target: Element | null; at: number } = { target: null, at: 0 };
+let pointerTracking = false;
+
+function trackPointer() {
+  if (pointerTracking) return;
+  pointerTracking = true;
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      lastPointer.target = event.target instanceof Element ? event.target : null;
+      lastPointer.at = performance.now();
+    },
+    true,
+  );
+}
+
+/**
+ * 오버레이를 연 컨트롤 — 포커스를 가진 요소, 없으면(사파리의 마우스 클릭) 방금 누른 포커스 가능한 요소.
+ * ⚠ `pointerdown`은 **방금**(1초 안) 것만 믿는다 — 오래전 클릭이 단축키·타이머로 연 오버레이의 복귀점이 되지 않게.
+ */
+function openerElement(): HTMLElement | null {
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && active !== document.body) return active;
+  if (!lastPointer.target || performance.now() - lastPointer.at > 1000) return null;
+  return lastPointer.target.closest<HTMLElement>(FOCUSABLE);
+}
+
 export function useFocusTrap(
   containerRef: RefObject<HTMLElement | null>,
   active: boolean,
@@ -33,12 +69,18 @@ export function useFocusTrap(
     onCloseRef.current = onClose;
   }, [onClose]);
 
+  // ⚠ 닫힌 채로 마운트될 때부터 듣는다 — 여는 클릭은 열리기 **전에** 일어난다.
+  //   그래서 이 트랩을 쓰는 오버레이는 닫혀 있어도 마운트해 둔다(`Sheet`·`Dialog`가 훅을 먼저 부르고 그 뒤에 `null`을 돌려준다).
+  useEffect(() => {
+    trackPointer();
+  }, []);
+
   useEffect(() => {
     if (!active) return;
 
     const container = containerRef.current;
-    // 닫힐 때 돌아갈 자리 — 열기 직전 포커스를 갖고 있던 요소
-    const trigger = document.activeElement as HTMLElement | null;
+    // 닫힐 때 돌아갈 자리 — 열기 직전 포커스를 갖고 있던 요소(사파리는 방금 누른 컨트롤 — `openerElement`)
+    const trigger = openerElement();
 
     const focusables = () =>
       Array.from(container?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []).filter(
@@ -50,7 +92,7 @@ export function useFocusTrap(
      *
      * ⚠ `preventScroll: true`가 필수다. `Sheet`의 진입 애니메이션은 첫 프레임이
      *   `translateY(100%)`라 대상이 **프레임 밖**에 있는데, 그냥 `focus()`하면 브라우저가
-     *   scroll-into-view로 430px 앱 프레임을 스크롤시킨다. 프레임이 `overflow-hidden`이라
+     *   scroll-into-view로 앱 프레임을 스크롤시킨다. 프레임이 `overflow-hidden`이라
      *   **사용자가 되돌릴 방법이 없어** 헤더·본문이 잘린 채 고정됐다(실측 190px).
      *   오버레이는 이미 화면 안에 있으므로 스크롤이 필요한 경우가 애초에 없다.
      */

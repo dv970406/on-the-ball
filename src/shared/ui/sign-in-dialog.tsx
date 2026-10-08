@@ -14,7 +14,7 @@ interface SignInDialogProps {
    */
   action: string;
   /**
-   * 로그인 후 돌아올 경로. 기본은 **지금 화면**이다.
+   * 로그인 후 돌아올 경로. 기본은 **지금 화면**이다(쿼리 포함).
    *
    * ⚠ 화면을 떠나는 동작(프로필 탭)만 목적지를 따로 준다 — 기본값으로 두면
    *   로그인하고 돌아와서 그 동작을 처음부터 다시 눌러야 한다.
@@ -45,9 +45,13 @@ export function SignInDialog({ open, onClose, action, next }: SignInDialogProps)
     <Dialog
       open={open}
       onCancel={onClose}
-      // ⚠ 현재 경로는 **누른 시점에** 읽는다 — `usePathname()`으로 구독하면 콜백에서만 쓰는
+      // ⚠ 현재 주소는 **누른 시점에** 읽는다 — `usePathname()`으로 구독하면 콜백에서만 쓰는
       //   값 때문에 이 다이얼로그를 단 화면 전부가 라우트 변화마다 리렌더된다.
-      onConfirm={() => router.push(signInWithNext(next ?? window.location.pathname))}
+      // ⚠ 쿼리까지 싣는다 — 이적 보드의 필터(`?league=`)·딜 패널(`?deal=`)은 주소에만 있어서,
+      //   경로만 실으면 로그인하고 돌아왔을 때 보던 딜·필터가 사라진다(`safeNextPath`가 쿼리를 통과시킨다).
+      onConfirm={() =>
+        router.push(signInWithNext(next ?? `${window.location.pathname}${window.location.search}`))
+      }
       title="로그인이 필요해요"
       description={`${action} 먼저 로그인해 주세요. ${
         next ? "로그인하면 이어서 진행할 수 있어요." : "로그인하면 이 화면으로 돌아와요."

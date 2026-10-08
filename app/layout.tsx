@@ -3,6 +3,7 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import { jetbrainsMono } from "@/app/fonts";
 import { AppProviders } from "@/app/providers";
 import { TOKEN_COLORS, env } from "@/shared/config";
+import { TopBar } from "@/widgets/top-bar";
 import "@/app/styles/globals.css";
 
 export const metadata: Metadata = {
@@ -81,15 +82,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <AppProviders>
           {/*
-            모바일 전용 프레임 — 데스크톱에서는 430px 센터 고정.
+            앱 프레임 — 768px 미만은 430px 센터 고정(모바일 화면 그대로), 768px부터는 화면 전체를 쓴다.
+            넓은 화면에서 내용 폭은 각 화면이 정한다(이적 보드는 판을 늘리고, 그 밖의 화면은 가운데 열로 모은다).
 
             ⚠ **`flex flex-col`이어야 한다.** 전에는 블록이라, 흐름에 자리를 차지하는
               `SubHeader`(71px)와 `h-full`인 `<main>`이 형제로 놓이면 프레임이 그 높이만큼
               넘쳤다. 프레임은 `overflow-hidden`이라 포커스가 이동해 한 번 밀리면
               **사용자가 되돌릴 수 없다**(실측 71px). 스크롤 컨테이너는 `h-full`이 아니라
               `min-h-0 flex-1`을 써서 남는 높이만 차지한다.
+            ⚠ 데스크톱 상단 바(`TopBar`)는 프레임의 **첫 자식**이다 — `lg`부터만 보이고(CSS로 숨김) 앱바·하단
+              탭바를 대신한다. 프레임 안에 두어야 시트·다이얼로그의 스크림(`absolute inset-0`)이 그 바까지 덮는다.
           */}
-          <div className="relative mx-auto flex h-dvh max-w-[430px] flex-col overflow-hidden bg-canvas sm:border-x sm:border-hairline-cool">
+          <div className="relative mx-auto flex h-dvh max-w-[430px] flex-col overflow-hidden bg-canvas sm:border-x sm:border-hairline-cool md:max-w-none md:border-x-0">
+            <TopBar />
             {children}
           </div>
         </AppProviders>

@@ -108,6 +108,9 @@ export function Dialog({
         tabIndex={-1}
         className={cn(
           "absolute inset-x-6 top-1/2 z-[82] rounded-xl bg-canvas outline-none",
+          // 넓은 프레임(768px~)에서 좌우로 끝까지 늘어나지 않게 가운데 카드로 묶는다 — inset-x + max-w + mx-auto가
+          // 가운데 정렬이다(translateX를 쓰지 않는다 — 아래 transform과 합성된다)
+          "md:mx-auto md:max-w-[400px]",
           // ⚠ -translate-y-1/2 표준 유틸이 아니라 arbitrary property다 — 같은 요소에 animation이
           //   있으면 `translate` 개별 프로퍼티가 `transform`과 합성되어 조용히 어긋난다(styling.md).
           //   이 자리는 globals.css 주석이 이미 translateY 충돌을 경고한 곳이다.

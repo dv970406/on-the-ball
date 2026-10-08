@@ -50,97 +50,123 @@ export function RankingView({ initialRanking, initialUserId, serverNowMs }: Rank
   return (
     <>
       <SubHeader title="예측 랭킹" fallbackHref={ROUTES.transferList} />
-      <main className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(32px+env(safe-area-inset-bottom))]">
-        <header className="pt-4">
-          {/* 제목은 서브헤더가 이미 보여 준다 — 같은 말을 두 번 그리지 않고 문서 구조에만 둔다(프로필과 같다) */}
-          <h1 className="sr-only">예측 랭킹</h1>
-          <p className="text-[13px] leading-[1.6] text-ink-mute">
-            딜 상세에서 &quot;이번 창 안에 오피셜이 뜰까?&quot;를 예측하면, 창이 닫힌 뒤(오피셜이 뜨면 그때) 채점돼요.
-            남들과 다른 예측을 맞힐수록 점수가 커요 — 맞히면 (100 − 같은 쪽을 고른 비율%)점이에요.
-          </p>
-        </header>
+      {/*
+        ⚠ `relative` — 순위의 `sr-only`(position:absolute)가 프레임까지 새지 않게 한다.
+        넓은 화면(768px~)에서는 안쪽을 가운데 열로 모은다 — 스크롤 영역은 전체 폭으로 둬야 열 밖에서도 휠이 먹는다.
+        ⚠ `md:[scrollbar-gutter:stable]` — 768px부터는 스크롤바가 보이므로(`no-scrollbar`), 로딩 스켈레톤(안 넘침)에서
+          목록(넘침)으로 바뀔 때 스크롤바 폭만큼 가운데 열이 옆으로 흔들리지 않게 그 자리를 늘 잡아 둔다.
+      */}
+      <main className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto px-5 md:[scrollbar-gutter:stable] pb-[calc(32px+env(safe-area-inset-bottom))]">
+        <div className="md:mx-auto md:max-w-[720px] md:pt-4">
+          <header className="pt-4">
+            {/* 제목은 서브헤더가 이미 보여 준다 — 같은 말을 두 번 그리지 않고 문서 구조에만 둔다(프로필과 같다) */}
+            <h1 className="sr-only">예측 랭킹</h1>
+            <p className="text-[13px] leading-[1.6] text-ink-mute">
+              딜 상세에서 &quot;이번 창 안에 오피셜이 뜰까?&quot;를 예측하면, 창이 닫힌 뒤(오피셜이 뜨면 그때) 채점돼요.
+              남들과 다른 예측을 맞힐수록 점수가 커요 — 맞히면 (100 − 같은 쪽을 고른 비율%)점이에요.
+            </p>
+          </header>
 
-        {/* 내 순위 — 로그인 사용자에게만. 목록 밖이면 따로 받은 점수를 쓴다 */}
-        {userId && (
-          <section aria-labelledby="my-rank-heading" className="mt-4 rounded-lg border border-hairline p-3.5">
-            <h2 id="my-rank-heading" className="font-mono text-[10px] uppercase tracking-[0.5px] text-ink-mute-2">
-              내 순위
-            </h2>
-            {mine ? (
-              <ScoreSummary score={mine} />
-            ) : !ranking.data || myScore.isPending ? (
-              <Skeleton className="mt-2 h-[22px] w-40" />
-            ) : (
-              <p className="mt-2 text-[13px] leading-[1.6] text-ink-mute">
-                아직 채점된 예측이 없어요.{round ? ` ${round.label} 예측은 그 창이 닫힌 뒤 채점돼요.` : ""}
-              </p>
-            )}
-          </section>
-        )}
+          {/* 내 순위 — 로그인 사용자에게만. 목록 밖이면 따로 받은 점수를 쓴다 */}
+          {userId && (
+            <section aria-labelledby="my-rank-heading" className="mt-4 rounded-lg border border-hairline p-3.5">
+              <h2 id="my-rank-heading" className="font-mono text-[10px] uppercase tracking-[0.5px] text-ink-mute-2">
+                내 순위
+              </h2>
+              {mine ? (
+                <ScoreSummary score={mine} />
+              ) : !ranking.data || myScore.isPending ? (
+                <Skeleton className="mt-2 h-[22px] w-40" />
+              ) : (
+                <p className="mt-2 text-[13px] leading-[1.6] text-ink-mute">
+                  아직 채점된 예측이 없어요.{round ? ` ${round.label} 예측은 그 창이 닫힌 뒤 채점돼요.` : ""}
+                </p>
+              )}
+            </section>
+          )}
 
-        {ranking.isPending && (
-          <div aria-hidden className="mt-5 flex flex-col gap-2">
-            {Array.from({ length: 6 }, (_, i) => (
-              <Skeleton key={i} className="h-14 w-full" />
-            ))}
-          </div>
-        )}
+          {ranking.isPending && (
+            <div aria-hidden className="mt-5 flex flex-col gap-2">
+              {Array.from({ length: 6 }, (_, i) => (
+                <Skeleton key={i} className="h-14 w-full" />
+              ))}
+            </div>
+          )}
 
-        {/* 보여줄 데이터가 없을 때만 전체 대체한다(`data-and-state.md`) */}
-        {ranking.error && !ranking.data && (
-          <EmptyState
-            className="pt-6"
-            title="랭킹을 불러오지 못했어요"
-            description={ranking.error.message}
-            onRetry={() => ranking.refetch()}
-          />
-        )}
-        {ranking.error && ranking.data && (
-          <div className="mt-4">
-            <StaleBanner noun="랭킹" onRetry={() => ranking.refetch()} />
-          </div>
-        )}
+          {/* 보여줄 데이터가 없을 때만 전체 대체한다(`data-and-state.md`) */}
+          {ranking.error && !ranking.data && (
+            <EmptyState
+              className="pt-6"
+              title="랭킹을 불러오지 못했어요"
+              description={ranking.error.message}
+              onRetry={() => ranking.refetch()}
+            />
+          )}
+          {ranking.error && ranking.data && (
+            <div className="mt-4">
+              <StaleBanner noun="랭킹" onRetry={() => ranking.refetch()} />
+            </div>
+          )}
 
-        {ranking.data && ranking.data.length === 0 && (
-          <EmptyState
-            className="pt-6"
-            title="아직 채점된 예측이 없어요"
-            description={
-              round
-                ? `${round.label} 이적 창이 닫히면 첫 순위가 나와요. 그 전에 오피셜이 뜬 딜은 바로 채점돼요.`
-                : "이적 창이 닫히면 첫 순위가 나와요."
-            }
-          />
-        )}
+          {ranking.data && ranking.data.length === 0 && (
+            <EmptyState
+              className="pt-6"
+              title="아직 채점된 예측이 없어요"
+              description={
+                round
+                  ? `${round.label} 이적 창이 닫히면 첫 순위가 나와요. 그 전에 오피셜이 뜬 딜은 바로 채점돼요.`
+                  : "이적 창이 닫히면 첫 순위가 나와요."
+              }
+            />
+          )}
 
-        {ranking.data && ranking.data.length > 0 && (
-          <ol className="mt-5 flex flex-col">
-            {ranking.data.map((score) => (
-              <li
-                key={score.userId}
-                className="flex items-center gap-3 border-b border-hairline-cool py-3 last:border-b-0"
+          {ranking.data && ranking.data.length > 0 && (
+            <>
+              {/*
+                넓은 화면에서는 표처럼 읽히게 열 머리를 둔다 — 시각용이라 접근성 트리에서 뺀다(각 줄이 단위를 함께 말한다).
+                열 폭은 아래 줄의 칸 폭과 한 쌍이다(순위 w-7 · 아바타 자리 · 점수·적중 w-28).
+              */}
+              <div
+                aria-hidden
+                className="mt-6 hidden items-center gap-3 border-b border-hairline pb-2 font-mono text-[10px] uppercase tracking-[0.5px] text-ink-mute-2 md:flex"
               >
-                <span className="w-7 shrink-0 text-center font-mono text-[14px] tabular-nums text-ink">
-                  {score.rank}
-                  <span className="sr-only">위</span>
-                </span>
-                <Avatar label={score.nickname} src={avatarUrl(score.avatarPath)} size={32} />
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <span className="truncate text-[14px] font-medium text-ink">{score.nickname}</span>
-                  {score.userId === userId && <Pill variant="dark">나</Pill>}
-                </span>
-                <span className="ml-auto shrink-0 text-right">
-                  <span className="block font-mono text-[14px] tabular-nums text-ink">
-                    {formatCount(score.points)}점
-                  </span>
-                  <span className="block font-mono text-[11px] tabular-nums text-ink-mute-2">
-                    적중 {formatCount(score.hits)}/{formatCount(score.scored)}
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
+                <span className="w-7 shrink-0 text-center">순위</span>
+                <span className="flex-1 pl-11">팬</span>
+                <span className="w-28 shrink-0 text-right">점수</span>
+                <span className="w-28 shrink-0 text-right">적중</span>
+              </div>
+              <ol className="mt-5 flex flex-col md:mt-0">
+                {ranking.data.map((score) => (
+                  <li
+                    key={score.userId}
+                    className="flex items-center gap-3 border-b border-hairline-cool py-3 last:border-b-0 md:py-3.5"
+                  >
+                    <span className="w-7 shrink-0 text-center font-mono text-[14px] tabular-nums text-ink">
+                      {score.rank}
+                      <span className="sr-only">위</span>
+                    </span>
+                    <Avatar label={score.nickname} src={avatarUrl(score.avatarPath)} size={32} />
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate text-[14px] font-medium text-ink">{score.nickname}</span>
+                      {score.userId === userId && <Pill variant="dark">나</Pill>}
+                    </span>
+                    {/* 모바일은 점수 위·적중 아래 두 줄, 넓은 화면은 열 머리에 맞춘 두 칸 */}
+                    <span className="ml-auto shrink-0 text-right md:flex md:items-center md:gap-3">
+                      <span className="block font-mono text-[14px] tabular-nums text-ink md:w-28">
+                        {formatCount(score.points)}점
+                      </span>
+                      <span className="block font-mono text-[11px] tabular-nums text-ink-mute-2 md:w-28 md:text-[13px] md:text-ink-mute">
+                        {/* 넓은 화면에서는 열 머리가 "적중"을 말한다 — 글자는 스크린리더에만 남긴다 */}
+                        <span className="md:sr-only">적중 </span>
+                        {formatCount(score.hits)}/{formatCount(score.scored)}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+        </div>
       </main>
     </>
   );

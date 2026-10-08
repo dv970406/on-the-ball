@@ -3,6 +3,7 @@ export {
   ROUTES,
   hasBottomBar,
   activeTabHref,
+  activeNavHref,
   signInWithNext,
   withNext,
   safeNextPath,

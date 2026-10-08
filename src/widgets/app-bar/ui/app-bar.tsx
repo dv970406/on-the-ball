@@ -13,10 +13,12 @@ import { Wordmark } from "@/shared/ui";
  *   화면에 보이는 진입점이 아니다.
  *   (로그인한 뒤의 계정 동작 — 닉네임·로그아웃 — 은 프로필 화면이 단독으로 갖는다.)
  *   위젯끼리 import하지 않도록(FSD 동일 레이어 금지) 슬롯으로 받아 뷰가 조립한다.
+ *
+ * ⚠ `lg`(1024px)부터는 숨는다 — 데스크톱 상단 바(`widgets/top-bar`)가 워드마크·로그인 자리를 대신한다.
  */
 export function AppBar({ leading }: { leading?: ReactNode }) {
   return (
-    <header className="sticky top-0 z-5 flex items-center gap-3 border-b border-hairline-cool bg-canvas px-5 pb-3 pt-[max(16px,env(safe-area-inset-top))]">
+    <header className="sticky top-0 z-5 flex lg:hidden items-center gap-3 border-b border-hairline-cool bg-canvas px-5 pb-3 pt-[max(16px,env(safe-area-inset-top))]">
       <Wordmark />
       {/*
         ⚠ `min-h-[37px]` — `leading`에 오는 로그인 버튼(`buttonClassName` sm)의 실측 높이다(py-2 16 + 13px×줄높이 1.5

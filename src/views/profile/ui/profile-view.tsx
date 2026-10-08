@@ -72,9 +72,12 @@ export function ProfileView({
    * ⚠ `h-full`이 아니라 `min-h-0 flex-1` — SubHeader와 형제라 `h-full`이면 프레임이 헤더
    *   높이(71px)만큼 넘쳐, 하단 버튼에 포커스가 가는 순간 화면이 밀리고 되돌릴 수 없다.
    * ⚠ `relative` — 숨은 파일 input의 `sr-only`(position:absolute)가 프레임까지 새지 않게 한다.
+   * `lg`부터는 탭바가 없어(데스크톱 상단 바가 대신한다) 바닥 여백을 탭바 몫만큼 걷는다.
+   * `md:[scrollbar-gutter:stable]` — 768px부터는 스크롤바가 보이므로 넘침이 생겼다 사라질 때(스켈레톤 ↔ 내용)
+   * 가운데 열이 스크롤바 폭만큼 흔들리지 않게 그 자리를 늘 잡아 둔다.
    */
   const mainClassName =
-    "no-scrollbar relative min-h-0 flex-1 overflow-y-auto pb-[calc(122px+env(safe-area-inset-bottom))]";
+    "no-scrollbar relative min-h-0 flex-1 overflow-y-auto pb-[calc(122px+env(safe-area-inset-bottom))] md:[scrollbar-gutter:stable] lg:pb-12";
 
   /*
    * ⚠ **로딩을 화면 전체의 조기 반환으로 두지 않는다.**
@@ -123,156 +126,161 @@ export function ProfileView({
       {header}
       <main className={mainClassName}>
         <h1 className="sr-only">프로필</h1>
-
-        {/* 계정 연결에서 돌아왔다 — 프로바이더가 거부했으면 사유를, 교환 중이면 진행 상태를 알린다 */}
-        {link.errorMessage && (
-          <p
-            className="border-b border-hairline bg-canvas-soft px-5 py-2.5 text-[13px] leading-[1.5] text-crimson"
-          >
-            {link.errorMessage}
-          </p>
-        )}
-        {!link.errorMessage && link.linking && (
-          <p
-            className="border-b border-hairline bg-canvas-soft px-5 py-2.5 text-[12px] text-ink-mute"
-          >
-            계정을 연결하는 중이에요…
-          </p>
-        )}
-
-        {/* 캐시된 프로필은 그대로 두고 최신화 실패만 알린다 — 재시도 수단까지 `StaleBanner`가 갖는다 */}
-        {profile.error && profile.data && (
-          <StaleBanner noun="프로필" onRetry={() => profile.refetch()} />
-        )}
-
         {/*
-          프로필만 아직 안 왔다 — 실물과 같은 골격의 스켈레톤을 둔다(치수가 다르면 도착 순간 시프트).
-          아래 두 섹션은 자기 쿼리를 갖고 이미 출발해 있다.
+          넓은 화면(768px~)에서는 안쪽을 가운데 열로 모은다. 스크롤 영역(`<main>`)은 화면 전체 폭으로 둔다 —
+          `<main>`을 좁히면 열 바깥에서 휠을 굴려도 스크롤되지 않는다. 오류 분기는 `EmptyState`가 이미 가운데 정렬이다.
         */}
-        {!profile.data && (
-          <>
-            <div className="flex flex-col items-center px-5 pt-8">
-              <Skeleton className="size-24 rounded-full" />
-              <Skeleton className="mt-3 h-[18px] w-24" />
-            </div>
-            <div className="flex flex-col gap-3 px-5 pt-8">
-              <Skeleton className="h-[70px] w-full" />
-              <Skeleton className="h-[50px] w-full" />
-            </div>
-          </>
-        )}
-
-        {profile.data && (
-          <>
-            {/* 아바타 */}
-            <section aria-labelledby="avatar-heading" className="flex flex-col items-center px-5 pt-8">
-              <h2 id="avatar-heading" className="sr-only">
-                프로필 사진
-              </h2>
-              {/* ⚠ flex다 — Avatar가 inline-flex라 블록 래퍼에서는 라인박스 디센더만큼
-                  아래에 여백이 붙어, inset-0 오버레이가 원보다 세로로 커진다(카메라 버튼의
-                  -bottom-1도 그만큼 아래로 밀린다). */}
-              <div className="relative flex">
-                <Avatar
-                  label={profile.data.nickname}
-                  src={avatarUrl(profile.data.avatarPath)}
-                  size={96}
-                  className="text-[32px]"
-                />
-                {/* 업로드 중 — 사진 위에 스피너를 얹는다.
-                    ⚠ 스크림이 75%인 이유가 규약이다 — 아래에 깔린 것이 사용자가 올린 사진이라
-                       밝기를 가정할 수 없다. 순백 사진 기준으로 흰 링과의 대비가 3:1을 넘는
-                       지점이 여기다(ink/40이면 1.6:1로 링이 묻힌다).
-                    ⚠ prefers-reduced-motion에서는 전역 블록이 회전을 멈춰 정지된 링이 되는데,
-                       스크림이 함께 깔려 있어 "지금 처리 중"은 그대로 읽힌다. */}
-                {avatar.isPending && (
-                  <span className="absolute inset-0 flex items-center justify-center rounded-full bg-ink/75">
-                    <span className="size-7 animate-spin rounded-full border-2 border-canvas/30 border-t-canvas" />
-                    <span className="sr-only">프로필 사진 올리는 중</span>
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={avatar.open}
-                  disabled={avatar.isPending}
-                  aria-label="프로필 사진 바꾸기"
-                  className="absolute -bottom-1 -right-1 flex size-9 items-center justify-center rounded-full border border-hairline-cool bg-canvas text-ink transition-colors duration-150 ease-otb active:bg-canvas-soft disabled:opacity-40"
-                >
-                  <Icon as={Camera} size={16} />
-                </button>
-              </div>
-              <input type="file" {...avatar.inputProps} className="sr-only" />
-              {/* mt-3 — 아바타 아래 첫 요소의 여백을 그대로 잇는다. mt-2면 원 밖으로 4px
-                  돌출한 카메라 버튼과 4px까지 붙는다(실측). */}
-              {avatar.error && (
-                <p className="mt-3 text-center text-[13px] text-crimson">{avatar.error.message}</p>
-              )}
-            </section>
-
-            {/* 닉네임 */}
-            <form onSubmit={nickname.onSubmit} className="flex flex-col gap-3 px-5 pt-8">
-              <TextField
-                label="닉네임"
-                name="nickname"
-                value={nickname.value}
-                error={nickname.error}
-                hint={`한글·영문·숫자 ${NICKNAME_LIMIT.grapheme}자까지 · 다른 사람과 같을 수 없어요`}
-                onChange={nickname.onChange}
-              />
-              <Button type="submit" block disabled={!nickname.canSave}>
-                {nickname.isPending ? "저장 중…" : "닉네임 저장"}
-              </Button>
-            </form>
-          </>
-        )}
-
-        {/* 응원 구단 — 자기 쿼리를 갖고 프로필과 동시에 출발한다 */}
-        <FollowedClubs userId={user?.id} onOpenPicker={() => setClubPickerOpen(true)} />
-
-        {/* 내 예측 — 예측 랭킹의 내 순위와 랭킹 화면의 진입점 */}
-        <PredictionSummary userId={user?.id} />
-
-        {/* 알림 — 서버에 알림 키가 없는 배포에서는 섹션이 통째로 그려지지 않는다 */}
-        <PushSettings userId={user?.id} />
-
-        {/* 로그인 수단 */}
-        <LinkedAccounts userId={user?.id} />
-
-        {/*
-          계정 — 공통 헤더(AppBar)에 있던 로그아웃이 내려온 자리다.
-          프로필로 가는 진입점은 하단 탭바가 상시 제공하므로, 계정 관련 동작은 이 화면이
-          단독으로 갖는다(헤더에는 비로그인 로그인 링크만 남는다).
-        */}
-        <section aria-labelledby="account-heading" className="px-5 pt-7">
-          <h2 id="account-heading" className="text-[15px] font-semibold tracking-[-0.3px] text-ink">
-            계정
-          </h2>
-          {user?.email && (
-            <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-mute">
-              로그인 계정 · {user.email}
+        <div className="md:mx-auto md:max-w-[640px]">
+          {/* 계정 연결에서 돌아왔다 — 프로바이더가 거부했으면 사유를, 교환 중이면 진행 상태를 알린다 */}
+          {link.errorMessage && (
+            <p
+              className="border-b border-hairline bg-canvas-soft px-5 py-2.5 text-[13px] leading-[1.5] text-crimson"
+            >
+              {link.errorMessage}
             </p>
           )}
-          <Button
-            variant="secondary"
-            block
-            icon={LogOut}
-            className="mt-4"
-            disabled={signOut.isPending}
-            onClick={() => signOut.mutate()}
-          >
-            {signOut.isPending ? "로그아웃 중…" : "로그아웃"}
-          </Button>
+          {!link.errorMessage && link.linking && (
+            <p
+              className="border-b border-hairline bg-canvas-soft px-5 py-2.5 text-[12px] text-ink-mute"
+            >
+              계정을 연결하는 중이에요…
+            </p>
+          )}
+
+          {/* 캐시된 프로필은 그대로 두고 최신화 실패만 알린다 — 재시도 수단까지 `StaleBanner`가 갖는다 */}
+          {profile.error && profile.data && (
+            <StaleBanner noun="프로필" onRetry={() => profile.refetch()} />
+          )}
+
           {/*
-            훅이 한국어로 바꿔 던진 에러를 노출한다(변환은 훅, 노출은 컴포넌트).
-            토스트는 1.8초 뒤 사라지므로 지속 표시를 함께 남긴다 — 로그아웃은 성공하면
-            화면이 통째로 바뀌는 동작이라, 실패를 놓치면 "됐는지 안 됐는지" 알 수 없다.
+            프로필만 아직 안 왔다 — 실물과 같은 골격의 스켈레톤을 둔다(치수가 다르면 도착 순간 시프트).
+            아래 두 섹션은 자기 쿼리를 갖고 이미 출발해 있다.
           */}
-          {signOut.error && (
-            <p className="mt-3 text-[13px] leading-[1.5] text-crimson">
-              {signOut.error.message}
-            </p>
+          {!profile.data && (
+            <>
+              <div className="flex flex-col items-center px-5 pt-8">
+                <Skeleton className="size-24 rounded-full" />
+                <Skeleton className="mt-3 h-[18px] w-24" />
+              </div>
+              <div className="flex flex-col gap-3 px-5 pt-8">
+                <Skeleton className="h-[70px] w-full" />
+                <Skeleton className="h-[50px] w-full" />
+              </div>
+            </>
           )}
-        </section>
+
+          {profile.data && (
+            <>
+              {/* 아바타 */}
+              <section aria-labelledby="avatar-heading" className="flex flex-col items-center px-5 pt-8">
+                <h2 id="avatar-heading" className="sr-only">
+                  프로필 사진
+                </h2>
+                {/* ⚠ flex다 — Avatar가 inline-flex라 블록 래퍼에서는 라인박스 디센더만큼
+                    아래에 여백이 붙어, inset-0 오버레이가 원보다 세로로 커진다(카메라 버튼의
+                    -bottom-1도 그만큼 아래로 밀린다). */}
+                <div className="relative flex">
+                  <Avatar
+                    label={profile.data.nickname}
+                    src={avatarUrl(profile.data.avatarPath)}
+                    size={96}
+                    className="text-[32px]"
+                  />
+                  {/* 업로드 중 — 사진 위에 스피너를 얹는다.
+                      ⚠ 스크림이 75%인 이유가 규약이다 — 아래에 깔린 것이 사용자가 올린 사진이라
+                         밝기를 가정할 수 없다. 순백 사진 기준으로 흰 링과의 대비가 3:1을 넘는
+                         지점이 여기다(ink/40이면 1.6:1로 링이 묻힌다).
+                      ⚠ prefers-reduced-motion에서는 전역 블록이 회전을 멈춰 정지된 링이 되는데,
+                         스크림이 함께 깔려 있어 "지금 처리 중"은 그대로 읽힌다. */}
+                  {avatar.isPending && (
+                    <span className="absolute inset-0 flex items-center justify-center rounded-full bg-ink/75">
+                      <span className="size-7 animate-spin rounded-full border-2 border-canvas/30 border-t-canvas" />
+                      <span className="sr-only">프로필 사진 올리는 중</span>
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={avatar.open}
+                    disabled={avatar.isPending}
+                    aria-label="프로필 사진 바꾸기"
+                    className="absolute -bottom-1 -right-1 flex size-9 items-center justify-center rounded-full border border-hairline-cool bg-canvas text-ink transition-colors duration-150 ease-otb active:bg-canvas-soft disabled:opacity-40"
+                  >
+                    <Icon as={Camera} size={16} />
+                  </button>
+                </div>
+                <input type="file" {...avatar.inputProps} className="sr-only" />
+                {/* mt-3 — 아바타 아래 첫 요소의 여백을 그대로 잇는다. mt-2면 원 밖으로 4px
+                    돌출한 카메라 버튼과 4px까지 붙는다(실측). */}
+                {avatar.error && (
+                  <p className="mt-3 text-center text-[13px] text-crimson">{avatar.error.message}</p>
+                )}
+              </section>
+
+              {/* 닉네임 */}
+              <form onSubmit={nickname.onSubmit} className="flex flex-col gap-3 px-5 pt-8">
+                <TextField
+                  label="닉네임"
+                  name="nickname"
+                  value={nickname.value}
+                  error={nickname.error}
+                  hint={`한글·영문·숫자 ${NICKNAME_LIMIT.grapheme}자까지 · 다른 사람과 같을 수 없어요`}
+                  onChange={nickname.onChange}
+                />
+                <Button type="submit" block disabled={!nickname.canSave}>
+                  {nickname.isPending ? "저장 중…" : "닉네임 저장"}
+                </Button>
+              </form>
+            </>
+          )}
+
+          {/* 응원 구단 — 자기 쿼리를 갖고 프로필과 동시에 출발한다 */}
+          <FollowedClubs userId={user?.id} onOpenPicker={() => setClubPickerOpen(true)} />
+
+          {/* 내 예측 — 예측 랭킹의 내 순위와 랭킹 화면의 진입점 */}
+          <PredictionSummary userId={user?.id} />
+
+          {/* 알림 — 서버에 알림 키가 없는 배포에서는 섹션이 통째로 그려지지 않는다 */}
+          <PushSettings userId={user?.id} />
+
+          {/* 로그인 수단 */}
+          <LinkedAccounts userId={user?.id} />
+
+          {/*
+            계정 — 공통 헤더(AppBar)에 있던 로그아웃이 내려온 자리다.
+            프로필로 가는 진입점은 늘 따로 있으므로(1024px 미만은 하단 탭바, 그 이상은 데스크톱 상단 바), 계정 관련 동작은 이 화면이
+            단독으로 갖는다(헤더에는 비로그인 로그인 링크만 남는다).
+          */}
+          <section aria-labelledby="account-heading" className="px-5 pt-7">
+            <h2 id="account-heading" className="text-[15px] font-semibold tracking-[-0.3px] text-ink">
+              계정
+            </h2>
+            {user?.email && (
+              <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-mute">
+                로그인 계정 · {user.email}
+              </p>
+            )}
+            <Button
+              variant="secondary"
+              block
+              icon={LogOut}
+              className="mt-4"
+              disabled={signOut.isPending}
+              onClick={() => signOut.mutate()}
+            >
+              {signOut.isPending ? "로그아웃 중…" : "로그아웃"}
+            </Button>
+            {/*
+              훅이 한국어로 바꿔 던진 에러를 노출한다(변환은 훅, 노출은 컴포넌트).
+              토스트는 1.8초 뒤 사라지므로 지속 표시를 함께 남긴다 — 로그아웃은 성공하면
+              화면이 통째로 바뀌는 동작이라, 실패를 놓치면 "됐는지 안 됐는지" 알 수 없다.
+            */}
+            {signOut.error && (
+              <p className="mt-3 text-[13px] leading-[1.5] text-crimson">
+                {signOut.error.message}
+              </p>
+            )}
+          </section>
+        </div>
       </main>
       {tabBar}
 
