@@ -37,15 +37,28 @@ export function feeKindCaption(kind: TransferDeal["feeKind"]): string | null {
  */
 const CURRENCY_SYMBOL: Record<string, string> = { EUR: "€", GBP: "£", USD: "$" };
 
-/** `95` → `"95"`, `12.5` → `"12.5"`, `12.25` → `"12.3"` — 정수는 소수 없이, 아니면 소수 1자리 */
-function formatMillions(amount: number): string {
-  return Number.isInteger(amount) ? String(amount) : amount.toFixed(1);
+/**
+ * 금액의 크기 단위와 숫자 — **저장된 정밀도 그대로** 그린다(소수 둘째 자리까지, 꼬리 0은 걷는다).
+ * - 백만 이상: `95` → `95M`, `12.5` → `12.5M`, `1.25` → `1.25M`.
+ * - 백만 미만은 **천(K)** 이다: `0.25` → `250K`(백만 단위로 그리면 `0.25`·`0.3`이 같은 글자가 되고 그 차이가 `0`이 된다).
+ * ⚠ 자리수를 반올림해 줄이지 않는다 — 줄이면 서로 다른 금액이 같은 글자가 되어(`1.25`·`1.3` → `1.3M`) 범위 바의 양 끝,
+ *   헤드라인 금액과 범위, 변동폭이 서로 다른 말을 한다. 저장값이 소수 둘째 자리까지라(`numeric(…, 2)`) 이 표기는 금액마다
+ *   하나로 정해지고, 서로 다른 금액이 같은 글자가 되지 않는다.
+ */
+function scaleOf(amount: number): { value: string; unit: "M" | "K" } {
+  if (amount < 1) return { value: String(Math.round(amount * 1000)), unit: "K" };
+  const fixed = amount.toFixed(2);
+  return { value: fixed.replace(/0+$/, "").replace(/\.$/, ""), unit: "M" };
 }
 
+const symbolOf = (currency: string) => CURRENCY_SYMBOL[currency] ?? `${currency} `;
+
 /**
- * 이적료 표기 — `€95M` / `£12.5M`. 금액 단위는 **백만**이다(`fee_amount`가 그렇게 저장된다).
+ * 이적료 표기 — `€95M` / `£12.5M` / `£250K`. 저장 단위는 **백만**이다(`fee_amount`가 그렇게 저장된다). 백만 미만은 천 단위로
+ * 그린다(`scaleOf`).
  * ⚠ 둘 중 하나라도 없으면 `null` — 화면이 `—`를 그린다. DB CHECK가 둘을 묶지만 타입은 각각
  *   nullable이라 여기서 한 번 더 접는다.
+ * ⚠ 순수 함수다 — 서버(메타데이터 설명·딜 공유 카드)와 화면이 같은 표기를 쓴다.
  */
 export function formatFee({
   amount,
@@ -55,7 +68,8 @@ export function formatFee({
   currency: string | null;
 }): string | null {
   if (amount === null || currency === null) return null;
-  return `${CURRENCY_SYMBOL[currency] ?? `${currency} `}${formatMillions(amount)}M`;
+  const { value, unit } = scaleOf(amount);
+  return `${symbolOf(currency)}${value}${unit}`;
 }
 
 /**
@@ -104,6 +118,7 @@ export function feeDelta(
 
 /**
  * 보도 범위 — 그 딜의 보도 이적료 최소–최대(`€58–95M`). 같으면 한 값(`€95M`), 없으면 `null`.
+ * 두 끝의 단위가 같으면 단위를 한 번만 적고(`£250–300K`), 다르면 끝마다 적는다(`£500K–1.5M`).
  * ⚠ `min(prev,fee)–(fee+add)` 공식을 쓰지 않는다 — 하락 딜에서 `€58–58M`로 퇴화한다.
  *   파생기가 같은 통화 보도의 min/max를 저장한다.
  */
@@ -113,6 +128,10 @@ export function formatFeeRange(
   const { feeLowAmount: low, feeHighAmount: high, feeCurrency: currency } = deal;
   if (low === null || high === null || currency === null) return null;
   if (low === high) return formatFee({ amount: low, currency });
-  const symbol = CURRENCY_SYMBOL[currency] ?? `${currency} `;
-  return `${symbol}${formatMillions(low)}–${formatMillions(high)}M`;
+  const from = scaleOf(low);
+  const to = scaleOf(high);
+  const symbol = symbolOf(currency);
+  return from.unit === to.unit
+    ? `${symbol}${from.value}–${to.value}${to.unit}`
+    : `${symbol}${from.value}${from.unit}–${to.value}${to.unit}`;
 }

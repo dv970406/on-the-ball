@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { ROUTES, predictionRound, transferWindowByKey } from "@/shared/config";
-import { formatCount } from "@/shared/lib";
+import { cn, formatCount } from "@/shared/lib";
 import { Icon, Skeleton, chipClassName } from "@/shared/ui";
 import {
   latestVotedRound,
@@ -35,6 +35,13 @@ interface PredictionCardProps {
   nowMs: number | null;
   /** 비로그인이 눌렀다 — 안내는 뷰가 한 벌 갖는다(`SignInDialog` 주석) */
   onSignInRequired: (action: string) => void;
+  /**
+   * 카드 제목의 단계 — 놓인 자리의 제목 계층을 따른다. 기본은 딜 상세의 구역 단계(`h2`)이고, 보드의 오른쪽 판은 판 제목(`h2`)
+   * 아래라 `h3`을 준다(고정이면 판 안에서 `h2 선수 → h3 … → h2 예측 → h3 최신 보도`로 계층이 뒤집힌다).
+   */
+  headingLevel?: "h2" | "h3";
+  /** 바깥 여백 — 기본은 상세의 카드 사이 간격(`mt-3`). 넓은 화면의 곁 칸·보드의 오른쪽 판은 자기 간격을 준다 */
+  className?: string;
 }
 
 /** 칸 라벨 — 이적료 카드와 같은 mono 10 uppercase */
@@ -67,7 +74,10 @@ export function PredictionCard({
   userId,
   nowMs,
   onSignInRequired,
+  headingLevel: Heading = "h2",
+  className = "mt-3",
 }: PredictionCardProps) {
+  const headingId = useId();
   const status = useSessionStore((s) => s.status);
   const predict = usePredictDeal(dealId);
   const requestedRef = useRef<boolean | null>(null);
@@ -107,7 +117,7 @@ export function PredictionCard({
   };
 
   return (
-    <section aria-labelledby="prediction-heading" className="mt-3 rounded-lg border border-hairline p-3.5">
+    <section aria-labelledby={headingId} className={cn("rounded-lg border border-hairline p-3.5", className)}>
       <div className="flex items-center gap-2">
         <span className={labelClassName}>성사 예측 · {round.label}</span>
         <Link
@@ -118,12 +128,9 @@ export function PredictionCard({
           <Icon as={ChevronRight} size={14} />
         </Link>
       </div>
-      <h2
-        id="prediction-heading"
-        className="mt-2 text-[16px] font-semibold leading-[1.4] tracking-[-0.3px] text-ink"
-      >
+      <Heading id={headingId} className="mt-2 text-[16px] font-semibold leading-[1.4] tracking-[-0.3px] text-ink">
         {settled ? "결과가 나와 예측이 닫혔어요" : `${round.label} 이적 창 안에 오피셜이 뜰까요?`}
-      </h2>
+      </Heading>
 
       {/* 받는 중 — 버튼 줄과 같은 높이를 잡아 도착 순간 카드가 늘지 않게 한다 */}
       {!prediction && !error && <Skeleton className="mt-3 h-[46px] w-full" />}

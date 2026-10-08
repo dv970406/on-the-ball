@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
-import { MY_PREDICTION_SELECT, RANKING_LIMIT, SCORE_SELECT, TALLY_SELECT } from "./mappers";
+import { MY_PREDICTION_SELECT, type MyPredictionSelectRow, RANKING_LIMIT, SCORE_SELECT, TALLY_SELECT } from "./mappers";
 
 /**
  * 예측 조회 조립의 **단일 소스** — 훅과 SSR 페이지가 같은 함수를 부른다.
@@ -14,9 +14,12 @@ export function buildTallyQuery(supabase: SupabaseClient<Database>, dealId: numb
 
 /**
  * 한 딜의 내 표. ⚠ 유저 필터를 걸지 않는다 — SELECT 정책이 "내 행만"이라 필터가 곧 정책이다.
- *   비로그인(anon)은 grant만 있고 정책에서 걸려 빈 배열을 받는다(서버 조회가 세션으로 갈라 부를 필요가 없다).
+ * ⚠ **비로그인이면 요청을 보내지 않는다**(`signedIn` 거짓) — anon은 정책에서 걸려 늘 빈 배열이라, 보내 봐야 왕복(브라우저는
+ *   OPTIONS까지 둘)만 는다. 대신 같은 모양의 빈 결과를 돌려줘 호출부(훅·SSR)가 분기 없이 `buildDealPrediction`에 넘긴다.
+ *   "로그인했는가"는 호출부가 **쿼리 키와 같은 근거**로 정한다 — 훅은 키의 `userId`, SSR은 세션 쿠키 유무.
  */
-export function buildMyPredictionsQuery(supabase: SupabaseClient<Database>, dealId: number) {
+export function buildMyPredictionsQuery(supabase: SupabaseClient<Database>, dealId: number, signedIn: boolean) {
+  if (!signedIn) return Promise.resolve({ data: [] as MyPredictionSelectRow[], error: null });
   return supabase.from("transfer_deal_prediction").select(MY_PREDICTION_SELECT).eq("deal_id", dealId);
 }
 

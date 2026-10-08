@@ -7,7 +7,7 @@ import { parsePostId } from "@/shared/lib/post-id";
 import { NOT_FOUND_TITLE, OG_SITE, ROUTES, absoluteUrl } from "@/shared/config";
 // ⚠ 배럴(@/shared/lib)이 아니라 직접 경로 — 배럴은 "use client" 훅을 포함한다.
 import { clamp } from "@/shared/lib/text";
-import { createSupabaseServerClient } from "@/shared/api/supabase-server";
+import { createSupabaseServerClient, hasSessionCookie } from "@/shared/api/supabase-server";
 // ⚠ 배럴이 아니라 직접 경로 — 조립·매퍼·단계 라벨은 "use client"가 없어 서버에서 쓸 수 있다.
 import { buildDealQuery, buildReportsQuery } from "@/entities/transfer/api/list-query";
 import { buildDeal, buildReport } from "@/entities/transfer/api/mappers";
@@ -72,7 +72,7 @@ type DealHead =
 const fetchDealHead = cache(async (dealId: number): Promise<DealHead> => {
   const nowMs = Date.now();
   try {
-    const supabase = await createSupabaseServerClient();
+    const [supabase, signedIn] = await Promise.all([createSupabaseServerClient(), hasSessionCookie()]);
     if (!supabase) return { state: "unknown" };
 
     // 서로의 결과를 쓰는 조회가 없다 → **전부 병렬로** 보낸다. 직렬이면 왕복이 쌓인다.
@@ -91,9 +91,10 @@ const fetchDealHead = cache(async (dealId: number): Promise<DealHead> => {
       buildReportsQuery(supabase, dealId),
       // ⚠ 조립·자르기·뒤집기는 클라이언트 훅과 같은 함수다 — 갈리면 하이드레이션 직후 목록이 흔들린다
       buildCommentListQuery(supabase, dealId),
-      // ⚠ 예측도 클라이언트 훅과 같은 조립이다. 내 표는 세션이 없으면 정책에서 걸려 빈 배열이다(세션으로 갈라 부르지 않는다)
+      // ⚠ 예측도 클라이언트 훅과 같은 조립이다. 내 표는 세션 쿠키가 없으면 묻지 않는다(정책상 늘 빈 배열 — 훅이 비로그인 키에서
+      //   건너뛰는 것과 같은 결과다). 판정은 쿠키만 본다 — `getUser()`를 기다리면 병렬이 직렬이 된다
       buildTallyQuery(supabase, dealId),
-      buildMyPredictionsQuery(supabase, dealId),
+      buildMyPredictionsQuery(supabase, dealId, signedIn),
     ]);
 
     if (error) return { state: "unknown" };

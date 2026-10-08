@@ -2,6 +2,7 @@
 //    그래서 순수 함수는 배럴이 아니라 직접 경로로 가져온다(`credibility-badge.tsx`와 같은 이유).
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { memo } from "react";
 import { ROUTES } from "@/shared/config";
 import { formatRelativeTime } from "@/shared/lib/format";
 import { Icon } from "@/shared/ui";
@@ -12,7 +13,6 @@ import { FeeValue } from "./fee-value";
 import { TransferCrest } from "./transfer-crest";
 import { WatchMark } from "./watch-mark";
 import { playerName } from "../lib/player-name";
-
 
 interface DealMiniCardProps {
   deal: TransferDealListItem;
@@ -26,9 +26,13 @@ interface DealMiniCardProps {
  * ⚠ **관심 표시를 이름 앞에 그린다** — 목록 행에만 두면 관심 딜이 오피셜이 되어 미니 카드로
  *   옮겨 가는 순간 보드 어디에도 표시가 안 되는 구멍이 생긴다.
  * ⚠ 그림자 없음 — press는 `active:bg-canvas-soft`(카드 press `shadow-2`는 규약으로 대체).
+ * ⚠ 링크의 `data-deal-id`는 lg+에서 보드가 클릭을 가로채 오른쪽 판에 여는 표지다(`DealRow`와 같다).
+ *   md+에서는 보드가 이 카드 대신 같은 딜을 표의 행(`DealRow`)으로 그린다.
  * ⚠ 트랙의 `snap-start`·너비는 여기가 갖는다 — 트랙(뷰)은 `flex gap-2.5 overflow-x-auto snap-x`만.
+ * ⚠ `memo`·`prefetch={false}` — 사유는 `DealRow`와 같다(행을 고를 때마다 보드가 다시 그려진다 · 동적 상세의 뷰포트 프리페치는
+ *   받아 오는 것이 거의 없고 2분할 폭에서는 클릭이 선택으로 가로채진다).
  */
-export function DealMiniCard({ deal, nowMs }: DealMiniCardProps) {
+export const DealMiniCard = memo(function DealMiniCard({ deal, nowMs }: DealMiniCardProps) {
   const name = playerName(deal);
   const route = routeLabels(deal);
 
@@ -36,6 +40,8 @@ export function DealMiniCard({ deal, nowMs }: DealMiniCardProps) {
     <li className="w-[200px] shrink-0 snap-start">
       <Link
         href={ROUTES.transfer(deal.id)}
+        prefetch={false}
+        data-deal-id={deal.id}
         className="block rounded-lg border border-hairline bg-canvas px-3.5 py-3 transition-colors duration-150 ease-otb active:bg-canvas-soft"
       >
         <div className="flex items-center gap-1.5">
@@ -68,4 +74,4 @@ export function DealMiniCard({ deal, nowMs }: DealMiniCardProps) {
       </Link>
     </li>
   );
-}
+});

@@ -23,7 +23,7 @@ interface UseDealPredictionQueryArgs {
 }
 
 /**
- * 한 딜의 예측 — 회차별 집계(공개)와 내 표("내 행만"). 두 조회를 함께 보낸다.
+ * 한 딜의 예측 — 회차별 집계(공개)와 내 표("내 행만"). 두 조회를 함께 보낸다(비로그인 키는 집계 하나만).
  * ⚠ 조립은 `buildTallyQuery`·`buildMyPredictionsQuery`·`buildDealPrediction`이 단독으로 소유한다 — SSR이 같은 함수를 부른다.
  */
 export function useDealPredictionQuery({
@@ -43,7 +43,8 @@ export function useDealPredictionQuery({
       const supabase = requireBrowserSupabase();
       const [tally, mine] = await Promise.all([
         buildTallyQuery(supabase, dealId),
-        buildMyPredictionsQuery(supabase, dealId),
+        // 비로그인 키(`userId` 없음)는 내 표를 묻지 않는다 — 정책상 늘 빈 배열이다(SSR도 같은 판정으로 접는다)
+        buildMyPredictionsQuery(supabase, dealId, userId !== undefined),
       ]);
       const error = tally.error ?? mine.error;
       if (error) {

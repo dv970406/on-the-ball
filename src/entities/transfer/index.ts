@@ -2,9 +2,8 @@
 //    lib/stage·lib/route-label·lib/player-name·lib/fee를 직접 import한다(허용 목록은 `check-conventions.mjs`).
 //
 // ⚠ **다른 레이어가 소비하지 않는 것은 올리지 않는다.** `TransferClubRow`·`TransferNewsRow`·
-//    `TransferDealWatchRow`·`TransferStatus`·`STAGE_GROUP`·`isDeadStage`·`feeDelta`·`ClubRoute`·
-//    `WatchMark`는 이 슬라이스 안에서만 쓰여 배럴에서 뺐다. `STAGE_STATUS`·`STATUS_LABEL`도 배럴에는
-//    없지만 서버 page가 `lib/stage` 직접 경로로 쓴다(og description). `check:conventions`가 이 유형을
+//    `TransferDealWatchRow`·`STAGE_GROUP`·`isDeadStage`·`feeDelta`·`ClubRoute`·
+//    `WatchMark`는 이 슬라이스 안에서만 쓰여 배럴에서 뺐다. `check:conventions`가 이 유형을
 //    **잡지 못하므로**(상대 경로 소비도 "현역"으로 센다) 손으로 지킨다.
 export type {
   ReportSort,
@@ -16,6 +15,8 @@ export type {
   TransferLeague,
   TransferReport,
   TransferSort,
+  // 상태 톤 — 보드의 지수 띠가 톤별 건수를 센다
+  TransferStatus,
 } from "./model/types";
 // ⚠ 리그 시트가 5개 리그를 이 순서로 그린다 — 손으로 다시 적지 않는다(망라성 가드가 여기 있다)
 export { TRANSFER_LEAGUES } from "./model/types";
@@ -36,6 +37,9 @@ export {
 export { compareClubs } from "./api/mappers";
 // ⚠ 구간 순서·라벨은 구간 점프 칩(빈 구간도 0건으로 그린다)이 직접 돈다 — `groupDeals`는 빈 구간을 뺀다
 export { GROUP_LABEL, GROUP_ORDER } from "./lib/stage";
+// ⚠ 단계 → 상태 톤 · 톤 라벨 — 보드의 지수 띠(클라이언트)가 뱃지와 같은 라벨로 톤별 건수를 센다.
+//    서버 page(og description)는 배럴이 아니라 `lib/stage` 직접 경로로 쓴다(배럴이 클라이언트 모듈을 담는다)
+export { STAGE_STATUS, STATUS_LABEL } from "./lib/stage";
 // ⚠ 정렬 → 분류 순서다. 안정 정렬·빈 구간 제외 규칙을 이 둘이 단독으로 소유한다
 export { groupDeals, sortDeals, sortReports } from "./lib/sort";
 // ⚠ 캐러셀 판정(T1 · 3일 이내)의 단일 소스 — 서버 프리페치와 뷰가 같은 함수를 부른다
@@ -64,6 +68,7 @@ export { playerName } from "./lib/player-name";
 // ⚠ 이적료 칸은 금액 · FA(확인된 자유계약) · 미공개 셋 중 하나다 — 빈 이적료를 FA로 추정하지 않는다
 export { FeeValue } from "./ui/fee-value";
 export { DealRow } from "./ui/deal-row";
+export { DealTable, DealTableHead } from "./ui/deal-table";
 export { DealMiniCard } from "./ui/deal-mini-card";
 export { RumorCard } from "./ui/rumor-card";
 // 상세 화면(`views/transfer-detail`)이 그리는 조각들 — 목록 UI는 같은 슬라이스라 상대 경로로 가져간다
@@ -74,3 +79,13 @@ export { StatusBadge } from "./ui/status-badge";
 export { CredibilityBadge } from "./ui/credibility-badge";
 export { FeeDelta } from "./ui/fee-delta";
 export { TransferCrest } from "./ui/transfer-crest";
+// 딜 상세(`views/transfer-detail`)와 보드의 오른쪽 판(`widgets/deal-panel`)이 **함께** 그리는 조각들 —
+// views와 widgets는 서로 import할 수 없어 이 레이어에 둔다(데이터를 받아 그리기만 한다 — features를 모른다)
+export { DealInfoLine } from "./ui/deal-info-line";
+export { DealRouteCard } from "./ui/deal-route-card";
+export { ReportItem } from "./ui/report-item";
+export { FeeHighlight } from "./ui/fee-highlight";
+export { ContractTerms } from "./ui/contract-terms";
+export { SuitorList } from "./ui/suitor-list";
+// ⚠ 보도 흐름 — 날짜·출처 등급만 그린다(보도별 단계·이적료는 뱃지와 다른 판정이라 싣지 않는다)
+export { ReportFlowChart } from "./ui/report-flow-chart";
