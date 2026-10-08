@@ -14,17 +14,21 @@ import { ROUTES } from "@/shared/config";
  *   해석은 뷰가 주소에서 한다(`useBoardFilters` → `parseTransferLeague`). 모르는 값은 전체로 폴백한다.
  * ⚠ 구단(`?club=`)은 구단 코드(slug)다 — 해석은 `parseTransferClub`, 보드에 없는 구단은 뷰가 전체로 폴백한다.
  * ⚠ 관심(`?watch=1`)은 켜졌을 때만 붙는다 — 해석은 `parseTransferWatch`. 다른 필터와 함께 걸린다(AND).
+ * ⚠ 고른 딜(`?deal=`)은 **오른쪽 판에 딜을 열 때만** 싣는다(행 선택). 필터·정렬 링크는 넘기지 않는다 — 필터가 바뀌면
+ *   고른 딜이 목록에서 빠질 수 있어, 선택을 풀고 화면 순서상 첫 딜로 돌아가는 편이 예측 가능하다.
  */
 export function boardHref(
   league: TransferLeague | null,
   sort: TransferSort,
   club: string | null = null,
   watch = false,
+  deal: number | null = null,
 ): string {
   const params: string[] = [];
   if (league !== null) params.push(`league=${encodeURIComponent(league)}`);
   if (sort !== "latest") params.push(`sort=${sort}`);
   if (club !== null) params.push(`club=${encodeURIComponent(club)}`);
   if (watch) params.push("watch=1");
+  if (deal !== null) params.push(`deal=${deal}`);
   return params.length === 0 ? ROUTES.transferList : `${ROUTES.transferList}?${params.join("&")}`;
 }

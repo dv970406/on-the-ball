@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
+import { parsePostId } from "@/shared/lib";
 import {
   parseTransferClub,
   parseTransferLeague,
@@ -20,6 +21,12 @@ export interface BoardFilters {
   club: string | null;
   /** 관심 딜만 보는가(`?watch=1`) — 비로그인이면 담은 딜이 없어 빈 목록이 된다 */
   watch: boolean;
+  /**
+   * 목록·상세 2분할(lg+)에서 오른쪽 판에 연 딜(`?deal=<id>`) — `null`이면 화면 순서상 첫 딜이다.
+   * ⚠ **필터가 아니다** — `boardHref`의 필터 링크는 이 값을 싣지 않는다(필터를 바꾸면 선택이 풀리고 기본값으로 간다).
+   * ⚠ 해석은 `parsePostId`다 — 상세 라우트(`/transfers/[id]`)와 같은 파서여야 같은 딜이 두 주소 표기로 갈리지 않는다.
+   */
+  deal: number | null;
 }
 
 /**
@@ -56,6 +63,7 @@ export function useBoardFilters(): BoardFilters {
       sort: parseTransferSort(searchParams.get("sort") ?? undefined),
       club: parseTransferClub(searchParams.get("club") ?? undefined),
       watch: parseTransferWatch(searchParams.get("watch") ?? undefined),
+      deal: parsePostId(searchParams.get("deal") ?? ""),
     }),
     [searchParams],
   );

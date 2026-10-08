@@ -7,6 +7,11 @@ import type { RumorEntry } from "../model/use-transfer-board";
 
 /** 트랙의 카드 간격(px) — 아래 `gap-2.5`와 같은 값. 인디케이터 인덱스가 이 값으로 나눈다 */
 const TRACK_GAP_PX = 10;
+/**
+ * md+ 그리드는 **한 줄만** 보인다 — md 2장, lg+ 3장. 그 뒤 카드는 넓은 화면에서 가린다(같은 딜이 바로 아래 표에 있고,
+ * 소식이 여러 줄로 쌓이면 표가 첫 화면 밖으로 밀린다). 모바일 트랙은 전부 그대로다.
+ */
+const GRID_ROW_MD = 2;
 
 interface RumorCarouselProps {
   /** 비어 있으면 호출부가 섹션 자체를 그리지 않는다 — 빈 캡션이 첫 화면 세로 공간을 먹지 않게 */
@@ -15,7 +20,8 @@ interface RumorCarouselProps {
 }
 
 /**
- * "최근 3일 소식" 캐러셀 — 캡션 + 300px 카드 스냅 트랙 + 점 인디케이터.
+ * "최근 3일 소식" 캐러셀 — 캡션 + 300px 카드 스냅 트랙 + 점 인디케이터. md+에서는 트랙이 아니라 한 줄 그리드다
+ * (md 2열 · lg+ 3열 — 점 인디케이터는 트랙에만 있다).
  *
  * ⚠ `확률 N%`는 없다(보류). 카드 자체는 `RumorCard`가 그린다.
  * ⚠ 인디케이터 인덱스는 `round(scrollLeft / (카드폭 + 간격))`. 스냅이
@@ -43,14 +49,21 @@ export function RumorCarousel({ rumors, nowMs }: RumorCarouselProps) {
       </h2>
       <ul
         onScroll={handleScroll}
-        className="no-scrollbar flex snap-x snap-mandatory gap-2.5 overflow-x-auto scroll-px-5 px-5 pb-1"
+        className="no-scrollbar flex snap-x snap-mandatory gap-2.5 overflow-x-auto scroll-px-5 px-5 pb-1 md:grid md:snap-none md:grid-cols-2 md:overflow-visible lg:grid-cols-3"
       >
         {rumors.map(({ deal, report }, i) => (
           // 첫 카드만 즉시 로드 — 나머지는 트랙을 넘겨야 보인다
-          <RumorCard key={deal.id} deal={deal} report={report} nowMs={nowMs} priority={i === 0} />
+          <RumorCard
+            key={deal.id}
+            deal={deal}
+            report={report}
+            nowMs={nowMs}
+            priority={i === 0}
+            className={cn(i >= GRID_ROW_MD && "md:hidden", i === GRID_ROW_MD && "lg:block")}
+          />
         ))}
       </ul>
-      <div aria-hidden className="flex justify-center gap-1 pb-1.5 pt-3">
+      <div aria-hidden className="flex justify-center gap-1 pb-1.5 pt-3 md:hidden">
         {rumors.map(({ deal }, i) => (
           <span
             key={deal.id}

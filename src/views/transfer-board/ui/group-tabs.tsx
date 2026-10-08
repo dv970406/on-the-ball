@@ -33,13 +33,15 @@ interface GroupTabsProps {
  * ⚠ 밑줄은 잉크다 — 에메랄드가 아니다(`styling.md`의 에메랄드 자리 표에 이 파일은 없다).
  * ⚠ 다섯 구간이 전부 있으면 좁은 폭에서 정렬 링크와 함께 한 줄을 넘길 수 있어 탭 쪽만 가로 스크롤한다 —
  *   정렬은 `shrink-0`으로 오른쪽에 남는다.
+ * ⚠ 탭 줄은 `overflow-y-hidden`이다 — `overflow-x-auto`만 주면 세로도 auto가 되어, 스크롤바가 보이는 폭에서 1px 넘침에
+ *   세로 스크롤바 토막이 선다.
  */
 export function GroupTabs({ counts, active, onJump, trailing }: GroupTabsProps) {
   const keys = GROUP_ORDER.filter((key) => counts[key] > 0);
   return (
     <div className="flex items-center gap-4 border-b border-hairline-cool px-5">
       {keys.length > 1 && (
-        <nav aria-label="구간 이동" className="no-scrollbar flex min-w-0 gap-3.5 overflow-x-auto">
+        <nav aria-label="구간 이동" className="no-scrollbar flex min-w-0 gap-3.5 overflow-x-auto overflow-y-hidden">
           {keys.map((key) => (
             <button
               key={key}

@@ -208,9 +208,15 @@ export function useTransferBoard({
     rumors,
     groups,
     counts,
-    /** 구단 필터 — 칩 목록과, URL의 구단 중 보드에 실제로 있는 것(칩·링크가 이 값을 선택 상태로 쓴다) */
-    clubFilter: { options: clubOptions, selected: effectiveClub },
-    /** 관심 필터 — 필터 레일의 칩과 빈 화면 문구가 함께 읽는다 */
-    watchFilter: { watchedCount, isGuest },
+    /**
+     * 필터 레일·왼쪽 레일이 읽는 값 — 구단 칩 목록과 URL의 구단 중 보드에 실제로 있는 것(칩·링크가 이 값을 선택
+     * 상태로 쓴다), 관심 필터의 빈 화면 문구·로그인 안내 판정
+     */
+    filter: { clubOptions, club: effectiveClub, watchedCount, isGuest },
+    /**
+     * 이 보드의 쿼리 스코프(복원 전에는 서버가 본 사용자) — 같은 스코프의 쿼리를 갖는 하위(오른쪽 딜 판)까지 흘려보낸다.
+     * 판이 다른 키로 같은 딜을 찾으면 첫 렌더에 같은 데이터를 한 번 더 받는다(`nextjs.md` 서버 프리페치 절).
+     */
+    userId,
   };
 }

@@ -1,12 +1,15 @@
 "use client";
 
-import { Bell, ChevronDown, Heart, X } from "lucide-react";
+import { Bell, ChevronDown, ChevronLeft, ChevronRight, Heart, X } from "lucide-react";
+import type { MouseEvent } from "react";
 import type { TransferLeague, TransferSort } from "@/entities/transfer";
+import { cn } from "@/shared/lib";
 import { chipClassName, Icon } from "@/shared/ui";
 import { boardHref } from "../lib/board-href";
 import { leagueLabel } from "../lib/league-options";
 import type { ClubOption } from "../model/use-transfer-board";
 import { BoardLink } from "./board-link";
+import { useRailOverflow } from "./use-rail-overflow";
 
 /**
  * 레일에 늘어놓는 **그 밖의 구단** 수 — 그 뒤는 딜이 한두 건인 구단이라 칩으로 둘 가치가 작다. 선택된 구단은 순위와
@@ -34,6 +37,22 @@ interface FilterRailProps {
 const CHIP_LAYOUT = "inline-flex items-center gap-1 whitespace-nowrap";
 
 /**
+ * md+에서 칩 줄의 넘친 쪽 끝을 흐린다 — 가로 스크롤바 대신 "더 있다"를 알리는 신호(아래 주석). 넘친 쪽에만 건다.
+ * ⚠ 완성된 클래스 문자열로 둔다(Tailwind는 소스 텍스트에서 클래스를 훑는다 — 조립하면 생성되지 않는다). `-webkit-mask-image`는
+ *   빌드(Lightning CSS)가 붙인다(빌드 산출물 확인) — 손으로 병기하지 않는다.
+ */
+const RAIL_FADE = {
+  both: "md:[mask-image:linear-gradient(to_right,transparent,black_40px,black_calc(100%-40px),transparent)]",
+  back: "md:[mask-image:linear-gradient(to_right,transparent,black_40px)]",
+  forward:
+    "md:[mask-image:linear-gradient(to_left,transparent,black_40px)]",
+} as const;
+
+/** 넘기기 버튼 — md+에서 넘친 쪽에만 선다. 칩 줄 끝에 겹쳐 놓는다(줄의 흐린 끝 위) */
+const PAGER =
+  "absolute inset-y-0 my-auto hidden size-7 place-items-center rounded-sm border border-hairline bg-canvas text-ink-secondary transition-colors duration-150 ease-otb hover:bg-canvas-soft md:grid";
+
+/**
  * 필터 레일 — 왼쪽에 리그 버튼(시트를 연다)을 고정하고 그 뒤로 관심 칩과 구단 칩이 흐른다. 보드의 **필터는 이 한 줄이 전부**다
  * (구간 탭은 이동, 정렬은 순서 — 둘 다 필터가 아니라 다른 줄·다른 형태다).
  *
@@ -56,7 +75,15 @@ const CHIP_LAYOUT = "inline-flex items-center gap-1 whitespace-nowrap";
  * ⚠ 리그 버튼은 그냥 `button`이다 — `aria-haspopup`을 붙이지 않는다(과한 ARIA는 없느니만 못하다).
  * ⚠ 고를 구단이 둘 미만이면 구단 칩을 그리지 않는다(리그 버튼과 관심 칩만 남는다). 단 선택된 구단이 있으면 풀 길이
  *   있어야 하므로 그린다.
+ * ⚠ **`min-[90rem]`에서는 숨는다** — 그 폭에서는 왼쪽 레일(`BoardRail`)이 리그·관심·구단을 세로로 늘어놓는다(리그 시트도
+ *   그 폭에서는 쓰지 않는다). 두 자리가 같은 링크(`boardHref`)를 만든다.
  * ⚠ 칩 레일은 화면 오른쪽 끝까지 흐른다(`-mr-5 pr-5`) — 오른쪽에 여백이 남으면 거기서 끝나는 것처럼 보인다.
+ * ⚠ **md+에서도 가로 스크롤바를 그리지 않는다** — 칩 줄은 거의 늘 넘쳐서 막대가 상시 한 줄을 차지했다. 대신 넘친 쪽 끝을
+ *   흐리고(`RAIL_FADE`) 그 끝에 넘기기 버튼(‹ ›)을 세운다 — 마우스로 숨은 칩에 닿는 수단이다(트랙패드·터치는 그대로 밀고,
+ *   키보드는 Tab이 칩마다 멈추며 브라우저가 그 칩을 보이는 곳으로 끌어온다). 버튼은 그래서 포커스 순서에 넣지 않는다
+ *   (`tabIndex={-1}` + `aria-hidden` — 같은 칩에 닿는 키보드 경로가 이미 있고, 스크린리더에 장식 버튼 둘을 더 읽히지 않는다).
+ *   줄바꿈(`flex-wrap`)은 택하지 않았다 — 구단 칩을 다 펼치면 1024px의 가운데 열에서 여러 줄이 되어 목록이 그만큼 밀린다.
+ *   모바일은 그대로다(막대가 원래 숨어 있고 손가락으로 민다 — 버튼·흐림은 md+에만 있다).
  */
 export function FilterRail({
   options,
@@ -74,6 +101,8 @@ export function FilterRail({
   const selected = club === null ? null : options.find((o) => o.code === club);
   if (selected && !shown.includes(selected)) shown.push(selected);
   const showClubChips = options.length >= 2 || selected !== null;
+  const { ref: railRef, back, forward, page } = useRailOverflow<HTMLElement>();
+  const fade = back && forward ? RAIL_FADE.both : back ? RAIL_FADE.back : forward ? RAIL_FADE.forward : null;
 
   const watchChip = (
     <>
@@ -88,8 +117,14 @@ export function FilterRail({
     </>
   );
 
+  /**
+   * 넘기기 버튼은 누르는 순간 포커스를 가져가지 않는다 — `aria-hidden`인 요소가 포커스를 가지면 보조기술에 이름 없는 자리가
+   * 생기고, 끝까지 넘겨 버튼이 사라지면 포커스가 `body`로 떨어진다. 키보드 경로는 칩마다 멈추는 Tab이 따로 있다.
+   */
+  const keepFocus = (event: MouseEvent) => event.preventDefault();
+
   return (
-    <div className="flex items-center gap-2 px-5 pb-2.5 pt-3">
+    <div className="flex items-center gap-2 px-5 pb-2.5 pt-3 min-[90rem]:hidden">
       <button
         type="button"
         onClick={onOpenLeague}
@@ -101,54 +136,77 @@ export function FilterRail({
 
       {/* 고정된 리그 버튼과 흐르는 칩의 경계 — 헤어라인 한 토막 */}
       <span aria-hidden className="h-5 w-px flex-none bg-hairline" />
-      <nav aria-label="관심·구단 필터" className="no-scrollbar -mr-5 flex min-w-0 gap-1.5 overflow-x-auto pr-5">
-        {isGuest && !watch ? (
-          <button
-            type="button"
-            // ⚠ 인자 없이 감싼다 — `onClick`은 MouseEvent를 실어 부른다
-            onClick={() => onWatchSignInRequired()}
-            className={chipClassName(false, CHIP_LAYOUT)}
-          >
-            {watchChip}
-            <span className="sr-only">(로그인 필요)</span>
-          </button>
-        ) : (
-          <BoardLink
-            href={boardHref(league, sort, club, !watch)}
-            aria-current={watch ? "page" : undefined}
-            className={chipClassName(watch, CHIP_LAYOUT)}
-          >
-            {watchChip}
-          </BoardLink>
-        )}
+      {/* 칩 줄 + 넘기기 버튼(md+)의 자리 — 버튼이 줄 양 끝에 겹친다 */}
+      <div className="relative -mr-5 flex min-w-0">
+        {/* ⚠ `overflow-y-hidden` — `overflow-x-auto`만 주면 세로도 auto가 되어, 스크롤바가 보이는 폭에서 1px 넘침에 세로 스크롤바 토막이 선다 */}
+        <nav
+          ref={railRef}
+          aria-label="관심·구단 필터"
+          className={cn(
+            // md+의 `scroll-px-10`: Tab으로 칩을 옮기면 브라우저가 그 칩을 보이는 끝까지만 끌어오는데, 그 자리가 양 끝의 흐림(40px)과
+            // 넘기기 버튼 밑이라 포커스 링이 가려진다 — 끌어올 때 그만큼 안쪽에 세운다
+            "no-scrollbar flex min-w-0 gap-1.5 overflow-x-auto overflow-y-hidden pr-5 md:scroll-px-10 md:[scrollbar-width:none] md:[&::-webkit-scrollbar]:hidden",
+            fade,
+          )}
+        >
+          {isGuest && !watch ? (
+            <button
+              type="button"
+              // ⚠ 인자 없이 감싼다 — `onClick`은 MouseEvent를 실어 부른다
+              onClick={() => onWatchSignInRequired()}
+              className={chipClassName(false, CHIP_LAYOUT)}
+            >
+              {watchChip}
+              <span className="sr-only">(로그인 필요)</span>
+            </button>
+          ) : (
+            <BoardLink
+              href={boardHref(league, sort, club, !watch)}
+              aria-current={watch ? "page" : undefined}
+              className={chipClassName(watch, CHIP_LAYOUT)}
+            >
+              {watchChip}
+            </BoardLink>
+          )}
 
-        {showClubChips &&
-          shown.map((o) => {
-            const isSelected = club === o.code;
-            return (
-              <BoardLink
-                key={o.code}
-                href={boardHref(league, sort, isSelected ? null : o.code, watch)}
-                aria-current={isSelected ? "page" : undefined}
-                className={chipClassName(isSelected, CHIP_LAYOUT)}
-              >
-                {o.followed && (
-                  <>
-                    <Icon as={Heart} size={11} className="fill-current" />
-                    <span className="sr-only">응원 구단</span>
-                  </>
-                )}
-                {o.label}
-                {isSelected && (
-                  <>
-                    <Icon as={X} size={12} className="-mr-0.5" />
-                    <span className="sr-only">필터 해제</span>
-                  </>
-                )}
-              </BoardLink>
-            );
-          })}
-      </nav>
+          {showClubChips &&
+            shown.map((o) => {
+              const isSelected = club === o.code;
+              return (
+                <BoardLink
+                  key={o.code}
+                  href={boardHref(league, sort, isSelected ? null : o.code, watch)}
+                  aria-current={isSelected ? "page" : undefined}
+                  className={chipClassName(isSelected, CHIP_LAYOUT)}
+                >
+                  {o.followed && (
+                    <>
+                      <Icon as={Heart} size={11} className="fill-current" />
+                      <span className="sr-only">응원 구단</span>
+                    </>
+                  )}
+                  {o.label}
+                  {isSelected && (
+                    <>
+                      <Icon as={X} size={12} className="-mr-0.5" />
+                      <span className="sr-only">필터 해제</span>
+                    </>
+                  )}
+                </BoardLink>
+              );
+            })}
+        </nav>
+        {back && (
+          <button type="button" tabIndex={-1} aria-hidden onMouseDown={keepFocus} onClick={() => page(-1)} className={cn(PAGER, "left-0")}>
+            <Icon as={ChevronLeft} size={16} />
+          </button>
+        )}
+        {forward && (
+          <button type="button" tabIndex={-1} aria-hidden onMouseDown={keepFocus} onClick={() => page(1)} className={cn(PAGER, "right-2")}>
+            <Icon as={ChevronRight} size={16} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
