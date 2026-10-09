@@ -1,0 +1,612 @@
+{
+ "_comment": [
+  "LLM 판정 벤치의 고정 묶음 — scripts/bench-transfer-judge.mjs가 같은 설정으로 N회 물어 일관성(반복끼리 같은 답인가)과 정확도(transfer-golden.json의 필드 정답)를 함께 잰다.",
+  "항목: id(운영 transfer_news 행) · player(물을 때 넘기는 선수 — 규칙이 뽑은 이름, null이면 모델이 선수를 읽는다) · reason(그 보도를 고른 이유 한 낱말) · set(출처).",
+  "set qa-1001: 2026-10-01 지시문 A/B에 쓴 68건 그대로(선수도 그때 넘긴 값) — .cache/transfer-eval/qa-1001/prompt/의 옛 결과를 기준선으로 비교할 수 있다.",
+  "set golden: 정답 세트에서 판정이 흔들리기 쉬운 유형(회고·재계약·인터뷰·모음 기사·한 토큰 이름·놓친 이적 보도)을 골고루 더했다. player는 그 보도로 파생이 물을 선수(scripts 기준 2026-10-09 HEAD).",
+  "reason: 이동(진행형 이적 보도) · 회고 · 재계약 · 인터뷰 · 모음 · 임원 · 미특정 · 경기 · 기타 · 한토큰(한 토큰 이름 선수) · 놓침(이동 보도인데 운영 판정이 이동이 아니었거나 없었다) · 정답없음(정답 세트 밖 — 일관성만 잰다).",
+  "⚠ 본문을 싣지 않는다(저장소 공개) — 본문은 .cache/transfer-eval/snapshot.json, 기사 본문은 .cache/transfer-eval/bench/articles.json(첫 실행이 한 번 받아 고정한다)."
+ ],
+ "items": [
+  {
+   "id": 385,
+   "player": null,
+   "reason": "정답없음",
+   "set": "qa-1001"
+  },
+  {
+   "id": 1733,
+   "player": null,
+   "reason": "인터뷰",
+   "set": "qa-1001"
+  },
+  {
+   "id": 1858,
+   "player": null,
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 4178,
+   "player": null,
+   "reason": "재계약",
+   "set": "qa-1001"
+  },
+  {
+   "id": 4200,
+   "player": null,
+   "reason": "기타",
+   "set": "qa-1001"
+  },
+  {
+   "id": 9242,
+   "player": null,
+   "reason": "정답없음",
+   "set": "qa-1001"
+  },
+  {
+   "id": 9270,
+   "player": null,
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 12022,
+   "player": null,
+   "reason": "정답없음",
+   "set": "qa-1001"
+  },
+  {
+   "id": 12058,
+   "player": null,
+   "reason": "모음",
+   "set": "qa-1001"
+  },
+  {
+   "id": 12082,
+   "player": "Erling Haaland",
+   "reason": "모음",
+   "set": "qa-1001"
+  },
+  {
+   "id": 12140,
+   "player": null,
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 12209,
+   "player": null,
+   "reason": "미특정",
+   "set": "qa-1001"
+  },
+  {
+   "id": 12213,
+   "player": "Estevao Willian",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 12338,
+   "player": "Harry Kane",
+   "reason": "재계약",
+   "set": "qa-1001"
+  },
+  {
+   "id": 12510,
+   "player": null,
+   "reason": "모음",
+   "set": "qa-1001"
+  },
+  {
+   "id": 12511,
+   "player": null,
+   "reason": "정답없음",
+   "set": "qa-1001"
+  },
+  {
+   "id": 12590,
+   "player": null,
+   "reason": "회고",
+   "set": "qa-1001"
+  },
+  {
+   "id": 494,
+   "player": null,
+   "reason": "한토큰",
+   "set": "qa-1001"
+  },
+  {
+   "id": 516,
+   "player": null,
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 580,
+   "player": "JJ Gabriel",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 656,
+   "player": null,
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 1720,
+   "player": null,
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 11863,
+   "player": null,
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 11977,
+   "player": "Goncalo Inacio",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 12131,
+   "player": null,
+   "reason": "한토큰",
+   "set": "qa-1001"
+  },
+  {
+   "id": 12211,
+   "player": null,
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 887,
+   "player": "Cody Gakpo",
+   "reason": "기타",
+   "set": "qa-1001"
+  },
+  {
+   "id": 1054,
+   "player": null,
+   "reason": "회고",
+   "set": "qa-1001"
+  },
+  {
+   "id": 1696,
+   "player": null,
+   "reason": "인터뷰",
+   "set": "qa-1001"
+  },
+  {
+   "id": 1789,
+   "player": "Lukas Hornicek",
+   "reason": "회고",
+   "set": "qa-1001"
+  },
+  {
+   "id": 4055,
+   "player": "Folarin Balogun",
+   "reason": "회고",
+   "set": "qa-1001"
+  },
+  {
+   "id": 4069,
+   "player": "Johan Manzambi",
+   "reason": "회고",
+   "set": "qa-1001"
+  },
+  {
+   "id": 4089,
+   "player": "Pavel Sulč",
+   "reason": "회고",
+   "set": "qa-1001"
+  },
+  {
+   "id": 6680,
+   "player": null,
+   "reason": "회고",
+   "set": "qa-1001"
+  },
+  {
+   "id": 9273,
+   "player": "Cavan Sullivan",
+   "reason": "회고",
+   "set": "qa-1001"
+  },
+  {
+   "id": 12136,
+   "player": "Raul Asencio",
+   "reason": "회고",
+   "set": "qa-1001"
+  },
+  {
+   "id": 12410,
+   "player": null,
+   "reason": "회고",
+   "set": "qa-1001"
+  },
+  {
+   "id": 11882,
+   "player": "Yankuba Minteh",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 12409,
+   "player": "Kim Min-jae",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 12458,
+   "player": "Alejandro Balde",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 16036,
+   "player": null,
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 16157,
+   "player": null,
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 6668,
+   "player": "Manu Koné",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 6661,
+   "player": "Dani Olmo",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 12330,
+   "player": "Alex Scott",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 1895,
+   "player": "Manu Koné",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 1914,
+   "player": "Goncalo Inacio",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 1926,
+   "player": null,
+   "reason": "정답없음",
+   "set": "qa-1001"
+  },
+  {
+   "id": 1946,
+   "player": null,
+   "reason": "정답없음",
+   "set": "qa-1001"
+  },
+  {
+   "id": 1917,
+   "player": null,
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 1937,
+   "player": null,
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 353,
+   "player": null,
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 11959,
+   "player": "Neto",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 6724,
+   "player": "Finn Jeltsch",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 9244,
+   "player": "Abdukodir Khusanov",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 11967,
+   "player": "Patric",
+   "reason": "한토큰",
+   "set": "qa-1001"
+  },
+  {
+   "id": 16264,
+   "player": "Dodo",
+   "reason": "한토큰",
+   "set": "qa-1001"
+  },
+  {
+   "id": 16262,
+   "player": null,
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 12308,
+   "player": null,
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 1934,
+   "player": null,
+   "reason": "한토큰",
+   "set": "qa-1001"
+  },
+  {
+   "id": 1610,
+   "player": "David Eze",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 660,
+   "player": "Isaac Konde",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 6617,
+   "player": "Tyrick Mitchell",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 12534,
+   "player": "Virgil van Dijk",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 4167,
+   "player": null,
+   "reason": "정답없음",
+   "set": "qa-1001"
+  },
+  {
+   "id": 1932,
+   "player": "Alessandro Romano",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 15944,
+   "player": null,
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 372,
+   "player": "Neto",
+   "reason": "이동",
+   "set": "qa-1001"
+  },
+  {
+   "id": 851,
+   "player": null,
+   "reason": "회고",
+   "set": "golden"
+  },
+  {
+   "id": 1701,
+   "player": null,
+   "reason": "회고",
+   "set": "golden"
+  },
+  {
+   "id": 1723,
+   "player": null,
+   "reason": "회고",
+   "set": "golden"
+  },
+  {
+   "id": 1927,
+   "player": null,
+   "reason": "회고",
+   "set": "golden"
+  },
+  {
+   "id": 15971,
+   "player": null,
+   "reason": "회고",
+   "set": "golden"
+  },
+  {
+   "id": 16187,
+   "player": null,
+   "reason": "회고",
+   "set": "golden"
+  },
+  {
+   "id": 244,
+   "player": null,
+   "reason": "재계약",
+   "set": "golden"
+  },
+  {
+   "id": 973,
+   "player": null,
+   "reason": "재계약",
+   "set": "golden"
+  },
+  {
+   "id": 4118,
+   "player": null,
+   "reason": "재계약",
+   "set": "golden"
+  },
+  {
+   "id": 12266,
+   "player": null,
+   "reason": "재계약",
+   "set": "golden"
+  },
+  {
+   "id": 16088,
+   "player": null,
+   "reason": "재계약",
+   "set": "golden"
+  },
+  {
+   "id": 4121,
+   "player": null,
+   "reason": "인터뷰",
+   "set": "golden"
+  },
+  {
+   "id": 1666,
+   "player": null,
+   "reason": "인터뷰",
+   "set": "golden"
+  },
+  {
+   "id": 4077,
+   "player": "Erling Haaland",
+   "reason": "인터뷰",
+   "set": "golden"
+  },
+  {
+   "id": 6678,
+   "player": null,
+   "reason": "인터뷰",
+   "set": "golden"
+  },
+  {
+   "id": 12204,
+   "player": null,
+   "reason": "인터뷰",
+   "set": "golden"
+  },
+  {
+   "id": 16065,
+   "player": null,
+   "reason": "인터뷰",
+   "set": "golden"
+  },
+  {
+   "id": 459,
+   "player": null,
+   "reason": "모음",
+   "set": "golden"
+  },
+  {
+   "id": 1632,
+   "player": null,
+   "reason": "모음",
+   "set": "golden"
+  },
+  {
+   "id": 4124,
+   "player": null,
+   "reason": "모음",
+   "set": "golden"
+  },
+  {
+   "id": 370,
+   "player": "Neto",
+   "reason": "한토큰",
+   "set": "golden"
+  },
+  {
+   "id": 1893,
+   "player": null,
+   "reason": "한토큰",
+   "set": "golden"
+  },
+  {
+   "id": 6595,
+   "player": null,
+   "reason": "한토큰",
+   "set": "golden"
+  },
+  {
+   "id": 12019,
+   "player": null,
+   "reason": "한토큰",
+   "set": "golden"
+  },
+  {
+   "id": 434,
+   "player": null,
+   "reason": "한토큰",
+   "set": "golden"
+  },
+  {
+   "id": 658,
+   "player": null,
+   "reason": "놓침",
+   "set": "golden"
+  },
+  {
+   "id": 878,
+   "player": null,
+   "reason": "놓침",
+   "set": "golden"
+  },
+  {
+   "id": 6614,
+   "player": null,
+   "reason": "놓침",
+   "set": "golden"
+  },
+  {
+   "id": 11904,
+   "player": "Estevao Willian",
+   "reason": "놓침",
+   "set": "golden"
+  },
+  {
+   "id": 12062,
+   "player": "JJ Gabriel",
+   "reason": "놓침",
+   "set": "golden"
+  },
+  {
+   "id": 12107,
+   "player": "Raheem Sterling",
+   "reason": "놓침",
+   "set": "golden"
+  },
+  {
+   "id": 12547,
+   "player": "Cavan Sullivan",
+   "reason": "놓침",
+   "set": "golden"
+  }
+ ]
+}

@@ -3,7 +3,14 @@
   "이적 딜 파생의 정답 세트 — 운영 transfer_news 행 id별로 \"이 보도가 특정 선수의 구단 이동을 (현재 진행형으로) 보도하는가\"와 그 선수들.",
   "2026-09-28 운영 보도 101건(딜 후보 합집합 41 + 미선택 이적 어휘 보도 무작위 60)을 파이프라인 결과를 보지 않은 독립 채점자 둘이 원문 기사를 읽고 매겼다. 둘이 갈린 9건은 원문으로 판정했다(가십 모음은 두 채점자가 모두 적은 선수만).",
   "2026-10-01 운영 보도 524건을 더했다 — LLM이 판정한 190건 전부와, 판정에 가지 못한 보도의 층화 표본 334건(단계 있음 54 · 단계 없음+이적 어휘 200 · 그 밖 80). 파이프라인의 답을 보지 않은 채점자(LLM 서브에이전트)가 원문만 읽고 매겼고, 회고·재계약·선수 미특정·모음 기사는 이동 보도가 아니다(basis에 분류). 앞의 101건과 겹치면 앞의 것이 남는다.",
-  "⚠ 저장소가 공개라 본문을 싣지 않는다(재배포 원칙) — 본문은 scripts/eval-transfer.mjs --export 로 받은 로컬 스냅샷(.cache/, gitignore)에서 읽는다."
+  "⚠ 저장소가 공개라 본문을 싣지 않는다(재배포 원칙) — 본문은 scripts/eval-transfer.mjs --export 로 받은 로컬 스냅샷(.cache/, gitignore)에서 읽는다.",
+  "필드 정답(선택) — 항목에 있으면 채점하고, 없으면 그 필드는 채점에서 뺀다. null·[]은 \"원문에 없다\"는 정답이다(키가 없는 것과 다르다). 전부 is_move_report의 첫 선수(players[0]) 기준이다.",
+  "  timing: current(지금 진행 중이거나 새로 나온 소식) · past(끝난 이적·지난 창의 관심/무산을 돌아보는 글). 이동 보도는 current, 회고로 분류한 보도는 past이고, 그 밖(재계약·인터뷰 등)은 적지 않는다.",
+  "  stage: transfer_stage 값(rumour·talks·offer·agreement·personal_terms·medical·here_we_go·official·collapsed·denied) — 이동 보도에만.",
+  "  from: 선수의 현재 소속(자유계약이면 직전 소속, 원문에 없으면 null). to: 선수가 실제로 가려는·간 구단 — 협상·제안·합의·완료의 상대, 또는 관심 구단이 하나뿐일 때 그 구단. 관심만 보인 구단이 여럿이면 to는 null이고 전부 suitors. 이름 없는 무리(\"several clubs\")와 한 구단만 나오면 to는 null이고 그 구단은 suitors.",
+  "  suitors: to 밖의 관심 구단(집합으로 채점한다). 구단 이름은 전부 scripts/lib/transfer/clubs.mjs의 정규명(사전 밖 구단은 원문 표기).",
+  "  fee: 그 선수의 금액 하나 {amount(백만 단위), currency(GBP·EUR·USD), kind(fee·bid·asking_price·release_clause·valuation, 채점자가 갈렸거나 그 밖의 성격이면 null)}. 원문에 그 선수의 금액이 없으면 null.",
+  "  출처: 2026-10-01 블라인드 채점(.cache/transfer-eval/qa-1001의 out-A/B/C와 after/out-A2/B2 — 채점 기준 RUBRIC.md, 원문만 읽고 매김)에서만 가져왔다. 두 번 채점된 항목은 필드마다 둘이 같을 때만 넣었다. 2026-09-30 자동 감사는 심사자가 파이프라인 답을 보고 매겨 원천에서 뺐다(파이프라인 답을 정답으로 쓰지 않는다)."
  ],
  "items": [
   {
@@ -22,7 +29,13 @@
    "players": [
     "Andria Bartishvili"
    ],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "current",
+   "stage": "official",
+   "from": "Kolkheti 1913",
+   "to": "Arsenal",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 6,
@@ -32,7 +45,13 @@
    "players": [
     "Michail Antonio"
    ],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "current",
+   "stage": "official",
+   "from": null,
+   "to": "Watford",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 7,
@@ -200,7 +219,8 @@
    "url": "https://www.bbc.co.uk/sport/football/articles/c68042y9l4kno?at_medium=RSS&amp;at_campaign=rss",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 328,
@@ -218,7 +238,13 @@
    "players": [
     "David Alaba"
    ],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "current",
+   "stage": "official",
+   "from": "Real Madrid",
+   "to": "Udinese",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 345,
@@ -226,7 +252,8 @@
    "url": "https://t.me/fabrizioromanotg/66720",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 353,
@@ -254,7 +281,13 @@
    "players": [
     "David Alaba"
    ],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "current",
+   "stage": "here_we_go",
+   "from": "Real Madrid",
+   "to": "Udinese",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 369,
@@ -272,7 +305,13 @@
    "players": [
     "Neto"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "here_we_go",
+   "from": null,
+   "to": "Juventus",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 371,
@@ -291,7 +330,13 @@
     "David Alaba",
     "Neto"
    ],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "current",
+   "stage": "medical",
+   "from": null,
+   "to": "Udinese",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 373,
@@ -301,7 +346,13 @@
    "players": [
     "Dany Freire"
    ],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "current",
+   "stage": "official",
+   "from": null,
+   "to": "Barcelona",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 374,
@@ -311,7 +362,13 @@
    "players": [
     "David Alaba"
    ],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "current",
+   "stage": "medical",
+   "from": null,
+   "to": "Udinese",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 376,
@@ -337,7 +394,13 @@
    "players": [
     "David Alaba"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "medical",
+   "from": null,
+   "to": "Udinese",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 381,
@@ -347,7 +410,13 @@
    "players": [
     "David Alaba"
    ],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "current",
+   "stage": "personal_terms",
+   "from": "Real Madrid",
+   "to": "Udinese",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 383,
@@ -545,7 +614,13 @@
    "players": [
     "Christian Eriksen"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)",
+   "timing": "current",
+   "stage": "official",
+   "from": "VfL Wolfsburg",
+   "to": null,
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 445,
@@ -707,7 +782,13 @@
    "players": [
     "Alaba"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "personal_terms",
+   "from": "Real Madrid",
+   "to": "Udinese",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 498,
@@ -765,7 +846,13 @@
    "players": [
     "Rio Ngumoha"
    ],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "current",
+   "stage": "rumour",
+   "from": null,
+   "to": "Arsenal",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 517,
@@ -851,7 +938,13 @@
    "players": [
     "JJ Gabriel"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Manchester United",
+   "to": "Real Madrid",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 582,
@@ -941,7 +1034,13 @@
    "players": [
     "Lautaro Martínez"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "denied",
+   "from": "Inter",
+   "to": "Barcelona",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 658,
@@ -951,7 +1050,13 @@
    "players": [
     "Isaac Konde"
    ],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "current",
+   "stage": "here_we_go",
+   "from": "Liverpool",
+   "to": "Manchester United",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 660,
@@ -961,7 +1066,13 @@
    "players": [
     "Isaac Konde"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "here_we_go",
+   "from": "Liverpool",
+   "to": "Manchester United",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 679,
@@ -1003,7 +1114,13 @@
    "players": [
     "Ngumoha"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Liverpool",
+   "to": "Arsenal",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 712,
@@ -1163,7 +1280,17 @@
    "players": [
     "JJ Gabriel"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "denied",
+   "from": "Manchester United",
+   "to": null,
+   "suitors": [
+    "Real Madrid",
+    "Bayern Munich",
+    "Paris Saint-Germain"
+   ],
+   "fee": null
   },
   {
    "id": 851,
@@ -1171,7 +1298,8 @@
    "url": "https://www.bbc.co.uk/sport/football/articles/cw98022gvjr1o?at_medium=RSS&amp;at_campaign=rss",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 864,
@@ -1189,7 +1317,18 @@
    "players": [
     "Kevin Schade"
    ],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Brentford",
+   "to": null,
+   "suitors": [
+    "Arsenal",
+    "Liverpool",
+    "Chelsea",
+    "Tottenham Hotspur"
+   ],
+   "fee": null
   },
   {
    "id": 882,
@@ -1213,7 +1352,8 @@
    "url": "https://www.theguardian.com/football/2026/sep/25/liverpool-cody-gakpo-tough-summer-manchester-city",
    "is_move_report": false,
    "players": [],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "past"
   },
   {
    "id": 891,
@@ -1397,7 +1537,8 @@
    "url": "https://news.google.com/rss/articles/CBMif0FVX3lxTE5tTHVIaUVUaHNBdE9ST2dtcVlFTnRNQ3ZJRERHNkhkNlRyRElJdDIwTEkwRW4ydms4RjduNG5pcWJra3pJaVdKM3E4WEVQNFBneUJHcnpTOFI3TG5ub3pWUi1UbGpRTUZWLThDaU5iT2Y1aEJBVlBSanp1QTRZTVXSAYQBQVVfeXFMTVN0X0laU0FNbEVmamtYWjcwYzJVRjlGY2J3VmdQUW0zVUFEbXlOREEzaHdHcTFMM1BHMGJjVlpfVEZyRlNjakxweTlfeXlOdTlsWjF4ZWEzN1hEMHBsM3YxNUlNVEU5S3d0c1pkbGNZaWY3YThnemRabk00WE40Wm1tMHky?oc=5",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective · 확신 medium)"
+   "basis": "2026-10-01 채점(retrospective · 확신 medium)",
+   "timing": "past"
   },
   {
    "id": 1059,
@@ -1456,7 +1597,13 @@
     "Chiesa",
     "Luis Henrique"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": null,
+   "to": "Inter",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 1112,
@@ -1676,7 +1823,8 @@
    "url": "https://bsky.app/profile/paddyboyland.bsky.social/post/3mvmo4alkmc2o",
    "is_move_report": false,
    "players": [],
-   "basis": "판정"
+   "basis": "판정",
+   "timing": "past"
   },
   {
    "id": 1354,
@@ -1748,7 +1896,8 @@
    "url": "https://bsky.app/profile/leeryder.bsky.social/post/3mwbfdx4ucs26",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 1446,
@@ -1862,7 +2011,13 @@
    "players": [
     "Isaac Konde"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "official",
+   "from": "Liverpool",
+   "to": "Manchester United",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 1572,
@@ -1880,7 +2035,13 @@
    "players": [
     "David Alaba"
    ],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "current",
+   "stage": "medical",
+   "from": null,
+   "to": "Udinese",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 1604,
@@ -1888,7 +2049,8 @@
    "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/alejandro-garnacho-man-united-villa-34677602",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 1610,
@@ -1898,7 +2060,13 @@
    "players": [
     "David Eze"
    ],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "current",
+   "stage": "official",
+   "from": "Manchester City",
+   "to": "Manchester United",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 1612,
@@ -1934,7 +2102,12 @@
    "players": [
     "JJ Gabriel"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Manchester United",
+   "to": null,
+   "fee": null
   },
   {
    "id": 1625,
@@ -1942,7 +2115,8 @@
    "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/manchester-united-scrutiny-world-away-34666542",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 1627,
@@ -1953,7 +2127,13 @@
     "Isaac Konde",
     "Karim Cassim"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "official",
+   "from": "Liverpool",
+   "to": "Manchester United",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 1632,
@@ -1972,7 +2152,16 @@
     "Tyler Morton",
     "Ronald Araujo"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Lyon",
+   "to": null,
+   "suitors": [
+    "Liverpool",
+    "Juventus"
+   ],
+   "fee": null
   },
   {
    "id": 1656,
@@ -2036,7 +2225,8 @@
    "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/cahill-everton-folarin-balogun-transfer-34665953",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 1706,
@@ -2068,7 +2258,8 @@
    "url": "https://www.football.london/chelsea-fc/transfer-news/xabi-alonso-gets-219m-chelsea-34666261",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 1717,
@@ -2094,7 +2285,17 @@
    "players": [
     "Morgan Rogers"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": null,
+   "to": "Chelsea",
+   "suitors": [],
+   "fee": {
+    "amount": 52,
+    "currency": "GBP",
+    "kind": null
+   }
   },
   {
    "id": 1723,
@@ -2102,7 +2303,8 @@
    "url": "https://www.football.london/chelsea-fc/transfer-news/xabi-alonso-given-morgan-rogers-34658905",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 1726,
@@ -2160,7 +2362,8 @@
    "url": "https://www.football.london/arsenal-fc/news/arsenal-transfer-news-kai-havertz-34673150",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective · 확신 medium)"
+   "basis": "2026-10-01 채점(retrospective · 확신 medium)",
+   "timing": "past"
   },
   {
    "id": 1747,
@@ -2168,7 +2371,8 @@
    "url": "https://www.football.london/arsenal-fc/transfer-news/vinicius-jr-arsenal-truth-emerges-34670712",
    "is_move_report": false,
    "players": [],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "past"
   },
   {
    "id": 1756,
@@ -2210,7 +2414,13 @@
    "players": [
     "Dele Alli"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)",
+   "timing": "current",
+   "stage": "talks",
+   "from": null,
+   "to": null,
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 1781,
@@ -2234,7 +2444,8 @@
    "url": "https://www.chroniclelive.co.uk/sport/football/transfer-news/newcastle-united-lukas-hornicek-transfer-34675876",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 1790,
@@ -2245,7 +2456,15 @@
     "Noah Fernandez",
     "Amir Bouhamdi"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "PSV",
+   "to": null,
+   "suitors": [
+    "Newcastle United"
+   ],
+   "fee": null
   },
   {
    "id": 1794,
@@ -2320,7 +2539,13 @@
     "David Eze",
     "Karrim Cassim"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "official",
+   "from": "Manchester City",
+   "to": "Manchester United",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 1858,
@@ -2352,7 +2577,13 @@
     "Isaac Konde",
     "JJ Gabriel"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "official",
+   "from": "Manchester City",
+   "to": "Manchester United",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 1870,
@@ -2376,7 +2607,8 @@
    "url": "https://football-italia.net/alajbegovic-right-juventus-decision-spalletti/",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 1893,
@@ -2386,7 +2618,13 @@
    "players": [
     "Patric"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "talks",
+   "from": "Lazio",
+   "to": "Al-Ittifaq",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 1895,
@@ -2396,7 +2634,22 @@
    "players": [
     "Manu Koné"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Roma",
+   "to": null,
+   "suitors": [
+    "Manchester United",
+    "Chelsea",
+    "Atletico Madrid",
+    "Liverpool"
+   ],
+   "fee": {
+    "amount": 100,
+    "currency": "EUR",
+    "kind": "asking_price"
+   }
   },
   {
    "id": 1905,
@@ -2414,7 +2667,21 @@
    "players": [
     "Alessandro Romano"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Cagliari",
+   "to": null,
+   "suitors": [
+    "Juventus",
+    "Inter",
+    "AC Milan"
+   ],
+   "fee": {
+    "amount": 20,
+    "currency": "EUR",
+    "kind": "asking_price"
+   }
   },
   {
    "id": 1917,
@@ -2424,7 +2691,16 @@
    "players": [
     "Goncalo Inacio"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "to": "AC Milan",
+   "suitors": [],
+   "fee": {
+    "amount": 40,
+    "currency": "EUR",
+    "kind": null
+   }
   },
   {
    "id": 1927,
@@ -2432,7 +2708,8 @@
    "url": "https://sempremilan.com/reinstated-but-unused-amorim-message-tomori",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 1930,
@@ -2461,7 +2738,13 @@
    "players": [
     "Endrick"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Real Madrid",
+   "to": "AC Milan",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 1935,
@@ -2479,7 +2762,17 @@
    "players": [
     "Goncalo Inacio"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Sporting CP",
+   "to": "AC Milan",
+   "suitors": [],
+   "fee": {
+    "amount": 40,
+    "currency": "EUR",
+    "kind": "bid"
+   }
   },
   {
    "id": 1939,
@@ -2511,7 +2804,8 @@
    "url": "https://sempremilan.com/agent-corinthians-andre-collapsed-deal-modric",
    "is_move_report": false,
    "players": [],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "past"
   },
   {
    "id": 1944,
@@ -2529,7 +2823,13 @@
    "players": [
     "André-Frank Zambo Anguissa"
    ],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "current",
+   "stage": "talks",
+   "from": "Napoli",
+   "to": "AC Milan",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 1954,
@@ -2539,7 +2839,16 @@
    "players": [
     "Endrick"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Real Madrid",
+   "to": null,
+   "suitors": [
+    "AC Milan",
+    "Roma"
+   ],
+   "fee": null
   },
   {
    "id": 1956,
@@ -2571,7 +2880,8 @@
    "url": "https://sempremilan.com/how-musah-convinced-amorim-west-ham",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective · 확신 medium)"
+   "basis": "2026-10-01 채점(retrospective · 확신 medium)",
+   "timing": "past"
   },
   {
    "id": 1966,
@@ -2587,7 +2897,8 @@
    "url": "https://sempremilan.com/milan-doumbia-sporting-cp-26m-bid",
    "is_move_report": false,
    "players": [],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "past"
   },
   {
    "id": 1972,
@@ -2637,7 +2948,18 @@
    "players": [
     "Francesco Camarda"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "AC Milan",
+   "to": null,
+   "suitors": [
+    "Chelsea",
+    "Tottenham Hotspur",
+    "Brentford",
+    "Brighton"
+   ],
+   "fee": null
   },
   {
    "id": 1997,
@@ -2701,7 +3023,13 @@
    "players": [
     "Lamine Camara"
    ],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Monaco",
+   "to": "Liverpool",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 4050,
@@ -2717,7 +3045,8 @@
    "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/folarin-balogun-agreement-reached-after-34677948",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective · 확신 medium)"
+   "basis": "2026-10-01 채점(retrospective · 확신 medium)",
+   "timing": "past"
   },
   {
    "id": 4056,
@@ -2736,7 +3065,16 @@
     "Erling Haaland",
     "Kevin Schade"
    ],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "current",
+   "stage": "talks",
+   "from": "Manchester City",
+   "to": null,
+   "suitors": [
+    "Arsenal",
+    "Real Madrid"
+   ],
+   "fee": null
   },
   {
    "id": 4061,
@@ -2754,7 +3092,13 @@
    "players": [
     "Kim Min-jae"
    ],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Bayern Munich",
+   "to": "Aston Villa",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 4069,
@@ -2762,7 +3106,8 @@
    "url": "https://www.birminghammail.co.uk/sport/football/football-news/aston-villa-manzambi-johan-newcastle-34678457",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 4077,
@@ -2786,7 +3131,8 @@
    "url": "https://www.getfootballnewsfrance.com/2026/when-juventus-approached-me-it-felt-a-bit-like-a-dream-lyons-pavel-sulc-on-what-made-him-turn-down-a-move-to-turin/",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 4094,
@@ -2964,7 +3310,8 @@
    "url": "https://www.football.london/chelsea-fc/transfer-news/manu-kone-chelsea-transfer-news-34679719",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 4272,
@@ -2988,7 +3335,8 @@
    "url": "https://www.liverpoolecho.co.uk/sport/football/football-news/liverpool-agreed-virgil-van-dijk-34679057",
    "is_move_report": false,
    "players": [],
-   "basis": "두 채점자 일치"
+   "basis": "두 채점자 일치",
+   "timing": "past"
   },
   {
    "id": 4294,
@@ -3014,7 +3362,13 @@
    "players": [
     "Estevao"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Chelsea",
+   "to": "Barcelona",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 6596,
@@ -3024,7 +3378,13 @@
    "players": [
     "Joao Felix"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Al Nassr",
+   "to": "Barcelona",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 6612,
@@ -3034,7 +3394,13 @@
    "players": [
     "Estevao Willian"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Chelsea",
+   "to": "Barcelona",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 6613,
@@ -3044,7 +3410,13 @@
    "players": [
     "Joao Felix"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Al-Nassr",
+   "to": null,
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 6614,
@@ -3054,7 +3426,16 @@
    "players": [
     "Erling Haaland"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Manchester City",
+   "to": null,
+   "suitors": [
+    "Arsenal",
+    "Real Madrid"
+   ],
+   "fee": null
   },
   {
    "id": 6615,
@@ -3064,7 +3445,18 @@
    "players": [
     "Abdelhamid Ait Boudlal"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Rennes",
+   "to": null,
+   "suitors": [
+    "Newcastle United",
+    "Everton",
+    "Brentford",
+    "Hull City"
+   ],
+   "fee": null
   },
   {
    "id": 6616,
@@ -3074,7 +3466,16 @@
    "players": [
     "Ibrahim Maza"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Bayer Leverkusen",
+   "to": null,
+   "suitors": [
+    "Arsenal",
+    "Tottenham Hotspur"
+   ],
+   "fee": null
   },
   {
    "id": 6617,
@@ -3084,7 +3485,17 @@
    "players": [
     "Tyrick Mitchell"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Crystal Palace",
+   "to": null,
+   "suitors": [
+    "Chelsea",
+    "Manchester United",
+    "Liverpool"
+   ],
+   "fee": null
   },
   {
    "id": 6618,
@@ -3094,7 +3505,13 @@
    "players": [
     "Ethan Ampadu"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "denied",
+   "from": "Leeds United",
+   "to": "Chelsea",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 6619,
@@ -3104,7 +3521,13 @@
    "players": [
     "Alejandro Balde"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Barcelona",
+   "to": "Manchester United",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 6620,
@@ -3114,7 +3537,13 @@
    "players": [
     "Gvidas Gineitis"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Torino",
+   "to": "Celtic",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 6624,
@@ -3132,7 +3561,13 @@
    "players": [
     "Rabbi Matondo"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "talks",
+   "from": "Brann",
+   "to": "Hibernian",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 6627,
@@ -3158,7 +3593,17 @@
    "players": [
     "Dani Olmo"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Barcelona",
+   "to": "Bayern Munich",
+   "suitors": [],
+   "fee": {
+    "amount": 69,
+    "currency": "GBP",
+    "kind": "bid"
+   }
   },
   {
    "id": 6662,
@@ -3168,7 +3613,16 @@
    "players": [
     "Trent Alexander-Arnold"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "denied",
+   "from": "Real Madrid",
+   "to": null,
+   "suitors": [
+    "Arsenal",
+    "Liverpool"
+   ],
+   "fee": null
   },
   {
    "id": 6663,
@@ -3178,7 +3632,13 @@
    "players": [
     "Alejandro Balde"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Barcelona",
+   "to": "Manchester United",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 6664,
@@ -3188,7 +3648,16 @@
    "players": [
     "Micky van de Ven"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Tottenham Hotspur",
+   "to": null,
+   "suitors": [
+    "Liverpool",
+    "Manchester United"
+   ],
+   "fee": null
   },
   {
    "id": 6665,
@@ -3199,7 +3668,13 @@
     "Fikayo Tomori",
     "Ruben Loftus-Cheek"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "AC Milan",
+   "to": null,
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 6666,
@@ -3209,7 +3684,13 @@
    "players": [
     "Tomas Araujo"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Benfica",
+   "to": "Bayern Munich",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 6667,
@@ -3219,7 +3700,13 @@
    "players": [
     "Erling Haaland"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Manchester City",
+   "to": "Barcelona",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 6668,
@@ -3229,7 +3716,17 @@
    "players": [
     "Manu Kone"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Roma",
+   "to": "Chelsea",
+   "suitors": [],
+   "fee": {
+    "amount": 86,
+    "currency": "GBP",
+    "kind": "asking_price"
+   }
   },
   {
    "id": 6671,
@@ -3261,7 +3758,8 @@
    "url": "https://www.skysports.com/football/news/11095/13591966/transfer-news-crystal-palace-chairman-steve-parish-tells-liverpool-accepting-50m-ismaila-sarr-bid-was-never-going-to-happen-paper-talk",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective · 확신 low)"
+   "basis": "2026-10-01 채점(retrospective · 확신 low)",
+   "timing": "past"
   },
   {
    "id": 6684,
@@ -3279,7 +3777,17 @@
    "players": [
     "Marcos Llorente"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Atletico Madrid",
+   "to": null,
+   "suitors": [
+    "Manchester City",
+    "Liverpool",
+    "Chelsea"
+   ],
+   "fee": null
   },
   {
    "id": 6719,
@@ -3289,7 +3797,15 @@
    "players": [
     "Alessandro Bastoni"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Inter",
+   "to": null,
+   "suitors": [
+    "Barcelona"
+   ],
+   "fee": null
   },
   {
    "id": 6720,
@@ -3299,7 +3815,16 @@
    "players": [
     "Kevin Schade"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Brentford",
+   "to": null,
+   "suitors": [
+    "Arsenal",
+    "Liverpool"
+   ],
+   "fee": null
   },
   {
    "id": 6724,
@@ -3309,7 +3834,13 @@
    "players": [
     "Finn Jeltsch"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "VfB Stuttgart",
+   "to": "Real Madrid",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 6725,
@@ -3319,7 +3850,16 @@
    "players": [
     "Valentin Atangana"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Al-Ahli",
+   "to": null,
+   "suitors": [
+    "Nottingham Forest",
+    "Aston Villa"
+   ],
+   "fee": null
   },
   {
    "id": 6735,
@@ -3337,7 +3877,17 @@
    "players": [
     "Dani Olmo"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Barcelona",
+   "to": "Bayern Munich",
+   "suitors": [],
+   "fee": {
+    "amount": 60,
+    "currency": "GBP",
+    "kind": "valuation"
+   }
   },
   {
    "id": 9241,
@@ -3347,7 +3897,17 @@
    "players": [
     "Giorgio Scalvini"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Atalanta",
+   "to": null,
+   "suitors": [
+    "Tottenham Hotspur",
+    "Newcastle United",
+    "Chelsea"
+   ],
+   "fee": null
   },
   {
    "id": 9243,
@@ -3357,7 +3917,11 @@
    "players": [
     "Tyler Morton"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Lyon",
+   "fee": null
   },
   {
    "id": 9244,
@@ -3367,7 +3931,15 @@
    "players": [
     "Abdukodir Khusanov"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Manchester City",
+   "to": null,
+   "suitors": [
+    "Chelsea"
+   ],
+   "fee": null
   },
   {
    "id": 9269,
@@ -3377,7 +3949,17 @@
    "players": [
     "JJ Gabriel"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Manchester United",
+   "to": null,
+   "suitors": [
+    "Bayern Munich",
+    "Real Madrid",
+    "Barcelona"
+   ],
+   "fee": null
   },
   {
    "id": 9270,
@@ -3395,7 +3977,8 @@
    "url": "https://www.manchestereveningnews.co.uk/sport/football/transfer-news/man-city-agreed-exciting-2027-34678569",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective · 확신 low)"
+   "basis": "2026-10-01 채점(retrospective · 확신 low)",
+   "timing": "past"
   },
   {
    "id": 9289,
@@ -3439,7 +4022,13 @@
    "players": [
     "Isaac Konde"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "official",
+   "from": "Liverpool",
+   "to": "Manchester United",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 11839,
@@ -3473,7 +4062,13 @@
    "players": [
     "Lewis Ferguson"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Bologna",
+   "to": "Rangers",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 11864,
@@ -3512,7 +4107,16 @@
     "Enzo Fernandez",
     "Rayan Cherki"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Manchester City",
+   "to": null,
+   "suitors": [
+    "Real Madrid",
+    "Barcelona"
+   ],
+   "fee": null
   },
   {
    "id": 11881,
@@ -3522,7 +4126,13 @@
    "players": [
     "Isaac Konde"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "official",
+   "from": "Liverpool",
+   "to": "Manchester United",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 11882,
@@ -3532,7 +4142,12 @@
    "players": [
     "Yankuba Minteh"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Brighton",
+   "to": "Liverpool",
+   "suitors": []
   },
   {
    "id": 11904,
@@ -3542,7 +4157,13 @@
    "players": [
     "Estevao Willian"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Chelsea",
+   "to": "Barcelona",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 11905,
@@ -3552,7 +4173,13 @@
    "players": [
     "Estevao Willian"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Chelsea",
+   "to": "Barcelona",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 11908,
@@ -3562,7 +4189,13 @@
    "players": [
     "Estevao Willian"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Chelsea",
+   "to": "Barcelona",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 11914,
@@ -3570,7 +4203,8 @@
    "url": "https://www.football.london/west-ham-united-fc/news/west-ham-legend-gives-instant-34681027",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 11915,
@@ -3604,7 +4238,13 @@
    "players": [
     "Joe Willock"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Newcastle United",
+   "to": "Besiktas",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 11925,
@@ -3622,7 +4262,12 @@
    "players": [
     "JJ Gabriel"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Manchester United",
+   "to": null,
+   "fee": null
   },
   {
    "id": 11936,
@@ -3630,7 +4275,8 @@
    "url": "https://www.mirror.co.uk/sport/football/transfer-news/gary-neville-man-utd-transfers-37708671",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 11950,
@@ -3648,7 +4294,13 @@
    "players": [
     "Norberto Neto"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "official",
+   "from": "Botafogo",
+   "to": "Juventus",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 11961,
@@ -3658,7 +4310,17 @@
    "players": [
     "Kim Min-jae"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Bayern Munich",
+   "to": null,
+   "suitors": [
+    "AC Milan",
+    "Tottenham Hotspur",
+    "Aston Villa"
+   ],
+   "fee": null
   },
   {
    "id": 11962,
@@ -3668,7 +4330,15 @@
    "players": [
     "Hakan Calhanoglu"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Inter",
+   "to": null,
+   "suitors": [
+    "Juventus"
+   ],
+   "fee": null
   },
   {
    "id": 11967,
@@ -3678,7 +4348,13 @@
    "players": [
     "Patric"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "official",
+   "from": "Lazio",
+   "to": "Al-Ettifaq",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 11968,
@@ -3696,7 +4372,17 @@
    "players": [
     "Kim Min-Jae"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Bayern Munich",
+   "to": null,
+   "suitors": [
+    "AC Milan",
+    "Aston Villa",
+    "Tottenham Hotspur"
+   ],
+   "fee": null
   },
   {
    "id": 11978,
@@ -3704,7 +4390,8 @@
    "url": "https://sempremilan.com/gila-dominating-san-siro-amorim-go-to-defender",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 11993,
@@ -3728,7 +4415,8 @@
    "url": "https://www.bbc.co.uk/sport/football/articles/c6ge4lnj0vnqo?at_medium=RSS&amp;at_campaign=rss",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 12009,
@@ -3746,7 +4434,13 @@
    "players": [
     "Neto"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "official",
+   "from": null,
+   "to": "Juventus",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 12026,
@@ -3794,7 +4488,8 @@
    "url": "https://www.chroniclelive.co.uk/sport/football/transfer-news/anthony-gordon-barcelona-newcastle-united-34686184",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 12058,
@@ -3812,7 +4507,12 @@
    "players": [
     "JJ Gabriel"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Manchester United",
+   "to": null,
+   "fee": null
   },
   {
    "id": 12067,
@@ -3878,7 +4578,12 @@
    "players": [
     "Raheem Sterling"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)",
+   "timing": "current",
+   "stage": "collapsed",
+   "to": "Le Havre",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 12108,
@@ -3912,7 +4617,17 @@
    "players": [
     "Alberto Costa"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Porto",
+   "to": null,
+   "suitors": [
+    "Manchester United",
+    "Arsenal",
+    "Paris Saint-Germain"
+   ],
+   "fee": null
   },
   {
    "id": 12131,
@@ -3922,7 +4637,19 @@
    "players": [
     "Haaland"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Manchester City",
+   "to": null,
+   "suitors": [
+    "Chelsea",
+    "Arsenal",
+    "Bayern Munich",
+    "Real Madrid",
+    "Barcelona"
+   ],
+   "fee": null
   },
   {
    "id": 12132,
@@ -3932,7 +4659,12 @@
    "players": [
     "Raheem Sterling"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "denied",
+   "to": null,
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 12135,
@@ -3942,7 +4674,13 @@
    "players": [
     "Aurelien Tchouameni"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Real Madrid",
+   "to": "Liverpool",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 12136,
@@ -3950,7 +4688,8 @@
    "url": "https://www.skysports.com/football/news/11095/13593048/real-madrid-defender-raul-asencio-rejected-transfer-interest-from-liverpool-and-chelsea-this-summer-paper-talk",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective · 확신 low)"
+   "basis": "2026-10-01 채점(retrospective · 확신 low)",
+   "timing": "past"
   },
   {
    "id": 12138,
@@ -3960,7 +4699,13 @@
    "players": [
     "Joe Willock"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Newcastle United",
+   "to": "Besiktas",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 12140,
@@ -3997,7 +4742,18 @@
     "JJ Gabriel",
     "Mezian Mesloub"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Manchester United",
+   "to": null,
+   "suitors": [
+    "Barcelona",
+    "Real Madrid",
+    "Paris Saint-Germain",
+    "Bayern Munich"
+   ],
+   "fee": null
   },
   {
    "id": 12194,
@@ -4047,7 +4803,13 @@
    "players": [
     "Erling Haaland"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": null,
+   "to": "Arsenal",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 12213,
@@ -4065,7 +4827,8 @@
    "url": "https://www.football.london/arsenal-fc/news/joining-arsenal-chelsea-hardest-decision-34681011",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 12218,
@@ -4115,7 +4878,13 @@
    "players": [
     "Kosta Nedeljkovic"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Rangers",
+   "to": null,
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 12249,
@@ -4197,7 +4966,17 @@
    "players": [
     "Cavan Sullivan"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "agreement",
+   "from": "Philadelphia Union",
+   "to": "Manchester City",
+   "suitors": [
+    "Barcelona",
+    "Real Madrid",
+    "Paris Saint-Germain"
+   ],
+   "fee": null
   },
   {
    "id": 12308,
@@ -4207,7 +4986,12 @@
    "players": [
     "Florian Wirtz"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "from": "Liverpool",
+   "to": "Bayern Munich",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 12327,
@@ -4225,7 +5009,17 @@
    "players": [
     "Alex Scott"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Bournemouth",
+   "to": "Chelsea",
+   "suitors": [],
+   "fee": {
+    "amount": 64,
+    "currency": "GBP",
+    "kind": "bid"
+   }
   },
   {
    "id": 12334,
@@ -4299,7 +5093,13 @@
    "players": [
     "Matteo Darmian"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "talks",
+   "from": "Inter",
+   "to": "Bologna",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 12393,
@@ -4335,7 +5135,17 @@
     "Goncalo Inacio",
     "Tiago Gabriel"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Bayern Munich",
+   "to": "AC Milan",
+   "suitors": [],
+   "fee": {
+    "amount": 25,
+    "currency": "EUR",
+    "kind": "asking_price"
+   }
   },
   {
    "id": 12410,
@@ -4343,7 +5153,8 @@
    "url": "https://sempremilan.com/leao-lawyer-explains-exit-plan-galatasaray-decision",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective · 확신 medium)"
+   "basis": "2026-10-01 채점(retrospective · 확신 medium)",
+   "timing": "past"
   },
   {
    "id": 12412,
@@ -4361,7 +5172,13 @@
    "players": [
     "Jules Koundé"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Barcelona",
+   "to": "Bayern Munich",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 12435,
@@ -4411,7 +5228,24 @@
    "players": [
     "Alejandro Balde"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Barcelona",
+   "to": null,
+   "suitors": [
+    "Manchester United",
+    "AC Milan",
+    "Chelsea",
+    "Liverpool",
+    "Paris Saint-Germain",
+    "Inter"
+   ],
+   "fee": {
+    "amount": 45,
+    "currency": "EUR",
+    "kind": "valuation"
+   }
   },
   {
    "id": 12464,
@@ -4493,7 +5327,13 @@
    "players": [
     "Virgil van Dijk"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Liverpool",
+   "to": "Real Madrid",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 12535,
@@ -4511,7 +5351,13 @@
    "players": [
     "Jean-Philippe Mateta"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Crystal Palace",
+   "to": "Manchester United",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 12539,
@@ -4521,7 +5367,13 @@
    "players": [
     "Jules Kounde"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Barcelona",
+   "to": "Bayern Munich",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 12547,
@@ -4531,7 +5383,13 @@
    "players": [
     "Cavan Sullivan"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "denied",
+   "from": "City Group",
+   "to": null,
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 12548,
@@ -4557,7 +5415,13 @@
    "players": [
     "Leo Black"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "official",
+   "from": "Tottenham Hotspur",
+   "to": "Chelsea",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 12583,
@@ -4581,7 +5445,8 @@
    "url": "https://www.skysports.com/football/news/11095/13593423/man-city-guilty-premier-league-club-knew-of-independent-commissions-verdict-in-the-summer-paper-talk",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 15912,
@@ -4597,7 +5462,8 @@
    "url": "https://www.bbc.co.uk/sport/football/articles/c9lyk46gekkeo?at_medium=RSS&amp;at_campaign=rss",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 15925,
@@ -4655,7 +5521,12 @@
    "players": [
     "JJ Gabriel"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Manchester United",
+   "to": null,
+   "fee": null
   },
   {
    "id": 15948,
@@ -4689,7 +5560,19 @@
    "players": [
     "Alex Scott"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 low)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 low)",
+   "timing": "current",
+   "stage": "denied",
+   "from": "Bournemouth",
+   "to": null,
+   "suitors": [
+    "Chelsea",
+    "Liverpool",
+    "Arsenal",
+    "Manchester United",
+    "Manchester City"
+   ],
+   "fee": null
   },
   {
    "id": 15958,
@@ -4721,7 +5604,8 @@
    "url": "https://t.me/fabrizioromanotg/66876",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective · 확신 medium)"
+   "basis": "2026-10-01 채점(retrospective · 확신 medium)",
+   "timing": "past"
   },
   {
    "id": 15985,
@@ -4753,7 +5637,8 @@
    "url": "https://www.skysports.com/football/news/11095/13593167/rangers-transfers-inside-the-summer-window-that-lay-foundations-for-consecutive-celtic-wins-but-will-it-deliver-long-term-success",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 15999,
@@ -4793,7 +5678,8 @@
    "url": "https://www.chroniclelive.co.uk/sport/football/football-news/aladji-bamba-something-first-time-34693391",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 16036,
@@ -4803,7 +5689,20 @@
    "players": [
     "Kevin Viveros"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Athletico Paranaense",
+   "to": null,
+   "suitors": [
+    "Aston Villa",
+    "Sunderland"
+   ],
+   "fee": {
+    "amount": 20,
+    "currency": "EUR",
+    "kind": "valuation"
+   }
   },
   {
    "id": 16048,
@@ -4845,7 +5744,16 @@
    "players": [
     "Alessandro Romano"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "talks",
+   "from": "Cagliari",
+   "to": null,
+   "suitors": [
+    "Juventus",
+    "Inter"
+   ],
+   "fee": null
   },
   {
    "id": 16076,
@@ -4861,7 +5769,8 @@
    "url": "https://www.getfootballnewsfrance.com/2026/olivier-giroud-reveals-borussia-dortmund-interest-before-progressing-by-leaving-arsenal-for-chelsea/",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 16085,
@@ -4869,7 +5778,8 @@
    "url": "https://www.getfootballnewsfrance.com/2026/romas-manu-kone-admits-that-things-happened-during-summer-transfer-window-amid-reported-arsenal-and-chelsea-interest/",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 16088,
@@ -4885,7 +5795,8 @@
    "url": "https://sempremilan.com/giroud-admits-close-joining-inter-before-milan",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 16095,
@@ -4943,7 +5854,13 @@
    "players": [
     "Chris Smalling"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "here_we_go",
+   "from": null,
+   "to": "Porto",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 16119,
@@ -4969,7 +5886,13 @@
    "players": [
     "Chris Smalling"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "talks",
+   "from": "Al-Fayha",
+   "to": "Porto",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 16137,
@@ -4995,7 +5918,21 @@
    "players": [
     "Jarrell Quansah"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "talks",
+   "from": "Bayer Leverkusen",
+   "to": "Chelsea",
+   "suitors": [
+    "Arsenal",
+    "Real Madrid",
+    "Liverpool"
+   ],
+   "fee": {
+    "amount": 55.5,
+    "currency": "GBP",
+    "kind": "bid"
+   }
   },
   {
    "id": 16177,
@@ -5011,7 +5948,8 @@
    "url": "https://football-italia.net/muzzi-rejected-arsenal-wenger-cagliari-fury/",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 16196,
@@ -5035,7 +5973,8 @@
    "url": "https://sempremilan.com/athekame-reveals-amorim-advice-lyon-loan",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 16202,
@@ -5045,7 +5984,13 @@
    "players": [
     "Chris Smalling"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 medium)"
+   "basis": "2026-10-01 채점(transfer_current · 확신 medium)",
+   "timing": "current",
+   "stage": "here_we_go",
+   "from": null,
+   "to": null,
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 16207,
@@ -5127,7 +6072,16 @@
    "players": [
     "Kevin Schade"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Brentford",
+   "to": null,
+   "suitors": [
+    "Liverpool",
+    "Manchester United"
+   ],
+   "fee": null
   },
   {
    "id": 16260,
@@ -5135,7 +6089,8 @@
    "url": "https://www.bbc.co.uk/sport/football/articles/c3ew9vv7444xo?at_medium=RSS&amp;at_campaign=rss",
    "is_move_report": false,
    "players": [],
-   "basis": "2026-10-01 채점(retrospective)"
+   "basis": "2026-10-01 채점(retrospective)",
+   "timing": "past"
   },
   {
    "id": 16262,
@@ -5145,7 +6100,13 @@
    "players": [
     "Phil Foden"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Manchester City",
+   "to": "Bayern Munich",
+   "suitors": [],
+   "fee": null
   },
   {
    "id": 16263,
@@ -5155,7 +6116,16 @@
    "players": [
     "Giorgio Scalvini"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Atalanta",
+   "to": null,
+   "suitors": [
+    "Newcastle United",
+    "Chelsea"
+   ],
+   "fee": null
   },
   {
    "id": 16264,
@@ -5165,7 +6135,17 @@
    "players": [
     "Dodo"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Fiorentina",
+   "to": null,
+   "suitors": [
+    "Nottingham Forest",
+    "Roma",
+    "Napoli"
+   ],
+   "fee": null
   },
   {
    "id": 16265,
@@ -5175,7 +6155,13 @@
    "players": [
     "Yankuba Minteh"
    ],
-   "basis": "2026-10-01 채점(transfer_current)"
+   "basis": "2026-10-01 채점(transfer_current)",
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Brighton",
+   "to": "Liverpool",
+   "suitors": [],
+   "fee": null
   }
  ]
 }
