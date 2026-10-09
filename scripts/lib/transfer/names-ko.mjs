@@ -17,6 +17,7 @@
  */
 import { readFileSync } from "node:fs";
 import { clubDisplay } from "./club-display.mjs";
+export { shortKoClubName } from "./club-display.mjs";
 import { detectClubs, isKnownClub } from "./clubs.mjs";
 import { currentClubOf, lookupKo } from "./wikidata.mjs";
 
@@ -84,6 +85,16 @@ export function createNameBook({ players = {}, clubs = {}, cache = [] } = {}) {
       for (const r of cache) if (r.kind === "player" && r.wikidata_id && r.key.includes(" ") && r.key.split(" ").at(-1) === token && !out.has(r.key)) out.set(r.key, { key: r.key, name: r.name_en ?? titleCase(r.key) });
       return [...out.values()];
     },
+    /**
+     * 참고값 — 믿을 수 있는 표기(사람 사전·통용 표기)가 **없고** 위키데이터 레이블만 있을 때 그 레이블. 판정 지시문에 `≈ 참고값`으로
+     * 실어 모델이 백지에서 음역하지 않게 하고, 같은 실행의 표기가 동률로 갈릴 때 고르는 기준이 된다(`pickConsensusKo`).
+     * 믿을 수 있는 표기가 있으면 null — 그쪽이 `=`로 실린다.
+     */
+    playerKoReference: (key) => {
+      if (players[key]?.ko) return null;
+      const row = cached.get(`player:${key}`);
+      return row && row.source !== "llm" ? (row.name_ko ?? null) : null;
+    },
     /** 선수 한국어 표기 — 키는 `normalizePlayer` 결과. 사람 사전 → 캐시(판정자의 통용 표기, 없으면 위키데이터 레이블) */
     playerKo: (key) => players[key]?.ko ?? cached.get(`player:${key}`)?.name_ko ?? null,
     /**
@@ -142,27 +153,82 @@ export async function loadNameBook(supabase) {
   return createNameBook({ players: loadPlayerDictionary(), clubs: loadGlossary().clubs, cache });
 }
 
+/** 표기 비교용 — 공백 차이("에마누엘마누"·"에마누엘 마누")는 같은 표기다 */
+const koShape = (ko) => ko.replace(/\s+/gu, "");
+
+/**
+ * 같은 선수에게 온 표기들 중 하나를 고른다 — 같은 실행에서도 모델이 "주앙/조앙"·"마누/마뉴"로 갈라 적는다. 먼저 온 값이 캐시를
+ * 차지하지 않게 실행 끝에 모아 고른다. 다수결이고, 동률이면 참고값(위키데이터 레이블)과 같은 쪽, 그래도 갈리면 고르지 않는다
+ * (틀린 표기가 캐시에 앉는 것보다 다음 실행이 다시 묻는 편이 낫다).
+ * @param {string[]} candidates
+ * @param {string | null} reference
+ * @returns {{ ko: string | null, split: boolean, variants: number }} variants = 서로 다른 표기 수(공백 차이 제외) — 2 이상이면 갈렸던 것이다
+ */
+export function pickConsensusKo(candidates, reference = null) {
+  const groups = new Map();
+  for (const c of candidates) {
+    if (typeof c !== "string" || !c.trim()) continue;
+    const shape = koShape(c);
+    const g = groups.get(shape) ?? { count: 0, forms: new Map() };
+    g.count += 1;
+    const form = c.trim().replace(/\s+/gu, " ");
+    g.forms.set(form, (g.forms.get(form) ?? 0) + 1);
+    groups.set(shape, g);
+  }
+  if (!groups.size) return { ko: null, split: false, variants: 0 };
+  // 무리 안에서 가장 많이 쓴 띄어쓰기(동률이면 먼저 온 것)
+  const formOf = (g) => [...g.forms].reduce((a, b) => (b[1] > a[1] ? b : a))[0];
+  const top = Math.max(...[...groups.values()].map((g) => g.count));
+  const tied = [...groups].filter(([, g]) => g.count === top);
+  if (tied.length === 1) return { ko: formOf(tied[0][1]), split: false, variants: groups.size };
+  const ref = reference ? tied.find(([shape]) => shape === koShape(reference)) : null;
+  if (ref) return { ko: formOf(ref[1]), split: false, variants: groups.size };
+  return { ko: null, split: true, variants: groups.size };
+}
+
+/** 새로 쌓인 통용 표기 한 줄 — 사람이 보고 사전(`players-ko.json`)에 확정하거나 고친다 */
+export const formatNewNameLog = ({ key, ko, reference }) => `신규 통용 표기: ${key} = ${ko} (위키데이터: ${reference ?? "없음"})`;
+
 /**
  * 판정자(LLM)가 적은 통용 표기를 캐시에 쓴다(`source = 'llm'`). 사람 사전에 있거나 이미 통용 표기가 있는 선수는 쓰지 않는다.
  * **위키데이터 레이블은 덮는다** — 팬들이 쓰는 표기가 기준이다. 기존 행의 확인 시각·항목 id는 그대로 둔다(검증 관문은 항목 id를 본다).
  * 레이블을 덮었으면 이미 쓴 요약 속 옛 표기도 함께 바꾼다(`fixSummaryNames`).
+ * 같은 선수에게 표기가 여럿 오면(한 실행의 여러 보도) `pickConsensusKo`로 하나를 고르고, 갈리면 그 선수는 쓰지 않는다(`split`).
  * @param {{ key: string, name: string, ko: string }[]} entries
- * @returns {number} 쓴 행 수
+ * @returns {{ written: number, added: { key: string, ko: string, reference: string | null }[], split: { key: string, candidates: string[] }[] }}
+ *   `added`는 새로 쓴 통용 표기(로그는 `formatNewNameLog`).
  */
 export async function cacheLlmNames(supabase, entries, book) {
+  const trusted = book.playerKoTrusted ?? book.playerKo;
+  const byKey = new Map();
+  for (const e of entries) {
+    if (!e?.key || !e.ko || trusted(e.key)) continue;
+    const list = byKey.get(e.key) ?? [];
+    list.push(e);
+    byKey.set(e.key, list);
+  }
   const rows = [];
   const renamed = [];
-  for (const e of entries) {
-    if ((book.playerKoTrusted ?? book.playerKo)(e.key)) continue;
-    const prev = book.entry("player", e.key);
-    if (prev?.name_ko && prev.name_ko !== e.ko) renamed.push({ key: e.key, from: prev.name_ko, to: e.ko });
-    rows.push({ kind: "player", key: e.key, name_en: e.name.slice(0, 120), name_ko: e.ko, wikidata_id: prev?.wikidata_id ?? null, source: "llm", checked_at: prev?.checked_at ?? NEVER_CHECKED });
+  const added = [];
+  const split = [];
+  for (const [key, list] of byKey) {
+    const prev = book.entry("player", key);
+    const reference = book.playerKoReference ? book.playerKoReference(key) : (prev && prev.source !== "llm" ? (prev.name_ko ?? null) : null);
+    const pick = pickConsensusKo(list.map((e) => e.ko), reference);
+    if (!pick.ko) {
+      split.push({ key, candidates: list.map((e) => e.ko) });
+      continue;
+    }
+    if (prev?.name_ko && prev.name_ko !== pick.ko) renamed.push({ key, from: prev.name_ko, to: pick.ko });
+    rows.push({ kind: "player", key, name_en: list[0].name.slice(0, 120), name_ko: pick.ko, wikidata_id: prev?.wikidata_id ?? null, source: "llm", checked_at: prev?.checked_at ?? NEVER_CHECKED });
+    added.push({ key, ko: pick.ko, reference });
   }
-  if (!rows.length) return 0;
+  const result = (written, done) => ({ written, added: done, split });
+  if (!rows.length) return result(0, []);
   const { error } = await supabase.from(NAME_TABLE).upsert(rows, { onConflict: "kind,key" });
   if (error) throw new Error(`통용 표기 저장 실패: ${error.message}`);
   await fixSummaryNames(supabase, renamed);
-  return rows.length;
+  return result(rows.length, added);
 }
 
 /**
@@ -290,32 +356,49 @@ export async function lookupAndCache(supabase, names, { fetchImpl = fetch, limit
 /** 정규식 이스케이프 */
 const reEscape = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/** 이름 뒤에 붙는 조사 — 받침에 따라 모양이 바뀌는 것만 잡는다(바꿔 붙인다) */
+const JOSA_PAIR = { 이: ["이", "가"], 가: ["이", "가"], 은: ["은", "는"], 는: ["은", "는"], 을: ["을", "를"], 를: ["을", "를"], 과: ["과", "와"], 와: ["과", "와"] };
+/** 조사 뒤에 이어 붙는 조사("홀란과**의**"·"홀란과**도**") — 그 뒤가 낱말 끝이면 앞 조사도 이름에 딸린 조사다 */
+const PARTICLE_AFTER = "(?:의|도|만|에게|에서|부터|까지)";
+const WORD_END = `(?=${PARTICLE_AFTER}?(?:[^\\p{L}\\p{N}]|$))`;
+const JOSA = `(?:(이|가|은|는|을|를|과|와|으로|로)${WORD_END})?`;
+
+/** 새 표기의 받침에 맞춘 조사 */
+function josaFor(word, josa) {
+  const code = word.codePointAt(word.length - 1) - 0xac00;
+  if (code < 0 || code > 11171) return josa;
+  const jong = code % 28;
+  const pair = JOSA_PAIR[josa];
+  if (pair) return jong ? pair[0] : pair[1];
+  return jong && jong !== 8 ? "으로" : "로";
+}
+
+/**
+ * 글 속의 `a`를 `b`로 바꾼다. `protect`(이미 새 표기인 자리 — `a`를 품은 더 긴 이름)는 건드리지 않는다: "마누 코네" → "에마누엘 마누 코네"를
+ * 바꾼 뒤 성 "코네" → "마누 코네"를 또 바꾸면 "마누 마누 코네"가 된다. `short`면 앞뒤가 낱말 경계일 때만 바꾼다("네투" ≠ "네투어").
+ */
+function swapName(text, a, b, protect, short) {
+  if (!a || !b || a === b) return text;
+  const guards = [...new Set(protect.filter((p) => p && p !== a && p.includes(a)))].sort((x, y) => y.length - x.length).map(reEscape);
+  const head = short ? "(?<![\\p{L}\\p{N}])" : "";
+  const tail = short ? WORD_END : "";
+  const name = `${head}${reEscape(a)}${JOSA}${tail}`;
+  const re = new RegExp(guards.length ? `(${guards.join("|")})|${name}` : `()${name}`, "gu");
+  return text.replace(re, (m, kept, josa) => (kept ? m : b + (josa ? josaFor(b, josa) : "")));
+}
+
 /**
  * 표기 하나를 바꾼다 — 전체 이름과, 이름을 뗀 **성 부분**("판 데이크" → "반 다이크")을 함께. 요약은 성만 쓰는 일이 많다.
- * 새 표기가 옛 표기로 시작하면("홀란" → "홀란드") 이미 바뀐 글자를 또 늘리지 않는다("홀란드드"). 성 부분이 두 글자 미만이면
- * 성만으로는 바꾸지 않는다(다른 낱말과 겹친다). 받침이 달라지면 바로 뒤의 조사도 맞춘다.
+ * - 새 표기가 옛 표기를 품으면("홀란" → "홀란드", "마누 코네" → "에마누엘 마누 코네") 이미 새 표기인 자리를 다시 바꾸지 않는다.
+ * - 받침이 달라지면 바로 뒤의 조사를 맞춘다 — 조사 뒤에 조사가 더 붙어도("홀란과의" → "홀란드와의").
+ * - 성 부분은 두 글자 이상만 바꾸고, 두 글자 이하면 낱말 경계에서만 바꾼다("네투어"의 "네투"는 이름이 아니다).
  */
 export function renameInSummary(text, from, to) {
-  // 이름 바로 뒤의 조사는 새 표기의 받침에 맞춘다("홀란과" → "홀란드와") — 조사 뒤가 공백·문장부호일 때만(낱말의 일부가 아니다)
-  const JOSA = "(?:(이|가|은|는|을|를|과|와|으로|로)(?=[\\s,.·]|$))?";
-  const josaFor = (word, josa) => {
-    const code = word.codePointAt(word.length - 1) - 0xac00;
-    if (code < 0 || code > 11171) return josa;
-    const jong = code % 28;
-    const pair = { 이: ["이", "가"], 가: ["이", "가"], 은: ["은", "는"], 는: ["은", "는"], 을: ["을", "를"], 를: ["을", "를"], 과: ["과", "와"], 와: ["과", "와"] }[josa];
-    if (pair) return jong ? pair[0] : pair[1];
-    return jong && jong !== 8 ? "으로" : "로";
-  };
-  const swap = (t, a, b) => {
-    if (!a || !b || a === b) return t;
-    const re = new RegExp(`${reEscape(a)}${b.startsWith(a) ? `(?!${reEscape(b.slice(a.length))})` : ""}${JOSA}`, "gu");
-    return t.replace(re, (_m, josa) => b + (josa ? josaFor(b, josa) : ""));
-  };
-  let out = swap(text, from, to);
-  const tail = (x) => (x.includes(" ") ? x.slice(x.indexOf(" ") + 1) : null);
-  const a = tail(from);
-  const b = tail(to);
-  if (a && b && [...a].length >= 2) out = swap(out, a, b);
+  let out = swapName(text, from, to, [to], [...from].length <= 2);
+  const surname = (x) => (x.includes(" ") ? x.slice(x.indexOf(" ") + 1) : null);
+  const a = surname(from);
+  const b = surname(to);
+  if (a && b && [...a].length >= 2) out = swapName(out, a, b, [to, b], [...a].length <= 2);
   return out;
 }
 

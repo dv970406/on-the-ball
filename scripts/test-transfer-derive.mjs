@@ -7,7 +7,7 @@
  */
 import { createNameBook } from "./lib/transfer/names-ko.mjs";
 import { isRoundup } from "./lib/transfer/story.mjs";
-import { boardScopeStartMs, clubRecord, createExtractMemo, dealKey, dedupeRows, deriveDeals, derivationStartMs, normalizePlayer, windowSpan } from "./lib/transfer/derive-deals.mjs";
+import { JUDGE_TIER, boardScopeStartMs, clubRecord, createExtractMemo, dealKey, dedupeRows, deriveDeals, derivationStartMs, holdStage, judgeMode, normalizePlayer, orderJudgeNeeds, retryDelayMs, windowSpan } from "./lib/transfer/derive-deals.mjs";
 
 const NOW = Date.parse("2026-09-25T00:00:00Z");
 const WINDOWS = [
@@ -605,11 +605,144 @@ const SUITOR = {
   competitionJudged: derive([row("Newcastle are keeping an eye on Rennes defender John Doe, 20, but face competition from Everton and Brentford.", { verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_from: "Rennes", verdict_to: "Newcastle United" })]),
   renewal: derive([row("Brentford are in discussions with John Doe about a new long-term contract amid increasing interest from Liverpool.")]),
 };
+// ── 판정 흔들림이 보드로 번지지 않게 — 우선순위 · 재시도 간격 · 본문 재시도 · 부분 판정 · 단계 히스테리시스 ──
+const HOUR = 3_600_000;
+const ago = (ms) => new Date(NOW - ms).toISOString();
+const RSS = { source_id: "rss:bbc-football", url: "https://www.bbc.co.uk/sport/football/articles/x1" };
+const need = (id, playerKey, priority) => ({ id, playerKey, priority });
+// 우선순위 정렬 — 탐색용(playerKey null)은 상한 안에서 exploreMax건까지만 앞에 둔다
+const ORDER = {
+  tiers: orderJudgeNeeds([need(1, null, 4e13), need(2, "a", 3e13), need(3, "b", 2e13), need(4, "c", 1e13)]).map((x) => x.id),
+  capped: orderJudgeNeeds([need(1, null, 4e13 + 1), need(2, null, 4e13 + 2), need(3, null, 4e13 + 3), need(4, "a", 3e13 + 9), need(5, "b", 3e13 + 8)], { limit: 3, exploreMax: 1 }).map((x) => x.id),
+  ties: orderJudgeNeeds([need(9, "a", 5), need(3, "b", 5)]).map((x) => x.id),
+};
+// 파생이 매기는 층 — 규칙 완료·확정 > 새 딜 > 기존 딜 > 탐색, 같은 층은 최신이 먼저
+const PRIO_ROWS = () => [
+  row("Chelsea agree deal for John Doe from Benfica.", { id: 901, stage: "agreement", published_at: ago(5 * 86_400_000) }),
+  row("Chelsea agree deal for John Doe from Benfica, medical next.", { id: 902, stage: "agreement", published_at: ago(1 * 86_400_000) }),
+  row("Arsenal want Jack Roe from Porto.", { id: 903, stage: "rumour", players: ["Jack Roe"], published_at: ago(2 * 86_400_000) }),
+  row("Official: Arsenal sign Jack Roe from Porto.", { id: 904, stage: "official", players: ["Jack Roe"], published_at: ago(3 * 86_400_000) }),
+  row("Bayern Munich would move for the Chelsea winger.", { id: 905, stage: "rumour", players: [], published_at: ago(HOUR) }),
+];
+// 이월 — 앞 실행에서 일시 실패로 판정을 못 받은 행(판정 시각 없이 verdict_attempts만 있다)은 같은 층에서 먼저 묻는다(층은 넘지 않는다)
+const CARRIED = deriveDeals(PRIO_ROWS().map((r) => (r.id === 901 ? { ...r, verdict_attempts: 1 } : r)), { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: { ...DICT, "jack roe": { ko: "잭 로" } } }), requireVerified: true, requireVerdict: true, existingKeys: new Set([JOHN]) });
+const PRIO = deriveDeals(PRIO_ROWS(), { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: { ...DICT, "jack roe": { ko: "잭 로" } } }), requireVerified: true, requireVerdict: true, existingKeys: new Set([JOHN]) });
+// 재시도 간격 · 요약만 · 본문 재시도 · 지문 · 옛 형식 승격의 반복 방지
+const MODE = {
+  backoffWait: judgeMode({ verdict: null, verdict_player: "john doe", verdict_at: ago(30 * HOUR), verdict_attempts: 2 }, "john doe", NOW),
+  backoffDue: judgeMode({ verdict: null, verdict_player: "john doe", verdict_at: ago(49 * HOUR), verdict_attempts: 2 }, "john doe", NOW),
+  backoffCap: judgeMode({ verdict: null, verdict_player: "john doe", verdict_at: ago(169 * HOUR), verdict_attempts: 9 }, "john doe", NOW),
+  articleRetry: judgeMode({ ...RSS, verdict: "move", verdict_player: "john doe", verdict_raw: "{}", summary_ko: "요약", verdict_at: ago(25 * HOUR), verdict_attempts: 1, verdict_article_chars: 0, published_at: ago(2 * 86_400_000) }, "john doe", NOW),
+  articleSpent: judgeMode({ ...RSS, verdict: "move", verdict_player: "john doe", verdict_raw: "{}", summary_ko: "요약", verdict_at: ago(200 * HOUR), verdict_attempts: 3, verdict_article_chars: 0, published_at: ago(2 * 86_400_000) }, "john doe", NOW),
+  articleOld: judgeMode({ ...RSS, verdict: "move", verdict_player: "john doe", verdict_raw: "{}", summary_ko: "요약", verdict_at: ago(25 * HOUR), verdict_attempts: 0, verdict_article_chars: 0, published_at: ago(5 * 86_400_000) }, "john doe", NOW),
+  articleGot: judgeMode({ ...RSS, verdict: "move", verdict_player: "john doe", verdict_raw: "{}", summary_ko: "요약", verdict_at: ago(25 * HOUR), verdict_attempts: 0, verdict_article_chars: 2400, published_at: ago(2 * 86_400_000) }, "john doe", NOW),
+  articleTelegram: judgeMode({ source_id: "tg:romano", url: "https://t.me/x/1", verdict: "move", verdict_player: "john doe", verdict_raw: "{}", summary_ko: "요약", verdict_at: ago(25 * HOUR), verdict_attempts: 0, verdict_article_chars: 0, published_at: ago(2 * 86_400_000) }, "john doe", NOW),
+  stale: judgeMode({ verdict: "move", verdict_player: "john doe", verdict_raw: "{}", summary_ko: "요약", verdict_at: ago(HOUR), verdict_prompt: "aaaaaaaaaaaa" }, "john doe", NOW, { stalePrompt: "bbbbbbbbbbbb" }),
+  fresh: judgeMode({ verdict: "move", verdict_player: "john doe", verdict_raw: "{}", summary_ko: "요약", verdict_at: ago(HOUR), verdict_prompt: "bbbbbbbbbbbb" }, "john doe", NOW, { stalePrompt: "bbbbbbbbbbbb" }),
+  upgradeFailedRecent: judgeMode({ verdict: "move", verdict_player: "john doe", verdict_raw: null, summary_ko: "요약", verdict_at: ago(HOUR), verdict_attempts: 1 }, "john doe", NOW, { upgrade: true }),
+  upgradeFirst: judgeMode({ verdict: "move", verdict_player: "john doe", verdict_raw: null, summary_ko: "요약", verdict_at: ago(HOUR), verdict_attempts: 0 }, "john doe", NOW, { upgrade: true }),
+};
+// 본문 없이 난 "이동 아님"도 본문을 받으러 다시 묻는다(딜에는 들지 않는다)
+const NOTMOVE_ARTICLE = judged([
+  row("Chelsea agree deal for John Doe from Benfica.", { ...RSS, ...V("not_move", { verdict_at: ago(25 * HOUR), verdict_attempts: 1, verdict_article_chars: 0 }), published_at: ago(2 * 86_400_000) }),
+  row("Chelsea in talks for John Doe from Benfica.", { stage: "talks", ...V("move", { verdict_raw: "{}", verdict_stage: "talks", verdict_to: "Chelsea" }) }),
+]);
+// 판정 커버리지가 다 차지 않은 딜 — 보도 수는 전 보도, 단계는 판정받은 보도. 후퇴는 저장된 단계를 지킨다
+const stored = (stage, settled_at = null) => new Map([[JOHN, { stage, settled_at }]]);
+const withStored = (rows, map) => deriveDeals(rows, { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: DICT }), requireVerified: true, requireVerdict: true, existingKeys: map });
+const RUMOURS = () => Array.from({ length: 4 }, (_, i) => row(`Chelsea keen on John Doe of Benfica (${i}).`, { stage: "rumour" }));
+const HYST = {
+  // 루머 4건(판정 전) + 맨 나중 부인 1건만 먼저 판정 — 저장된 루머를 지킨다(알림이 나가지 않는다)
+  heldDenied: withStored([...RUMOURS(), row("Chelsea deny interest in John Doe of Benfica.", ST("denied"))], stored("rumour")),
+  // 같은 상황인데 저장된 딜 단계를 모르면(Set) 판정대로 간다 — 지키는 근거는 저장된 단계뿐이다
+  noStored: withStored([...RUMOURS(), row("Chelsea deny interest in John Doe of Benfica.", ST("denied"))], new Set([JOHN])),
+  // 진전은 곧바로 — 저장된 루머, 합의 판정이 먼저 오면 합의
+  progress: withStored([...RUMOURS(), row("Chelsea agree deal for John Doe from Benfica.", ST("agreement"))], stored("rumour")),
+  // 커버리지가 차면 판정대로 간다(마지막이 부인 · 협상 이력 없음 → 부인)
+  covered: withStored([row("Chelsea keen on John Doe of Benfica.", ST("rumour")), row("Chelsea deny interest in John Doe of Benfica.", ST("denied"))], stored("rumour")),
+  // 반복 실패로 포기한 보도는 커버리지를 막지 않는다
+  givenUp: withStored([row("Chelsea keen on John Doe of Benfica.", { stage: "rumour", verdict: null, verdict_player: "john doe", verdict_at: ago(HOUR), verdict_attempts: 3 }), row("Chelsea deny interest in John Doe of Benfica.", ST("denied"))], stored("rumour")),
+  // 결과 시각 — 커버리지가 덜 찼으면 저장된 값을 지키고, 차면 보도로 다시 정한다
+  settledKept: withStored([row("Here we go: John Doe to Chelsea from Benfica.", ST("here_we_go")), row("Chelsea keen on John Doe of Benfica.", { stage: "rumour" })], stored("here_we_go", "2026-07-02T00:00:00+00:00")),
+  settledCovered: withStored([row("Here we go: John Doe to Chelsea from Benfica.", { ...ST("here_we_go"), published_at: "2026-07-05T00:00:00.000Z" })], stored("here_we_go", "2026-07-02T00:00:00+00:00")),
+};
+/*
+ * 순서 민감도 — 같은 보도 묶음에 판정이 도착하는 **순서만** 바꿔 매 단계 저장된 딜(단계·결과 시각)을 다음 파생에 넘긴다.
+ * 판정이 다 도착한 뒤의 딜(단계·보도 수·결과 시각·최근 보도 시각)은 순서와 무관해야 하고, 도중에 단계가 후퇴해서도 안 된다.
+ */
+function permutations(arr) {
+  return arr.length <= 1 ? [arr] : arr.flatMap((x, i) => permutations([...arr.slice(0, i), ...arr.slice(i + 1)]).map((p) => [x, ...p]));
+}
+function arrivalRuns(specs) {
+  const base = specs.map(([body, stage], i) => ({ id: 700 + i, body, stage, published_at: new Date(Date.UTC(2026, 6, 1 + i)).toISOString() }));
+  const make = (judgedIds) => base.map((b) => row(b.body, { id: b.id, published_at: b.published_at, ...(judgedIds.has(b.id) ? ST(b.stage) : { stage: b.stage }) }));
+  const outcomes = new Set();
+  let regressed = 0;
+  for (const order of permutations(base.map((b) => b.id))) {
+    let map = new Map();
+    let prev = null;
+    let finalDeal = null;
+    for (let k = 1; k <= order.length; k++) {
+      const d = withStored(make(new Set(order.slice(0, k))), map).deals[0];
+      if (!d) continue;
+      // 도중 후퇴 = 저장된 단계와 다른데 holdStage가 바꾸지 말았어야 할 방향(마지막 단계는 커버리지가 차 판정대로 간다)
+      if (k < order.length && prev && holdStage(d.stage, prev) !== d.stage) regressed += 1;
+      prev = d.stage;
+      map = new Map([[JOHN, { stage: d.stage, settled_at: d.settled_at }]]);
+      finalDeal = d;
+    }
+    outcomes.add(JSON.stringify(pick(finalDeal, ["stage", "report_count", "settled_at", "latest_reported_at"])));
+  }
+  return { outcomes: [...outcomes].map((o) => JSON.parse(o)), regressed };
+}
+const ORDERS = {
+  // 협상 → 루머 → 부인 → 루머: 다 도착하면 되살아난 루머
+  saga: arrivalRuns([["Chelsea in talks for John Doe from Benfica.", "talks"], ["Chelsea keen on John Doe of Benfica.", "rumour"], ["Chelsea deny interest in John Doe of Benfica.", "denied"], ["Chelsea still want John Doe of Benfica.", "rumour"]]),
+  // 합의 완료 → 루머 → 오피셜: 결과 시각은 처음 나온 합의 완료 보도의 시각
+  settled: arrivalRuns([["Here we go: John Doe to Chelsea from Benfica.", "here_we_go"], ["Chelsea keen on John Doe of Benfica.", "rumour"], ["Official: Chelsea sign John Doe from Benfica.", "official"]]),
+};
+// 대표 행 — 같은 보도의 개정판 중 판정 있는 행이 대표다(판정 없는 새 개정판이 판정을 빼앗지 않는다)
+const REP = dedupeRows([
+  { id: 1, url: BBC, body: "Chelsea agree deal for John Doe from Benfica.", published_at: "2026-07-10T00:00:00Z", verdict: "move" },
+  { id: 2, url: BBC, body: "Chelsea agree deal for John Doe from Benfica. Medical booked.", published_at: "2026-07-10T00:00:00Z" },
+]);
+
 const UNIT = [
+  { name: "우선순위 — priority가 작은 것부터(층 순서)", got: ORDER.tiers, want: [4, 3, 2, 1] },
+  { name: "우선순위 — 상한 안에서 탐색용은 exploreMax건까지만 앞에 두고 나머지는 뒤로 민다", got: ORDER.capped, want: [5, 4, 1, 2, 3] },
+  { name: "우선순위 — 같은 priority면 행 id 순(결정적)", got: ORDER.ties, want: [3, 9] },
+  {
+    name: "우선순위 — 파생이 매기는 순서: 규칙 오피셜 > 새 딜 > 기존 딜(최신 먼저) > 탐색",
+    got: PRIO.judgeNeeds.map((x) => x.id),
+    want: [904, 903, 902, 901, 905],
+  },
+  { name: "우선순위 — 물을 대상에 게시 시각·방식·옛 판정을 싣는다", got: [PRIO.judgeNeeds[0].published_at === PRIO_ROWS()[3].published_at, PRIO.judgeNeeds[0].mode, Object.keys(PRIO.judgeNeeds[0].prev).length, PRIO.judgeNeeds[0].prev.verdict_attempts], want: [true, "full", 14, 0] },
+  { name: "우선순위 — 이월된 행은 같은 층의 새 보도보다 먼저, 다른 층은 넘지 않는다", got: CARRIED.judgeNeeds.map((x) => x.id), want: [904, 903, 901, 902, 905] },
+  { name: "우선순위 — 이월된 행은 실패 수와 무관하게 다음 실행이 곧바로 묻는다(재시도 간격은 판정 시각이 있는 행에만)", got: judgeMode({ verdict: null, verdict_player: "john doe", verdict_at: null, verdict_attempts: 2 }, "john doe", NOW), want: "full" },
+  { name: "우선순위 — 층 상수", got: JUDGE_TIER, want: { settled: 1, newDeal: 2, existing: 3, explore: 4 } },
+  { name: "재시도 간격 — 24h × 2^(실패−1), 상한 7일(0·옛 행은 24h)", got: [0, 1, 2, 3, 4, 5].map((a) => retryDelayMs(a) / HOUR), want: [24, 24, 48, 96, 168, 168] },
+  { name: "재시도 간격 — 두 번 실패한 판정 불가는 48시간 전에 다시 묻지 않는다", got: [MODE.backoffWait, MODE.backoffDue, MODE.backoffCap], want: [null, "full", "full"] },
+  { name: "요약 재시도 — 이동인데 요약이 없으면 요약만 다시 묻는다(mode summary)", got: VERDICT.noSummaryRecent.judgeNeeds.map((x) => x.mode), want: ["summary"] },
+  { name: "본문 재시도 — 매체 RSS 판정이 본문 없이 났으면 다시 묻는다(최대 2회 · 게시 4일 안 · 본문 받은 판정·텔레그램은 아니다)", got: [MODE.articleRetry, MODE.articleSpent, MODE.articleOld, MODE.articleGot, MODE.articleTelegram], want: ["full", null, null, null, null] },
+  { name: "본문 재시도 — 본문 없이 난 '이동 아님'도 다시 묻고 딜에는 들지 않는다", got: [NOTMOVE_ARTICLE.judgeNeeds.map((x) => [x.mode, x.prev.verdict]), NOTMOVE_ARTICLE.deals[0]?.report_count], want: [[["full", "not_move"]], 1] },
+  { name: "지문 — 지금 지시문과 다른 지문으로 난 판정만 다시 묻는다(--rejudge-stale)", got: [MODE.stale, MODE.fresh], want: ["full", null] },
+  { name: "옛 형식 승격 — 한 번 다시 물어 실패한 행(원출력이 여전히 없다)은 실패 간격 전에 또 묻지 않는다", got: [MODE.upgradeFirst, MODE.upgradeFailedRecent], want: ["full", null] },
+  { name: "부분 판정 — 저장된 루머 딜에 부인 1건만 먼저 판정되면 루머를 지킨다(보도 수는 전 보도)", got: pick(HYST.heldDenied.deals[0] ?? {}, ["stage", "report_count"]), want: { stage: "rumour", report_count: 5 } },
+  { name: "부분 판정 — 저장된 단계를 모르면 판정대로 간다", got: HYST.noStored.deals[0]?.stage, want: "denied" },
+  { name: "부분 판정 — 진전은 곧바로 반영한다", got: HYST.progress.deals[0]?.stage, want: "agreement" },
+  { name: "부분 판정 — 커버리지가 차면 후퇴도 반영한다", got: HYST.covered.deals[0]?.stage, want: "denied" },
+  { name: "부분 판정 — 반복 실패(3회)로 포기한 보도는 커버리지를 막지 않는다", got: HYST.givenUp.deals[0]?.stage, want: "denied" },
+  { name: "holdStage — 후퇴(진전 순위 하락·죽은 단계로)는 지키고, 진전·되살아남·죽은 단계끼리는 반영", got: [holdStage("rumour", "agreement"), holdStage("denied", "talks"), holdStage("official", "rumour"), holdStage("rumour", "denied"), holdStage("collapsed", "denied"), holdStage("talks", null)], want: ["agreement", "talks", "official", "rumour", "collapsed", "talks"] },
+  { name: "결과 시각 — 커버리지가 덜 찼고 여전히 합의 완료면 저장된 값을 지킨다", got: HYST.settledKept.deals[0]?.settled_at, want: "2026-07-02T00:00:00.000Z" },
+  { name: "결과 시각 — 커버리지가 차면 보도로 다시 정한다", got: HYST.settledCovered.deals[0]?.settled_at, want: "2026-07-05T00:00:00.000Z" },
+  { name: "순서 민감도 — 협상·루머·부인·루머 판정이 어떤 순서로 도착해도 최종 딜이 같고 도중에 후퇴하지 않는다", got: [ORDERS.saga.outcomes.length, ORDERS.saga.outcomes[0]?.stage, ORDERS.saga.outcomes[0]?.report_count, ORDERS.saga.regressed], want: [1, "rumour", 4, 0] },
+  { name: "순서 민감도 — 합의 완료·루머·오피셜이 어떤 순서로 도착해도 단계·결과 시각이 같다", got: [ORDERS.settled.outcomes.length, ORDERS.settled.outcomes[0]?.stage, ORDERS.settled.outcomes[0]?.settled_at, ORDERS.settled.regressed], want: [1, "official", "2026-07-01T00:00:00.000Z", 0] },
+  { name: "대표 행 — 같은 보도의 개정판 중 판정 있는 행이 대표다", got: REP.reps.map((r) => r.id), want: [1] },
+
   { name: "단계 — 부인 뒤에 루머가 다시 이어지면 되살아난 것이다(중간의 부인이 딜을 죽이지 않는다)", got: SAGA.revived.deals[0]?.stage, want: "rumour" },
   { name: "단계 — 가장 나중 보도가 부인이고 협상까지 갔었으면 결렬", got: SAGA.deadLast.deals[0]?.stage, want: "collapsed" },
   { name: "단계 — 가장 나중 보도가 부인이고 루머까지였으면 부인", got: SAGA.deniedLast.deals[0]?.stage, want: "denied" },
-  { name: "이름 — 줄여 쓴 이름은 긴 이름의 딜로 합친다(딜이 둘로 갈리지 않고, 줄인 이름의 보도는 긴 이름으로 다시 묻는다)", got: [SAGA.suffix.deals.map((d) => [d.player, d.report_count]), SAGA.suffix.judgeNeeds.map((x) => x.player)], want: [[["John van Doe", 1]], ["John van Doe"]] },
+  { name: "이름 — 줄여 쓴 이름은 긴 이름의 딜로 합친다(딜이 둘로 갈리지 않고, 줄인 이름의 보도는 긴 이름으로 다시 묻고 보도 수에는 든다)", got: [SAGA.suffix.deals.map((d) => [d.player, d.report_count]), SAGA.suffix.judgeNeeds.map((x) => x.player)], want: [[["John van Doe", 2]], ["John van Doe"]] },
   { name: "넓힌 후보 — 단계 없음 + 선수 + 이적 낱말 + 5대 리그 구단이면 선수를 비워 판정자에게 묻는다", got: WIDE.soft.judgeNeeds.map((x) => [x.player, x.playerKey]), want: [[null, null]] },
   { name: "넓힌 후보 — 이적 낱말이 없으면 묻지 않는다(경기 기사)", got: WIDE.softNoVocab.judgeNeeds.length, want: 0 },
   { name: "넓힌 후보 — 규칙이 선수를 못 잡았으면 묻지 않는다", got: WIDE.softNoPlayer.judgeNeeds.length, want: 0 },
@@ -640,7 +773,7 @@ const UNIT = [
   { name: "판정 — 이동 판정이 있는 새 딜은 연다(다시 묻지 않는다)", got: [VERDICT.movedNew.deals.length, VERDICT.movedNew.judgeNeeds.length], want: [1, 0] },
   { name: "판정 — 이미 있는 딜은 판정이 없어도 남긴다(판정이 멎어도 보드가 비지 않게)", got: [VERDICT.unjudgedExisting.deals.length, VERDICT.unjudgedExisting.judgeNeeds.length], want: [1, 1] },
   { name: "판정 — 이미 있는 딜도 보도가 전부 '이동 아님'이면 사라진다", got: [VERDICT.allVetoedExisting.deals.length, VERDICT.allVetoedExisting.skipped["이동 아님(LLM 판정)"], VERDICT.allVetoedExisting.assignments.size], want: [0, 2, 0] },
-  { name: "판정 — '이동 아님' 보도는 딜에서 빠지고, 판정 전 보도는 묻기만 하고 딜에 들지 않는다(판정받은 협상 보도만 남는다)", got: [VERDICT.mixed.deals[0]?.report_count, VERDICT.mixed.deals[0]?.stage, VERDICT.mixed.judgeNeeds.length, VERDICT.mixed.assignments.size], want: [1, "talks", 1, 1] },
+  { name: "판정 — '이동 아님' 보도는 딜에서 빠지고, 판정 전 보도는 보도 수·배정에는 들지만 단계는 판정받은 협상 보도로 정한다", got: [VERDICT.mixed.deals[0]?.report_count, VERDICT.mixed.deals[0]?.stage, VERDICT.mixed.judgeNeeds.length, VERDICT.mixed.assignments.size], want: [2, "talks", 1, 2] },
   { name: "판정 — 다른 선수로 내린 판정은 없는 것이다(다시 묻는다)", got: [VERDICT.otherPlayer.deals.length, VERDICT.otherPlayer.judgeNeeds.length], want: [0, 1] },
   { name: "판정 — 판정 불가는 24시간 동안 다시 묻지 않는다", got: [VERDICT.invalidRecent.deals.length, VERDICT.invalidRecent.judgeNeeds.length], want: [0, 0] },
   { name: "판정 — 판정 불가가 24시간 지나면 다시 묻는다", got: VERDICT.invalidOld.judgeNeeds.length, want: 1 },

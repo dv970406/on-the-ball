@@ -11,7 +11,8 @@
  *   3. 5대 리그 — 보도가 언급한 구단 중 5대 리그 구단이 하나도 없으면 딜이 아니고 **LLM도 부르지 않는다**.
  *   4. 확인된 선수 — 사람 사전·위키데이터에서 확인된 선수만(`names.isVerifiedPlayer`). 예외: 완료·확정 판정이거나 출처 두 곳의
  *      "이동" 판정이 있는 두 토큰 이상 이름(`canOpenUnverified` — 유스 이적).
- *   5. LLM 판정 — "이동 아님" 보도는 빠지고, 새 딜은 "이동" 판정이 있어야 연다(`judge.mjs`). 판정받은 보도가 있으면 그 보도들만으로 만든다.
+ *   5. LLM 판정 — "이동 아님" 보도는 빠지고, 새 딜은 "이동" 판정이 있어야 연다(`judge.mjs`). 판정받은 보도가 있으면 단계·방향·금액은
+ *      그 보도들만으로 정하고(보도 수·배정은 전 보도), 판정이 덜 찬 동안 단계의 후퇴는 저장된 단계로 미룬다(`holdStage`).
  *   6. 방향 — 출발·행선지 중 하나는 있어야 하고 그중 하나는 5대 리그 구단이어야 한다. LLM이 읽은 구단이 규칙 표보다 크다.
  *
  * 두 층으로 나뉜다.
@@ -25,14 +26,13 @@
  *   더는 가리키지 않는 딜**뿐이다.
  */
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { clampCp, slugify, upsertRows } from "../sync-db.mjs";
 import { clubCode, clubDisplay, presetClubs } from "./club-display.mjs";
 import { canonicalClubName } from "./clubs.mjs";
 import { contractText, parseContract } from "./contract.mjs";
 import { DEST, FORMER, FROM, LEFT_FREE, SUITOR_FROM, addVotes, collectVotes, topVote } from "./direction.mjs";
 import { extractTransfer } from "./extract.mjs";
-import { JUDGE_RETRY_MS, SUMMARY_RETRY_WINDOW_MS, replayJudgements } from "./judge.mjs";
+import { JUDGE_MAX_PER_RUN, JUDGE_RETRY_MS, SUMMARY_RETRY_WINDOW_MS, replayJudgements, wantsArticle } from "./judge.mjs";
 import { createNameBook, loadGlossary, loadNameBook, loadPlayerDictionary, lookupAndCache, lookupCurrentClubs, missingNames, syncDictionaryNames } from "./names-ko.mjs";
 import { RANK, RENEWAL, cleanBody, isDead, isRoundup, isRoundupItem, mentionRe, sentencesOf } from "./story.mjs";
 import { normalizePlayer } from "./player-key.mjs";
@@ -42,25 +42,9 @@ export const MIN_RELEVANCE = 0.3;
 /** 보드 범위 시작보다 이만큼 앞선 보도까지 본다 — 창 직전의 "합의" 보도가 창 안의 오피셜과 한 이야기다 */
 export const SCOPE_SLACK_MS = 14 * 86_400_000;
 
-function readJson(rel) {
-  const url = new URL(rel, import.meta.url);
-  try {
-    return JSON.parse(readFileSync(url, "utf8"));
-  } catch (e) {
-    throw new Error(`${url.pathname}를 읽지 못했습니다 — ${e instanceof Error ? e.message : String(e)}`);
-  }
-}
-/**
- * 창 일정 — 리그별 일정을 **합친 기간**으로 돌려준다(개장 = 가장 먼저 여는 리그, 마감 = 가장 늦게 닫는 리그).
- * ⚠ 화면(`src/shared/config/transfer-window.ts`의 `span`)과 같은 규칙이다 — 같은 JSON을 읽는다.
- */
-export function windowSpan(w) {
-  const all = Object.values(w.leagues);
-  const opensAt = all.reduce((a, b) => (Date.parse(b.opensAt) < Date.parse(a.opensAt) ? b : a)).opensAt;
-  const closesAt = all.reduce((a, b) => (Date.parse(b.closesAt) > Date.parse(a.closesAt) ? b : a)).closesAt;
-  return { key: w.key, label: w.label, opensAt, closesAt };
-}
-export const loadWindows = () => readJson("./windows.json").windows.map(windowSpan);
+// 창 일정 읽기는 windows.mjs가 갖는다(판정 요청도 쓴다) — 기존 소비자를 위해 다시 내보낸다
+import { loadWindows, windowSpan } from "./windows.mjs";
+export { loadWindows, windowSpan };
 
 /**
  * 보드 범위의 시작 — `opensAt <= now`인 마지막 창의 개장 시각. 아직 아무 창도 열리지 않았으면 첫 창.
@@ -110,8 +94,10 @@ function textKey(body) {
  * ⚠ 같은 기사가 여러 행으로 저장돼 있다: BBC가 고칠 때마다 올리는 guid 개정 번호(`#0`·`#1`)로 같은 URL이 최대 6행,
  *   BBC 가십 칼럼이 두 피드(bbc-gossip·bbc-football)에 함께 실리고, 리트윗이 원문과 같은 글로 들어온다(운영: 2,297행 중
  *   550행이 같은 URL). 그대로 두면 딜의 보도 수가 부풀고 판정·요약을 같은 글에 여러 번 부른다.
- * ⚠ **행을 지우지 않는다** — 파생에서만 대표 하나를 쓴다(지우는 것은 되돌릴 수 없다). 대표는 가장 이른 게시 시각,
- *   같으면 나중에 수집된 행(= 최신 개정판)이다.
+ * ⚠ **행을 지우지 않는다** — 파생에서만 대표 하나를 쓴다(지우는 것은 되돌릴 수 없다). 대표는 **판정(이동·이동 아님)이 있는 행**,
+ *   그다음 가장 이른 게시 시각, 같으면 나중에 수집된 행(= 최신 개정판)이다.
+ * ⚠ 판정 있는 행이 먼저인 이유 — 기사가 개정될 때마다 판정 없는 새 행이 생기는데, 그 행이 대표가 되면 판정을 잃고 딜이
+ *   흔들리며 같은 글을 다시 묻는다(개정판마다 한 번씩).
  * ⚠ **가십 칼럼의 항목 행은 URL로 합치지 않는다** — 한 칼럼의 항목이 전부 칼럼 URL을 물려받는다(`roundup.mjs`).
  *   두 피드에 실린 같은 칼럼의 항목은 본문이 같아 본문 키로 합쳐진다.
  * @returns {{ reps: object[], duplicates: number }}
@@ -139,27 +125,108 @@ export function dedupeRows(rows) {
     if (!groups.has(g)) groups.set(g, []);
     groups.get(g).push(r);
   }
-  const reps = [...groups.values()].map((g) => g.sort((a, b) => ts(a) - ts(b) || b.id - a.id)[0]);
+  const judgedFirst = (r) => (r.verdict != null ? 0 : 1);
+  const reps = [...groups.values()].map((g) => g.sort((a, b) => judgedFirst(a) - judgedFirst(b) || ts(a) - ts(b) || b.id - a.id)[0]);
   return { reps, duplicates: rows.length - reps.length };
 }
 
 /** 그 선수에 대한 LLM 판정 — 다른 선수로 판정했으면(추출이 바뀌어 딜이 옮겨 감) 판정이 없는 것이다 */
 const verdictOf = (r, key) => (r.verdict_player === key ? (r.verdict ?? null) : null);
+/** 판정 불가·실패 재시도 간격의 상한 — 같은 이유로 실패하는 행을 하루마다 끝없이 묻지 않는다(한 행 9회가 있었다) */
+export const JUDGE_BACKOFF_MAX_MS = 7 * 86_400_000;
+/** 매체 RSS인데 기사 본문 없이 난 판정을, 본문을 받으러 다시 묻는 횟수 상한 */
+export const ARTICLE_RETRY_MAX = 2;
+/** 본문 재시도를 하는 기간 — 게시 뒤 이만큼 지나면 발췌로 난 판정을 그대로 둔다(시도 횟수가 쌓이지 않아도 끝이 있게) */
+export const ARTICLE_RETRY_WINDOW_MS = 4 * 86_400_000;
+/** 연달아 실패한 행을 "반복 실패"로 세는 기준(실행 요약·Actions 경고) */
+export const REPEATED_FAILURE_ATTEMPTS = 3;
+
 /**
- * 지금 LLM에 물어야 하는가 — 그 선수로 판정한 적이 없거나, 판정 불가·요약 실패로 끝난 지 `JUDGE_RETRY_MS`가 지났다.
- * 요약 실패는 최근 `SUMMARY_RETRY_WINDOW_MS` 안의 보도만 다시 묻는다(오래된 보도는 영문 발췌로 둔다).
+ * 다시 묻기까지의 간격 — 24시간 × 2^(연속 실패 − 1), 상한 7일. 실패 기록이 없는 행(옛 행 · 0)은 24시간이다.
+ * @param {number | null | undefined} attempts `verdict_attempts`
  */
-function needsJudge(r, key, nowMs, rejudge, upgrade = false) {
-  if (rejudge || r.verdict_player !== key) return true;
-  // 옛 형식의 "이동" 판정(원출력이 없다 — 시점·금액을 읽기 전의 것)은 한 번 다시 묻는다. 판정은 새 답이 올 때까지 그대로 쓴다
-  if (upgrade && r.verdict === "move" && r.verdict_raw == null) return true;
-  const stale = !r.verdict_at || nowMs - Date.parse(r.verdict_at) >= JUDGE_RETRY_MS;
-  if (r.verdict == null) return stale;
-  return r.verdict === "move" && r.summary_ko == null && stale && nowMs - ts(r) <= SUMMARY_RETRY_WINDOW_MS;
+export function retryDelayMs(attempts) {
+  const n = Math.max(1, Number(attempts) || 0);
+  return Math.min(JUDGE_RETRY_MS * 2 ** (n - 1), JUDGE_BACKOFF_MAX_MS);
 }
-/** 규칙이 선수를 못 뽑은 보도를 지금 LLM에 물어야 하는가 — 아직 묻지 않았거나, 판정 불가로 끝난 지 `JUDGE_RETRY_MS`가 지났다 */
-const needsJudgeUnnamed = (r, nowMs, rejudge) =>
-  rejudge || !r.verdict_at || (r.verdict == null && nowMs - Date.parse(r.verdict_at) >= JUDGE_RETRY_MS);
+
+/**
+ * 지금 LLM에 물어야 하는가 — 물을 방식(`"full"` 판정 전체 · `"summary"` 요약만)이나 `null`(묻지 않는다).
+ *
+ * - 그 선수로 판정한 적이 없다(다른 선수로 판정 · 시도 없음) · `rejudge` → 전체.
+ * - `stalePrompt`(지금 지시문의 지문)가 주어졌고 그 행의 지문이 다르다 → 전체(`--rejudge-stale` — 지시문을 고친 뒤 그 지시문으로 나지 않은 행만).
+ * - 판정 불가(판정 없음) → `retryDelayMs(verdict_attempts)`가 지나면 전체. 실패할수록 간격이 늘어난다.
+ * - 옛 형식의 "이동"(원출력 없음 — 시점·금액을 읽기 전의 것) → 한 번 다시 묻는다. 그 시도가 실패하면(`verdict_attempts` > 0 —
+ *   옛 판정은 남고 원출력은 여전히 없다) 실패 간격을 따른다. 판정은 새 답이 올 때까지 그대로 쓴다.
+ * - 매체 RSS인데 기사 본문 없이 난 판정(`verdict_article_chars === 0`) → 실패 간격마다 다시 묻는다. 최대 `ARTICLE_RETRY_MAX`회,
+ *   게시 뒤 `ARTICLE_RETRY_WINDOW_MS` 안에서만(발췌만 보고 난 판정이 영구히 남지 않게, 그러나 끝없이 묻지도 않게).
+ * - "이동"인데 요약이 없다 → 실패 간격이 지났고 최근 `SUMMARY_RETRY_WINDOW_MS` 안의 보도면 **요약만**(`judge.mjs`가 판정은 건드리지 않는다).
+ */
+export function judgeMode(r, key, nowMs, { rejudge = false, upgrade = false, stalePrompt = null } = {}) {
+  if (rejudge || r.verdict_player !== key || !r.verdict_at) return "full";
+  if (stalePrompt && r.verdict_prompt !== stalePrompt) return "full";
+  const attempts = Number(r.verdict_attempts) || 0;
+  const waited = nowMs - Date.parse(r.verdict_at) >= retryDelayMs(attempts);
+  if (r.verdict == null) return waited ? "full" : null;
+  if (upgrade && r.verdict === "move" && r.verdict_raw == null && (attempts === 0 || waited)) return "full";
+  if (r.verdict_article_chars === 0 && wantsArticle(r) && attempts <= ARTICLE_RETRY_MAX && waited && nowMs - ts(r) <= ARTICLE_RETRY_WINDOW_MS) return "full";
+  if (r.verdict === "move" && r.summary_ko == null && waited && nowMs - ts(r) <= SUMMARY_RETRY_WINDOW_MS) return "summary";
+  return null;
+}
+
+/** 물을 때 함께 넘기는 그 행의 기존 판정(`judge.mjs`가 새 답이 실패하면 옛 판정을 지키는 데 쓴다) */
+const PREV_COLUMNS = [
+  "verdict", "verdict_player", "verdict_player_name", "verdict_evidence", "verdict_from", "verdict_to", "verdict_suitors", "verdict_stage",
+  "verdict_fee_amount", "verdict_fee_currency", "verdict_fee_kind", "verdict_raw", "verdict_at", "verdict_attempts",
+];
+const prevVerdict = (r) => Object.fromEntries(PREV_COLUMNS.map((c) => [c, c === "verdict_attempts" ? Number(r[c]) || 0 : (r[c] ?? null)]));
+
+/** 우선순위 층 — 작을수록 먼저. 같은 층에서는 최신 보도가 먼저다 */
+export const JUDGE_TIER = { settled: 1, newDeal: 2, existing: 3, explore: 4 };
+const TIER_SPAN = 1e13; // 층 사이 간격 — 밀리초 시각(약 1.8e12)보다 커서 층이 섞이지 않는다
+/** 이월된 행을 같은 층 안에서 앞당기는 폭 — 층 안의 시각 항(TIER_SPAN − 게시 ms ≥ 약 8e12)보다 작아 다른 층으로 넘어가지 않는다 */
+const CARRIED_LEAD = 5e12;
+/** 규칙이 완료·확정으로 읽은 보도 — 맞으면 보드의 가장 큰 소식이라 맨 먼저 묻는다 */
+const RULE_SETTLED = new Set(["official", "here_we_go"]);
+
+/**
+ * 물을 대상 하나 — `judge.mjs`가 받는 모양(계약서의 need). `priority`는 층 × 간격 + (간격 − 게시 시각) — 같은 층이면 최신이 먼저.
+ * 요약만 다시 묻는 것은 새 판정보다 급하지 않아 기존 딜 층 아래로 내린다.
+ */
+function judgeNeed(r, { playerKey, player, clubs, mode, tier }) {
+  const t = Number.isFinite(ts(r)) ? ts(r) : 0;
+  const layer = RULE_SETTLED.has(r.stage) ? JUDGE_TIER.settled : tier;
+  // 이월된 행(앞 실행에서 일시 실패로 판정을 못 받았다 — 판정 시각 없이 `verdict_attempts`만 있다)은 같은 층에서 먼저 묻는다.
+  // 같은 층의 새 보도보다 뒤에 서면 대기열이 길 때 계속 밀려 판정 없이 남는다
+  const carried = !r.verdict_at && (Number(r.verdict_attempts) || 0) > 0;
+  const priority = Math.max(layer, mode === "summary" ? JUDGE_TIER.existing : layer) * TIER_SPAN + (TIER_SPAN - t) - (carried ? CARRIED_LEAD : 0);
+  return {
+    id: r.id, playerKey, player, body: r.body, clubs, source_id: r.source_id, external_id: r.external_id, url: r.url, summary_ko: r.summary_ko ?? null,
+    published_at: r.published_at ?? null, mode, prev: prevVerdict(r), priority,
+  };
+}
+
+/**
+ * 물을 대상을 우선순위로 정렬한다 — 실행당 상한(`limit`)에 걸리면 앞의 것만 묻는다(`runJudgements`가 앞에서 자른다).
+ * 상한 안에서 탐색용(선수 없이 묻는 행 — 규칙이 선수를 못 뽑은 보도·넓힌 후보)은 `exploreMax`건까지만 앞에 두고, 나머지는 뒤로 민다
+ * (탐색이 상한을 다 먹어 새 딜의 보도가 한 시간씩 밀리지 않게 — 10-01 백필에서 118건 중 58건이 넘겨졌다).
+ * 순수 함수 — 같은 입력이면 같은 순서다(동률은 행 id).
+ */
+export function orderJudgeNeeds(needs, { limit = JUDGE_MAX_PER_RUN, exploreMax = Math.round(limit / 3) } = {}) {
+  const sorted = [...needs].sort((a, b) => a.priority - b.priority || a.id - b.id);
+  const head = [];
+  const rest = [];
+  let explored = 0;
+  for (const n of sorted) {
+    const explore = n.playerKey == null;
+    if (head.length < limit && (!explore || explored < exploreMax)) {
+      head.push(n);
+      if (explore) explored += 1;
+    } else rest.push(n);
+  }
+  return [...head, ...rest];
+}
+
 /**
  * 그 행의 선수들 — 규칙이 뽑은 이름, 없으면 LLM이 "이동"으로 판정하며 읽은 이름.
  * ⚠ 규칙이 단계를 못 읽은 행(넓힌 후보 — `isSoftCandidate`)은 규칙의 이름을 쓰지 않는다. 단계 문형 없이 잡힌 이름은 글의 주인공이
@@ -479,6 +546,29 @@ function resolveSettledAt(items, stage) {
 }
 
 /**
+ * 판정 커버리지가 다 차지 않은 딜의 단계 — **진전은 곧바로, 후퇴는 미룬다.** 판정이 몇 건씩 도착하는 동안(실행당 상한) 먼저 도착한
+ * 판정만으로 단계가 내려가면, 다음 실행에 나머지가 도착해 다시 올라가며 단계가 왕복하고 그때마다 알림이 나간다.
+ * 후퇴 = 살아 있던 단계가 죽은 단계(결렬·부인)로 가거나, 살아 있는 단계끼리 진전 순위가 내려가는 것. 그때는 저장된 단계를 둔다.
+ * 죽은 단계에서 살아나는 것(되살아난 이적설)과 죽은 단계끼리의 바뀜은 그대로 반영한다. 커버리지가 차면 판정대로 간다.
+ */
+export function holdStage(next, storedStage) {
+  if (!storedStage || storedStage === next || isDead(storedStage)) return next;
+  if (isDead(next)) return storedStage;
+  return RANK.indexOf(next) < RANK.indexOf(storedStage) ? storedStage : next;
+}
+
+/**
+ * 결과 시각 — 판정 커버리지가 다 차지 않은 동안은 **저장된 값을 지킨다**(딜이 여전히 합의 완료·오피셜일 때). 판정이 한 건씩 도착하며
+ * 시각이 생겼다 사라지거나 움직이면 예측 채점·순위가 시간마다 흔들렸다. 커버리지가 차면 보도로 다시 정한다(순수 — 도착 순서와 무관).
+ * @param {{ settled_at?: string | null } | null} stored 커버리지가 차지 않았을 때만 넘긴다
+ */
+function settledAtFor(items, stage, stored) {
+  if (!SETTLED.has(stage)) return null;
+  if (stored?.settled_at) return new Date(Date.parse(stored.settled_at)).toISOString();
+  return resolveSettledAt(items, stage);
+}
+
+/**
  * 그 행에서 그 선수의 금액과 성격. **금액까지 읽는 형식으로 판정된 행(`verdict_raw`가 있다)은 판정자의 값이 전부다** — 판정자가
  * 금액이 없다고 했으면 없는 것이다. 규칙은 문장에서 가장 큰 금액을 집어 같은 기사의 남의 금액(다른 선수의 옵션 £47m)을 그 딜에 붙였다(운영).
  * 판정이 없거나 옛 형식이면 규칙이 읽은 금액이고 성격은 모른다(null).
@@ -562,18 +652,25 @@ export function clubRowsToWrite(derivedClubs, names = createNameBook()) {
 /**
  * @param {object[]} rows  transfer_news 행(id, source_id, stage, players, body, published_at, relevance, verdict*, summary_ko)
  * @param {{ nowMs: number, windows?: object[], names?: ReturnType<typeof createNameBook>, memo?: ReturnType<typeof createExtractMemo>,
- *   requireVerified?: boolean, requireVerdict?: boolean, upgradeVerdicts?: boolean, rejudge?: boolean, existingKeys?: Set<string> }} opts
+ *   requireVerified?: boolean, requireVerdict?: boolean, upgradeVerdicts?: boolean, rejudge?: boolean, rejudgeStalePrompt?: string | null,
+ *   existingKeys?: Set<string> | Map<string, { stage: string, settled_at: string | null }>, judgeLimit?: number }} opts
  *   `requireVerified`: 확인된 선수(`names.isVerifiedPlayer`)의 딜만 만든다 — 판정과 함께 켜면 `canOpenUnverified`가 예외를 연다.
  *     운영 실행(`runDerivation`)이 켠다.
  *   `requireVerdict`: LLM 판정(`judge.mjs`)을 관문으로 쓴다 — "이동 아님" 보도는 딜에서 빼고, **새 딜**은 "이동"
  *     판정이 한 건 이상 있어야 연다. `existingKeys`(이미 저장된 딜 키)에 있는 딜은 판정이 없어도 둔다(판정이 멎어도
  *     보드가 비지 않게). 운영 실행이 켠다. `rejudge`면 저장된 판정이 있어도 전부 다시 묻는다.
  *   `upgradeVerdicts`: 원출력이 없는 옛 형식의 "이동" 판정을 한 번 다시 묻는다(시점·금액을 읽기 전의 판정). 운영 실행이 켠다.
+ *   `rejudgeStalePrompt`: 지금 지시문의 지문(`judgeFingerprint`) — 주어지면 판정 행의 `verdict_prompt`가 다른 행을 다시 묻는다.
+ *   `existingKeys`: 저장된 딜 — `Map(deal_key → { stage, settled_at })`이면 판정이 덜 찬 딜의 단계 후퇴·결과 시각을 저장된 값으로 지킨다
+ *     (`holdStage`·`settledAtFor`). `Set`(키만)이면 지키지 않는다.
+ *   `judgeLimit`: 실행당 판정 상한(기본 `JUDGE_MAX_PER_RUN`) — 탐색용 몫(상한의 1/3)을 정하는 데 쓴다(`orderJudgeNeeds`).
  *   `names`가 없으면 사람이 고친 JSON만으로 만든 사전을 쓴다(자동 캐시 없음 — 테스트가 이 경로다).
  *   `memo`가 없으면 이 호출 안에서만 쓰는 메모를 만든다.
  * @returns {{ deals: object[], clubs: object[], assignments: Map<number, string>, nameNeeds: object[], judgeNeeds: object[], warnings: string[], skipped: Record<string, number>, startMs: number }}
- *   `judgeNeeds`는 LLM에 물어야 할 보도(행 id · 선수 키 · 표시 이름 · 원문 · 언급된 구단) — 5대 리그 구단이 걸린 딜의 행(확인되지 않은 두 토큰 이상 이름 포함)과
- *     선수 없이 묻는 행(규칙이 선수를 못 뽑았거나 넓힌 후보)이다.
+ *   `judgeNeeds`는 LLM에 물어야 할 보도(행 id · 선수 키 · 표시 이름 · 원문 · 언급된 구단 · 게시 시각 · 방식 `mode` · 옛 판정 `prev` ·
+ *     `priority`) — 5대 리그 구단이 걸린 딜의 행(확인되지 않은 두 토큰 이상 이름 포함)과 선수 없이 묻는 행(규칙이 선수를 못 뽑았거나
+ *     넓힌 후보)이다. **우선순위로 정렬돼 있다**(`orderJudgeNeeds`) — 호출부는 앞에서 상한만큼 자른다.
+ *   `repeatedFailures`는 연달아 `REPEATED_FAILURE_ATTEMPTS`번 이상 실패한 대표 행 수다.
  *   `nameNeeds`는 딜마다 선수 키·구단 정규명 — 이름 사전에서 빠진 것을 찾는 데 쓴다(저장하지 않는다).
  */
 /**
@@ -592,6 +689,10 @@ export function deriveDeals(rows, opts) {
   const names = opts.names ?? createNameBook({ players: loadPlayerDictionary(), clubs: loadGlossary().clubs });
   const startMs = derivationStartMs(opts.nowMs, windows);
   const memo = opts.memo ?? createExtractMemo();
+  const modeOpts = { rejudge: Boolean(opts.rejudge), upgrade: Boolean(opts.upgradeVerdicts), stalePrompt: opts.rejudgeStalePrompt ?? null };
+  // 저장된 딜 — Set(키만 — 테스트·옛 호출부)이든 Map(키 → { stage, settled_at })이든 받는다. 저장된 값은 Map일 때만 있다
+  const existing = opts.existingKeys ?? new Set();
+  const storedDeal = (k) => (existing instanceof Map ? (existing.get(k) ?? null) : null);
   const warnings = [];
   const skipped = {};
   const skip = (why) => { skipped[why] = (skipped[why] ?? 0) + 1; };
@@ -627,8 +728,10 @@ export function deriveDeals(rows, opts) {
   for (const r of candidates) {
     if (playersOf(r).length) { named.push(r); continue; }
     const mentioned = mentionedClubs(memo.sentences(r));
-    if (opts.requireVerdict && verdictOf(r, r.verdict_player) !== "not_move" && [...mentioned].some(isTopLeague) && needsJudgeUnnamed(r, opts.nowMs, opts.rejudge)) {
-      judgeNeeds.push({ id: r.id, playerKey: null, player: null, body: r.body, clubs: [...mentioned], source_id: r.source_id, external_id: r.external_id, url: r.url, summary_ko: r.summary_ko ?? null });
+    // "이동 아님"으로 끝난 행은 지시문이 바뀌었거나(`--rejudge-stale`) 본문 없이 났을 때만 다시 묻는다(`judgeMode`가 가른다)
+    const mode = opts.requireVerdict ? judgeMode(r, r.verdict_player ?? null, opts.nowMs, modeOpts) : null;
+    if (mode && [...mentioned].some(isTopLeague) && (verdictOf(r, r.verdict_player) !== "not_move" || modeOpts.stalePrompt || r.verdict_article_chars === 0)) {
+      judgeNeeds.push(judgeNeed(r, { playerKey: null, player: null, clubs: [...mentioned], mode, tier: JUDGE_TIER.explore }));
       skip("선수 없음(판정 대기)");
     } else skip("선수 없음");
   }
@@ -638,6 +741,16 @@ export function deriveDeals(rows, opts) {
     let group = grouped;
     if (opts.requireVerdict) {
       group = grouped.filter((r) => verdictOf(r, key) !== "not_move");
+      /*
+       * "이동 아님" 보도도 다시 물을 때가 있다 — 지시문이 바뀌었거나(`--rejudge-stale`·`--rejudge`) 매체 기사 본문 없이 난 판정이다
+       * (발췌만 보고 "이동 아님"이 영구히 남지 않게). 그 행은 딜에 들지 않으니 여기서 따로 넘긴다(5대 리그 구단이 걸린 것만).
+       */
+      for (const r of grouped.filter((x) => verdictOf(x, key) === "not_move")) {
+        const mode = judgeMode(r, key, opts.nowMs, modeOpts);
+        const mentioned = mentionedClubs(memo.sentences(r));
+        if (!mode || ![...mentioned].some(isTopLeague)) continue;
+        judgeNeeds.push(judgeNeed(r, { playerKey: key, player: displayName(grouped, key), clubs: [...mentioned], mode, tier: existing.has(dealKey(key)) ? JUDGE_TIER.existing : JUDGE_TIER.newDeal }));
+      }
       for (let i = group.length; i < grouped.length; i++) skip("이동 아님(LLM 판정)");
       if (!group.length) continue;
     }
@@ -664,12 +777,19 @@ export function deriveDeals(rows, opts) {
     }
     if (!items.length) continue;
     /*
-     * 판정받은 보도가 있는 딜은 **판정받은 보도만으로** 만든다. 아직 판정 전인 보도는 규칙이 읽은 단계·금액·방향을 들고 있는데,
-     * 그 값이 판정받은 값을 덮는다 — 이름만으로 묶인 부상 기사의 "medical"이 루머 딜의 단계가 됐다(회귀 실측). 판정 전 보도는
-     * 묻기만 하고(`askJudge`) 판정이 온 뒤에 딜에 든다. 판정이 하나도 없는 딜(판정이 멎은 동안의 기존 딜)은 지금처럼 전부 쓴다.
+     * 판정받은 보도가 있는 딜은 **단계·방향·금액·관심 구단을 판정받은 보도만으로** 정한다. 아직 판정 전인 보도는 규칙이 읽은
+     * 단계·금액·방향을 들고 있는데, 그 값이 판정받은 값을 덮는다 — 이름만으로 묶인 부상 기사의 "medical"이 루머 딜의 단계가 됐다.
+     * 판정이 하나도 없는 딜(판정이 멎은 동안의 기존 딜)은 지금처럼 전부 쓴다.
+     * ⚠ **보도 수·첫/최근 보도 시각·보도 배정은 "이동 아님"을 뺀 전 보도로** 센다(`reported`). 판정받은 보도만 세면 판정이 한 건씩
+     *   도착할 때마다 보도 수와 최근 시각이 오르내렸다(판정 상한 60건이 실행마다 일부만 판정한다).
      */
-    const queued = items;
+    const reported = items;
     if (opts.requireVerdict && items.some((it) => verdictOf(it.row, key) === "move")) items = items.filter((it) => verdictOf(it.row, key) === "move");
+    /*
+     * 판정 커버리지 — 판정을 기다리는 보도(그 선수의 판정이 없고, 반복 실패로 포기하지 않은 것)가 남았는가. 남았으면 단계의 **후퇴**는
+     * 미룬다(아래 `holdStage`) — 루머 10건 딜에 부인 1건만 먼저 판정되면 "부인" 알림이 나가고 다음 시간에 루머로 돌아왔다.
+     */
+    const awaiting = reported.some((it) => verdictOf(it.row, key) == null && (Number(it.row.verdict_attempts) || 0) < REPEATED_FAILURE_ATTEMPTS);
 
     const dir = resolveDirection(items, player, key);
     /*
@@ -708,7 +828,8 @@ export function deriveDeals(rows, opts) {
     }
     // 행선지 밖의 관심 구단(정규명, 유력한 순) — 이름 조회 대상이고 관문·자식 행의 근거다
     const suitorCanonicals = rankSuitors(items, key).filter((c) => c !== dir.from && c !== dir.to);
-    const stage = resolveStage(items);
+    const stored = storedDeal(dealKey(key));
+    const stage = opts.requireVerdict && awaiting && stored ? holdStage(resolveStage(items), stored.stage) : resolveStage(items);
     const { fee, prev, low, high } = resolveFee(items);
     const addOn = fee ? firstOf(items.flatMap((it) => it.storySentences), (ex) => (ex.addOnAmount != null && ex.addOnCurrency === fee.currency ? ex.addOnAmount : null), memo) : null;
     const wage = firstOf(items.flatMap((it) => it.storySentences), (ex) => ex.wageText, memo);
@@ -728,9 +849,10 @@ export function deriveDeals(rows, opts) {
      */
     // 이 딜의 보도 중 지금 물어야 할 것 — 아래 두 관문(미확인 선수 · 판정)이 함께 쓴다
     const askJudge = () => {
-      for (const it of queued) {
-        if (verdictOf(it.row, key) === "not_move" || !needsJudge(it.row, key, opts.nowMs, opts.rejudge, opts.upgradeVerdicts)) continue;
-        judgeNeeds.push({ id: it.row.id, playerKey: key, player, body: it.row.body, clubs: [...mentioned], source_id: it.row.source_id, external_id: it.row.external_id, url: it.row.url, summary_ko: it.row.summary_ko ?? null });
+      const tier = existing.has(dealKey(key)) ? JUDGE_TIER.existing : JUDGE_TIER.newDeal;
+      for (const it of reported) {
+        const mode = judgeMode(it.row, key, opts.nowMs, modeOpts);
+        if (mode) judgeNeeds.push(judgeNeed(it.row, { playerKey: key, player, clubs: [...mentioned], mode, tier }));
       }
     };
     if (opts.requireVerified && !names.isVerifiedPlayer(key)) {
@@ -756,7 +878,7 @@ export function deriveDeals(rows, opts) {
     if (opts.requireVerdict) {
       askJudge();
       const confirmed = items.some((it) => verdictOf(it.row, key) === "move");
-      if (!confirmed && !opts.existingKeys?.has(dealKey(key))) {
+      if (!confirmed && !existing.has(dealKey(key))) {
         unconfirmed.push(player);
         skip("판정 대기(LLM)");
         continue;
@@ -784,7 +906,7 @@ export function deriveDeals(rows, opts) {
     for (const c of [fromClub, toClub, ...suitorClubs]) if (c) clubs.set(c.code, c);
     if (!playerKo) missingKo.push(player);
 
-    const times = items.map((it) => ts(it.row));
+    const times = reported.map((it) => ts(it.row));
     deals.push({
       deal_key: dealKey(key),
       player: clampCp(player, 120),
@@ -808,22 +930,27 @@ export function deriveDeals(rows, opts) {
       // ⚠ 이적료가 확인되면 자유계약이 아니다(DB CHECK `transfer_deal_free_agent_no_fee`) — 화면은
       //   이적료가 있으면 금액, 없고 이 값이 켜졌으면 "FA(자유 계약)", 둘 다 아니면 "미공개"를 그린다
       is_free_agent: dir.isFree && !fee,
-      settled_at: resolveSettledAt(items, stage),
+      settled_at: settledAtFor(items, stage, awaiting ? stored : null),
       first_reported_at: new Date(Math.min(...times)).toISOString(),
       latest_reported_at: new Date(Math.max(...times)).toISOString(),
-      report_count: items.length,
-      rowIds: items.map((it) => it.row.id),
+      report_count: reported.length,
+      rowIds: reported.map((it) => it.row.id),
       // 관심 구단 코드(유력한 순 — `rankSuitors`) — `transfer_deal` 컬럼이 아니라 자식 행(`transfer_deal_suitor`)으로 쓴다
       suitorCodes: suitorClubs.map((c) => c.code),
     });
-    for (const it of items) assignments.set(it.row.id, dealKey(key));
+    for (const it of reported) assignments.set(it.row.id, dealKey(key));
   }
 
   if (unconfirmed.length) warnings.push(`이동 판정(LLM)을 받지 못한 새 딜 ${unconfirmed.length}건 — 보드에 올리지 않았다: ${unconfirmed.join(", ")}`);
   if (unverified.length) warnings.push(`확인되지 않은 선수 ${unverified.length}명 — 보드에 올리지 않았다(완료·확정 판정이나 출처 두 곳의 이동 판정이 오면 열린다. 선수가 맞으면 players-ko.json에 넣어 바로 연다): ${unverified.map((u) => u.player).join(", ")}`);
   if (missingKo.length) warnings.push(`한국어 표기가 없는 선수 ${missingKo.length}명(사람 사전·위키데이터 모두 없음) — 영문명으로 그려진다: ${missingKo.join(", ")}`);
   deals.sort((a, b) => b.latest_reported_at.localeCompare(a.latest_reported_at));
-  return { deals, clubs: [...clubs.values()], assignments, nameNeeds, judgeNeeds, clubNeeds, fromFallback, warnings, skipped, startMs };
+  // 같은 이유로 연달아 실패한 행 — 실행 요약과 Actions 경고가 센다(사람이 원인을 봐야 한다)
+  const repeatedFailures = reps.filter((r) => (Number(r.verdict_attempts) || 0) >= REPEATED_FAILURE_ATTEMPTS).length;
+  return {
+    deals, clubs: [...clubs.values()], assignments, nameNeeds, judgeNeeds: orderJudgeNeeds(judgeNeeds, { limit: opts.judgeLimit ?? JUDGE_MAX_PER_RUN }),
+    clubNeeds, fromFallback, warnings, skipped, startMs, repeatedFailures,
+  };
 }
 
 /** 요약(로그·드라이런) */
@@ -870,7 +997,7 @@ async function loadRows(supabase, startMs) {
   for (;;) {
     const { data, error } = await supabase
       .from(NEWS)
-      .select("id, source_id, external_id, url, stage, players, clubs, body, published_at, relevance, deal_id, verdict, verdict_player, verdict_player_name, verdict_evidence, verdict_at, verdict_from, verdict_to, verdict_suitors, verdict_stage, verdict_fee_amount, verdict_fee_currency, verdict_fee_kind, verdict_raw, summary_ko")
+      .select("id, source_id, external_id, url, stage, players, clubs, body, published_at, relevance, deal_id, verdict, verdict_player, verdict_player_name, verdict_evidence, verdict_at, verdict_from, verdict_to, verdict_suitors, verdict_stage, verdict_fee_amount, verdict_fee_currency, verdict_fee_kind, verdict_raw, verdict_model, verdict_prompt, verdict_input, verdict_article_chars, verdict_attempts, summary_ko")
       .gte("published_at", new Date(startMs).toISOString())
       .or(`deal_id.not.is.null,and(stage.neq.unknown,relevance.gte.${MIN_RELEVANCE}),and(stage.eq.unknown,players.neq.{})`)
       .gt("id", lastId)
@@ -1126,7 +1253,8 @@ export async function writeDeals(supabase, derived, rows, opts = {}) {
 
 /**
  * 조회 → 파생 → 이름 조회 → LLM 판정·요약 → (dryRun이 아니면) 쓰기.
- * @param {{ dryRun?: boolean, rejudge?: boolean, nowMs?: number, log?: Console, fetchImpl?: typeof fetch, lookupNames?: boolean,
+ * `rejudgeStalePrompt`(지금 지시문의 지문)를 주면 다른 지문으로 난 판정만 다시 묻고, `judgeLimit`은 판정 상한이다(판정 함수에 넘긴 값과 같게).
+ * @param {{ dryRun?: boolean, rejudge?: boolean, rejudgeStalePrompt?: string | null, judgeLimit?: number, nowMs?: number, log?: Console, fetchImpl?: typeof fetch, lookupNames?: boolean,
  *   judge?: ((needs: object[], names: object) => Promise<{ updates: object[] }>) | null }} opts
  *   `judge`는 판정 함수(`judge.mjs`의 `runJudgements`를 호출부가 감싸 넘긴다). 없으면(키가 없다) 판정하지 않는다 —
  *   판정이 없는 **새** 딜은 열리지 않고 이미 있는 딜은 남는다. `rejudge`는 저장된 판정을 무시하고 전부 다시 묻는다.
@@ -1155,11 +1283,14 @@ export async function runDerivation(supabase, opts = {}) {
     for (const { id, ...fields } of replayed.updates) Object.assign(byId.get(id) ?? {}, fields);
     if (replayed.namesWritten) names = await loadNameBook(supabase);
   }
-  // 이미 저장된 딜 — 판정이 없어도 남긴다(판정이 멎은 시간에 보드가 통째로 비지 않게)
-  const existingKeys = new Set((await readAll(supabase, DEALS, "deal_key", "deal_key")).map((d) => d.deal_key));
+  // 이미 저장된 딜 — 판정이 없어도 남기고(판정이 멎은 시간에 보드가 통째로 비지 않게), 판정이 덜 찬 딜은 저장된 단계·결과 시각을 지킨다
+  const existingKeys = new Map((await readAll(supabase, DEALS, "deal_key, stage, settled_at", "deal_key")).map((d) => [d.deal_key, { stage: d.stage, settled_at: d.settled_at }]));
   // 이름을 찾아 다시 파생할 때 추출을 되풀이하지 않도록 메모를 여러 번의 파생이 나눠 쓴다
   const memo = createExtractMemo();
-  const derive = (rejudge = false) => deriveDeals(rows, { nowMs, windows, names, memo, requireVerified: true, requireVerdict: true, upgradeVerdicts: true, rejudge, existingKeys });
+  const derive = (rejudge = false) => deriveDeals(rows, {
+    nowMs, windows, names, memo, requireVerified: true, requireVerdict: true, upgradeVerdicts: true, rejudge, existingKeys,
+    rejudgeStalePrompt: opts.rejudgeStalePrompt ?? null, judgeLimit: opts.judgeLimit,
+  });
   let derived = derive(Boolean(opts.rejudge));
 
   /*
@@ -1203,6 +1334,16 @@ export async function runDerivation(supabase, opts = {}) {
    * 드라이런은 묻지 않는다(비용이 들고 DB에 쓴다) — 저장된 판정만으로 파생한다.
    */
   let judged = null;
+  // 이번 실행에 물을 대상의 모양(실행 요약) — 판정 뒤 다시 파생하면 judgeNeeds가 바뀌므로 묻기 전에 센다
+  const limit = opts.judgeLimit ?? JUDGE_MAX_PER_RUN;
+  const asked = derived.judgeNeeds.slice(0, limit);
+  const needStats = {
+    total: derived.judgeNeeds.length,
+    asked: asked.length,
+    summaryOnly: asked.filter((x) => x.mode === "summary").length,
+    explore: asked.filter((x) => x.playerKey == null).length,
+    deferred: Math.max(0, derived.judgeNeeds.length - limit),
+  };
   if (!opts.dryRun && opts.judge && derived.judgeNeeds.length) {
     judged = await opts.judge(derived.judgeNeeds, names);
     const byId = new Map(rows.map((r) => [r.id, r]));
@@ -1226,6 +1367,8 @@ export async function runDerivation(supabase, opts = {}) {
     warnings: [...derived.warnings, ...(lookup?.warnings ?? []), ...(clubLookup?.warnings ?? []), ...(replayed?.warnings.filter((w) => !w.includes("판정 불가")) ?? []), ...(judged?.warnings ?? [])],
     skipped: derived.skipped,
     deals: derived.deals,
+    needStats,
+    repeatedFailures: derived.repeatedFailures,
     write,
     lookup,
     clubLookup,

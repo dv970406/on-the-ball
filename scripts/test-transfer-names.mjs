@@ -3,7 +3,7 @@
  *
  *   node scripts/test-transfer-names.mjs
  */
-import { CLUB_RECHECK_MS, RECHECK_MS, cacheLlmNames, canonicalClubName, createNameBook, lookupAndCache, missingNames, renameInSummary, shortClubName, syncDictionaryNames } from "./lib/transfer/names-ko.mjs";
+import { CLUB_RECHECK_MS, RECHECK_MS, cacheLlmNames, canonicalClubName, createNameBook, formatNewNameLog, lookupAndCache, missingNames, pickConsensusKo, renameInSummary, shortClubName, shortKoClubName, syncDictionaryNames } from "./lib/transfer/names-ko.mjs";
 import { koLabel, lookupKo, normalizeName, pickCurrentClub, pickEntity, toHits } from "./lib/transfer/wikidata.mjs";
 
 let pass = 0;
@@ -98,6 +98,14 @@ check("약칭 — 뒤 CF", shortClubName("인터 마이애미 CF") === "인터 �
 check("약칭 — 앞 VfL", shortClubName("VfL 볼프스부르크") === "볼프스부르크");
 check("약칭 — 걷을 게 없으면 그대로", shortClubName("리버풀") === "리버풀");
 check("약칭 — 다 걷어 비면 원래 이름", shortClubName("FC") === "FC");
+check("요약용 짧은 이름 — 뒤 AFC·JK·FC를 걷는다", shortKoClubName("헐 시티 AFC") === "헐 시티" && shortKoClubName("베식타시 JK") === "베식타시" && shortKoClubName("알파이하 FC") === "알파이하");
+check("요약용 짧은 이름 — 앞 SK, 앞뒤 둘 다, S.p.A.", shortKoClubName("SK 슈투름 그라츠") === "슈투름 그라츠" && shortKoClubName("FC 바젤 1893 AG") === "바젤 1893 AG" && shortKoClubName("AC 몬차 S.p.A.") === "몬차");
+check("요약용 짧은 이름 — 프리셋 구단은 프리셋 약칭(파리 FC는 파리가 되지 않는다)", shortKoClubName("파리 FC") === "파리 FC" && shortKoClubName("AC 밀란") === "밀란" && shortKoClubName("함부르크 SV") === "함부르크");
+check("요약용 짧은 이름 — 걷을 게 없으면 그대로, 다 걷어 비면 원래 이름", shortKoClubName("리버풀") === "리버풀" && shortKoClubName("FC") === "FC");
+check("다수결 — 많은 쪽, 공백 차이는 같은 표기", eq(pickConsensusKo(["주앙 고메스", "조앙 고메스", "주앙고메스"], null), { ko: "주앙 고메스", split: false, variants: 2 }));
+check("다수결 — 동률이면 참고값과 같은 쪽", eq(pickConsensusKo(["곤살루 이나시우", "곤살로 이나시오"], "곤살루 이나시우"), { ko: "곤살루 이나시우", split: false, variants: 2 }));
+check("다수결 — 동률이고 참고값도 없으면 고르지 않는다", eq(pickConsensusKo(["마누 코네", "마뉴 코네"], "에마누엘 코네"), { ko: null, split: true, variants: 2 }));
+check("다수결 — 하나뿐이면 그것, 비면 null", eq(pickConsensusKo(["코디 각포"], null), { ko: "코디 각포", split: false, variants: 1 }) && eq(pickConsensusKo([], null), { ko: null, split: false, variants: 0 }));
 
 // ── 우선순위: 사람 > 캐시 ─────────────────────────────────────────────────
 const NOW = Date.parse("2026-09-25T00:00:00Z");
@@ -170,10 +178,14 @@ check("사전 — 조회 대상: 없는 행·재확인 주기가 지난 행(찾�
   ];
   const book = createNameBook({ players: { "erling haaland": { ko: "엘링 홀란드" } }, cache });
   check("표기 — 믿는 표기는 사람 사전과 통용 표기뿐이다(위키데이터 레이블은 판정자에게 넘기지 않는다)", book.playerKoTrusted("erling haaland") === "엘링 홀란드" && book.playerKoTrusted("isaac konde") === "아이작 콘데" && book.playerKoTrusted("cody gakpo") === null && book.playerKo("cody gakpo") === "코디 가크포");
+  check("참고값 — 위키데이터 레이블만 있을 때 그 값, 사람 사전·통용 표기가 있거나 레이블이 없으면 null", book.playerKoReference("cody gakpo") === "코디 가크포" && book.playerKoReference("erling haaland") === null && book.playerKoReference("isaac konde") === null && book.playerKoReference("thiago silva") === null && book.playerKoReference("nobody") === null);
   check("성으로 찾기 — 아는 선수(사전 · 확인된 캐시) 중 그 성을 가진 선수", eq(book.playersBySurname("haaland"), [{ key: "erling haaland", name: "Erling Haaland" }]) && book.playersBySurname("silva").length === 2 && book.playersBySurname("konde").length === 0);
 
   check("요약 표기 — 전체 이름과 성 부분을 함께 바꾼다", renameInSummary("리버풀의 판 데이크가 떠난다. 버질 판 데이크는", "버질 판 데이크", "버질 반 다이크") === "리버풀의 반 다이크가 떠난다. 버질 반 다이크는");
   check("요약 표기 — 받침이 달라지면 조사를 맞추고, 이미 바뀐 글자를 또 늘리지 않는다", renameInSummary("엘링 홀란과 홀란드, 홀란은", "엘링 홀란", "엘링 홀란드") === "엘링 홀란드와 홀란드, 홀란드는");
+  check("요약 표기 — 조사 뒤에 조사가 더 붙어도 받침을 맞춘다(홀란과의 → 홀란드와의)", renameInSummary("맨시티는 엘링 홀란과의 재계약, 홀란과도 논의", "엘링 홀란", "엘링 홀란드") === "맨시티는 엘링 홀란드와의 재계약, 홀란드와도 논의", renameInSummary("맨시티는 엘링 홀란과의 재계약, 홀란과도 논의", "엘링 홀란", "엘링 홀란드"));
+  check("요약 표기 — 새 이름이 옛 이름을 품어도 두 번 바꾸지 않는다(마누 코네 → 에마누엘 마누 코네)", renameInSummary("마누 코네가 떠난다. 코네는 로마행, 에마누엘 마누 코네", "마누 코네", "에마누엘 마누 코네") === "에마누엘 마누 코네가 떠난다. 마누 코네는 로마행, 에마누엘 마누 코네", renameInSummary("마누 코네가 떠난다. 코네는 로마행, 에마누엘 마누 코네", "마누 코네", "에마누엘 마누 코네"));
+  check("요약 표기 — 두 글자 성은 낱말 경계에서만 바꾼다(네투어 ≠ 네투)", renameInSummary("페드루 네투가 독일 네투어 매체에 말했다. 네투의 이적", "페드루 네투", "페드루 네토") === "페드루 네토가 독일 네투어 매체에 말했다. 네토의 이적", renameInSummary("페드루 네투가 독일 네투어 매체에 말했다. 네투의 이적", "페드루 네투", "페드루 네토"));
   check("요약 표기 — 가크포를 → 각포를", renameInSummary("코디 가크포의 이적, 가크포를 원한다", "코디 가크포", "코디 각포") === "코디 각포의 이적, 각포를 원한다");
 
   // 쓰기 흐름 — 가짜 DB(쓴 것을 모은다)
@@ -185,8 +197,19 @@ check("사전 — 조회 대상: 없는 행·재확인 주기가 지난 행(찾�
   };
   const db1 = fake([{ id: 7, summary_ko: "코디 가크포의 이적이 무산됐다." }]);
   const wrote = await cacheLlmNames(db1, [{ key: "cody gakpo", name: "Cody Gakpo", ko: "코디 각포" }, { key: "erling haaland", name: "Erling Haaland", ko: "엘링 홀란" }, { key: "isaac konde", name: "Isaac Konde", ko: "이삭 콘데" }], book);
-  check("통용 표기 — 위키데이터 레이블을 덮고 항목 id는 남긴다(사람 사전·앞선 통용 표기는 건드리지 않는다)", wrote === 1 && eq(db1.log.upserts.map((r) => [r.key, r.name_ko, r.wikidata_id, r.source]), [["cody gakpo", "코디 각포", "Q1", "llm"]]), JSON.stringify(db1.log.upserts));
+  check("통용 표기 — 위키데이터 레이블을 덮고 항목 id는 남긴다(사람 사전·앞선 통용 표기는 건드리지 않는다)", wrote.written === 1 && eq(db1.log.upserts.map((r) => [r.key, r.name_ko, r.wikidata_id, r.source]), [["cody gakpo", "코디 각포", "Q1", "llm"]]), JSON.stringify(db1.log.upserts));
   check("통용 표기 — 레이블을 덮으면 이미 쓴 요약도 바꾼다", eq(db1.log.updates, [{ table: "transfer_news", id: 7, summary_ko: "코디 각포의 이적이 무산됐다." }]), JSON.stringify(db1.log.updates));
+
+  check("통용 표기 — 새로 쓴 표기를 참고값(위키데이터 레이블)과 함께 돌려준다", eq(wrote.added, [{ key: "cody gakpo", ko: "코디 각포", reference: "코디 가크포" }]), JSON.stringify(wrote.added));
+  check("통용 표기 — 로그 한 줄", formatNewNameLog(wrote.added[0]) === "신규 통용 표기: cody gakpo = 코디 각포 (위키데이터: 코디 가크포)" && formatNewNameLog({ key: "x", ko: "엑스", reference: null }) === "신규 통용 표기: x = 엑스 (위키데이터: 없음)");
+
+  // 한 실행에서 같은 선수에게 표기가 여럿 — 먼저 온 값이 아니라 다수결
+  const db4 = fake();
+  const many = await cacheLlmNames(db4, [
+    { key: "joao gomes", name: "Joao Gomes", ko: "조앙 고메스" }, { key: "joao gomes", name: "Joao Gomes", ko: "주앙 고메스" }, { key: "joao gomes", name: "Joao Gomes", ko: "주앙 고메스" },
+    { key: "manu kone", name: "Manu Kone", ko: "마누 코네" }, { key: "manu kone", name: "Manu Kone", ko: "마뉴 코네" },
+  ], book);
+  check("통용 표기 — 같은 선수의 여러 표기는 다수결로 한 행만 쓰고, 동률로 갈리면 쓰지 않는다", eq(db4.log.upserts.map((r) => [r.key, r.name_ko]), [["joao gomes", "주앙 고메스"]]) && eq(many.split, [{ key: "manu kone", candidates: ["마누 코네", "마뉴 코네"] }]), JSON.stringify([db4.log.upserts, many.split]));
 
   const db2 = fake();
   const found = async () => ({ ok: true, json: async () => ({}) });

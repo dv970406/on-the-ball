@@ -65,3 +65,39 @@ export function clubCode(canonical) {
 export function presetClubs() {
   return Object.keys(load().presets).filter((k) => !k.startsWith("_"));
 }
+
+/** 구단 형태를 나타내는 법인 약어 — 한국어 구단명의 앞뒤에 남은 것(위키데이터 레이블 "헐 시티 AFC"·"베식타시 JK"·"SK 슈투름 그라츠") */
+const LEADING_FORM = /^(?:1\.\s*)?(?:A?FC|CF|SC|AC|SSC|FK|NK|SK|VfL|VfB|RB)\s+/u;
+const TRAILING_FORM = /\s+(?:A?FC|CF|SC|AC|SSC|FK|NK|SK|JK|BK|SAD|S\.A\.D\.|SpA|S\.p\.A\.)$/u;
+
+/**
+ * 한국어 구단명의 짧은 이름 — 요약 문장에 들어갈 이름이다("헐 시티 AFC" → "헐 시티", "베식타시 JK" → "베식타시").
+ * 프리셋 구단은 프리셋의 약칭을 그대로 쓴다 — "파리 FC"의 FC를 걷으면 "파리"(파리 생제르맹으로 읽힌다)가 되므로 사람이 정한 값이 이긴다.
+ * 그 밖은 앞뒤의 법인 약어를 걷는다(여럿이면 전부). 다 걷어서 비면 원래 이름이다.
+ * `names-ko.mjs`의 `shortClubName`(구단 행의 `short_name` — 앞뒤 한 겹만 걷는다)과 다른 함수다: 그쪽은 화면 표기라 바꾸지 않는다.
+ * @param {string} koName
+ */
+export function shortKoClubName(koName) {
+  if (!koName) return koName;
+  const name = koName.trim();
+  const preset = presetShortByKoName().get(name);
+  if (preset) return preset;
+  let short = name;
+  for (let prev = null; prev !== short; ) {
+    prev = short;
+    short = short.replace(LEADING_FORM, "").replace(TRAILING_FORM, "").trim();
+  }
+  return short || name;
+}
+
+let presetShorts = null;
+/** 프리셋 구단의 한국어 정식명 → 약칭 */
+function presetShortByKoName() {
+  if (presetShorts) return presetShorts;
+  presetShorts = new Map();
+  for (const canonical of presetClubs()) {
+    const d = clubDisplay(canonical);
+    if (d.league) presetShorts.set(d.name, d.short);
+  }
+  return presetShorts;
+}

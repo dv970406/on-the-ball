@@ -5,7 +5,8 @@
  *   node scripts/test-transfer-judge.mjs
  */
 import { createNameBook } from "./lib/transfer/names-ko.mjs";
-import { evidenceIn, fullNameFor, judgeFee, localizeSummary, moneyMentions, replayJudgements, isEnumeratedWith, loneOtherClub, normalizeDestination,
+import { JUDGE_CONFIGS, judgeFingerprint, prepareJudgeInput } from "./lib/transfer/judge-prompt.mjs";
+import { evidenceIn, fullNameFor, koNameOf, sourceFingerprint, judgeFee, localizeSummary, moneyMentions, replayJudgements, isEnumeratedWith, loneOtherClub, normalizeDestination,
   ARTICLE_MAX_CHARS,
   BODY_MAX_CHARS,
   EVIDENCE_MAX_CHARS,
@@ -150,6 +151,8 @@ const BODY = "Udinese have reached a verbal agreement with David Alaba! Austrian
   }
   check("요약 이름 — 영문 이름과 모델의 제 표기를 사전 표기로, 영문으로 남은 구단을 한국어로", localizeSummary("맨유의 JJ Gabriel과 JJ 개브리얼을 Sporting CP가 원한다.", { player: "JJ Gabriel", playerKoByModel: "JJ 개브리얼", ko: "JJ 가브리엘", rawClubs: ["Sporting CP"], clubKo: () => "스포르팅 CP" }) === "맨유의 JJ 가브리엘과 JJ 가브리엘을 스포르팅 CP가 원한다.");
   check("요약 이름 — ⚠ 이미 한국어 이름이 적힌 구단은 다시 바꾸지 않는다(PSV 에인트호번 에인트호번)", localizeSummary("PSV 에인트호번 소속 미드필더", { player: "X Y", playerKoByModel: null, ko: null, rawClubs: ["PSV"], clubKo: () => "PSV 에인트호번" }) === "PSV 에인트호번 소속 미드필더");
+  check("요약 이름 — 영문 성만 남은 자리도 사전 표기의 성으로(Gakpo는 → 각포는)", localizeSummary("리버풀이 Cody Gakpo를 원한다. Gakpo는 남는다.", { player: "Cody Gakpo", playerKoByModel: null, ko: "코디 각포" }) === "리버풀이 코디 각포를 원한다. 각포는 남는다.");
+  check("요약 이름 — ⚠ 성은 라틴 낱말 경계에서만, 3자 미만 성은 바꾸지 않는다", localizeSummary("Gakposon과 Gakpo", { player: "Cody Gakpo", ko: "코디 각포" }) === "Gakposon과 각포" && localizeSummary("Sá와 Lu가", { player: "José Sá", ko: "주제 사" }) === "Sá와 Lu가");
   check("요약 이름 — 사전 표기가 없으면 그대로 둔다", localizeSummary("Dany Freire가 이적했다.", { player: "Dany Freire", playerKoByModel: null, ko: null }) === "Dany Freire가 이적했다.");
   check("요약 — ⚠ 한자가 섞이면 버린다", judgeSummary("각포는 英 언론의 관심을 받았다.", {}).reason?.includes("英"));
   check("요약 — ⚠ 아랍 문자가 섞이면 버린다", Boolean(judgeSummary("알라바가 메دي컬을 진행한다.", {}).reason));
@@ -196,6 +199,9 @@ const MANZAMBI = "Johan Manzambi addresses rumours after €70m Aston Villa tran
 }
 check("단계 — 목록 밖 값은 null", parseJudgement(J({ move: true, stage: "done", evidence: "Austrian star", summary_ko: "요약." }), BODY, ALABA).stage === null && JUDGE_STAGES.includes("here_we_go") && !JUDGE_STAGES.includes("unknown"));
 check("한글 표기 — 한글 낱말만 받는다", isKoName("다비드 알라바") && isKoName("응골로 캉테") && !isKoName("David Alaba") && !isKoName("알라바!") && !isKoName("가".repeat(41)));
+check("한글 표기 — 라틴 대문자 머리글자(1~3자)는 받는다(JJ 가브리엘 — 거부했더니 요약마다 표기가 갈렸다)", isKoName("JJ 가브리엘") && isKoName("CJ 이건") && isKoName("에밀 스미스-로우"));
+check("한글 표기 — ⚠ 머리글자만·4자 이상·소문자·다른 문자는 받지 않는다", !isKoName("JJ") && !isKoName("ABCD 가브리엘") && !isKoName("Jj 가브리엘") && !isKoName("빅토르 עיוケレス") && !isKoName("빅토르 ケレス"));
+check("한글 표기 — 교정표를 적용하고 받는다(요약은 각포인데 제목은 가크포로 남았다)", koNameOf("코디 가크포", { "가크포": "각포" }) === "코디 각포" && koNameOf("Cody Gakpo", {}) === null);
 check("한글 표기 — 형식이 틀리면 null", parseJudgement(J({ move: true, player_ko: "Alaba", evidence: "Austrian star", summary_ko: "요약." }), BODY, ALABA).playerKo === null);
 
 // ── 구단 — 원문에 있는 이름만, 사전 → 위키데이터 확인 ──────────────────────────
@@ -240,7 +246,7 @@ const names = createNameBook({ players: { "david alaba": { ko: "다비드 알라
   const need = { player: "David Alaba", playerKey: "david alaba", body: "🚨 Alaba joins Udinese https://t.co/DOzpNRhhbi pic.twitter.com/abc123 — here we go!", clubs: ["Real Madrid", "Udinese", "Watford", "Kolkheti 1913"] };
   const req = buildJudgeRequest(need, names, "system");
   check("요청 — 사용자가 고른 모델", req.model === JUDGE_MODEL);
-  check("요청 — 생각을 끈다(짧은 판정·두 줄 요약)", eq(req.thinking, { type: "disabled" }));
+  check("요청 — 생각 설정은 운영 설정을 따른다", eq(req.thinking, (await import("./lib/transfer/judge-prompt.mjs")).JUDGE_CONFIG.thinking));
   check("요청 — 출력을 JSON 스키마로 고정하고 effort를 낮춘다", req.output_config.effort === "low" && eq(req.output_config.format, { type: "json_schema", schema: JUDGE_SCHEMA }));
   check("요청 — 지시문에 캐시 표식이 있다(모든 호출이 같은 문자열)", req.system[0].cache_control.type === "ephemeral" && req.system[0].text === "system");
   check("요청 — 도구가 없다(웹 검색·열기 금지)", !("tools" in req) && !("tool_choice" in req));
@@ -250,7 +256,7 @@ const names = createNameBook({ players: { "david alaba": { ko: "다비드 알라
   check("요청 — 표기는 그 보도의 구단·선수 중 표기가 있는 것만(프리셋 · 자동 캐시 · 사람 사전)",
     eq(buildGlossary(need, names), ["Real Madrid = 레알 마드리드", "Udinese = 우디네세", "Watford = 왓퍼드 FC", "David Alaba = 다비드 알라바"]), JSON.stringify(buildGlossary(need, names)));
   check("요청 — 같은 입력이면 같은 요청(변동값이 없다)", JSON.stringify(req) === JSON.stringify(buildJudgeRequest(need, names, "system")));
-  check("요청 — 스키마는 모든 필드를 요구하고 다른 필드를 막는다", JUDGE_SCHEMA.additionalProperties === false && eq(JUDGE_SCHEMA.required, ["move", "timing", "player", "player_ko", "stage", "from", "to", "suitors", "fee", "evidence", "summary_ko"]));
+  check("요청 — 스키마는 모든 필드를 요구하고 다른 필드를 막는다", JUDGE_SCHEMA.additionalProperties === false && eq(JUDGE_SCHEMA.required, ["evidence_ids", "timing", "player", "why", "move", "stage", "from", "to", "suitors", "fee", "player_ko", "summary_ko"]));
 }
 {
   const sys = buildSystem({ "pre-contract": "사전 계약" });
@@ -312,14 +318,14 @@ const noLookup = async () => ({ wikidataId: null, nameKo: null });
     { id: 2, playerKey: "thomas tuchel", player: "Thomas Tuchel", body: "Alan Shearer in agreement with Thomas Tuchel after brutal Cole Palmer blast" },
     { id: 3, playerKey: "joao pedro", player: "Joao Pedro", body: "Joao Pedro agreement reached after bold Xabi Alonso verdict" },
     { id: 4, playerKey: "rayan cherki", player: "Rayan Cherki", body: "Rayan Cherki on dreaming to win the Ballon d'Or" },
-    { id: 5, playerKey: "david alaba", player: "David Alaba", body: BODY + " (2)", summary_ko: "옛 요약." },
+    { id: 5, playerKey: "david alaba", player: "David Alaba", body: BODY + " Second report here.", summary_ko: "옛 요약." },
     { id: 6, playerKey: null, player: null, body: MANZAMBI, clubs: ["Aston Villa"] },
     { id: 7, playerKey: null, player: null, body: "Liverpool confirm a £47m agreement to sign a South American star." },
   ];
   const r = await runJudgements(db, needs, {
     names, corrections: {}, lookup: noLookup,
     client: fakeClient([
-      ["Austrian star leaves Real Madrid as a free agent. (2)", J({ move: true, from: "Real Madrid", to: "Udinese", evidence: "Austrian star", summary_ko: "English only" })],
+      ["Second report here.", J({ move: true, from: "Real Madrid", to: "Udinese", evidence: "Austrian star", summary_ko: "English only" })],
       ["David Alaba", J({ move: true, from: "Real Madrid", to: "Udinese", stage: "agreement", evidence: "reached a verbal agreement with David Alaba", summary_ko: "다비드 알라바가 우디네세와 구두 합의했다." })],
       ["Thomas Tuchel", J({ move: false, evidence: "Alan Shearer in agreement with Thomas Tuchel" })],
       ["Joao Pedro", J({ move: true, to: "Arsenal", evidence: "Joao Pedro completes move to Arsenal", summary_ko: "요약." })],
@@ -333,9 +339,10 @@ const noLookup = async () => ({ wikidataId: null, nameKo: null });
   check("저장 — 이동·아님·판정 불가는 쓰고, 일시 실패는 쓰지 않는다(다음 실행이 다시 묻는다)", eq(db.writes.map((w) => w.id), [1, 2, 3, 5, 6, 7]));
   const w1 = db.writes[0];
   check("저장 — 이동은 판정·선수·근거·구단·단계·관심 구단·요약·시각을 쓴다",
-    eq(Object.keys(w1).sort(), ["id", "summary_ko", "verdict", "verdict_at", "verdict_evidence", "verdict_fee_amount", "verdict_fee_currency", "verdict_fee_kind", "verdict_from", "verdict_player", "verdict_player_name", "verdict_raw", "verdict_stage", "verdict_suitors", "verdict_to"]) && typeof w1.verdict_raw === "string" && JSON.parse(w1.verdict_raw).move === true && w1.verdict_from === "Real Madrid" && w1.verdict_to === "Udinese" && w1.verdict_stage === "agreement" && w1.verdict_player_name === "David Alaba" && w1.summary_ko === "다비드 알라바가 우디네세와 구두 합의했다.", JSON.stringify(w1));
+    eq(Object.keys(w1).sort(), ["id", "summary_ko", "verdict", "verdict_article_chars", "verdict_at", "verdict_attempts", "verdict_evidence", "verdict_fee_amount", "verdict_fee_currency", "verdict_fee_kind", "verdict_from", "verdict_input", "verdict_model", "verdict_player", "verdict_player_name", "verdict_prompt", "verdict_raw", "verdict_stage", "verdict_suitors", "verdict_to"]) && typeof w1.verdict_raw === "string" && JSON.parse(w1.verdict_raw).move === true && w1.verdict_from === "Real Madrid" && w1.verdict_to === "Udinese" && w1.verdict_stage === "agreement" && w1.verdict_player_name === "David Alaba" && w1.summary_ko === "다비드 알라바가 우디네세와 구두 합의했다.", JSON.stringify(w1));
   check("저장 — 아님은 요약을 비우고 근거를 남긴다", db.writes[1].verdict === "not_move" && db.writes[1].summary_ko === null && db.writes[1].verdict_evidence === "Alan Shearer in agreement with Thomas Tuchel" && db.writes[1].verdict_from === null);
-  check("저장 — 판정 불가는 값 없이 선수·시각만(요약은 건드리지 않는다)", db.writes[2].verdict === null && db.writes[2].verdict_player === "joao pedro" && db.writes[2].verdict_at && !("summary_ko" in db.writes[2]));
+  check("저장 — 옛 판정 없는 판정 불가는 값 없이 선수·시각·실패 횟수만, 요약은 비운다(재계약·회고 요약이 남지 않게)", db.writes[2].verdict === null && db.writes[2].verdict_player === "joao pedro" && db.writes[2].verdict_at && db.writes[2].summary_ko === null && db.writes[2].verdict_attempts === 1);
+  check("저장 — 성공은 실패 횟수를 0으로, 출처(모델·지시문 지문·원문 지문)를 남긴다", w1.verdict_attempts === 0 && w1.verdict_model === JUDGE_MODEL && w1.verdict_prompt === judgeFingerprint(buildSystem()) && w1.verdict_input === sourceFingerprint(prepareJudgeInput(needs[0]).numbered.text) && w1.verdict_article_chars === null);
   check("저장 — 요약이 버려졌는데 옛 요약이 있으면 둔다(영문으로 되돌리지 않는다)", db.writes[3].verdict === "move" && !("summary_ko" in db.writes[3]));
   check("저장 — 선수 없는 보도는 모델이 읽은 선수를 정규형 키와 원문 표기로 남긴다", db.writes[4].verdict === "move" && db.writes[4].verdict_player === "johan manzambi" && db.writes[4].verdict_player_name === "Johan Manzambi" && db.writes[4].verdict_to === "Aston Villa");
   check("저장 — 선수 없는 보도에서 선수를 못 특정하면 이동 아님으로 접는다(선수 null · 근거는 남긴다 · 다시 묻지 않는다)", db.writes[5].verdict === "not_move" && db.writes[5].verdict_player === null && db.writes[5].verdict_evidence === "agreement to sign a South American star");
@@ -382,6 +389,7 @@ const noLookup = async () => ({ wikidataId: null, nameKo: null });
   check("흐름 — 못 받으면 저장된 글만으로 판정한다(근거가 없으면 근거만 비운다)", !sent[1].includes("[기사 본문]") && db.writes[1].verdict === "not_move" && db.writes[1].verdict_evidence === null);
   check("흐름 — 텔레그램은 받지 않는다", fetched.length === 2 && !fetched.some((u) => u.includes("t.me")));
   check("흐름 — 받은/못 받은 수를 센다", r.articles === 1 && r.articleMissing === 1);
+  check("흐름 — 본문을 받은 판정은 글자 수와 실패 0, 못 받은 판정은 0자·실패 1, 텔레그램은 null", db.writes[0].verdict_article_chars > 0 && db.writes[0].verdict_attempts === 0 && db.writes[1].verdict_article_chars === 0 && db.writes[1].verdict_attempts === 1 && db.writes[2].verdict_article_chars === null);
 }
 {
   // 계정 사용 한도 — 첫 거부에서 멈춘다(남은 호출이 전부 곧바로 거부된다)
@@ -396,6 +404,117 @@ const noLookup = async () => ({ wikidataId: null, nameKo: null });
   const broke = { messages: { create: async () => { creditCalls += 1; throw new Anthropic.BadRequestError(400, { type: "error", error: { type: "invalid_request_error", message: "Your credit balance is too low to access the Anthropic API." } }, "Your credit balance is too low to access the Anthropic API.", new Headers()); } } };
   const r2 = await runJudgements(fakeDb(), [1, 2, 3].map((id) => ({ id, playerKey: "david alaba", player: "David Alaba", body: BODY })), { names, corrections: {}, lookup: noLookup, client: broke });
   check("크레딧 소진 — 첫 거부에서 멈춘다", creditCalls === 1 && r2.warnings.some((w) => w.includes("사용 한도")));
+}
+
+// ── 새 출력 형식 — 근거는 문장 번호(evidence_ids) ─────────────────────────────
+const N = (o) => JSON.stringify({ evidence_ids: [], timing: "current", player: null, why: "짧은 설명", move: false, stage: null, from: null, to: null, suitors: [], fee: null, player_ko: null, summary_ko: null, ...o });
+{
+  const { sentText, numbered } = prepareJudgeInput({ body: BODY });
+  const opt = { ...ALABA, sentences: numbered.sentences };
+  const r = parseJudgement(N({ evidence_ids: [1], move: true, stage: "agreement", from: "Real Madrid", to: "Udinese", summary_ko: "다비드 알라바가 우디네세와 구두 합의했다." }), sentText, opt);
+  check("번호 근거 — 번호의 문장이 근거가 된다(대조할 인용이 없다)", r.kind === "move" && r.evidence === "Udinese have reached a verbal agreement with David Alaba!" && r.to === "Udinese", JSON.stringify(r));
+  check("번호 근거 — 여러 번호는 문장을 이어 붙이고 중복은 접는다", parseJudgement(N({ evidence_ids: [1, 2, 1], move: true, summary_ko: "요약." }), sentText, opt).evidence === numbered.sentences.join(" "));
+  const out = parseJudgement(N({ evidence_ids: [1, 9], move: true, summary_ko: "요약." }), sentText, opt);
+  check("번호 근거 — 범위 밖 번호가 있으면 이동은 판정 불가(사유에 번호)", out.kind === "invalid" && out.reason.includes("범위 밖") && out.reason.includes("9"), JSON.stringify(out));
+  check("번호 근거 — 0·소수·문자도 범위 밖", ["0", 1.5, "1"].every((x) => parseJudgement(N({ evidence_ids: [x], move: true, summary_ko: "요약." }), sentText, opt).kind === "invalid"));
+  check("번호 근거 — 이동인데 빈 배열이면 판정 불가", parseJudgement(N({ evidence_ids: [], move: true, summary_ko: "요약." }), sentText, opt).reason === "이동이라면서 근거가 없다");
+  check("번호 근거 — 이동 아님은 빈 배열이어도 받고 근거를 비운다", eq(parseJudgement(N({}), sentText, opt), { kind: "not_move", evidence: null }));
+  check("번호 근거 — 이동 아님의 범위 밖 번호는 근거만 버린다(다시 묻지 않는다)", eq(parseJudgement(N({ evidence_ids: [7] }), sentText, opt), { kind: "not_move", evidence: null }));
+  check("번호 근거 — 회고(past)는 번호와 무관하게 이동 아님", parseJudgement(N({ evidence_ids: [], move: true, timing: "past" }), sentText, opt).retrospective === true);
+  check("번호 근거 — 번호표 없이 번호 근거는 읽지 못한다(판정 불가)", parseJudgement(N({ evidence_ids: [1], move: true, summary_ko: "요약." }), sentText, ALABA).kind === "invalid");
+  {
+    const s4 = ["A.", "B.", "C.", "D."];
+    check("번호 근거 — 서로 다른 번호 4개면 앞 3개만", parseJudgement(N({ evidence_ids: [1, 2, 3, 4], move: true, summary_ko: "요약." }), "x", { ...NO_FIX, player: "X Y", sentences: s4 }).evidence === "A. B. C.");
+  }
+  check("옛 형식 — evidence 문자열 원출력도 지금처럼 인용 대조로 읽는다(재생 호환)", parseJudgement(J({ move: true, evidence: "reached a verbal agreement with David Alaba", summary_ko: "요약." }), sentText, opt).kind === "move");
+  // 금액 — 모델이 옮긴 원문 표기
+  const M = "Brighton want 60 million pounds plus add-ons for Yankuba Minteh. Liverpool bid £50m.";
+  const fee = (f) => parseJudgement(N({ evidence_ids: [1], move: true, summary_ko: "요약.", fee: f }), M, { ...NO_FIX, player: "Yankuba Minteh", sentences: ["Brighton want 60 million pounds plus add-ons for Yankuba Minteh.", "Liverpool bid £50m."] }).fee;
+  check("금액 — 원문 표기(text)가 원문에 그대로 있으면 받는다", eq(fee({ amount: 50, currency: "GBP", kind: "bid", text: "£50m" }), { amount: 50, currency: "GBP", kind: "bid" }));
+  check("금액 — ⚠ 표기가 원문에 있어도 읽히는 금액과 어긋나면 받지 않는다(£50m인데 55)", fee({ amount: 55, currency: "GBP", kind: "bid", text: "£50m" }) === null);
+  check("금액 — 표기가 원문에 없으면 원문 금액 읽기로 대조한다", eq(fee({ amount: 60, currency: "GBP", kind: "asking_price", text: "£60 million" }), { amount: 60, currency: "GBP", kind: "asking_price" }) && fee({ amount: 70, currency: "GBP", kind: "bid", text: "£70m" }) === null);
+}
+
+// ── 저장 — 옛 판정 지키기 · 요약만 다시 받기 · 출력 잘림 · 출처 · 통용 표기 다수결 ─────────
+{
+  const db = fakeDb();
+  const sys = "system";
+  const prevMove = { verdict: "move", verdict_player: "david alaba", verdict_stage: "agreement", verdict_to: "Udinese", verdict_attempts: 2, verdict_raw: "{}" };
+  const needs = [
+    // 판정 불가 + 같은 선수의 옛 판정 → 옛 판정을 지키고 시각·실패 횟수만
+    { id: 1, playerKey: "david alaba", player: "David Alaba", body: "Case one. " + BODY, prev: prevMove },
+    // 판정 불가 + 다른 선수의 옛 판정 → 판정을 비운다
+    { id: 2, playerKey: "david alaba", player: "David Alaba", body: "Case two. " + BODY, prev: { ...prevMove, verdict_player: "someone else" } },
+    // 요약만 다시 받기 — 새 답이 단계를 다르게 읽어도 판정은 그대로, 요약만 쓴다
+    { id: 3, playerKey: "david alaba", player: "David Alaba", body: "Case three. " + BODY, mode: "summary", prev: prevMove, summary_ko: null },
+    // 요약만 다시 받기 실패 — 요약·판정 그대로, 실패 횟수만 +1
+    { id: 4, playerKey: "david alaba", player: "David Alaba", body: "Case four. " + BODY, mode: "summary", prev: { ...prevMove, verdict_attempts: 0 }, summary_ko: null },
+    // 출력 상한에 잘림 — 옛 판정이 없으면 판정 불가로 비우고 원출력은 남기지 않는다
+    { id: 5, playerKey: "david alaba", player: "David Alaba", body: "Case five. " + BODY },
+    // 매체 RSS인데 본문을 못 받음 — 본문 글자 수 0
+    { id: 6, playerKey: "david alaba", player: "David Alaba", body: "Case six. " + BODY, source_id: "rss:bbc", url: "https://blocked.test/x" },
+  ];
+  const client = {
+    messages: {
+      create: async (req) => {
+        const body = req.messages[0].content;
+        const reply = (text, stop = "end_turn") => ({ stop_reason: stop, content: [{ type: "text", text }], usage: {} });
+        if (body.includes("Case one") || body.includes("Case two")) return reply(N({ evidence_ids: [99], move: true, summary_ko: "요약." }));
+        if (body.includes("Case three")) return reply(N({ evidence_ids: [2], move: true, stage: "official", to: "Udinese", summary_ko: "David Alaba가 우디네세로 간다." }));
+        if (body.includes("Case four")) return reply(N({ evidence_ids: [2], move: false }));
+        if (body.includes("Case five")) return reply('{"evidence_ids":[1],"timing":"cur', "max_tokens");
+        return reply(N({ evidence_ids: [2], move: true, to: "Udinese", summary_ko: "요약." }));
+      },
+    },
+  };
+  const fetchImpl = async () => ({ ok: false, status: 403, text: async () => "" });
+  const r = await runJudgements(db, needs, { names, corrections: {}, lookup: noLookup, client, fetchImpl, system: sys, config: JUDGE_CONFIGS["s55-adaptive"] });
+  const w = (id) => db.writes.find((x) => x.id === id);
+  check("옛 판정 지키기 — 같은 선수의 판정이 있으면 판정 불가가 지우지 않는다(시각·실패 횟수만)", eq(Object.keys(w(1)).sort(), ["id", "verdict_at", "verdict_attempts"]) && w(1).verdict_attempts === 3 && r.kept >= 1, JSON.stringify(w(1)));
+  check("옛 판정 지키기 — ⚠ 다른 선수의 판정은 지킬 판정이 아니다(비운다)", w(2).verdict === null && w(2).summary_ko === null && w(2).verdict_attempts === 3);
+  check("요약만 — 판정 컬럼·원출력은 건드리지 않고 요약·시각만 쓴다(요약 하나 때문에 단계가 흔들리지 않는다)", eq(Object.keys(w(3)).sort(), ["id", "summary_ko", "verdict_at", "verdict_attempts"]) && w(3).summary_ko === "다비드 알라바가 우디네세로 간다." && w(3).verdict_attempts === 0, JSON.stringify(w(3)));
+  check("요약만 — 요약을 못 받으면 요약은 그대로 두고 실패 횟수만 +1", eq(Object.keys(w(4)).sort(), ["id", "verdict_at", "verdict_attempts"]) && w(4).verdict_attempts === 1 && r.warnings.some((x) => x.includes("#4 요약 재시도 실패")));
+  check("출력 잘림 — 형식 깨짐이 아니라 출력 상한으로 알리고 원출력을 남기지 않는다", w(5).verdict === null && w(5).verdict_raw === null && r.truncated === 1 && r.warnings.some((x) => x.includes("#5") && x.includes("출력 상한")) && !r.warnings.some((x) => x.includes("#5") && x.includes("JSON")));
+  check("출처 — 모델은 설정의 모델, 지시문 지문은 그 설정 기준", w(6).verdict_model === "claude-sonnet-5-5" && w(6).verdict_prompt === judgeFingerprint(sys, JUDGE_CONFIGS["s55-adaptive"]) && w(6).verdict_prompt !== judgeFingerprint(sys, JUDGE_CONFIGS["s5-off"]));
+  check("출처 — 매체 RSS인데 본문을 못 받으면 0, 본문 소스가 아니면 null", w(6).verdict_article_chars === 0 && w(5).verdict_article_chars === null);
+  check("본문 못 받음 — 판정이 성공해도 실패 횟수 +1(파생이 본문 재시도를 센다)", w(6).verdict === "move" && w(6).verdict_attempts === 1);
+  check("출처 — 옛 판정을 지킨 행·요약만 받은 행은 출처 컬럼을 바꾸지 않는다", !("verdict_model" in w(1)) && !("verdict_model" in w(3)));
+}
+{
+  // 같은 실행에서 모델이 같은 선수를 갈라 적는다 — 첫 값이 차지하지 않고 다수결로 정한 뒤, 다른 표기로 쓴 요약을 맞춘다
+  const db = fakeDb();
+  const book = createNameBook({});
+  const body = (i) => `Report ${i}: Arsenal have agreed a deal for Joao Silva from Benfica.`;
+  const kos = { 1: "조앙 시우바", 2: "주앙 실바", 3: "주앙 실바" };
+  const sentBodies = [];
+  const client = { messages: { create: async (req) => {
+    sentBodies.push(req.messages[0].content);
+    const i = Number(req.messages[0].content.match(/Report (\d)/)[1]);
+    return { stop_reason: "end_turn", usage: {}, content: [{ type: "text", text: N({ evidence_ids: [1], move: true, stage: "agreement", to: "Arsenal", player_ko: kos[i], summary_ko: `${kos[i]}가 아스날로 간다.` }) }] };
+  } } };
+  const r = await runJudgements(db, [1, 2, 3].map((i) => ({ id: i, playerKey: "joao silva", player: "Joao Silva", body: body(i) })), { names: book, corrections: {}, lookup: noLookup, client });
+  const cached = db.upserts.flatMap((u) => u.rows).filter((x) => x.kind === "player");
+  check("다수결 — 통용 표기는 실행 끝에 다수결로 한 번 쓴다(첫 값이 차지하지 않는다)", cached.length === 1 && cached[0].name_ko === "주앙 실바", JSON.stringify(cached));
+  check("다수결 — 다른 표기로 쓴 이번 실행의 요약을 확정 표기로 맞춘다(DB와 updates 모두)", db.writes.some((x) => x.id === 1 && x.summary_ko === "주앙 실바가 아스날로 간다." && Object.keys(x).length === 2) && r.updates.find((u) => u.id === 1).summary_ko === "주앙 실바가 아스날로 간다." && r.summariesRenamed === 1, JSON.stringify(r.updates.map((u) => u.summary_ko)));
+  check("다수결 — 새 통용 표기를 로그로 남긴다", r.warnings.some((x) => x.includes("신규 통용 표기") && x.includes("주앙 실바")));
+  check("다수결 — 요청의 <표기>에 이번 실행의 첫 값을 싣지 않는다(뒤의 답이 첫 값을 따라가지 않게)", sentBodies.length === 3 && sentBodies.every((b) => !b.includes("조앙") && !b.includes("주앙")));
+}
+{
+  // 갈린 표기는 쓰지 않는다
+  const db = fakeDb();
+  let k = 0;
+  const kos = ["마누 코네", "마뉴 코네"];
+  const client = { messages: { create: async () => ({ stop_reason: "end_turn", usage: {}, content: [{ type: "text", text: N({ evidence_ids: [1], move: true, to: "Roma", player_ko: kos[k++ % 2], summary_ko: "요약." }) }] }) } };
+  const r = await runJudgements(db, [1, 2].map((id) => ({ id, playerKey: "manu kone", player: "Manu Kone", body: `Roma want Manu Kone now ${id}.` })), { names: createNameBook({}), corrections: {}, lookup: noLookup, client });
+  check("다수결 — 표기가 반반으로 갈리면 쓰지 않고 경고한다", !db.upserts.some((u) => u.rows.some((x) => x.kind === "player")) && r.warnings.some((x) => x.includes("표기가 갈려") && x.includes("manu kone")));
+}
+{
+  // 요약의 구단은 짧은 이름 — "SK 슈투름 그라츠"가 문장에 그대로 들어가지 않게
+  const db = fakeDb();
+  const book = createNameBook({ cache: [{ kind: "club", key: "Sturm Graz", name_ko: "SK 슈투름 그라츠", wikidata_id: "Q1", checked_at: "2026-09-25T00:00:00Z" }] });
+  const client = { messages: { create: async () => ({ stop_reason: "end_turn", usage: {}, content: [{ type: "text", text: N({ evidence_ids: [1], move: true, from: "Sturm Graz", to: "Arsenal", summary_ko: "아스날이 Sturm Graz의 루카 바인한들을 원한다." }) }] }) } };
+  await runJudgements(db, [{ id: 1, playerKey: "luca weinhandl", player: "Luca Weinhandl", body: "Arsenal want Sturm Graz midfielder Luca Weinhandl." }], { names: book, corrections: {}, lookup: noLookup, client });
+  check("요약 구단 — 법인 접미를 걷은 짧은 이름으로 바꾼다", db.writes[0].summary_ko === "아스날이 슈투름 그라츠의 루카 바인한들을 원한다.", db.writes[0].summary_ko);
 }
 
 // ── 재생 — 저장된 원출력을 지금의 해석으로 다시 읽는다(API 없음) ──
@@ -414,6 +533,108 @@ const noLookup = async () => ({ wikidataId: null, nameKo: null });
   ], { names, lookup: async () => ({ nameKo: null, wikidataId: null }) });
   check("재생 — 원출력이 있는 행만 다시 읽고, 달라진 행만 쓴다", r.read === 2 && r.changed === 1 && eq(db.writes.map((w) => w.id), [1]), JSON.stringify([r.read, r.changed, db.writes.map((w) => w.id)]));
   check("재생 — 판정 시각은 그대로 두고(새 시도가 아니다) 요약의 이름을 사전 표기로 맞춘다", db.writes[0]?.verdict === "move" && db.writes[0]?.verdict_at === "2026-09-30T00:00:00.000Z" && db.writes[0]?.summary_ko === "다비드 알라바가 우디네세와 구두 합의했다.", JSON.stringify(db.writes[0]));
+}
+
+{
+  // 새 형식 원출력의 재생 — 원문 지문이 같아야 번호가 같은 문장을 가리킨다
+  const db = fakeDb();
+  const names = createNameBook({ players: { "david alaba": { ko: "다비드 알라바" } } });
+  const print = sourceFingerprint(prepareJudgeInput({ body: BODY }).numbered.text);
+  const raw = N({ evidence_ids: [1], move: true, player: "David Alaba", stage: "agreement", to: "Udinese", summary_ko: "David Alaba가 Udinese와 합의했다." });
+  const row = (id, extra) => ({ id, body: BODY, source_id: "tg:romano", url: null, verdict_at: "2026-09-30T00:00:00.000Z", verdict_player: "david alaba", verdict_suitors: [], verdict_raw: raw, verdict: null, verdict_input: print, ...extra });
+  const r = await replayJudgements(db, [
+    row(1, {}),
+    // 원문이 바뀌었다(기사가 고쳐졌다) — 번호가 다른 문장을 가리킬 수 있어 건드리지 않는다
+    row(2, { verdict_input: "0000000000000000", verdict: "move" }),
+    // 지금의 해석으로 판정 불가인데 옛 판정이 있으면 지우지 않는다
+    row(3, { verdict: "move", verdict_raw: N({ evidence_ids: [42], move: true, summary_ko: "요약." }) }),
+    // 판정 없는 행에 남은 요약은 판정 불가 재생에서 걷는다
+    row(4, { verdict: null, summary_ko: "재계약 요약.", verdict_raw: N({ evidence_ids: [], move: true, summary_ko: "요약." }) }),
+  ], { names, corrections: {}, lookup: noLookup });
+  check("재생(새 형식) — 번호 근거를 같은 원문의 문장으로 읽는다", db.writes.find((w) => w.id === 1)?.verdict_evidence === "Udinese have reached a verbal agreement with David Alaba!" && db.writes.find((w) => w.id === 1)?.summary_ko === "다비드 알라바가 우디네세와 합의했다.", JSON.stringify(db.writes));
+  check("재생 — 원문 지문이 다르면 건드리지 않는다", r.inputChanged === 1 && !db.writes.some((w) => w.id === 2));
+  check("재생 — 판정 불가로 읽혀도 옛 판정을 지우지 않는다", r.kept === 1 && !db.writes.some((w) => w.id === 3));
+  check("재생 — 판정 없는 행에 남은 요약은 걷는다", db.writes.find((w) => w.id === 4)?.summary_ko === null);
+  check("재생 — 시도 횟수·출처 컬럼은 쓰지 않는다(새 시도가 아니다)", db.writes.every((w) => !("verdict_attempts" in w) && !("verdict_model" in w)));
+}
+
+// ── 일시 실패(시간 초과·연결·서버 오류)는 빠짐없이 다시 묻는다 ───────────────────────
+{
+  const Anthropic = (await import("@anthropic-ai/sdk")).default;
+  const { isTransientApiError } = await import("./lib/transfer/judge.mjs");
+  const timeout = () => new Anthropic.APIConnectionTimeoutError({ message: "Request timed out." });
+  const server = () => new Anthropic.InternalServerError(503, { type: "error", error: { type: "overloaded_error", message: "Overloaded" } }, "Overloaded", new Headers());
+  const bad = () => new Anthropic.BadRequestError(400, { type: "error", error: { type: "invalid_request_error", message: "messages: too long" } }, "messages: too long", new Headers());
+  check("일시 실패 판정 — 시간 초과·5xx는 일시 실패, 400은 아니다", isTransientApiError(timeout()) && isTransientApiError(server()) && !isTransientApiError(bad()) && !isTransientApiError(new Error("x")));
+  const OK = N({ evidence_ids: [1], player: "David Alaba", move: true, stage: "agreement", from: "Real Madrid", to: "Udinese", summary_ko: "다비드 알라바가 레알 마드리드를 떠나 우디네세와 구두 합의했다. 자유계약으로 옮기는 것으로 전해졌다." });
+  // failures: 보도 id → 그 행이 앞에서부터 겪을 실패 목록
+  const flaky = (failures) => {
+    const calls = [];
+    return { calls, messages: { create: async (req) => {
+      const id = Number(/#id(\d+)/u.exec(req.messages[0].content)?.[1]);
+      calls.push(id);
+      const queue = failures[id] ?? [];
+      if (queue.length) throw queue.shift()();
+      return { stop_reason: "end_turn", content: [{ type: "text", text: OK }], usage: { input_tokens: 1, output_tokens: 1 } };
+    } } };
+  };
+  const needOf = (id, prev = {}) => ({ id, playerKey: "david alaba", player: "David Alaba", body: `${BODY} #id${id}`, prev: { verdict_attempts: 0, ...prev } });
+
+  // 한 번 시간 초과 → 실행 끝에 다시 물어 판정받는다
+  {
+    const db = fakeDb();
+    const client = flaky({ 1: [timeout] });
+    const r = await runJudgements(db, [needOf(1), needOf(2)], { names, corrections: {}, lookup: noLookup, client });
+    check("일시 실패 — 시간 초과한 행을 실행 끝에 다시 물어 판정받는다", client.calls.join(",") === "1,2,1" && r.updates.filter((u) => u.verdict === "move").map((u) => u.id).sort().join(",") === "1,2" && r.transient.length === 0 && r.failed === 0, JSON.stringify({ calls: client.calls, transient: r.transient }));
+  }
+  // 두 번 다 일시 실패 → 이월. 판정한 적 없는 행은 verdict_attempts만 올리고(판정 시각·판정 컬럼은 쓰지 않는다), 옛 판정이 있는 행은 건드리지 않는다
+  {
+    const db = fakeDb();
+    const client = flaky({ 1: [timeout, server], 2: [server, timeout] });
+    const r = await runJudgements(db, [needOf(1), needOf(2, { verdict: "move", verdict_player: "david alaba", verdict_at: "2026-09-20T00:00:00Z", verdict_attempts: 1 })], { names, corrections: {}, lookup: noLookup, client });
+    const w1 = db.writes.filter((w) => w.id === 1);
+    check("일시 실패 — 두 번 다 실패하면 이월하고, 판정 없던 행에 연속 실패 수만 남긴다", r.transient.join(",") === "1,2" && w1.length === 1 && w1[0].verdict_attempts === 1 && !("verdict" in w1[0]) && !("verdict_at" in w1[0]) && !db.writes.some((w) => w.id === 2), JSON.stringify(db.writes));
+    check("일시 실패 — 이월한 행을 경고로 알린다", r.warnings.some((w) => w.includes("일시 실패") && w.includes("#1") && w.includes("#2")));
+  }
+  // 영구 오류(400)는 다시 묻지 않는다 — 같은 요청은 같은 거부를 받는다
+  {
+    const client = flaky({ 1: [bad] });
+    const r = await runJudgements(fakeDb(), [needOf(1)], { names, corrections: {}, lookup: noLookup, client });
+    check("영구 오류 — 실행 끝 재시도에 넣지 않는다", client.calls.join(",") === "1" && r.failed === 1 && r.transient.length === 0);
+  }
+  // 사용 한도로 멈추면 남은 일시 실패 행도 보내지 않고 이월한다
+  {
+    const limit = () => new Anthropic.BadRequestError(400, { type: "error", error: { type: "invalid_request_error", message: "You have reached your specified API usage limits." } }, "You have reached your specified API usage limits.", new Headers());
+    const db = fakeDb();
+    const client = flaky({ 1: [timeout], 2: [limit] });
+    const r = await runJudgements(db, [needOf(1), needOf(2), needOf(3)], { names, corrections: {}, lookup: noLookup, client });
+    check("사용 한도 — 멈춘 뒤에는 일시 실패 행을 다시 보내지 않고 이월한다", client.calls.join(",") === "1,2" && r.transient.join(",") === "1" && db.writes.some((w) => w.id === 1 && w.verdict_attempts === 1));
+  }
+  // 기사 본문 — 일시 실패(시간 초과·5xx·429)는 한 번 더 받고, 403·404는 다시 받지 않는다
+  {
+    const html = '<html><script type="application/ld+json">{"articleBody":"Arsenal agree fee for John Doe."}</script></html>';
+    const seq = (...steps) => { let i = 0; const f = async () => { const s = steps[Math.min(i, steps.length - 1)]; i += 1; if (s === "throw") throw new Error("timeout"); return { ok: s === 200, status: s, text: async () => html }; }; f.count = () => i; return f; };
+    const t1 = seq("throw", 200);
+    check("본문 — 시간 초과 뒤 한 번 더 받는다", (await fetchArticleText("https://x.test/a", t1, { retryDelayMs: 0 })) === "Arsenal agree fee for John Doe." && t1.count() === 2);
+    const t2 = seq(503, 200);
+    check("본문 — 5xx 뒤 한 번 더 받는다", (await fetchArticleText("https://x.test/a", t2, { retryDelayMs: 0 })) !== "" && t2.count() === 2);
+    const t3 = seq(404, 200);
+    check("본문 — 404는 다시 받지 않는다", (await fetchArticleText("https://x.test/a", t3, { retryDelayMs: 0 })) === "" && t3.count() === 1);
+    const t4 = seq("throw", "throw", 200);
+    check("본문 — 다시 받기는 한 번뿐이다(그다음은 발췌로 판정하고 파생이 본문 재시도를 맡는다)", (await fetchArticleText("https://x.test/a", t4, { retryDelayMs: 0 })) === "" && t4.count() === 2);
+  }
+}
+
+check("요약 — 문장 끝 뒤의 JSON 꼬리를 걷는다", judgeSummary("첼시는 내년 여름 재도전을 고려하고 있다.”}, ", {}).text === "첼시는 내년 여름 재도전을 고려하고 있다.", JSON.stringify(judgeSummary("첼시는 내년 여름 재도전을 고려하고 있다.”}, ", {})));
+check("요약 — 본문에 괄호가 섞이면 버린다(다시 묻는다)", Boolean(judgeSummary('첼시가 {"move": true} 영입을 노린다.', {}).reason));
+check("요약 — 괄호 없는 정상 요약은 그대로", judgeSummary("아스날이 £60m 제안을 했다. 협상은 이어지고 있다.", {}).text === "아스날이 £60m 제안을 했다. 협상은 이어지고 있다.");
+
+check("요약 — 금액 단위 낱말을 기호로 접는다(€45million·£64 million → €45m·£64m)", judgeSummary("평가액은 €45million, 제안은 £64 million이었다. 요구액은 €1.2billion이다.", {}).text === "평가액은 €45m, 제안은 £64m이었다. 요구액은 €1.2bn이다.", judgeSummary("평가액은 €45million, 제안은 £64 million이었다. 요구액은 €1.2billion이다.", {}).text);
+{
+  const { detectClubs } = await import("./lib/transfer/clubs.mjs");
+  const clubKo = (raw) => ({ "Sporting CP": "스포르팅 CP", "West Bromwich Albion": "웨스트 브로미치" })[detectClubs(raw)[0]] ?? null;
+  const out = localizeSummary("Sporting CP 소속 곤살루 이나시우를 두고 €40m 제안을 Sporting이 수락했다. David Alaba와 City는 그대로.", { clubKo });
+  check("요약 — 원출력 구단 칸 밖의 영문 구단명도 사전으로 풀리면 한국어로", out === "스포르팅 CP 소속 곤살루 이나시우를 두고 €40m 제안을 스포르팅 CP이 수락했다. David Alaba와 City는 그대로.", out);
 }
 
 console.log(`\nLLM 판정 ${pass}/${pass + fail} 통과`);

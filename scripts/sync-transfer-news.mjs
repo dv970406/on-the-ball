@@ -9,6 +9,7 @@
  *   node scripts/sync-transfer-news.mjs --derive-only            # 수집 없이 딜 파생만 돈다
  *   node scripts/sync-transfer-news.mjs --derive-only --dry-run  # 파생 결과 요약만 찍고 쓰지 않는다(LLM도 부르지 않는다)
  *   node scripts/sync-transfer-news.mjs --derive-only --rejudge  # 저장된 판정을 무시하고 전부 다시 묻는다(지시문·사전을 고친 뒤)
+ *   node scripts/sync-transfer-news.mjs --derive-only --rejudge-stale  # 지금 지시문과 다른 지문으로 난 판정만 다시 묻는다(상한 안에서 — 남으면 다시 돌린다)
  *   node scripts/sync-transfer-news.mjs --derive-only --replay   # 저장된 원출력을 지금의 해석으로 다시 읽는다(API를 부르지 않는다 — 해석만 고친 뒤)
  *   node scripts/sync-transfer-news.mjs --verify                 # 계정 인증·채널 출처를 점검한다
  *   node scripts/sync-transfer-news.mjs --remote                 # 원격 프로젝트에 쓴다(명시적일 때만). 대상은 환경변수다 —
@@ -29,8 +30,8 @@
  * ⚠ 소스 하나라도 실패하거나 행 단위 저장이 실패하면 종료 코드 1이다 — 읽는 화면이 없어 종료 코드가 유일한 신호다.
  */
 import { clampCp, createSyncClient, flag, guardTarget, loadEnv } from "./lib/sync-db.mjs";
-import { runDerivation } from "./lib/transfer/derive-deals.mjs";
-import { JUDGE_MODEL, runJudgements } from "./lib/transfer/judge.mjs";
+import { REPEATED_FAILURE_ATTEMPTS, runDerivation } from "./lib/transfer/derive-deals.mjs";
+import * as judgeLib from "./lib/transfer/judge.mjs";
 import { runNotifications } from "./lib/transfer/notify.mjs";
 import { runScoring, syncWindows } from "./lib/transfer/predictions.mjs";
 import { expandRoundups, reprocessAll, syncSources } from "./lib/transfer/pipeline.mjs";
@@ -44,10 +45,11 @@ const reprocess = argv.includes("--reprocess");
 const deriveOnly = argv.includes("--derive-only");
 const rejudge = argv.includes("--rejudge");
 const replay = argv.includes("--replay");
+const rejudgeStale = argv.includes("--rejudge-stale");
 const onlyArg = flag(argv, "only");
 
 // 모르는 플래그와 뜻이 겹치는 조합은 거부한다 — 조용히 무시하면 의도와 다른 일이 원격에 일어난다
-const KNOWN = new Set(["--remote", "--dry-run", "--reprocess", "--derive-only", "--rejudge", "--replay", "--verify", "--only"]);
+const KNOWN = new Set(["--remote", "--dry-run", "--reprocess", "--derive-only", "--rejudge", "--rejudge-stale", "--replay", "--verify", "--only"]);
 const unknownFlags = argv.filter((a, i) => a.startsWith("--") ? !KNOWN.has(a) : argv[i - 1] !== "--only");
 if (unknownFlags.length) usage(`알 수 없는 인자: ${unknownFlags.join(" ")}`);
 if (argv.includes("--only") && !onlyArg) usage("--only 뒤에 소스 id가 필요합니다");
@@ -56,6 +58,7 @@ if ([dryRun && !deriveOnly, reprocess, deriveOnly, argv.includes("--verify")].fi
 }
 if (replay && (!deriveOnly || dryRun || rejudge)) usage("--replay 는 --derive-only 와 함께만 씁니다(--dry-run·--rejudge 와는 함께 쓸 수 없습니다)");
 if (rejudge && (!deriveOnly || dryRun)) usage("--rejudge 는 --derive-only 와 함께만 씁니다(--dry-run 과는 함께 쓸 수 없습니다)");
+if (rejudgeStale && (!deriveOnly || dryRun || rejudge || replay)) usage("--rejudge-stale 는 --derive-only 와 함께만 씁니다(--dry-run·--rejudge·--replay 와는 함께 쓸 수 없습니다)");
 if (reprocess && onlyArg) usage("--reprocess 는 저장분 전체를 다시 추출합니다 — --only 와 함께 쓸 수 없습니다");
 if (deriveOnly && onlyArg) usage("--derive-only 는 소스를 읽지 않습니다 — --only 와 함께 쓸 수 없습니다");
 
@@ -105,7 +108,7 @@ if (allowRemote && /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(url)) {
 const supabase = createSyncClient(url, key);
 
 if (deriveOnly) {
-  await derive({ dryRun, rejudge, replay });
+  await derive({ dryRun, rejudge, replay, rejudgeStale });
   console.log(`\n대상: ${url}`);
   process.exit(process.exitCode ?? 0);
 }
@@ -160,8 +163,17 @@ async function expand() {
  * 키가 없으면 판정 없이 파생한다. 원격 실행에서 키가 없으면 실패다 — 조용히 지나가면 새 딜이 영영 열리지 않고 화면이 영문으로 남는다.
  * 판정이 계통적으로 실패해도(인증) 파생은 끝까지 쓴다(새 딜은 닫힘·기존 딜은 유지) — 종료 코드만 올린다.
  */
-async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: reread = false, notify: announce = false }) {
+async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: reread = false, rejudgeStale: stale = false, notify: announce = false }) {
   try {
+    // --rejudge는 사람이 한 번에 끝내려고 돌리는 명령이다 — 실행당 상한을 크게 연다(비용은 호출부가 안다). 파생의 정렬도 같은 상한을 본다
+    const limit = again ? 1000 : judgeLib.JUDGE_MAX_PER_RUN;
+    // 지금 지시문의 지문 — 이 값과 다른 지문으로 난 판정만 다시 묻는다(`--rejudge-stale`)
+    let stalePrompt = null;
+    if (stale) {
+      if (typeof judgeLib.judgeFingerprint !== "function") throw new Error("judge-prompt.mjs에 judgeFingerprint가 없습니다 — --rejudge-stale을 쓸 수 없습니다");
+      stalePrompt = judgeLib.judgeFingerprint(judgeLib.buildSystem(), judgeLib.JUDGE_CONFIG);
+      console.log(`\n지시문 지문 ${stalePrompt}과 다른 판정만 다시 묻는다(상한 ${limit}건 — 남으면 다시 돌린다)`);
+    }
     const apiKey = env.ANTHROPIC_API_KEY;
     if (!apiKey && !summaryOnly) {
       const msg = "ANTHROPIC_API_KEY가 없어 LLM 판정·요약을 건너뜁니다 — 판정 없는 새 딜은 열리지 않습니다";
@@ -170,9 +182,8 @@ async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: rer
     const judge = apiKey
       ? async (needs, names) => {
           try {
-            // --rejudge는 사람이 한 번에 끝내려고 돌리는 명령이다 — 실행당 상한을 크게 연다(비용은 호출부가 안다)
-            console.log(`\nLLM 판정 시작: ${needs.length}건(한 건 3초 안팎 — 끝날 때까지 결과는 찍히지 않는다)`);
-            return await runJudgements(supabase, needs, { apiKey, names, limit: again ? 1000 : undefined, log: console });
+            console.log(`\nLLM 판정 시작: ${Math.min(needs.length, limit)}건(대상 ${needs.length} — 한 건 3초 안팎, 끝날 때까지 결과는 찍히지 않는다)`);
+            return await judgeLib.runJudgements(supabase, needs, { apiKey, names, limit, log: console });
           } catch (e) {
             console.error(`✗ LLM 판정 실패: ${e instanceof Error ? e.message : String(e)}`);
             process.exitCode = 1;
@@ -190,7 +201,7 @@ async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: rer
         process.exitCode = 1;
       }
     }
-    const r = await runDerivation(supabase, { dryRun: summaryOnly, rejudge: again, replay: reread, judge });
+    const r = await runDerivation(supabase, { dryRun: summaryOnly, rejudge: again, replay: reread, judge, judgeLimit: limit, rejudgeStalePrompt: stalePrompt });
     const s = r.summary;
     const stages = Object.entries(s.stages).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(" · ") || "—";
     console.log(`\n딜 파생${summaryOnly ? "(드라이런)" : ""}: 딜 ${s.deals} · 구단 ${s.clubs} · 연결된 보도 ${s.linkedRows}건`);
@@ -204,9 +215,9 @@ async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: rer
     if (r.nameSync?.synced) console.log(`  이름 사전 맞춤(사람 사전 → 캐시): 표기 ${r.nameSync.synced}건 · 요약 ${r.nameSync.summariesFixed}건`);
     const j = r.judged;
     if (j && "read" in j) {
-      console.log(`  LLM 판정·요약 · ${JUDGE_MODEL}: 대상 ${j.read} · 이동 ${j.move}(요약 ${j.summarized}, 요약 버림 ${j.summaryInvalid}) · 아님 ${j.notMove}(회고 ${j.retrospective ?? 0} · 제목뿐 ${j.titleOnly ?? 0} · 선수 미특정 ${j.unnamed ?? 0}) · 판정 불가 ${j.invalid} · 실패 ${j.failed} · 기사 본문 ${j.articles}(못 받음 ${j.articleMissing})`);
-      console.log(`  토큰: 입력 ${j.inputTokens}(캐시 읽음 ${j.cacheReadTokens} · 캐시 씀 ${j.cacheWriteTokens}) · 출력 ${j.outputTokens}`);
+      console.log(`  LLM 판정·요약 · ${judgeLib.JUDGE_MODEL}: 대상 ${j.read} · 이동 ${j.move}(요약 ${j.summarized}, 요약 버림 ${j.summaryInvalid}) · 아님 ${j.notMove}(회고 ${j.retrospective ?? 0} · 제목뿐 ${j.titleOnly ?? 0} · 선수 미특정 ${j.unnamed ?? 0}) · 판정 불가 ${j.invalid} · 실패 ${j.failed} · 기사 본문 ${j.articles}(못 받음 ${j.articleMissing})`);
     }
+    reportJudgeMetrics(r);
     for (const w of r.warnings) console.warn(`  ⚠ ${w}`);
     if (summaryOnly) {
       for (const d of r.deals.slice(0, 20)) {
@@ -225,6 +236,35 @@ async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: rer
     // 딜을 저장한 **뒤에** 실패했으면 변화 목록이 에러에 실려 온다(`writeDeals`) — 딜은 이미 새 단계라 다음 실행에는
     // 차이가 없다. 여기서 보내지 않으면 그 소식(오피셜 포함)은 영영 알림이 되지 못한다.
     if (announce && Array.isArray(e?.changes)) await notify(e.changes);
+  }
+}
+
+/**
+ * 판정 지표 한 줄 — 물을 대상(요약만 다시 · 탐색 · 다음 실행으로 넘긴 것) · 판정 결과 · 반복 실패 · 토큰. 드라이런도 대상까지는 찍는다.
+ * GitHub Actions에서는 판정 불가 비율이 `INVALID_WARN_RATIO`를 넘거나 반복 실패 행이 있으면 `::warning::` 줄을 낸다(실행 화면에 뜬다) —
+ * 실패해도 종료 코드는 그대로다(판정이 흔들려도 보드는 저장된 판정으로 그려진다). 원인은 사람이 본다.
+ */
+const INVALID_WARN_RATIO = 0.2;
+function reportJudgeMetrics(r) {
+  const n = r.needStats;
+  const j = r.judged && "read" in r.judged ? r.judged : null;
+  const parts = [];
+  if (n) parts.push(`대상 ${n.asked}${n.total > n.asked ? `/${n.total}` : ""}(요약만 다시 ${n.summaryOnly} · 탐색 ${n.explore}${n.deferred ? ` · 다음 실행으로 ${n.deferred}` : ""})`);
+  if (j) parts.push(`이동 ${j.move} · 아님 ${j.notMove} · 판정 불가 ${j.invalid} · 일시 실패 이월 ${j.transient?.length ?? 0}`);
+  parts.push(`반복 실패(${REPEATED_FAILURE_ATTEMPTS}회 이상) ${r.repeatedFailures ?? 0}`);
+  if (j) parts.push(`토큰 입력 ${j.inputTokens}(캐시 읽음 ${j.cacheReadTokens} · 캐시 씀 ${j.cacheWriteTokens}) · 출력 ${j.outputTokens}`);
+  console.log(`  판정 지표: ${parts.join(" · ")}`);
+  if (process.env.GITHUB_ACTIONS !== "true") return;
+  const decided = j ? j.move + j.notMove + j.invalid : 0;
+  if (decided && j.invalid / decided > INVALID_WARN_RATIO) {
+    console.log(`::warning title=LLM 판정::판정 불가 비율 ${Math.round((j.invalid / decided) * 100)}%(${j.invalid}/${decided}) — 경고 목록의 사유를 확인하세요`);
+  }
+  // 일시 실패(시간 초과·연결·서버 오류)로 이번 실행에서 판정을 못 받은 보도 — 다음 실행이 먼저 다시 묻지만, 매시 되풀이되면 API나 네트워크를 봐야 한다
+  if (j?.transient?.length) {
+    console.log(`::warning title=LLM 판정::일시 실패로 판정을 못 받은 보도 ${j.transient.length}건 — 다음 실행이 먼저 다시 묻는다(${j.transient.map((id) => `#${id}`).join(" ")})`);
+  }
+  if (r.repeatedFailures) {
+    console.log(`::warning title=LLM 판정::같은 보도가 연달아 ${REPEATED_FAILURE_ATTEMPTS}번 이상 판정에 실패했습니다(${r.repeatedFailures}건) — 실패 사유를 확인하세요`);
   }
 }
 
