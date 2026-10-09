@@ -545,7 +545,9 @@ export type Database = {
           tier: number
           url: string | null
           verdict: Database["public"]["Enums"]["transfer_verdict"] | null
+          verdict_article_chars: number | null
           verdict_at: string | null
+          verdict_attempts: number
           verdict_evidence: string | null
           verdict_fee_amount: number | null
           verdict_fee_currency: string | null
@@ -553,8 +555,11 @@ export type Database = {
             | Database["public"]["Enums"]["transfer_fee_kind"]
             | null
           verdict_from: string | null
+          verdict_input: string | null
+          verdict_model: string | null
           verdict_player: string | null
           verdict_player_name: string | null
+          verdict_prompt: string | null
           verdict_raw: string | null
           verdict_stage: Database["public"]["Enums"]["transfer_stage"] | null
           verdict_suitors: string[]
@@ -585,7 +590,9 @@ export type Database = {
           tier: number
           url?: string | null
           verdict?: Database["public"]["Enums"]["transfer_verdict"] | null
+          verdict_article_chars?: number | null
           verdict_at?: string | null
+          verdict_attempts?: number
           verdict_evidence?: string | null
           verdict_fee_amount?: number | null
           verdict_fee_currency?: string | null
@@ -593,8 +600,11 @@ export type Database = {
             | Database["public"]["Enums"]["transfer_fee_kind"]
             | null
           verdict_from?: string | null
+          verdict_input?: string | null
+          verdict_model?: string | null
           verdict_player?: string | null
           verdict_player_name?: string | null
+          verdict_prompt?: string | null
           verdict_raw?: string | null
           verdict_stage?: Database["public"]["Enums"]["transfer_stage"] | null
           verdict_suitors?: string[]
@@ -625,7 +635,9 @@ export type Database = {
           tier?: number
           url?: string | null
           verdict?: Database["public"]["Enums"]["transfer_verdict"] | null
+          verdict_article_chars?: number | null
           verdict_at?: string | null
+          verdict_attempts?: number
           verdict_evidence?: string | null
           verdict_fee_amount?: number | null
           verdict_fee_currency?: string | null
@@ -633,8 +645,11 @@ export type Database = {
             | Database["public"]["Enums"]["transfer_fee_kind"]
             | null
           verdict_from?: string | null
+          verdict_input?: string | null
+          verdict_model?: string | null
           verdict_player?: string | null
           verdict_player_name?: string | null
+          verdict_prompt?: string | null
           verdict_raw?: string | null
           verdict_stage?: Database["public"]["Enums"]["transfer_stage"] | null
           verdict_suitors?: string[]

@@ -1404,6 +1404,43 @@ update public.transfer_news set verdict = 'move', verdict_player = 'barcola', ve
 select verdict_fee_amount = 60 and verdict_fee_kind = 'bid' and verdict_raw is not null from public.transfer_news where id = :tv1;
 rollback to s;
 
+
+\echo ''
+\echo '-- 37-4. 판정의 출처 — 모델·지시문 지문·입력 지문·본문 길이·연속 실패 (20261009000001) --'
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[❌차단] 비로그인이 판정의 출처를 읽는다 — 비공개 추출 컬럼'
+select verdict_model, verdict_prompt, verdict_input, verdict_article_chars, verdict_attempts from public.transfer_news where id = :tv1;
+rollback to s;
+
+savepoint s;
+:login_alice
+\echo '[❌차단] 로그인 유저가 연속 실패 수를 쓴다 — 쓰기 grant가 없다'
+update public.transfer_news set verdict_attempts = 0 where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 판정 시도 없는 출처'
+update public.transfer_news set verdict_model = 'claude-sonnet-5' where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 음수 본문 길이'
+update public.transfer_news set verdict_at = now(), verdict_article_chars = -1 where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 음수 연속 실패 수'
+update public.transfer_news set verdict_attempts = -1 where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[t 기대] 판정 시도와 함께 출처를 쓴다(본문 못 받음 = 0)'
+update public.transfer_news set verdict_at = now(), verdict_model = 'claude-sonnet-5', verdict_prompt = 'a1b2c3d4e5f6', verdict_input = '0123456789abcdef', verdict_article_chars = 0, verdict_attempts = 2 where id = :tv1;
+select verdict_model = 'claude-sonnet-5' and verdict_article_chars = 0 and verdict_attempts = 2 from public.transfer_news where id = :tv1;
+rollback to s;
+
 rollback to s37v;
 
 \echo ''
