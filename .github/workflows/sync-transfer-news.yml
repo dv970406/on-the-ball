@@ -33,7 +33,8 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    # 요청마다 20초 타임아웃이 있어 정상 실행은 1분 안쪽이다 — 멈춘 실행이 한도를 먹지 않게 끊는다
+    # 수집 요청은 20초 상한, LLM 판정은 단계 전체가 5분 예산(`JUDGE_TIME_BUDGET_MS`)이라 판정이 몰린 실행도 이 안에 끝난다 —
+    # 멈춘 실행이 한도를 먹지 않게 끊는다. 예산을 늘리면 이 값도 함께 늘린다(잘리면 딜 저장·알림까지 통째로 빠진다)
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4

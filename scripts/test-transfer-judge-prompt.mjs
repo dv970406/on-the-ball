@@ -242,5 +242,12 @@ check("표기 — 선수 키가 없으면 선수 줄 없음", eq(buildGlossary({
   check("원문 — 모르는 엔티티는 그대로 둔다", decodeEntities("a &foo; b &#0; c") === "a &foo; b &#0; c");
 }
 
+{
+  const { buildSystem: bs, judgeFingerprint: fp } = await import("./lib/transfer/judge-prompt.mjs");
+  const base = bs({ bid: "제안" }, ["Arsenal = 아스널"]);
+  check("지문 — 사전(용어·구단 표)만 바뀌면 지문이 같다(주간 정비가 전량 재판정을 부르지 않게)", fp(base) === fp(bs({ bid: "제안", loan: "임대" }, ["Arsenal = 아스널", "Besiktas = 베식타스"])));
+  check("지문 — 규칙 문장이 바뀌면 지문이 바뀐다", fp(base) !== fp(base.replace("[timing]", "[timing] ")));
+}
+
 console.log(`\n판정 요청 ${pass}/${pass + fail} 통과`);
 if (fail) process.exit(1);

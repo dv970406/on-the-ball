@@ -27,7 +27,7 @@
 import { createHash } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import * as cheerio from "cheerio";
-import { detectClubs } from "./clubs.mjs";
+import { detectClubs, isClubName } from "./clubs.mjs";
 import { FROM, collectVotes } from "./direction.mjs";
 import { personName } from "./extract.mjs";
 import { NAME_TABLE, cacheLlmNames, formatNewNameLog, loadGlossary, renameInSummary, shortKoClubName } from "./names-ko.mjs";
@@ -45,7 +45,21 @@ export * from "./judge-prompt.mjs";
  * 호출 한 건의 시간 상한 — SDK 기본값(10분)이면 응답 없이 붙들린 연결 하나가 재시도까지 30분 동안 실행을 묶는다(실측: 끊긴
  * 연결 셋이 30분 넘게 진행이 없었다). 판정 한 건은 생각을 켜도 수십 초 안에 끝난다 — 시간이 다 되면 일시 실패로 쳐 다음 실행이 다시 묻는다.
  */
-export const JUDGE_TIMEOUT_MS = 120_000;
+export const JUDGE_TIMEOUT_MS = 60_000;
+/** SDK 재시도 횟수 — 시간 초과·5xx를 SDK가 다시 보내는 횟수. 호출 한 건이 묶이는 최대 시간은 상한 × (재시도 + 1)이다 */
+export const JUDGE_SDK_RETRIES = 1;
+/**
+ * 판정 단계 전체의 시간 예산 — 정기 실행은 작업 시간 상한(워크플로 `timeout-minutes: 10`) 안에서 수집·파생·저장·알림까지 끝내야 한다.
+ * 판정이 예산을 넘기면 남은 행은 묻지 않고 다음 실행으로 넘긴다(강제 종료되면 딜 저장까지 통째로 잃는다).
+ */
+export const JUDGE_TIME_BUDGET_MS = 5 * 60_000;
+/** 일시 실패가 이만큼 연달아 나면 장애로 보고 이번 실행의 판정을 멈춘다 — 장애 중에 호출마다 시간 상한을 다 쓰지 않게 */
+export const JUDGE_TRANSIENT_STREAK_MAX = 3;
+/** 영구 실패(일시 실패가 아닌 API 오류·저장 실패)가 이만큼 연달아 나면 멈춘다 */
+export const JUDGE_FAIL_STREAK_MAX = 5;
+/** 연속 실패 수 상한 — DB CHECK(`transfer_news_verdict_attempts_range`, 0~100) 안에 묶는다 */
+const ATTEMPTS_MAX = 100;
+const nextAttempts = (prev) => Math.min((Number(prev) || 0) + 1, ATTEMPTS_MAX);
 /**
  * API 일시 실패인가 — 시간 초과·연결 끊김·과부하(529)·서버 오류(5xx)·408·409. 같은 요청을 다시 보내면 성공할 수 있는 실패다.
  * 이런 실패는 판정 결과가 아니므로 판정 컬럼에 아무것도 쓰지 않고, 실행 끝에 한 번 더 묻고, 그래도 실패하면 다음 실행으로
@@ -261,6 +275,22 @@ const tidySummary = (text) => text.replace(/(?<=[가-힣A-Za-z])行/gu, "행").r
 const MONEY_WORD = /([€£$])\s?(\d[\d.,]*)\s?(million|billion|thousand|mn)(?![A-Za-z])/giu;
 const MONEY_UNIT = { million: "m", mn: "m", billion: "bn", thousand: "k" };
 
+/**
+ * 원문을 두고 하는 말("원문에는 금액이 나와 있지 않다") — 요약은 보도의 내용이지 원문에 대한 설명이 아니다. "두 문장으로, 둘째 문장에
+ * 금액 등"이라는 지시를 채우려고 모델이 없는 정보를 "없다"고 적었다(블라인드 채점: 새 요약의 12%, 옛 요약 1%).
+ * ⚠ "이적료는 공개되지 않았다"(비공개 이적료)·"밝혀지지 않았다"는 보도가 말한 사실이라 걷지 않는다 — 원문·정보 부재를 말하는 표현만.
+ */
+const META_SENTENCE = /원문(?!\s?에\s?따르면)|기사(?:에는|에서는)\s|(?:언급되지|명시되지)\s?않(?:는다|았다)|(?:기사|원문|본문|보도)(?:에는|에서는|에)\s[^.]*(?:나와 있지|나오지)\s?않(?:는다|았다)|언급(?:은|이) 없(?:다|었다)|정보(?:는|가) 없다/u;
+/** 메타 절이 쉼표 뒤 마지막 절로 붙은 경우("…분석이 나왔고, 금액은 언급되지 않았다.") — 앞 절의 "-고"를 "-다"로 맺는다 */
+const META_TAIL = /([가-힣])고,\s*(?:[^,.]*(?:언급되지|명시되지)|(?:기사|원문|본문|보도)[^,.]*(?:나와 있지|나오지))\s?않(?:는다|았다)\.?$/u;
+
+/** 요약에서 메타 문장을 걷는다. 걷고 나서 남는 문장이 없으면 원래 글을 돌려준다(요약 검증이 판단한다) */
+export function stripMetaSentences(text) {
+  const sentences = String(text).split(/(?<=[.!?])\s+/u).map((x) => x.replace(META_TAIL, "$1다.")).filter(Boolean);
+  const kept = sentences.filter((x) => !META_SENTENCE.test(x));
+  return kept.length ? kept.join(" ") : String(text);
+}
+
 /** 한국어 요약에 섞이면 안 되는 문자 — 한자·가나·아랍·키릴·그리스·히브리·태국·데바나가리 */
 const FOREIGN_SCRIPT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Arabic}\p{Script=Cyrillic}\p{Script=Greek}\p{Script=Hebrew}\p{Script=Thai}\p{Script=Devanagari}]/u;
 
@@ -344,7 +374,7 @@ export function judgeSummary(raw, corrections) {
   if (typeof raw !== "string") return { reason: "요약이 없다" };
   // 문장이 끝난 뒤의 JSON 꼬리(`.”}, `)를 걷는다 — 모델이 요약 문자열 안에 닫는 따옴표·괄호를 흘린 것이 화면에 나갔다(벤치 실측)
   const trimmed = raw.replace(/\s+/g, " ").trim().replace(/(?<=[.!?다요])[\s"'“”‘’{}[\],]+$/u, "").replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
-  const text = tidySummary(applyCorrections(trimmed, corrections));
+  const text = tidySummary(applyCorrections(stripMetaSentences(trimmed), corrections));
   if (!text) return { reason: "요약이 비었다" };
   // 그래도 괄호가 남았으면 출력 형식이 요약에 섞인 것이다 — 버리고 다시 묻는다
   if (/[{}]/u.test(text)) return { reason: "요약에 출력 형식 조각({ })이 섞였다" };
@@ -423,7 +453,8 @@ export function parseJudgement(raw, sentText, { corrections, player = null, name
   const found = player ?? personName(mention) ?? (mention ? fullNameFor(mention, sentText, names) : null);
   // 이동이라는데 선수를 특정할 수 없는 글("South American star"·"£60m full-back")은 **영영 딜이 될 수 없다** — 판정 불가로 두면 24시간마다
   // 같은 글에 다시 물어 비용만 반복된다(감사: 판정 불가 18건 중 8건). 후보가 아니라는 뜻으로 not_move에 접고 표시만 남긴다.
-  if (!found) return { kind: "not_move", evidence: clampCp(evidence, EVIDENCE_MAX_CHARS), unnamed: true, mention: mention ?? null };
+  // 정규형이 비는 이름(키릴·아랍 문자 등 — 딜 키를 만들 수 없다)도 같다. 그대로 두면 판정 저장이 CHECK(선수 키 1자 이상)에 걸려 매시 다시 물린다
+  if (!found || !normalizePlayer(found)) return { kind: "not_move", evidence: clampCp(evidence, EVIDENCE_MAX_CHARS), unnamed: true, mention: mention ?? found ?? null };
   // 기사 본문을 받았는데 **본문에 그 선수가 없으면** 제목의 낱말만으로 만든 이적설이다 — 라이브 블로그·소식 모음의 제목
   // ("Transfer news LIVE: Arsenal target Alexander-Arnold; …")이 본문(임원 선임)과 무관한 딜이 됐다. 지시문으로 막았는데도 모델이
   // 실행마다 다르게 읽어 코드가 접는다. 성(마지막 토큰)으로 본다 — 본문은 성만 쓰는 일이 많다.
@@ -543,12 +574,16 @@ export async function resolveClubs(m, book, { lookup = lookupKo, cacheRows = [],
   const resolve = async (raw) => {
     if (!raw) return null;
     if (memo.has(raw)) return memo.get(raw);
+    // 같은 실행에서 이미 찾아본 이름은 다시 찾지 않는다 — 두 번 쌓인 같은 키가 일괄 저장을 통째로 실패시킨다
+    const seen = cacheRows.find((c) => c.kind === "club" && c.key === raw);
+    if (seen) { memo.set(raw, seen.wikidata_id ? raw : null); return memo.get(raw); }
     let out = detectClubs(raw)[0] ?? null;
     if (!out) {
       if (book.isVerifiedClub(raw)) out = raw;
       else if (!book.needsLookup("club", raw, nowMs)) out = null; // 최근에 찾아봤지만 축구 클럽이 아니었다
       else {
         try {
+          if ([...raw].length > 120) throw new Error("키가 캐시 상한(120자)을 넘는다"); // 이름이 아니라 문장 조각이다
           const r = await lookup(raw, "club");
           cacheRows.push({ kind: "club", key: raw, name_en: raw.slice(0, 120), name_ko: r.nameKo, wikidata_id: r.wikidataId, source: "wikidata", checked_at: new Date().toISOString() });
           out = r.wikidataId ? raw : null;
@@ -600,6 +635,8 @@ export function localizeSummary(summary, { player, playerKoByModel, ko, rawClubs
   // 원출력의 구단 칸에 없던 영문 구단명("Sporting", "Al-Ittifaq")도 구단 사전·확인 캐시로 풀리면 한국어로 바꾼다. 영문 구절이 **통째로**
   // 구단 하나로 풀릴 때만(사람 이름·다른 낱말 속 구단은 건드리지 않는다)
   out = out.replace(/(?<![\p{Script=Latin}\p{M}])\p{Lu}[\p{Script=Latin}\p{M}'’.&-]*(?:[ -][\p{Lu}0-9][\p{Script=Latin}\p{M}0-9'’.&-]*)*/gu, (phrase) => {
+    // "Everton Soares"(선수)·"Bologna Rangers"처럼 구단 이름을 품은 다른 구절을 바꾸지 않는다 — 별칭과 통째로 같거나, 사전 밖이면 확인된 이름과 같아야 한다
+    if (detectClubs(phrase).length && !isClubName(phrase)) return phrase;
     const name = clubKo(phrase);
     return name && name !== phrase && !out.includes(name) ? name : phrase;
   });
@@ -641,7 +678,7 @@ async function settleJudgement(n, judged, rawText, ctx) {
   const { out, book, nameRun, clubCache, lookup, nowMs, provenance } = ctx;
   const at = ctx.verdictAt ?? new Date().toISOString();
   const label = n.player ?? judged.player ?? "?";
-  const attempts = (n.prev?.verdict_attempts ?? 0) + 1;
+  const attempts = nextAttempts(n.prev?.verdict_attempts);
   const standing = standingVerdict(n);
   const trusted = (k) => (book.playerKoTrusted ?? book.playerKo)(k) ?? null;
   const clubKo = (raw) => {
@@ -653,7 +690,7 @@ async function settleJudgement(n, judged, rawText, ctx) {
   /** 요약 한 줄 — 이름을 사전 표기로 맞추고, 통용 표기 후보를 모은다 */
   const summarize = (key) => {
     const ko = book.playerKo(key) ?? null;
-    if (judged.playerKo && !trusted(key)) nameRun.koEntries.push({ key, name: judged.player, ko: judged.playerKo });
+    if (judged.playerKo && !trusted(key)) nameRun.koEntries.push({ id: n.id, key, name: judged.player, ko: judged.playerKo });
     const text = localizeSummary(judged.summary, { player: judged.player, playerKoByModel: judged.playerKo, ko, rawClubs: judged.rawClubs, clubKo });
     // 믿을 수 있는 표기가 없던 선수의 요약은 실행 끝에 확정 표기로 다시 맞춘다 — 지금 요약에 들어간 표기를 적어 둔다
     const used = ko ?? judged.playerKo;
@@ -714,7 +751,7 @@ async function settleJudgement(n, judged, rawText, ctx) {
       out.summaryInvalid += 1;
       out.warnings.push(`#${n.id} 요약 버림(${label}): ${judged.summaryIssue} — 다음 실행이 다시 묻는다`);
       // 통용 표기는 요약이 없어도 후보다
-      if (judged.playerKo && !trusted(key)) nameRun.koEntries.push({ key, name: judged.player, ko: judged.playerKo });
+      if (judged.playerKo && !trusted(key)) nameRun.koEntries.push({ id: n.id, key, name: judged.player, ko: judged.playerKo });
       // 옛 요약이 있으면 둔다(다시 물은 경우) — 영문으로 되돌릴 이유가 없다
       if (!n.summary_ko) update.summary_ko = null;
     }
@@ -748,10 +785,12 @@ const newStats = (read) => ({
  * 이번 실행에서 확정 표기와 다른 표기로 쓴 요약을 맞춘다. 실패는 경고다(다음 실행이 다시 찾는다).
  */
 async function flushNames(supabase, out, clubCache, nameRun, names) {
-  if (clubCache.length) {
-    const { error } = await supabase.from(NAME_TABLE).upsert(clubCache, { onConflict: "kind,key" });
+  // 같은 키가 두 번 실리면 일괄 upsert가 통째로 거부된다("cannot affect row a second time") — 키마다 마지막 것 하나
+  const clubRows = [...new Map(clubCache.map((c) => [`${c.kind}:${c.key}`, c])).values()];
+  if (clubRows.length) {
+    const { error } = await supabase.from(NAME_TABLE).upsert(clubRows, { onConflict: "kind,key" });
     if (error) out.warnings.push(`구단 확인 캐시 저장 실패: ${error.message}`);
-    else out.namesWritten += clubCache.length;
+    else out.namesWritten += clubRows.length;
   }
   if (!nameRun.koEntries.length) return;
   let res;
@@ -844,8 +883,8 @@ export async function replayJudgements(supabase, rows, { names, fetchImpl = fetc
  *   `corrections`가 없으면 `glossary-ko.json`의 교정표를 쓴다. `log`(Console)를 주면 20건마다 진행을 찍는다.
  * @returns 저장한 값(`updates` — 파생이 메모리의 행에 곧바로 입혀 다시 파생한다)과 집계. `namesWritten`이 0보다 크면 이름 사전을 다시 읽는다
  */
-export async function runJudgements(supabase, needs, { apiKey, names, limit = JUDGE_MAX_PER_RUN, client, fetchImpl = fetch, lookup = lookupKo, corrections, nowMs = Date.now(), log = null, system = buildSystem(), config = JUDGE_CONFIG, articleRetry } = {}) {
-  const api = client ?? new Anthropic({ apiKey, timeout: JUDGE_TIMEOUT_MS, maxRetries: 2 });
+export async function runJudgements(supabase, needs, { apiKey, names, limit = JUDGE_MAX_PER_RUN, client, fetchImpl = fetch, lookup = lookupKo, corrections, nowMs = Date.now(), log = null, system = buildSystem(), config = JUDGE_CONFIG, articleRetry, timeBudgetMs = JUDGE_TIME_BUDGET_MS, now = Date.now } = {}) {
+  const api = client ?? new Anthropic({ apiKey, timeout: JUDGE_TIMEOUT_MS, maxRetries: JUDGE_SDK_RETRIES });
   const fixes = corrections ?? loadGlossary().corrections;
   const out = newStats(needs.length);
   if (needs.length > limit) out.warnings.push(`판정 상한(${limit}) — 남은 ${needs.length - limit}건은 다음 실행이 잇는다`);
@@ -867,6 +906,16 @@ export async function runJudgements(supabase, needs, { apiKey, names, limit = JU
       article = await fetchArticleText(n.url, fetchImpl, articleRetry);
       out[article ? "articles" : "articleMissing"] += 1;
     }
+    // 본문 없이 낸 판정을 본문으로 다시 보려는 행(`mode: "article"`) — 이번에도 못 받으면 **묻지 않는다**. 같은 글로 다시 물으면 비용만 들고
+    // 판정이 비결정적으로 뒤집힐 수 있다. 시각·횟수만 올려 옛 판정을 지킨다(파생이 횟수로 본문 재시도를 끝낸다)
+    if (n.mode === "article" && !article) {
+      out.articleSkipped = (out.articleSkipped ?? 0) + 1;
+      const update = { verdict_at: new Date().toISOString(), verdict_attempts: nextAttempts(n.prev?.verdict_attempts) };
+      const { error } = await supabase.from("transfer_news").update(update).eq("id", n.id);
+      if (error) out.warnings.push(`#${n.id} 본문 재시도 표지 저장 실패: ${error.message}`);
+      else out.updates.push(Object.assign(update, { id: n.id }));
+      return "done";
+    }
     const input = prepareJudgeInput(n, article);
     const request = buildJudgeRequest(n, names, system, article, config);
     const provenance = {
@@ -884,8 +933,8 @@ export async function runJudgements(supabase, needs, { apiKey, names, limit = JU
       out.cacheReadTokens += res.usage?.cache_read_input_tokens ?? 0;
       out.cacheWriteTokens += res.usage?.cache_creation_input_tokens ?? 0;
       rawText = res.content.filter((b) => b.type === "text").map((b) => b.text).join("");
-      judged = res.stop_reason === "refusal"
-        ? { kind: "invalid", reason: "모델이 거절" }
+      judged = res.stop_reason === "refusal" || res.stop_reason === "model_context_window_exceeded"
+        ? { kind: "invalid", reason: res.stop_reason === "refusal" ? "모델이 거절" : "문맥 상한을 넘었다", truncated: true }
         // 출력 상한에 잘린 JSON은 형식이 깨진 것이 아니다 — 원인을 따로 남긴다(생각이 켜진 설정이면 생각이 상한을 먹었을 수 있다)
         : res.stop_reason === "max_tokens"
           ? { kind: "invalid", reason: `출력 상한(max_tokens ${request.max_tokens})에 걸려 출력이 잘렸다`, truncated: true }
@@ -903,6 +952,7 @@ export async function runJudgements(supabase, needs, { apiKey, names, limit = JU
       // 곧바로 거부될 호출을 이어 보내지 않는다. 크레딧 소진을 빠뜨렸더니 한 실행이 546건을 전부 부르고 전부 거부당했다.
       if (e instanceof Anthropic.APIError && e.status === 400 && /usage limit|credit balance/iu.test(e.message)) {
         out.failed += 1;
+        out.usageLimited = true;
         out.warnings.push(`판정 API 계정 사용 한도에 닿았다 — 남은 ${remaining}건은 다음 실행으로 넘긴다: ${e.message.slice(0, 160)}`);
         return "stop";
       }
@@ -910,7 +960,7 @@ export async function runJudgements(supabase, needs, { apiKey, names, limit = JU
       if (isTransientApiError(e)) return "transient";
       out.failed += 1;
       out.warnings.push(`#${n.id} 판정 실패: ${e instanceof Anthropic.APIError ? e.status : ""} ${e instanceof Error ? e.message : String(e)}`);
-      return "done";
+      return "fail";
     }
 
     const update = await settleJudgement(n, judged, rawText, { out, book: names, nameRun, clubCache, lookup, nowMs, provenance });
@@ -918,7 +968,14 @@ export async function runJudgements(supabase, needs, { apiKey, names, limit = JU
     if (error) {
       out.failed += 1;
       out.warnings.push(`#${n.id} 판정 저장 실패: ${error.message}`);
-      return "done";
+      // 저장되지 않은 판정의 통용 표기 후보·요약 맞추기는 버린다(실행 끝에 저장되지 않은 행의 요약만 쓰게 된다)
+      nameRun.koEntries = nameRun.koEntries.filter((e) => e.id !== n.id);
+      nameRun.summaries = nameRun.summaries.filter((s) => s.id !== n.id);
+      // 시각·실패 횟수만이라도 남긴다 — 판정 시각이 없으면 같은 행이 매시 다시 물린다(비용 반복). 옛 판정은 건드리지 않는다
+      const fallback = { verdict_at: update.verdict_at ?? new Date().toISOString(), verdict_attempts: nextAttempts(n.prev?.verdict_attempts) };
+      const res = await supabase.from("transfer_news").update(fallback).eq("id", n.id);
+      if (!res.error) out.updates.push(Object.assign(fallback, { id: n.id }));
+      return "fail";
     }
     // 같은 객체를 넘긴다 — 실행 끝의 표기 맞추기(`flushNames`)가 고친 요약이 파생의 메모리에도 입혀지게
     out.updates.push(Object.assign(update, { id: n.id }));
@@ -928,16 +985,32 @@ export async function runJudgements(supabase, needs, { apiKey, names, limit = JU
   // 일시 실패한 행은 모았다가 실행 끝에 한 번 더 묻는다(그 사이 연결이 회복된다) — 시간 초과 하나로 그 보도가 이번 실행에서 빠지지 않게
   const transient = [];
   let stopped = false;
+  let streak = 0;
+  let failStreak = 0;
+  const begun = now();
+  // 예산·장애로 멈추면 아직 묻지 않은 행은 그대로 다음 실행이 묻는다(상한에 걸린 행과 같다 — 표지를 남기지 않는다)
+  const halt = (i, total, why) => { stopped = true; out.warnings.push(`${why} — 남은 ${total - i}건은 다음 실행이 묻는다`); };
+  const overBudget = () => now() - begun >= timeBudgetMs;
   for (const [i, n] of batch.entries()) {
     // 호출이 한 건에 3초 안팎이라 수십 건이면 몇 분 동안 아무 출력이 없다 — 20건마다 진행을 찍는다(호출부가 log를 줄 때만)
     if (log && i > 0 && i % 20 === 0) log.log(`  LLM 판정 진행 ${i}/${batch.length} · ${((Date.now() - started) / 1000).toFixed(0)}초`);
+    if (overBudget()) { halt(i, batch.length, `판정 시간 예산(${Math.round(timeBudgetMs / 1000)}초)을 다 썼다`); break; }
     const r = await judgeOne(n, batch.length - i - 1);
-    if (r === "transient") transient.push(n);
+    if (r === "transient") {
+      transient.push(n);
+      streak += 1;
+      if (streak >= JUDGE_TRANSIENT_STREAK_MAX) { halt(i + 1, batch.length, `일시 실패가 ${streak}번 연달아 났다(API 장애로 본다)`); break; }
+    } else streak = 0;
+    if (r === "fail") {
+      failStreak += 1;
+      // 같은 실패(모델 id 접근 불가·요청 형식 오류)는 남은 행도 전부 같다 — 상한까지 다 부르지 않는다
+      if (failStreak >= JUDGE_FAIL_STREAK_MAX) { out.failStreakStopped = true; halt(i + 1, batch.length, `판정이 ${failStreak}번 연달아 실패했다(설정·요청 오류로 본다)`); break; }
+    } else failStreak = 0;
     if (r === "stop") { stopped = true; break; }
   }
   const carried = [];
   for (const [i, n] of transient.entries()) {
-    if (stopped) { carried.push(n); continue; }
+    if (stopped || overBudget()) { carried.push(n); continue; }
     if (log && i === 0) log.log(`  일시 실패 ${transient.length}건을 다시 묻는다`);
     const r = await judgeOne(n, transient.length - i - 1);
     if (r === "transient") carried.push(n);
@@ -951,7 +1024,7 @@ export async function runJudgements(supabase, needs, { apiKey, names, limit = JU
   out.transient = carried.map((n) => n.id);
   for (const n of carried) {
     if (n.prev?.verdict_at) continue;
-    const update = { verdict_attempts: (n.prev?.verdict_attempts ?? 0) + 1 };
+    const update = { verdict_attempts: nextAttempts(n.prev?.verdict_attempts) };
     const { error } = await supabase.from("transfer_news").update(update).eq("id", n.id);
     if (error) out.warnings.push(`#${n.id} 이월 표지 저장 실패: ${error.message}`);
     else out.updates.push(Object.assign(update, { id: n.id }));

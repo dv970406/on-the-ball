@@ -450,7 +450,17 @@ const sha1 = (s) => createHash("sha1").update(s).digest("hex");
 
 /** 지시문 지문(12자) — 지시문·출력 형식·모델·생각 설정·effort 중 하나라도 바뀌면 바뀐다(`transfer_news.verdict_prompt`) */
 export function judgeFingerprint(system, config = JUDGE_CONFIG) {
-  return sha1(system + JSON.stringify(JUDGE_SCHEMA) + config.model + JSON.stringify(config.thinking) + config.effort).slice(0, 12);
+  return sha1(withoutDictionaries(system) + JSON.stringify(JUDGE_SCHEMA) + config.model + JSON.stringify(config.thinking) + config.effort).slice(0, 12);
+}
+
+/**
+ * 지문에서 사전 구간(`<구단 표>`·`<용어>`)을 뺀다 — 지문은 **판정 규칙**이 바뀌었는지를 가리킨다. 사전은 주간 정비로 자주 바뀌는데
+ * 그때마다 모든 판정이 "옛 지시문 판정"(`--rejudge-stale` 대상)이 되면 표기 한 줄 고친 것이 전량 재판정 비용으로 번진다.
+ * 사전이 바뀐 효과는 다시 묻지 않고 요약 쪽(교정표·사전 표기 맞추기)에서 반영된다.
+ */
+function withoutDictionaries(system) {
+  // 줄 하나를 차지한 여는 꼬리표부터만 지운다 — 지시문 문장 속의 "<구단 표>" 언급부터 지우면 그 사이 규칙 문장이 지문에서 빠진다
+  return String(system).replace(/^<구단 표>\n[\s\S]*?^<\/구단 표>$/mu, "<구단 표/>").replace(/^<용어>\n[\s\S]*?^<\/용어>$/mu, "<용어/>");
 }
 
 /** 입력 지문(16자) — 사용자 메시지가 같으면 같다(`transfer_news.verdict_input`). 재생이 "입력이 바뀐 행"을 가르는 데 쓴다 */

@@ -609,6 +609,45 @@ const N = (o) => JSON.stringify({ evidence_ids: [], timing: "current", player: n
     const client = flaky({ 1: [timeout], 2: [limit] });
     const r = await runJudgements(db, [needOf(1), needOf(2), needOf(3)], { names, corrections: {}, lookup: noLookup, client });
     check("사용 한도 — 멈춘 뒤에는 일시 실패 행을 다시 보내지 않고 이월한다", client.calls.join(",") === "1,2" && r.transient.join(",") === "1" && db.writes.some((w) => w.id === 1 && w.verdict_attempts === 1));
+    check("사용 한도 — 실행 화면 경고용 표지를 남긴다", r.usageLimited === true);
+  }
+  // 장애 차단기 — 일시 실패가 연달아 나면 남은 행을 보내지 않는다(장애 중에 호출마다 시간 상한을 다 쓰지 않게)
+  {
+    const db = fakeDb();
+    const client = flaky({ 1: [timeout], 2: [timeout], 3: [timeout] });
+    const r = await runJudgements(db, [1, 2, 3, 4, 5].map((id) => needOf(id)), { names, corrections: {}, lookup: noLookup, client });
+    check("차단기 — 일시 실패 3연속이면 멈추고 실패 행만 이월한다(4·5는 다음 실행이 묻는다)", client.calls.join(",") === "1,2,3" && r.transient.join(",") === "1,2,3" && !db.writes.some((w) => w.id >= 4) && r.warnings.some((w) => w.includes("연달아")), JSON.stringify({ calls: client.calls, t: r.transient }));
+  }
+  {
+    const client = flaky({ 1: [bad], 2: [bad], 3: [bad], 4: [bad], 5: [bad] });
+    const r = await runJudgements(fakeDb(), [1, 2, 3, 4, 5, 6, 7].map((id) => needOf(id)), { names, corrections: {}, lookup: noLookup, client });
+    check("차단기 — 영구 실패 5연속이면 멈춘다(모델 id·요청 형식 오류)", client.calls.length === 5 && r.failStreakStopped === true);
+  }
+  // 시간 예산 — 다 쓰면 남은 행을 묻지 않는다
+  {
+    let t = 0;
+    const client = flaky({});
+    const r = await runJudgements(fakeDb(), [1, 2, 3].map((id) => needOf(id)), { names, corrections: {}, lookup: noLookup, client, timeBudgetMs: 1000, now: () => (t += 600) });
+    check("시간 예산 — 예산을 넘기면 남은 행은 다음 실행으로", client.calls.join(",") === "1" && r.warnings.some((w) => w.includes("시간 예산")), client.calls.join(","));
+  }
+  // 저장 실패 — 판정 시각·실패 횟수만이라도 남겨 매시 다시 물리지 않게 한다
+  {
+    const writes = [];
+    let first = true;
+    const db = { writes, from: () => ({
+      update: (v) => ({ eq: async (_c, id) => { if (first && "verdict" in v) { first = false; return { error: { message: "violates check constraint" } }; } writes.push({ id, ...v }); return { error: null }; } }),
+      upsert: async () => ({ error: null }),
+    }) };
+    const r = await runJudgements(db, [needOf(1)], { names, corrections: {}, lookup: noLookup, client: flaky({}) });
+    check("저장 실패 — 시각·실패 횟수만 남긴다", r.failed === 1 && writes.length === 1 && writes[0].verdict_attempts === 1 && typeof writes[0].verdict_at === "string" && !("verdict" in writes[0]), JSON.stringify(writes));
+  }
+  // 본문 재시도 — 또 못 받으면 묻지 않고 시각·횟수만 올린다(옛 판정을 지킨다)
+  {
+    const db = fakeDb();
+    const client = flaky({});
+    const need = { ...needOf(1, { verdict: "move", verdict_player: "david alaba", verdict_at: "2026-09-20T00:00:00Z", verdict_attempts: 1, verdict_article_chars: 0 }), mode: "article", source_id: "rss:fl-arsenal", url: "https://www.football.london/a" };
+    const r = await runJudgements(db, [need], { names, corrections: {}, lookup: noLookup, client, fetchImpl: async () => ({ ok: false, status: 403, text: async () => "" }) });
+    check("본문 재시도 — 본문을 또 못 받으면 API를 부르지 않는다", client.calls.length === 0 && db.writes.length === 1 && db.writes[0].verdict_attempts === 2 && !("verdict" in db.writes[0]) && r.articleSkipped === 1, JSON.stringify(db.writes));
   }
   // 기사 본문 — 일시 실패(시간 초과·5xx·429)는 한 번 더 받고, 403·404는 다시 받지 않는다
   {
@@ -635,6 +674,38 @@ check("요약 — 금액 단위 낱말을 기호로 접는다(€45million·£64
   const clubKo = (raw) => ({ "Sporting CP": "스포르팅 CP", "West Bromwich Albion": "웨스트 브로미치" })[detectClubs(raw)[0]] ?? null;
   const out = localizeSummary("Sporting CP 소속 곤살루 이나시우를 두고 €40m 제안을 Sporting이 수락했다. David Alaba와 City는 그대로.", { clubKo });
   check("요약 — 원출력 구단 칸 밖의 영문 구단명도 사전으로 풀리면 한국어로", out === "스포르팅 CP 소속 곤살루 이나시우를 두고 €40m 제안을 스포르팅 CP이 수락했다. David Alaba와 City는 그대로.", out);
+}
+
+{
+  const { stripMetaSentences } = await import("./lib/transfer/judge.mjs");
+  check("요약 — 원문을 두고 하는 문장(\"원문에는 … 나와 있지 않다\")을 걷는다", stripMetaSentences("알라바가 우디네세와 합의했다. 원문 제목에는 이적료나 계약 기간은 나와 있지 않다.") === "알라바가 우디네세와 합의했다.");
+  check("요약 — 쉼표 뒤 메타 절은 걷고 앞 절을 맺는다", stripMetaSentences("맨유로 돌아가지 않을 수 있다는 분석이 나왔고, 금액은 언급되지 않았다.") === "맨유로 돌아가지 않을 수 있다는 분석이 나왔다.");
+  check("요약 — 비공개 이적료·다른 정보가 섞인 절은 남긴다", stripMetaSentences("이적료는 공개되지 않았다. 특정 구단은 언급되지 않았고, 레알은 제외한다고 밝혔다.") === "이적료는 공개되지 않았다. 특정 구단은 언급되지 않았고, 레알은 제외한다고 밝혔다.");
+  check("요약 — 전부 메타 문장이면 원래 글을 둔다(검증이 판단한다)", stripMetaSentences("원문에는 정보가 없다.") === "원문에는 정보가 없다.");
+  check("요약 — \"기사에 따르면\"으로 시작하는 본문 문장은 남긴다", stripMetaSentences("BBC 기사에 따르면 첼시가 제안을 했다. 금액은 £40m이다.") === "BBC 기사에 따르면 첼시가 제안을 했다. 금액은 £40m이다.");
+  check("요약 — 보도된 사실(\"공식 발표는 아직 나오지 않았다\")은 남긴다", stripMetaSentences("첼시가 합의에 이르렀다. 공식 발표는 아직 나오지 않았다.") === "첼시가 합의에 이르렀다. 공식 발표는 아직 나오지 않았다.");
+  check("요약 — 사실 절(\"…합의했고, 공식 발표는 아직 나오지 않았다\")도 남긴다", stripMetaSentences("첼시가 합의했고, 공식 발표는 아직 나오지 않았다.") === "첼시가 합의했고, 공식 발표는 아직 나오지 않았다.");
+  check("요약 — 주어가 기사인 \"나오지 않았다\"는 걷는다", stripMetaSentences("첼시가 합의했다. 기사에는 금액이 나오지 않았다.") === "첼시가 합의했다.");
+}
+{
+  const { detectClubs } = await import("./lib/transfer/clubs.mjs");
+  const clubKo = (raw) => ({ Everton: "에버턴", Bologna: "볼로냐" })[detectClubs(raw)[0]] ?? null;
+  const out = localizeSummary("첼시가 Everton Soares 영입에 나섰다. Bologna Rangers와 Everton도 관심.", { clubKo });
+  check("요약 — 구단 이름을 품은 다른 구절(선수 이름)은 바꾸지 않는다", out === "첼시가 Everton Soares 영입에 나섰다. Bologna Rangers와 에버턴도 관심.", out);
+}
+{
+  const r = parseJudgement(N({ evidence_ids: [1], player: "Сергей Иванов", move: true, stage: "rumour", to: "Chelsea", summary_ko: "첼시가 관심을 보였다." }), "Chelsea are interested in Сергей Иванов of Zenit.", { corrections: {}, player: null, names: createNameBook({}), sentences: ["Chelsea are interested in Сергей Иванов of Zenit."] });
+  check("판정 — 딜 키를 만들 수 없는 이름(키릴 문자)은 선수 미특정으로 접는다", r.kind === "not_move" && r.unnamed === true, JSON.stringify(r));
+}
+{
+  const { resolveClubs } = await import("./lib/transfer/judge.mjs");
+  let lookups = 0;
+  const lookup = async () => { lookups += 1; return { wikidataId: "Q1", nameKo: "가짜 FC" }; };
+  const cacheRows = [];
+  const book = createNameBook({});
+  await resolveClubs({ from: "Fakeclub United", to: null, suitors: [] }, book, { lookup, cacheRows });
+  await resolveClubs({ from: null, to: "Fakeclub United", suitors: [] }, book, { lookup, cacheRows });
+  check("구단 확인 — 같은 실행에서 같은 이름은 한 번만 찾고 한 행만 쌓는다", lookups === 1 && cacheRows.length === 1, JSON.stringify({ lookups, n: cacheRows.length }));
 }
 
 console.log(`\nLLM 판정 ${pass}/${pass + fail} 통과`);

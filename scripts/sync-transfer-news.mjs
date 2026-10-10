@@ -250,7 +250,7 @@ function reportJudgeMetrics(r) {
   const j = r.judged && "read" in r.judged ? r.judged : null;
   const parts = [];
   if (n) parts.push(`대상 ${n.asked}${n.total > n.asked ? `/${n.total}` : ""}(요약만 다시 ${n.summaryOnly} · 탐색 ${n.explore}${n.deferred ? ` · 다음 실행으로 ${n.deferred}` : ""})`);
-  if (j) parts.push(`이동 ${j.move} · 아님 ${j.notMove} · 판정 불가 ${j.invalid} · 일시 실패 이월 ${j.transient?.length ?? 0}`);
+  if (j) parts.push(`이동 ${j.move} · 아님 ${j.notMove} · 판정 불가 ${j.invalid} · 실패 ${j.failed} · 일시 실패 이월 ${j.transient?.length ?? 0}${j.articleSkipped ? ` · 본문 재시도 건너뜀 ${j.articleSkipped}` : ""}`);
   parts.push(`반복 실패(${REPEATED_FAILURE_ATTEMPTS}회 이상) ${r.repeatedFailures ?? 0}`);
   if (j) parts.push(`토큰 입력 ${j.inputTokens}(캐시 읽음 ${j.cacheReadTokens} · 캐시 씀 ${j.cacheWriteTokens}) · 출력 ${j.outputTokens}`);
   console.log(`  판정 지표: ${parts.join(" · ")}`);
@@ -266,6 +266,10 @@ function reportJudgeMetrics(r) {
   if (r.repeatedFailures) {
     console.log(`::warning title=LLM 판정::같은 보도가 연달아 ${REPEATED_FAILURE_ATTEMPTS}번 이상 판정에 실패했습니다(${r.repeatedFailures}건) — 실패 사유를 확인하세요`);
   }
+  // 계정 사용 한도·연속 실패는 판정이 통째로 멈춘 상태다 — 새 딜이 열리지 않는데 작업은 초록으로 끝나므로 실행 화면에 띄운다
+  if (j?.usageLimited) console.log("::warning title=LLM 판정::Anthropic 계정 사용 한도(또는 크레딧)에 닿아 판정을 멈췄습니다 — 콘솔에서 한도를 확인하세요");
+  if (j?.failStreakStopped) console.log("::warning title=LLM 판정::판정이 연달아 실패해 멈췄습니다(모델 id·요청 형식을 확인하세요)");
+  else if (j?.failed) console.log(`::warning title=LLM 판정::판정 호출·저장 실패 ${j.failed}건 — 경고 목록의 사유를 확인하세요`);
 }
 
 /**
