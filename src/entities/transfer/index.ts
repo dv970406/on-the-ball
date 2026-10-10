@@ -25,6 +25,8 @@ export { transferKeys } from "./api/keys";
 export { TRANSFER_DEAL_LIMIT } from "./api/mappers";
 // ⚠ 서버가 다른 사용자로 그린 목록의 자리 표시용 사본 — 관심 표시를 캐시에 사실처럼 앉히지 않는다
 export { withoutWatches } from "./api/mappers";
+// ⚠ 딜을 대표하는 보도(요약 있는 최신 → 없으면 최신) — 보드 오른쪽 판이 쓴다. 상세 page(서버)는 `api/mappers` 직접 경로로 같은 함수를 쓴다
+export { headlineReports } from "./api/mappers";
 export {
   useTransferDealListQuery,
   useTransferDealQuery,

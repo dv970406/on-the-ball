@@ -166,6 +166,28 @@ export function buildReport(row: ReportSelectRow): TransferReport {
   };
 }
 
+/**
+ * 딜을 **대표하는 보도** — 한국어 요약이 있는 보도 중 최신 `count`건, 그런 보도가 하나도 없을 때만 최신 `count`건.
+ *
+ * 공유 카드·검색 결과의 한 줄(상세 `generateMetadata`)과 보드 오른쪽 판의 "최신 보도"가 이 판정을 함께 쓴다 —
+ * 호출부가 각자 고르지 않는다(`gist`를 매퍼가 고르는 것과 같은 이유).
+ * - 요약(`summary_ko`)은 LLM이 "이동"으로 판정한 보도에만 있다. 판정 전·이동 아님 보도가 가장 최근이면 그 영문 발췌가
+ *   대표가 되어, 이적 보도도 아닌 목록 기사("Top 10 highest-paid teenagers …")가 공유 카드 설명으로 나갔다.
+ * - 요약 있는 보도가 하나도 없으면 지금까지처럼 최신 보도(영문 발췌)다 — 판정이 아직 돌지 않은 딜도 무언가를 말한다.
+ * ⚠ **문구만** 고른다 — "업데이트 N분 전"(`latestReportedAt`)·정렬·타임라인은 최신 보도 그대로다.
+ * ⚠ 입력 순서를 가정하지 않는다(시각으로 다시 정렬한다). 비교는 `sortReports`의 `latest`와 같다 — 문자열 비교는 소수 초를
+ *   생략한 표기를 뒤집는다. 원본 배열을 바꾸지 않는다(쿼리 캐시의 배열이 그대로 들어온다).
+ * ⚠ 서버(상세 page)가 직접 경로로 가져가므로 이 파일에 둔다 — `"use client"`가 없는 서버 안전 파일이다.
+ */
+export function headlineReports<T extends Pick<TransferReport, "publishedAt" | "gist">>(
+  reports: readonly T[],
+  count: number,
+): T[] {
+  const latestFirst = reports.slice().sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
+  const summarized = latestFirst.filter((r) => r.gist?.lang === "ko");
+  return (summarized.length > 0 ? summarized : latestFirst).slice(0, count);
+}
+
 /** `DEAL_DETAIL_SELECT`가 돌려주는 행 */
 export interface DealSelectRow {
   id: TransferDealRow["id"];

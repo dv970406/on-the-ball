@@ -10,7 +10,7 @@ import { clamp } from "@/shared/lib/text";
 import { createSupabaseServerClient, hasSessionCookie } from "@/shared/api/supabase-server";
 // ⚠ 배럴이 아니라 직접 경로 — 조립·매퍼·단계 라벨은 "use client"가 없어 서버에서 쓸 수 있다.
 import { buildDealQuery, buildReportsQuery } from "@/entities/transfer/api/list-query";
-import { buildDeal, buildReport } from "@/entities/transfer/api/mappers";
+import { buildDeal, buildReport, headlineReports } from "@/entities/transfer/api/mappers";
 import { STAGE_STATUS, STATUS_LABEL } from "@/entities/transfer/lib/stage";
 import { routeLabels } from "@/entities/transfer/lib/route-label";
 import { playerName } from "@/entities/transfer/lib/player-name";
@@ -131,13 +131,14 @@ const fetchDealHead = cache(async (dealId: number): Promise<DealHead> => {
 /**
  * 공유 카드·검색 결과의 한 줄.
  *
- * 최신 보도의 요지(한국어 요약, 없으면 영문 발췌)가 있으면 그것을 쓴다 — 화면의 타임라인 첫 항목과 같은 문장이다.
+ * 대표 보도의 요지를 쓴다 — 한국어 요약이 있는 가장 최근 보도, 그런 보도가 없으면 최신 보도의 영문 발췌(`headlineReports` —
+ * 보드 오른쪽 판의 "최신 보도"와 같은 판정). 최신 보도를 그대로 쓰면 판정 전·이적과 무관한 영문 기사가 공유 카드 설명이 된다.
  * 없으면 화면이 그리는 값(경로 + 상태 뱃지)으로 만든다(`nextjs.md` "색인 대상 상세는 description을
  * 채운다"). 어느 쪽이든 120자에서 클램프한다.
  * ⚠ 발췌는 줄바꿈을 담고 있을 수 있다(텔레그램 원문) — 메타 태그에 실릴 문장이라 공백 하나로 접는다.
  */
 function describe(head: Extract<DealHead, { state: "found" }>): string {
-  const gist = head.reports?.[0]?.gist?.text.replace(/\s+/g, " ").trim();
+  const gist = headlineReports(head.reports ?? [], 1)[0]?.gist?.text.replace(/\s+/g, " ").trim();
   if (gist) return clamp(gist, META_DESCRIPTION_MAX);
 
   const { deal } = head;

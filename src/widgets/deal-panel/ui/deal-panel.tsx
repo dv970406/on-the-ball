@@ -13,6 +13,7 @@ import {
   StatusBadge,
   SuitorList,
   type TransferDealListItem,
+  headlineReports,
   playerName,
   sortReports,
   useTransferReportsQuery,
@@ -42,7 +43,11 @@ export interface DealPanelProps {
   onSignInRequired: (action: string) => void;
 }
 
-/** 최신 보도 몇 건을 보여 주는가 — 나머지는 "전체 보기"(딜 상세)가 갖는다 */
+/**
+ * 최신 보도 몇 건을 보여 주는가 — 나머지는 "전체 보기"(딜 상세)가 갖는다.
+ * 고르는 판정은 `headlineReports`다(요약 있는 보도 중 최신, 없으면 최신) — 상세의 공유 카드 설명과 같은 판정이라, 판정 전·이적과
+ * 무관한 영문 기사가 가장 최근이어도 판의 첫 줄이 되지 않는다. 전체 타임라인은 "전체 보기"가 그대로 갖는다.
+ */
 const LATEST_REPORTS = 3;
 
 /**
@@ -85,9 +90,11 @@ export function DealPanel({ deal, userId, nowMs, active, onSignInRequired }: Dea
   const prediction = useDealPredictionQuery({ dealId: deal.id, userId, enabled });
   const nudge = usePushNudge({ dealId: deal.id, watched: deal.isWatched, userId });
   const latest = useMemo(
-    () => (reports.data ? sortReports(reports.data, "latest").slice(0, LATEST_REPORTS) : undefined),
+    () => (reports.data ? headlineReports(reports.data, LATEST_REPORTS) : undefined),
     [reports.data],
   );
+  // 레일의 잉크 점은 **가장 최근 보도** 하나다(`ReportItem`) — 위 목록이 요약 있는 보도만 골랐으면 첫 항목이 최신이 아닐 수 있다
+  const newestId = useMemo(() => (reports.data ? sortReports(reports.data, "latest")[0]?.id : undefined), [reports.data]);
 
   return (
     <section aria-labelledby={titleId} className="flex h-full min-h-0 flex-col bg-canvas">
@@ -176,8 +183,8 @@ export function DealPanel({ deal, userId, nowMs, active, onSignInRequired }: Dea
           )}
           {latest !== undefined && latest.length > 0 && (
             <ol className="mt-1">
-              {latest.map((report, i) => (
-                <ReportItem key={report.id} report={report} latest={i === 0} nowMs={nowMs} />
+              {latest.map((report) => (
+                <ReportItem key={report.id} report={report} latest={report.id === newestId} nowMs={nowMs} />
               ))}
             </ol>
           )}
