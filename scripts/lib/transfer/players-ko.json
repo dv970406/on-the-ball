@@ -1,6 +1,6 @@
 {
   "_comment": [
-    "선수 표기 사전 — 키는 player-key.mjs의 normalizePlayer(추출된 영문명) 결과다(NFD → 결합문자 제거 → 소문자 → 비영숫자 제거 → 공백 하나).",
+    "선수 표기 사전 — 키는 player-key.mjs의 normalizePlayer(추출된 영문명) 결과다(NFD → 결합문자 제거 → ø·æ·ß 같은 글자 옮기기 → 소문자 → 비영숫자 제거 → 공백 하나).",
     "값: ko(한국어 표기, 필수) · position(≤20자, 'RW/LW' 형태) · birthYear(1950~2015) · nationality(ISO 3자리 대문자). 모르는 값은 적지 않는다.",
     "없는 선수는 화면이 영문명으로 그린다 — 파생이 실패하지 않고 경고로 찍는다(엠블럼·팀 표기와 같은 운영 모델).",
     "형식은 scripts/test-transfer-extract.mjs가 검사한다."
@@ -80,7 +80,7 @@
   "gjivai zechiel": {
     "ko": "기바이 제키엘",
     "position": "CM",
-    "birthYear": 2006,
+    "birthYear": 2004,
     "nationality": "NED"
   },
   "estevao": {
@@ -113,12 +113,6 @@
     "birthYear": 2008,
     "nationality": "MEX"
   },
-  "mora": {
-    "ko": "힐베르토 모라",
-    "position": "AM",
-    "birthYear": 2008,
-    "nationality": "MEX"
-  },
   "mauro coronel": {
     "ko": "마우로 코로넬",
     "position": "CB",
@@ -129,12 +123,6 @@
     "position": "ST",
     "birthYear": 1997,
     "nationality": "BRA"
-  },
-  "alexanderarnold": {
-    "ko": "트렌트 알렉산더아널드",
-    "position": "RB",
-    "birthYear": 1998,
-    "nationality": "ENG"
   },
   "manu kone": {
     "ko": "마누 코네",
@@ -164,7 +152,10 @@
     "ko": "미키 판 더 펜"
   },
   "trent alexanderarnold": {
-    "ko": "트렌트 알렉산더-아놀드"
+    "ko": "트렌트 알렉산더-아놀드",
+    "position": "RB",
+    "birthYear": 1998,
+    "nationality": "ENG"
   },
   "joao felix": {
     "ko": "주앙 펠릭스"
@@ -194,7 +185,9 @@
     "ko": "마이클 올리세"
   },
   "jj gabriel": {
-    "ko": "JJ 가브리엘"
+    "ko": "JJ 가브리엘",
+    "birthYear": 2010,
+    "nationality": "ENG"
   },
   "noah fernandez": {
     "ko": "노아 페르난데스"
@@ -246,5 +239,74 @@
   },
   "jules kounde": {
     "ko": "쥘 쿤데"
+  },
+  "alberto costa": {
+    "ko": "알베르투 코스타"
+  },
+  "alessandro romano": {
+    "ko": "알레산드로 로마노",
+    "birthYear": 2006
+  },
+  "andria bartishvili": {
+    "ko": "안드리아 바르티슈빌리",
+    "birthYear": 2009,
+    "nationality": "GEO"
+  },
+  "carlos augusto": {
+    "ko": "카를루스 아우구스투",
+    "birthYear": 1999,
+    "nationality": "BRA"
+  },
+  "david eze": {
+    "ko": "데이비드 에제"
+  },
+  "dylan reid": {
+    "ko": "딜런 리드",
+    "birthYear": 2005
+  },
+  "finn jeltsch": {
+    "ko": "핀 옐치",
+    "birthYear": 2006,
+    "nationality": "GER"
+  },
+  "gabriel sara": {
+    "ko": "가브리엘 사라",
+    "birthYear": 1999,
+    "nationality": "BRA"
+  },
+  "kevin viveros": {
+    "ko": "케빈 비베로스",
+    "birthYear": 2000,
+    "nationality": "COL"
+  },
+  "martin odegaard": {
+    "ko": "마르틴 외데고르",
+    "birthYear": 1998,
+    "nationality": "NOR"
+  },
+  "phoenix blayney": {
+    "ko": "피닉스 블레이니"
+  },
+  "remy descamps": {
+    "ko": "레미 데캉",
+    "position": "GK",
+    "birthYear": 1996,
+    "nationality": "FRA"
+  },
+  "rodrigo mora": {
+    "ko": "호드리구 모라",
+    "birthYear": 2007,
+    "nationality": "POR"
+  },
+  "tyler morton": {
+    "ko": "타일러 모턴",
+    "birthYear": 2002,
+    "nationality": "ENG"
+  },
+  "pierreemile hojbjerg": {
+    "ko": "피에르에밀 호이비에르",
+    "position": "DM",
+    "birthYear": 1995,
+    "nationality": "DEN"
   }
 }

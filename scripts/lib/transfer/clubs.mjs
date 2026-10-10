@@ -128,10 +128,27 @@ const CLUB_ALIASES = {
   "Club Brugge": ["Club Brugge", "Brugge"],
   "Galatasaray": ["Galatasaray"],
   "Fenerbahce": ["Fenerbahce", "Fenerbahçe"],
+  // 사전 밖이면 위키데이터 레이블("베식타시 JK")로 그려진다 — 한국어 표기는 glossary-ko.json의 clubs가 정한다
+  "Besiktas": ["Besiktas", "Beşiktaş", "Besiktas JK", "Beşiktaş JK"],
+  "Trabzonspor": ["Trabzonspor"],
+  // ⚠ "Braga" 단독도 이적 보도에서는 SC 브라가다 — "Sporting Braga"가 스포르팅 CP로 잡히지 않게 긴 별칭을 함께 둔다.
+  //   도시를 가리키는 문형("born in Braga"·"in Braga")은 뺀다(`ALIAS_NOT_PRECEDED`)
+  "Braga": ["SC Braga", "Sporting Braga", "Sporting de Braga", "Braga"],
   "Celtic": ["Celtic"],
   "Rangers": ["Rangers"],
-  "Al Hilal": ["Al Hilal"],
-  "Al Nassr": ["Al Nassr"],
+  // 사우디 구단은 하이픈 표기("Al-Hilal")가 흔하다 — 없으면 판정자가 읽은 "Al-Hilal"이 위키데이터로 넘어가 같은 구단이
+  //   두 코드로 갈린다("Hull"과 같은 사고)
+  "Al Hilal": ["Al Hilal", "Al-Hilal"],
+  "Al Nassr": ["Al Nassr", "Al-Nassr"],
+  // ⚠ "Ittihad" 단독은 싣지 않는다 — Ittihad Kalba·Ittihad Tanger 같은 다른 구단의 머리다.
+  //   "Al Ittihad" 뒤에 도시가 붙은 다른 나라 구단("Al-Ittihad Kalba"·"Al Ittihad Tripoli")은 `ALIAS_NOT_FOLLOWED`가 뺀다
+  "Al Ittihad": ["Al Ittihad", "Al-Ittihad", "Al Ittihad Jeddah"],
+  // ⚠ 이집트의 알아흘리는 철자가 "Al Ahly"라 여기 걸리지 않는다(낱말 경계 — 아래 가로채기 항목도 둔다).
+  //   카타르·바레인·UAE의 동명 구단("Al Ahli Doha"·"Shabab Al Ahli")은 `ALIAS_NOT_FOLLOWED`·`ALIAS_NOT_PRECEDED`가 뺀다
+  "Al Ahli": ["Al Ahli", "Al-Ahli", "Al Ahli Saudi"],
+  "Al Ettifaq": ["Al Ettifaq", "Al-Ettifaq", "Ettifaq"],
+  "Al Qadsiah": ["Al Qadsiah", "Al-Qadsiah", "Al Qadisiyah", "Al-Qadisiyah"],
+  "Philadelphia Union": ["Philadelphia Union"],
 
   // ── 잉글랜드 하부 리그 ─────────────────────────────────────────────────
   // 프리셋이 없다 — 원문 영문명으로, 엠블럼 없이 표시된다. 사전에 두는 이유는 글의 소속팀·행선지를
@@ -181,6 +198,10 @@ const CLUB_ALIASES = {
   "OL Reign": ["OL Reign"],
   "Viktoria Koln": ["Viktoria Köln", "Viktoria Koln"],
   "Fortuna Koln": ["Fortuna Köln", "Fortuna Koln"],
+  // 이집트 구단 — 사우디 "Al Ahli"와 다른 구단이다
+  "Al Ahly": ["Al Ahly", "Al-Ahly"],
+  // 카타르·이집트·리비아에도 같은 이름이 있다 — 나라가 붙은 표기는 사우디 알이티하드가 아니다
+  "Al Ittihad Alexandria": ["Al Ittihad Alexandria", "Al-Ittihad Alexandria"],
 };
 
 /**
@@ -196,7 +217,25 @@ const CASE_SENSITIVE = new Set(["Como", "Rayo", "Levante", "Spurs", "OM", "OL", 
 const ALIAS_NOT_FOLLOWED = {
   Sporting: String.raw`(?!\s+(?:[Dd]irectors?|[Cc]lub|Charleroi|Cristal|Braga|Life|News|[Cc]hief|[Dd]epartment))`,
   Hull: String.raw`(?!\s+(?:KR\b|FC\b|Kingston|Rovers))`,
+  // 아랍 구단 이름은 나라마다 겹친다 — 뒤에 도시가 붙으면 사우디 구단이 아니다(Al-Ittihad Kalba는 UAE, Al Ahli Doha는 카타르,
+  //   Al-Hilal Omdurman은 수단). 하이픈 표기와 띄어쓴 표기에 같은 규칙을 건다(아래 `sameRule`)
+  ...sameRule(["Al Ittihad", "Al-Ittihad"], String.raw`(?![\s-]+(?:Kalba|Tripoli|Alexandria|Aleppo|Misrata|Benghazi|Doha|Manama)\b)`),
+  ...sameRule(["Al Ahli", "Al-Ahli"], String.raw`(?![\s-]+(?:Doha|Manama|Tripoli|Benghazi|Amman|Dubai|Sanaa|Aleppo|Bahrain|Qatar)\b)`),
+  ...sameRule(["Al Hilal", "Al-Hilal"], String.raw`(?![\s-]+(?:Omdurman|Benghazi|Port\s+Sudan|Kadougli)\b)`),
+  ...sameRule(["Al Nassr", "Al-Nassr"], String.raw`(?![\s-]+(?:Dubai|Benghazi|Oman)\b)`),
 };
+/**
+ * 별칭 바로 앞에 오면 그 구단이 아닌 낱말 — 다른 구단 이름의 꼬리("Shabab Al Ahli"는 UAE 구단)이거나,
+ * 도시 이름으로 쓰인 자리("born in Braga").
+ * ⚠ "from Braga"·"to Braga"·"at Braga"는 구단이다(이적 문형) — 도시로 읽히는 전치사만 막는다.
+ */
+const ALIAS_NOT_PRECEDED = {
+  ...sameRule(["Al Ahli", "Al-Ahli"], String.raw`(?<!Shabab[\s-]+)`),
+  Braga: String.raw`(?<!\b(?:[Ii]n|[Nn]ear|[Oo]utside|[Bb]orn|[Cc]ity\s+of|[Tt]own\s+of|[Dd]istrict\s+of)\s+)`,
+};
+function sameRule(aliases, re) {
+  return Object.fromEntries(aliases.map((a) => [a, re]));
+}
 
 /**
  * 구단명 바로 뒤에 오면 **그 구단이 아니다** — 여자팀·2군·유스팀이다.
@@ -206,6 +245,15 @@ const ALIAS_NOT_FOLLOWED = {
 const NOT_FIRST_TEAM = /^[\s-]*(?:Women|Ladies|Femenino|Feminino|Féminines|Frauen|WFC|II\b|B\b|U-?\d{2}\b|Castilla|Atl[eè]tic|Futures|Academy|Youth|Reserves)/;
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * 낱말 경계 — 유니코드 글자·숫자·결합 문자가 이어지지 않는 자리.
+ * ⚠ `\b`를 쓰지 않는다 — JS의 `\b`는 `u` 플래그에서도 ASCII 낱말 문자만 본다. 그래서 비ASCII 글자로 끝나는 별칭
+ *   ("Beşiktaş"·"Arsenal de Sarandí")은 단독 표기에서 끝 경계가 성립하지 않아 못 잡고(짧은 별칭 "Arsenal"이 대신 잡혔다),
+ *   ASCII 별칭은 악센트 글자 앞에서 낱말이 끝난 것으로 보여 "Interés"가 인테르가 된다.
+ */
+const WORD_START = String.raw`(?<![\p{L}\p{N}\p{M}_])`;
+const WORD_END = String.raw`(?![\p{L}\p{N}\p{M}_])`;
 
 /** 긴 별칭부터 매칭해야 "Manchester United" 가 "Manchester City" 로 오인되지 않는다 */
 const ALIAS_INDEX = Object.entries(CLUB_ALIASES)
@@ -217,7 +265,9 @@ const ALIAS_INDEX = Object.entries(CLUB_ALIASES)
     alias,
     // ⚠ 해시태그는 끝 경계를 따로 둔다 — 없으면 "#FCBayern"이 "#FCB"(바르셀로나)에 걸린다(실제 수집 글 2건)
     re: new RegExp(
-      alias.startsWith("#") ? `${escapeRe(alias)}(?![A-Za-z0-9_])` : `\\b${escapeRe(alias)}\\b${ALIAS_NOT_FOLLOWED[alias] ?? ""}`,
+      alias.startsWith("#")
+        ? `${escapeRe(alias)}(?![A-Za-z0-9_])`
+        : `${ALIAS_NOT_PRECEDED[alias] ?? ""}${WORD_START}${escapeRe(alias)}${WORD_END}${ALIAS_NOT_FOLLOWED[alias] ?? ""}`,
       CASE_SENSITIVE.has(alias) ? "gu" : "giu",
     ),
   }));

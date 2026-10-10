@@ -11,7 +11,19 @@
     "고친 뒤 이미 요약된 보도에 반영하려면: corrections는 node scripts/sync-transfer-news.mjs --derive-only --replay(API 호출 없음), terms는 --derive-only --rejudge(다시 묻는다)"
   ],
   "clubs": {
-    "Benfica": "벤피카"
+    "Benfica": "벤피카",
+    "Galatasaray": "갈라타사라이",
+    "Fenerbahce": "페네르바체",
+    "Besiktas": "베식타스",
+    "Trabzonspor": "트라브존스포르",
+    "Braga": "브라가",
+    "Al Hilal": "알힐랄",
+    "Al Nassr": "알나스르",
+    "Al Ittihad": "알이티하드",
+    "Al Ahli": "알아흘리",
+    "Al Ettifaq": "알이티파크",
+    "Al Qadsiah": "알카디시야",
+    "Al Ahly": "알아흘리 SC"
   },
   "terms": {
     "here we go": "이적 확정",

@@ -7,7 +7,7 @@
  */
 import { createNameBook } from "./lib/transfer/names-ko.mjs";
 import { isRoundup } from "./lib/transfer/story.mjs";
-import { JUDGE_TIER, boardScopeStartMs, clubRecord, createExtractMemo, dealKey, dedupeRows, deriveDeals, derivationStartMs, holdStage, judgeMode, normalizePlayer, orderJudgeNeeds, retryDelayMs, windowSpan } from "./lib/transfer/derive-deals.mjs";
+import { CARRIED_DAILY_ATTEMPTS, JUDGE_TIER, boardScopeStartMs, clubRecord, createExtractMemo, dealKey, dedupeRows, deriveDeals, derivationStartMs, holdStage, judgeMode, normalizePlayer, orderJudgeNeeds, retryDelayMs, windowSpan } from "./lib/transfer/derive-deals.mjs";
 
 const NOW = Date.parse("2026-09-25T00:00:00Z");
 const WINDOWS = [
@@ -558,6 +558,77 @@ const WIDE = {
   upgrade: deriveDeals([row("Chelsea agree deal for John Doe from Benfica.", V("move"))], { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: DICT }), requireVerified: true, requireVerdict: true, upgradeVerdicts: true, existingKeys: new Set() }),
   upgraded: deriveDeals([row("Chelsea agree deal for John Doe from Benfica.", MOVE())], { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: DICT }), requireVerified: true, requireVerdict: true, upgradeVerdicts: true, existingKeys: new Set() }),
 };
+// ── 딜 금액 후보 — 지난 금액·남의 금액은 딜 금액이 아니다(dealFee) ──
+const BID = (amount, extra = {}) => MOVE({ verdict_stage: "rumour", verdict_fee_amount: amount, verdict_fee_currency: "GBP", verdict_fee_kind: "bid", ...extra });
+const FEE = {
+  // 스콧(운영 딜 580) — 근거 구절이 "7월에 거절된 £64m 제안"이다. 관심은 지금 것이어도 금액은 지난 것이다
+  pastBid: judged([row("Chelsea target set for audition with talks continuing after £64m offer for John Doe.", { stage: "rumour", ...BID(64, {
+    verdict_from: "Bournemouth", verdict_to: "Chelsea",
+    verdict_evidence: "The Blues had a £64million offer knocked back by the Cherries in July but their interest in John Doe remains serious",
+    summary_ko: "첼시가 지난 7월 본머스 소속 존 도에게 £64m 제안을 넣었지만 거절당했고, 여전히 관심을 유지하고 있다.",
+  }) })]),
+  // 영문에는 시점이 없고 한국어 요약 절만 지난 때를 말한다
+  pastBidKo: judged([row("Chelsea remain keen on John Doe after £64m offer for the Bournemouth man.", { stage: "rumour", ...BID(64, {
+    verdict_from: "Bournemouth", verdict_to: "Chelsea",
+    summary_ko: "첼시가 지난여름 본머스의 존 도에게 낸 £64m 제안이 거절됐지만, 여전히 영입을 노린다.",
+  }) })]),
+  // 콴사(운영 딜 587) — 행선지가 없고 관심 구단 맨 앞은 첼시인데 £55.5m은 아스날의 제안이다
+  otherClubBid: judged([
+    row("Xabi Alonso 'leading transfer charge' for £55.5m star John Doe who agreed to join Arsenal. Chelsea will reportedly face competition from Arsenal to sign the defender.", { stage: "rumour", ...BID(55.5, {
+    verdict_from: "Bayer Leverkusen", verdict_to: null, verdict_suitors: ["Chelsea", "Arsenal", "Real Madrid", "Liverpool"],
+    }) }),
+    // 그 뒤 보도 — 첼시가 영입전을 이끈다(딜의 상대는 첼시다)
+    row("Chelsea lead the race for Bayer Leverkusen defender John Doe.", { stage: "rumour", ...MOVE({ verdict_stage: "rumour", verdict_from: "Bayer Leverkusen", verdict_to: "Chelsea" }) }),
+  ]),
+  // 대조 — 지금 딜의 상대(행선지)가 낸 지금의 제안은 쓴다("had … rejected"만으로는 지난 일이 아니다)
+  currentBid: judged([row("Chelsea have had a £50m bid for John Doe rejected by Benfica.", { stage: "rumour", ...BID(50, { verdict_from: "Benfica", verdict_to: "Chelsea" }) })]),
+  // 대조 — 요구액은 파는 쪽의 값이라 행선지가 없어도(관심 구단 여럿) 쓴다
+  askingPrice: judged([row("Benfica want €80m for John Doe, with Chelsea and Arsenal keen.", { stage: "rumour", ...MOVE({ verdict_stage: "rumour", verdict_from: "Benfica", verdict_suitors: ["Chelsea", "Arsenal"], verdict_fee_amount: 80, verdict_fee_currency: "EUR", verdict_fee_kind: "asking_price" }) })]),
+  // 무하레모비치(운영 딜 304) — 지금 구단이 데려올 때 낸 지난 이적료
+  pastFee: judged([row("Leeds paid Sassuolo £34m for John Doe last summer, and Juventus are now keen.", { stage: "rumour", ...MOVE({ verdict_stage: "rumour", verdict_from: "Leeds United", verdict_to: "Juventus", verdict_fee_amount: 34, verdict_fee_currency: "GBP", verdict_fee_kind: "fee" }) })]),
+  // 대조 — 완료 보도의 이적료는 달 이름·과거 동사가 있어도 그 딜의 값이다
+  officialFee: judged([row("Chelsea completed the signing of John Doe from Benfica for £50m in August, having paid the fee upfront.", { stage: "official", ...MOVE({ verdict_stage: "official", verdict_from: "Benfica", verdict_to: "Chelsea", verdict_fee_amount: 50, verdict_fee_currency: "GBP", verdict_fee_kind: "fee" }) })]),
+  // 지난 제안을 걸러도 지금의 제안이 남으면 그것이 딜 금액이고, 직전·범위도 남은 후보로만 센다
+  pastThenCurrent: judged([
+    row("Chelsea saw a £64m offer for John Doe rejected by Benfica last summer.", { stage: "rumour", published_at: "2026-09-20T00:00:00Z", ...BID(64, { verdict_from: "Benfica", verdict_to: "Chelsea", summary_ko: "첼시의 지난여름 £64m 제안이 거절됐다는 회고와 함께 관심이 이어진다고 전했다." }) }),
+    row("Chelsea prepare £70m bid for John Doe of Benfica.", { stage: "rumour", published_at: "2026-09-22T00:00:00Z", ...BID(70, { verdict_from: "Benfica", verdict_to: "Chelsea" }) }),
+  ]),
+  // 판정이 없는 딜(규칙만으로 열린 옛 딜)은 지금처럼 규칙 금액을 쓴다
+  unjudgedRule: derive([row("Chelsea agree £47m deal for John Doe from Benfica.", { stage: "agreement" })]),
+};
+// ── 같은 보도를 옮긴 두 매체 — 판정 뒤에 접는다(foldEchoes) ──
+const QS = "레알 마드리드가 바이어 레버쿠젠 소속 존 도 영입에 관심을 보이고 있다.";
+const CITED = (id, source_id, published_at, body, extra = {}) =>
+  // 가십 칼럼의 항목 행 — external_id가 칼럼의 자식 표지(`#item-`)를 단다(없으면 칼럼째 가십 모음으로 빠진다)
+  row(body, { id, source_id, external_id: `col-${id}#item-${id}`, published_at, stage: "rumour", attribution: "cited", attributed_to: "Bild", ...MOVE({ verdict_stage: "rumour", verdict_from: "Bayer Leverkusen", verdict_to: "Real Madrid", summary_ko: QS, ...extra }) });
+const fold = (rows) => { const r = judged(rows); return pick(r.deals[0] ?? {}, ["report_count", "rowIds"]); };
+const ECHO = {
+  // 콴사(운영 딜 188 — 보도 20391·20418): 두 칼럼이 같은 빌트 보도를 다른 문장으로 옮겼다. 판정 요약까지 같다
+  bild: fold([
+    CITED(9001, "rss:bbc-gossip", "2026-10-01T19:45:16Z", "Real Madrid are showing an interest in Bayer Leverkusen's 23-year-old England defender John Doe, who Arsenal made a bid for in the summer. (Bild)"),
+    CITED(9002, "rss:sky-transfers", "2026-10-01T21:41:00Z", "Real Madrid are keen on signing former Liverpool defender John Doe from Bayer Leverkusen (Bild)"),
+  ]),
+  // 같은 신문 인용 + 판정 필드가 같으면 요약이 달라도 접는다
+  bildFields: fold([
+    CITED(9011, "rss:bbc-gossip", "2026-10-01T19:45:16Z", "Real Madrid are showing an interest in Bayer Leverkusen defender John Doe. (Bild)", { summary_ko: "레알 마드리드가 레버쿠젠 수비수 존 도에게 관심을 보인다고 빌트가 전했다." }),
+    CITED(9012, "rss:sky-transfers", "2026-10-01T21:41:00Z", "Real Madrid are keen on signing John Doe from Bayer Leverkusen (Bild)"),
+  ]),
+  // 48시간을 넘으면 같은 요약이어도 따로 센다(같은 관심이 다시 보도된 것이다)
+  apart: fold([
+    CITED(9021, "rss:bbc-gossip", "2026-09-26T19:45:16Z", "Real Madrid are showing an interest in Bayer Leverkusen defender John Doe. (Bild)"),
+    CITED(9022, "rss:sky-transfers", "2026-10-01T21:41:00Z", "Real Madrid are keen on signing John Doe from Bayer Leverkusen (Bild)"),
+  ]),
+  // 다른 신문 · 다른 요약이면 다른 보도다(판정 필드가 같아도)
+  distinct: fold([
+    CITED(9031, "rss:bbc-gossip", "2026-10-01T19:45:16Z", "Real Madrid are showing an interest in Bayer Leverkusen defender John Doe. (Bild)"),
+    CITED(9032, "rss:sky-transfers", "2026-10-01T21:41:00Z", "Real Madrid are keen on signing John Doe from Bayer Leverkusen (Marca)", { attributed_to: "Marca", summary_ko: "마르카는 레알 마드리드가 레버쿠젠의 존 도 영입을 검토한다고 보도했다." }),
+  ]),
+  // 대표는 원보도(인용이 아닌 행)다 — 나중에 게시됐어도
+  original: fold([
+    CITED(9041, "rss:bbc-gossip", "2026-10-01T19:45:16Z", "Real Madrid are showing an interest in Bayer Leverkusen defender John Doe. (Bild)"),
+    row("Real Madrid are keen on Bayer Leverkusen defender John Doe, Bild reports.", { id: 9042, source_id: "rss:standard-football", published_at: "2026-10-01T22:00:00Z", stage: "rumour", ...MOVE({ verdict_stage: "rumour", verdict_from: "Bayer Leverkusen", verdict_to: "Real Madrid", summary_ko: QS }) }),
+  ]),
+};
 const ST = (stage, extra = {}) => ({ stage, ...MOVE({ verdict_stage: stage, verdict_from: "Benfica", verdict_to: "Chelsea", ...extra }) });
 const SAGA = {
   // 부인 뒤에 루머가 다시 이어지면 되살아난 이적설이다 — 중간의 부인이 딜을 죽이지 않는다
@@ -707,6 +778,62 @@ const REP = dedupeRows([
   { id: 2, url: BBC, body: "Chelsea agree deal for John Doe from Benfica. Medical booked.", published_at: "2026-07-10T00:00:00Z" },
 ]);
 
+// ── 검토 재현 사례 — 금액 시점 오탐 · 접기 연쇄 · 접기와 단계 · 미확인 기존 딜 · 본문 재시도 · 이월 · 결과 시각 ──
+const PAST = {
+  // 앞으로의 일 — "in the January transfer window"·"over the summer"는 과거 동사 없이 지난 때가 아니다
+  futureWindow: judged([row("Chelsea are planning a £60m bid for Benfica's John Doe in the January transfer window.", { stage: "rumour", ...BID(60, { verdict_from: "Benfica", verdict_to: "Chelsea" }) })]),
+  futureSummer: judged([row("Chelsea will table a £60m bid for John Doe of Benfica over the summer.", { stage: "rumour", ...BID(60, { verdict_from: "Benfica", verdict_to: "Chelsea" }) })]),
+  // 대조 — 과거 동사와 함께면 지난 때다
+  pastSummerVerb: judged([row("Chelsea had a £60m bid for John Doe rejected by Benfica over the summer.", { stage: "rumour", ...BID(60, { verdict_from: "Benfica", verdict_to: "Chelsea" }) })]),
+  // "previous"는 가장 가까운 금액(£60m)의 것이다 — 같은 절의 지금 제안(£70m)을 거르지 않는다
+  previousOther: judged([row("Chelsea submitted a £70m bid for John Doe after a previous £60m offer was rejected by Benfica.", { stage: "rumour", ...BID(70, { verdict_from: "Benfica", verdict_to: "Chelsea" }) })]),
+  previousSame: judged([row("Chelsea submitted a £70m bid for John Doe after a previous £60m offer was rejected by Benfica.", { stage: "rumour", ...BID(60, { verdict_from: "Benfica", verdict_to: "Chelsea" }) })]),
+  // 한국어 "지난 시즌"이 선수의 활약을 꾸민다 — 금액의 때가 아니다
+  koPerformance: judged([row("Chelsea make £60m bid for Benfica star John Doe.", { stage: "rumour", ...BID(60, { verdict_from: "Benfica", verdict_to: "Chelsea", summary_ko: "첼시가 지난 시즌 20골을 넣은 벤피카의 존 도에게 6000만 파운드 제안을 넣었다." }) })]),
+  // 대조 — "지난여름 거절된 6000만 파운드 제안"은 금액을 꾸민다
+  koModifies: judged([row("Chelsea revive £60m bid for Benfica star John Doe.", { stage: "rumour", ...BID(60, { verdict_from: "Benfica", verdict_to: "Chelsea", summary_ko: "첼시가 지난여름 거절된 6000만 파운드 제안을 다시 꺼냈다." }) })]),
+  koThen: judged([row("Chelsea revive £60m bid for Benfica star John Doe.", { stage: "rumour", ...BID(60, { verdict_from: "Benfica", verdict_to: "Chelsea", summary_ko: "첼시는 당시 £60m을 제시했고 벤피카가 거절했다." }) })]),
+  // 한 자리 금액(£1m)이 같은 절의 다른 숫자(£12m)의 앞자리에 맞지 않는다
+  koDigit: judged([row("Chelsea improve their offer for John Doe by £1m.", { stage: "rumour", ...BID(1, { verdict_from: "Benfica", verdict_to: "Chelsea", summary_ko: "첼시가 지난여름 거절된 £12m 제안 뒤 존 도에게 £1m 인상안을 냈다." }) })]),
+};
+const ES = "레알 마드리드가 바이어 레버쿠젠 소속 존 도 영입에 관심을 보이고 있다.";
+const ECHO_ROW = (id, hours, extra = {}) => row(`Real Madrid keen on John Doe of Bayer Leverkusen ${id}.`, { id, stage: "rumour", source_id: `rss:s${id}`, published_at: new Date(Date.UTC(2026, 8, 10) + hours * HOUR).toISOString(), ...MOVE({ verdict_stage: "rumour", verdict_from: "Bayer Leverkusen", verdict_to: "Real Madrid", summary_ko: ES, ...extra }) });
+const CHAIN_ROWS = () => [ECHO_ROW(9101, 0), ECHO_ROW(9102, 40), ECHO_ROW(9103, 80), ECHO_ROW(9104, 120)];
+const ECHO2 = {
+  chain: judged(CHAIN_ROWS()),
+  chainReversed: judged(CHAIN_ROWS().reverse()),
+  // 요약이 같아도 단계가 다르면 접지 않는다 — 더 진전된 판정(합의)이 사라지지 않게
+  stage: judged([ECHO_ROW(9111, 5, { verdict_stage: "agreement" }), { ...ECHO_ROW(9112, 1), stage: "rumour" }].map((r) => (r.id === 9111 ? { ...r, stage: "agreement", attribution: "cited", attributed_to: "Bild" } : r))),
+};
+// 미확인 선수 — 두 출처가 같은 요약이면 접혀 출처가 하나가 된다. 새 딜은 열지 않지만 이미 저장된 딜은 남긴다
+const KID_SUMMARY = "맨체스터 유나이티드가 리버풀의 유망주 키드 언노운 영입을 추진하고 있다.";
+const KID_ROWS = () => [
+  row("Manchester United want Kid Unknown from Liverpool.", { stage: "rumour", published_at: "2026-09-20T00:00:00Z", ...YOUTH({ verdict_stage: "rumour", summary_ko: KID_SUMMARY }) }),
+  row("Kid Unknown is a target for Manchester United, Liverpool fear.", { stage: "rumour", source_id: "rss:bbc-football", published_at: "2026-09-20T03:00:00Z", ...YOUTH({ verdict_stage: "rumour", summary_ko: KID_SUMMARY }) }),
+];
+const KID = dealKey(normalizePlayer("Kid Unknown"));
+const UNVERIFIED = { fresh: judged(KID_ROWS()), stored: judged(KID_ROWS(), [KID]) };
+// 본문 재시도는 기존 딜 층 아래로 · 반복 실패는 판정이 없는 행만
+const ARTICLE = deriveDeals([
+  row("Chelsea agree deal for John Doe from Benfica.", { id: 9201, ...RSS, ...MOVE({ verdict_stage: "agreement", verdict_to: "Chelsea", verdict_from: "Benfica", verdict_at: ago(25 * HOUR), verdict_attempts: 1, verdict_article_chars: 0 }), published_at: ago(2 * 86_400_000) }),
+  row("Arsenal want Jack Roe from Porto.", { id: 9202, stage: "rumour", players: ["Jack Roe"], published_at: ago(3 * 86_400_000) }),
+], { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: { ...DICT, "jack roe": { ko: "잭 로" } } }), requireVerified: true, requireVerdict: true, existingKeys: new Set([JOHN]) });
+const FAILS = deriveDeals([
+  row("Chelsea agree deal for John Doe from Benfica.", { ...RSS, ...MOVE({ verdict_stage: "agreement", verdict_to: "Chelsea", verdict_at: ago(HOUR), verdict_attempts: 3, verdict_article_chars: 0 }) }),
+  row("Arsenal want Jack Roe from Porto.", { stage: "rumour", players: ["Jack Roe"], verdict: null, verdict_player: "jack roe", verdict_at: ago(HOUR), verdict_attempts: 3 }),
+], { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: { ...DICT, "jack roe": { ko: "잭 로" } } }), requireVerified: true, requireVerdict: true, existingKeys: new Set([JOHN]) });
+// 이월 — CARRIED_DAILY_ATTEMPTS번 이상 이월된 행은 하루 한 번(UTC 시 % 24 === id % 24)만 묻고 앞당기지 않는다
+const CARRY = (id, attempts) => ({ id, verdict: null, verdict_player: null, verdict_at: null, verdict_attempts: attempts });
+const SLOT_NOW = NOW + (901 % 24) * HOUR; // NOW는 UTC 0시 — 행 901의 시간
+const CARRIED_DAILY = deriveDeals(PRIO_ROWS().map((r) => (r.id === 901 ? { ...r, verdict_attempts: CARRIED_DAILY_ATTEMPTS } : r)), { nowMs: SLOT_NOW, windows: WINDOWS, names: createNameBook({ players: { ...DICT, "jack roe": { ko: "잭 로" } } }), requireVerified: true, requireVerdict: true, existingKeys: new Set([JOHN]) });
+// 결과 시각 — 저장된 오피셜인데 결과 시각이 빈 옛 데이터
+const SETTLE = {
+  // 합의 완료·오피셜 보도가 하나도 없으면 null(가장 이른 루머 시각을 짓지 않는다)
+  none: withStored([row("Chelsea keen on John Doe of Benfica.", ST("rumour")), row("John Doe has a medical at Chelsea, Benfica confirm.", { stage: "medical" })], stored("official", null)),
+  // 판정 전 보도에 오피셜이 있으면 그 시각
+  unjudged: withStored([row("Chelsea keen on John Doe of Benfica.", ST("rumour")), row("Official: Chelsea sign John Doe from Benfica.", { stage: "official", published_at: "2026-09-21T00:00:00Z" })], stored("official", null)),
+};
+
 const UNIT = [
   { name: "우선순위 — priority가 작은 것부터(층 순서)", got: ORDER.tiers, want: [4, 3, 2, 1] },
   { name: "우선순위 — 상한 안에서 탐색용은 exploreMax건까지만 앞에 두고 나머지는 뒤로 민다", got: ORDER.capped, want: [5, 4, 1, 2, 3] },
@@ -719,12 +846,29 @@ const UNIT = [
   { name: "우선순위 — 물을 대상에 게시 시각·방식·옛 판정을 싣는다", got: [PRIO.judgeNeeds[0].published_at === PRIO_ROWS()[3].published_at, PRIO.judgeNeeds[0].mode, Object.keys(PRIO.judgeNeeds[0].prev).length, PRIO.judgeNeeds[0].prev.verdict_attempts], want: [true, "full", 14, 0] },
   { name: "우선순위 — 이월된 행은 같은 층의 새 보도보다 먼저, 다른 층은 넘지 않는다", got: CARRIED.judgeNeeds.map((x) => x.id), want: [904, 903, 901, 902, 905] },
   { name: "우선순위 — 이월된 행은 실패 수와 무관하게 다음 실행이 곧바로 묻는다(재시도 간격은 판정 시각이 있는 행에만)", got: judgeMode({ verdict: null, verdict_player: "john doe", verdict_at: null, verdict_attempts: 2 }, "john doe", NOW), want: "full" },
+  { name: "금액 시점 — \"in the January transfer window\"의 제안은 앞으로의 일이다", got: PAST.futureWindow.deals[0]?.fee_amount, want: 60 },
+  { name: "금액 시점 — \"will table … over the summer\"는 앞으로의 일이다", got: PAST.futureSummer.deals[0]?.fee_amount, want: 60 },
+  { name: "금액 시점 — \"over the summer\"도 과거 동사(had … rejected)와 함께면 지난 금액이다", got: PAST.pastSummerVerb.deals[0]?.fee_amount ?? null, want: null },
+  { name: "금액 시점 — previous는 가장 가까운 금액의 것이다(£70m 지금 제안은 쓰고 £60m 지난 제안은 거른다)", got: [PAST.previousOther.deals[0]?.fee_amount, PAST.previousSame.deals[0]?.fee_amount ?? null], want: [70, null] },
+  { name: "금액 시점 — 한국어 \"지난 시즌 20골을 넣은\"은 선수를 꾸민다(금액의 때가 아니다)", got: PAST.koPerformance.deals[0]?.fee_amount, want: 60 },
+  { name: "금액 시점 — 한국어 \"지난여름 거절된 6000만 파운드\"·\"당시 £60m\"은 지난 금액이다", got: [PAST.koModifies.deals[0]?.fee_amount ?? null, PAST.koThen.deals[0]?.fee_amount ?? null], want: [null, null] },
+  { name: "금액 시점 — 한 자리 금액(£1m)이 다른 금액(£12m)의 앞자리에 맞지 않는다", got: PAST.koDigit.deals[0]?.fee_amount, want: 1 },
+  { name: "같은 보도 — 연쇄하지 않는다(0·40·80·120시간 → 대표 둘), 접힌 행의 시각은 최근 보도 시각에 든다", got: pick(ECHO2.chain.deals[0] ?? {}, ["report_count", "rowIds", "first_reported_at", "latest_reported_at"]), want: { report_count: 2, rowIds: [9101, 9103], first_reported_at: "2026-09-10T00:00:00.000Z", latest_reported_at: "2026-09-15T00:00:00.000Z" } },
+  { name: "같은 보도 — 입력 순서가 달라도 같다", got: pick(ECHO2.chainReversed.deals[0] ?? {}, ["report_count", "rowIds"]), want: { report_count: 2, rowIds: [9101, 9103] } },
+  { name: "같은 보도 — 단계가 다르면 접지 않는다(합의 판정이 남는다)", got: pick(ECHO2.stage.deals[0] ?? {}, ["stage", "report_count"]), want: { stage: "agreement", report_count: 2 } },
+  { name: "미확인 선수 — 접혀 출처가 하나가 되면 새 딜은 열지 않지만, 이미 저장된 딜은 남긴다", got: [UNVERIFIED.fresh.deals.length, UNVERIFIED.stored.deals.map((d) => [d.player, d.report_count])], want: [0, [["Kid Unknown", 1]]] },
+  { name: "본문 재시도 — mode article이고 기존 딜 층 아래다(새 딜의 보도가 먼저)", got: ARTICLE.judgeNeeds.map((x) => [x.id, x.mode]), want: [[9202, "full"], [9201, "article"]] },
+  { name: "반복 실패 — 판정이 없는 행만 센다(본문만 못 받은 성공 판정은 아니다)", got: FAILS.repeatedFailures, want: 1 },
+  { name: "이월 — 여섯 번 넘게 이월된 행은 하루 한 번(그 행의 시간)만 묻는다, 그 전엔 매시", got: [judgeMode(CARRY(24, 6), "john doe", NOW), judgeMode(CARRY(5, 6), "john doe", NOW), judgeMode(CARRY(5, 6), "john doe", NOW + 5 * HOUR), judgeMode(CARRY(5, 5), "john doe", NOW)], want: ["full", null, "full", "full"] },
+  { name: "이월 — 하루 한 번으로 늦춘 행은 앞당기지 않는다", got: CARRIED_DAILY.judgeNeeds.map((x) => x.id), want: [904, 903, 902, 901, 905] },
+  { name: "결과 시각 — 저장 오피셜인데 결과 시각이 비었고 합의 완료·오피셜 보도가 없으면 null(루머 시각을 짓지 않는다)", got: pick(SETTLE.none.deals[0] ?? {}, ["stage", "settled_at"]), want: { stage: "official", settled_at: null } },
+  { name: "결과 시각 — 판정 전 보도의 오피셜이 있으면 그 시각", got: SETTLE.unjudged.deals[0]?.settled_at, want: "2026-09-21T00:00:00.000Z" },
   { name: "우선순위 — 층 상수", got: JUDGE_TIER, want: { settled: 1, newDeal: 2, existing: 3, explore: 4 } },
   { name: "재시도 간격 — 24h × 2^(실패−1), 상한 7일(0·옛 행은 24h)", got: [0, 1, 2, 3, 4, 5].map((a) => retryDelayMs(a) / HOUR), want: [24, 24, 48, 96, 168, 168] },
   { name: "재시도 간격 — 두 번 실패한 판정 불가는 48시간 전에 다시 묻지 않는다", got: [MODE.backoffWait, MODE.backoffDue, MODE.backoffCap], want: [null, "full", "full"] },
   { name: "요약 재시도 — 이동인데 요약이 없으면 요약만 다시 묻는다(mode summary)", got: VERDICT.noSummaryRecent.judgeNeeds.map((x) => x.mode), want: ["summary"] },
-  { name: "본문 재시도 — 매체 RSS 판정이 본문 없이 났으면 다시 묻는다(최대 2회 · 게시 4일 안 · 본문 받은 판정·텔레그램은 아니다)", got: [MODE.articleRetry, MODE.articleSpent, MODE.articleOld, MODE.articleGot, MODE.articleTelegram], want: ["full", null, null, null, null] },
-  { name: "본문 재시도 — 본문 없이 난 '이동 아님'도 다시 묻고 딜에는 들지 않는다", got: [NOTMOVE_ARTICLE.judgeNeeds.map((x) => [x.mode, x.prev.verdict]), NOTMOVE_ARTICLE.deals[0]?.report_count], want: [[["full", "not_move"]], 1] },
+  { name: "본문 재시도 — 매체 RSS 판정이 본문 없이 났으면 다시 묻는다(최대 2회 · 게시 4일 안 · 본문 받은 판정·텔레그램은 아니다)", got: [MODE.articleRetry, MODE.articleSpent, MODE.articleOld, MODE.articleGot, MODE.articleTelegram], want: ["article", null, null, null, null] },
+  { name: "본문 재시도 — 본문 없이 난 '이동 아님'도 다시 묻고 딜에는 들지 않는다", got: [NOTMOVE_ARTICLE.judgeNeeds.map((x) => [x.mode, x.prev.verdict]), NOTMOVE_ARTICLE.deals[0]?.report_count], want: [[["article", "not_move"]], 1] },
   { name: "지문 — 지금 지시문과 다른 지문으로 난 판정만 다시 묻는다(--rejudge-stale)", got: [MODE.stale, MODE.fresh], want: ["full", null] },
   { name: "옛 형식 승격 — 한 번 다시 물어 실패한 행(원출력이 여전히 없다)은 실패 간격 전에 또 묻지 않는다", got: [MODE.upgradeFirst, MODE.upgradeFailedRecent], want: ["full", null] },
   { name: "부분 판정 — 저장된 루머 딜에 부인 1건만 먼저 판정되면 루머를 지킨다(보도 수는 전 보도)", got: pick(HYST.heldDenied.deals[0] ?? {}, ["stage", "report_count"]), want: { stage: "rumour", report_count: 5 } },
@@ -756,7 +900,21 @@ const UNIT = [
   { name: "미확인 선수 — ⚠ 한 토큰 이름은 완료 판정이어도 열지 않는다", got: WIDE.youthMononym.deals.length, want: 0 },
   { name: "금액 — 판정자의 금액과 성격을 쓴다(같은 글의 남의 금액 £47m이 아니라)", got: pick(WIDE.feeJudged.deals[0] ?? {}, ["fee_amount", "fee_currency", "fee_text", "fee_kind"]), want: { fee_amount: 45, fee_currency: "EUR", fee_text: "€45m", fee_kind: "valuation" } },
   { name: "금액 — 판정자가 금액이 없다고 했으면 규칙의 금액을 쓰지 않는다", got: pick(WIDE.feeJudgedNone.deals[0] ?? {}, ["fee_amount", "fee_kind"]), want: { fee_amount: null, fee_kind: null } },
-  { name: "금액 — 옛 형식의 판정(원출력 없음)은 규칙의 금액이고 성격은 모른다", got: pick(WIDE.feeOldFormat.deals[0] ?? {}, ["fee_amount", "fee_kind"]), want: { fee_amount: 47, fee_kind: null } },
+  { name: "금액 — 판정이 있는 딜에서 성격 없는 규칙 금액(옛 형식 판정)은 쓰지 않는다 — 누구의 금액인지 모른다", got: pick(WIDE.feeOldFormat.deals[0] ?? {}, ["fee_amount", "fee_kind"]), want: { fee_amount: null, fee_kind: null } },
+  { name: "금액 — 판정이 없는 딜(규칙만)은 규칙 금액을 쓴다", got: pick(FEE.unjudgedRule.deals[0] ?? {}, ["fee_amount", "fee_kind"]), want: { fee_amount: 47, fee_kind: null } },
+  { name: "금액 — 지난 창에 거절된 제안(근거 구절 \"in July … knocked back\")은 딜 금액이 아니다(스콧)", got: pick(FEE.pastBid.deals[0] ?? {}, ["fee_amount", "fee_kind"]), want: { fee_amount: null, fee_kind: null } },
+  { name: "금액 — 한국어 요약의 금액 절이 지난 때(\"지난여름\")를 말하면 딜 금액이 아니다", got: FEE.pastBidKo.deals[0]?.fee_amount, want: null },
+  { name: "금액 — 딜의 상대(관심 구단 맨 앞 첼시)가 아닌 구단(아스날)의 제안은 딜 금액이 아니다(콴사)", got: pick(FEE.otherClubBid.deals[0] ?? {}, ["fee_amount", "to_club_code"]), want: { fee_amount: null, to_club_code: "chelsea" } },
+  { name: "금액 — 딜의 상대가 낸 지금의 제안은 쓴다", got: pick(FEE.currentBid.deals[0] ?? {}, ["fee_amount", "fee_kind"]), want: { fee_amount: 50, fee_kind: "bid" } },
+  { name: "금액 — 요구액은 파는 쪽의 값이라 행선지가 없어도 쓴다", got: pick(FEE.askingPrice.deals[0] ?? {}, ["fee_amount", "fee_kind"]), want: { fee_amount: 80, fee_kind: "asking_price" } },
+  { name: "금액 — 지금 구단이 데려올 때 낸 지난 이적료는 딜 금액이 아니다(무하레모비치)", got: FEE.pastFee.deals[0]?.fee_amount, want: null },
+  { name: "금액 — 완료 보도의 이적료는 달 이름·과거 동사가 있어도 쓴다", got: pick(FEE.officialFee.deals[0] ?? {}, ["fee_amount", "fee_kind"]), want: { fee_amount: 50, fee_kind: "fee" } },
+  { name: "금액 — 지난 제안을 거르면 직전·범위도 남은 후보로만 센다", got: pick(FEE.pastThenCurrent.deals[0] ?? {}, ["fee_amount", "prev_fee_amount", "fee_low_amount", "fee_high_amount"]), want: { fee_amount: 70, prev_fee_amount: null, fee_low_amount: 70, fee_high_amount: 70 } },
+  { name: "같은 보도 — 두 칼럼이 같은 신문(빌트)을 옮기고 요약이 같으면 한 보도다(먼저 게시된 행이 대표)", got: ECHO.bild, want: { report_count: 1, rowIds: [9001] } },
+  { name: "같은 보도 — 같은 신문 인용 + 판정 필드가 같으면 요약이 달라도 한 보도다", got: ECHO.bildFields, want: { report_count: 1, rowIds: [9011] } },
+  { name: "같은 보도 — 48시간을 넘으면 같은 요약이어도 따로 센다", got: ECHO.apart, want: { report_count: 2, rowIds: [9021, 9022] } },
+  { name: "같은 보도 — 다른 신문·다른 요약이면 다른 보도다", got: ECHO.distinct, want: { report_count: 2, rowIds: [9031, 9032] } },
+  { name: "같은 보도 — 대표는 원보도다(인용 행보다 나중에 게시됐어도)", got: ECHO.original, want: { report_count: 1, rowIds: [9042] } },
   { name: "옛 형식 판정 — 운영 실행은 한 번 다시 묻고 딜은 그대로 둔다", got: [WIDE.upgrade.judgeNeeds.length, WIDE.upgrade.deals.length], want: [1, 1] },
   { name: "옛 형식 판정 — 새 형식으로 판정된 행은 다시 묻지 않는다", got: WIDE.upgraded.judgeNeeds.length, want: 0 },
   { name: "중복 — BBC 개정판(같은 URL·쿼리·끝 슬래시 차이)은 한 보도이고 대표는 나중에 수집된 개정판", got: [DUP.revisions.reps.length, DUP.revisions.duplicates, DUP.revisions.reps[0].id], want: [1, 2, 3] },
@@ -816,6 +974,7 @@ const UNIT = [
   { name: "재계약 — 구단을 읽었어도 옮긴다는 표현이 없으면 딜이 아니다", got: derive([row("Napoli reach agreement to extend John Doe contract until 2029. Napoli have agreed terms with John Doe over a new deal.")]).deals.length, want: 0 },
   { name: "재계약 표현이 있어도 옮기면 딜이다", got: derive([row("John Doe joins Napoli from Benfica and signs a new contract until 2029.")]).deals.length, want: 1 },
   { name: "normalizePlayer — 악센트·하이픈·대소문자·공백", got: normalizePlayer("  Rafael  LEÃO "), want: "rafael leao" },
+  { name: "normalizePlayer — 분해되지 않는 라틴 글자(ø·æ·ß·ł)를 지우지 않고 옮긴다(호이비에르가 두 딜로 갈렸다)", got: [normalizePlayer("Pierre-Emile Højbjerg") === normalizePlayer("Pierre-Emile Hojbjerg"), normalizePlayer("Martin Ødegaard"), normalizePlayer("Łukasz Fabiański")], want: [true, "martin odegaard", "lukasz fabianski"] },
   { name: "normalizePlayer — 비분리 하이픈(U+2011)과 보통 하이픈이 같은 키", got: normalizePlayer("Morgan Gibbs‑White") === normalizePlayer("Morgan Gibbs-White"), want: true },
   { name: "dealKey — 16자리 소문자 hex(DB CHECK)", got: /^[0-9a-f]{16}$/.test(dealKey("john doe")), want: true },
   { name: "boardScopeStartMs — 창 안(2026-08)이면 그 창의 개장", got: new Date(boardScopeStartMs(Date.parse("2026-08-15T00:00:00Z"), WINDOWS)).toISOString(), want: "2026-06-01T00:00:00.000Z" },

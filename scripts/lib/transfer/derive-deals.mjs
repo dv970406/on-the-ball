@@ -13,6 +13,7 @@
  *      "이동" 판정이 있는 두 토큰 이상 이름(`canOpenUnverified` — 유스 이적).
  *   5. LLM 판정 — "이동 아님" 보도는 빠지고, 새 딜은 "이동" 판정이 있어야 연다(`judge.mjs`). 판정받은 보도가 있으면 단계·방향·금액은
  *      그 보도들만으로 정하고(보도 수·배정은 전 보도), 판정이 덜 찬 동안 단계의 후퇴는 저장된 단계로 미룬다(`holdStage`).
+ *      같은 보도를 옮긴 두 매체는 판정 뒤의 신호로 한 보도로 접고(`foldEchoes`), 딜 금액은 딜의 상대가 낸 지금의 금액만 쓴다(`dealFee`).
  *   6. 방향 — 출발·행선지 중 하나는 있어야 하고 그중 하나는 5대 리그 구단이어야 한다. LLM이 읽은 구단이 규칙 표보다 크다.
  *
  * 두 층으로 나뉜다.
@@ -32,7 +33,7 @@ import { canonicalClubName } from "./clubs.mjs";
 import { contractText, parseContract } from "./contract.mjs";
 import { DEST, FORMER, FROM, LEFT_FREE, SUITOR_FROM, addVotes, collectVotes, topVote } from "./direction.mjs";
 import { extractTransfer } from "./extract.mjs";
-import { JUDGE_MAX_PER_RUN, JUDGE_RETRY_MS, SUMMARY_RETRY_WINDOW_MS, replayJudgements, wantsArticle } from "./judge.mjs";
+import { JUDGE_MAX_PER_RUN, JUDGE_RETRY_MS, SUMMARY_RETRY_WINDOW_MS, moneyMentions, normalizeQuote, replayJudgements, wantsArticle } from "./judge.mjs";
 import { createNameBook, loadGlossary, loadNameBook, loadPlayerDictionary, lookupAndCache, lookupCurrentClubs, missingNames, syncDictionaryNames } from "./names-ko.mjs";
 import { RANK, RENEWAL, cleanBody, isDead, isRoundup, isRoundupItem, mentionRe, sentencesOf } from "./story.mjs";
 import { normalizePlayer } from "./player-key.mjs";
@@ -151,27 +152,50 @@ export function retryDelayMs(attempts) {
 }
 
 /**
- * 지금 LLM에 물어야 하는가 — 물을 방식(`"full"` 판정 전체 · `"summary"` 요약만)이나 `null`(묻지 않는다).
+ * 지금 LLM에 물어야 하는가 — 물을 방식(`"full"` 판정 전체 · `"article"` 기사 본문을 다시 받아 볼 때만 판정 · `"summary"` 요약만)이나
+ * `null`(묻지 않는다).
  *
  * - 그 선수로 판정한 적이 없다(다른 선수로 판정 · 시도 없음) · `rejudge` → 전체.
  * - `stalePrompt`(지금 지시문의 지문)가 주어졌고 그 행의 지문이 다르다 → 전체(`--rejudge-stale` — 지시문을 고친 뒤 그 지시문으로 나지 않은 행만).
  * - 판정 불가(판정 없음) → `retryDelayMs(verdict_attempts)`가 지나면 전체. 실패할수록 간격이 늘어난다.
  * - 옛 형식의 "이동"(원출력 없음 — 시점·금액을 읽기 전의 것) → 한 번 다시 묻는다. 그 시도가 실패하면(`verdict_attempts` > 0 —
  *   옛 판정은 남고 원출력은 여전히 없다) 실패 간격을 따른다. 판정은 새 답이 올 때까지 그대로 쓴다.
- * - 매체 RSS인데 기사 본문 없이 난 판정(`verdict_article_chars === 0`) → 실패 간격마다 다시 묻는다. 최대 `ARTICLE_RETRY_MAX`회,
+ * - 이월된 행(판정 시각 없이 `verdict_attempts`만 — 일시 실패)은 곧바로 전체. 단 `CARRIED_DAILY_ATTEMPTS`번 이상 이월됐으면 하루 한 번.
+ * - 매체 RSS인데 기사 본문 없이 난 판정(`verdict_article_chars === 0`) → 실패 간격마다 `"article"`. 최대 `ARTICLE_RETRY_MAX`회,
  *   게시 뒤 `ARTICLE_RETRY_WINDOW_MS` 안에서만(발췌만 보고 난 판정이 영구히 남지 않게, 그러나 끝없이 묻지도 않게).
+ *   `judge.mjs`는 본문을 다시 받아 보고 **또 못 받으면 API를 부르지 않는다**(시도 기록만 남기고 옛 판정을 지킨다) — 본문 없이 같은 글을
+ *   다시 물으면 비용만 들고, 비결정적인 답이 멀쩡한 판정을 뒤집는다.
  * - "이동"인데 요약이 없다 → 실패 간격이 지났고 최근 `SUMMARY_RETRY_WINDOW_MS` 안의 보도면 **요약만**(`judge.mjs`가 판정은 건드리지 않는다).
  */
 export function judgeMode(r, key, nowMs, { rejudge = false, upgrade = false, stalePrompt = null } = {}) {
-  if (rejudge || r.verdict_player !== key || !r.verdict_at) return "full";
-  if (stalePrompt && r.verdict_prompt !== stalePrompt) return "full";
+  if (rejudge) return "full";
   const attempts = Number(r.verdict_attempts) || 0;
+  if (isCarried(r) && attempts >= CARRIED_DAILY_ATTEMPTS) return carriedSlotDue(r, nowMs) ? "full" : null;
+  if (r.verdict_player !== key || !r.verdict_at) return "full";
+  if (stalePrompt && r.verdict_prompt !== stalePrompt) return "full";
   const waited = nowMs - Date.parse(r.verdict_at) >= retryDelayMs(attempts);
   if (r.verdict == null) return waited ? "full" : null;
   if (upgrade && r.verdict === "move" && r.verdict_raw == null && (attempts === 0 || waited)) return "full";
-  if (r.verdict_article_chars === 0 && wantsArticle(r) && attempts <= ARTICLE_RETRY_MAX && waited && nowMs - ts(r) <= ARTICLE_RETRY_WINDOW_MS) return "full";
+  if (r.verdict_article_chars === 0 && wantsArticle(r) && attempts <= ARTICLE_RETRY_MAX && waited && nowMs - ts(r) <= ARTICLE_RETRY_WINDOW_MS) return "article";
   if (r.verdict === "move" && r.summary_ko == null && waited && nowMs - ts(r) <= SUMMARY_RETRY_WINDOW_MS) return "summary";
   return null;
+}
+
+/** 이월된 행 — 앞 실행에서 일시 실패로 판정을 못 받았다(판정 시각 없이 `verdict_attempts`만 있다) */
+const isCarried = (r) => !r.verdict_at && (Number(r.verdict_attempts) || 0) > 0;
+/**
+ * 이월이 이만큼 거듭되면 하루에 한 번만 묻는다. 일시 실패(레이트 리밋·장애)는 누락 없이 다시 검사해야 해서 포기하지 않지만, 판정 시각이
+ * 없어 재시도 간격(`retryDelayMs`)이 걸리지 않으므로 그대로 두면 같은 행이 매시 대기열 앞줄을 차지한다(계속 실패하는 행이면 영영).
+ * 6회 = 매시 실행으로 여섯 시간 — 일시 장애가 풀리기에 충분한 시간이다.
+ */
+export const CARRIED_DAILY_ATTEMPTS = 6;
+/**
+ * 하루 한 번의 그 시간 — 시각 컬럼 없이 결정적으로 고른다(UTC 시 % 24 === 행 id % 24). 행마다 시간이 흩어져 한 시간에 몰리지 않는다.
+ * 실행이 그 시간을 건너뛰면(Actions 지연) 다음 날로 밀린다 — 간격이 하루 더 늘 뿐 행을 잃지는 않는다.
+ */
+function carriedSlotDue(r, nowMs) {
+  const hour = Math.floor(nowMs / 3_600_000) % 24;
+  return hour === (((Number(r.id) || 0) % 24) + 24) % 24;
 }
 
 /** 물을 때 함께 넘기는 그 행의 기존 판정(`judge.mjs`가 새 답이 실패하면 옛 판정을 지키는 데 쓴다) */
@@ -191,15 +215,18 @@ const RULE_SETTLED = new Set(["official", "here_we_go"]);
 
 /**
  * 물을 대상 하나 — `judge.mjs`가 받는 모양(계약서의 need). `priority`는 층 × 간격 + (간격 − 게시 시각) — 같은 층이면 최신이 먼저.
- * 요약만 다시 묻는 것은 새 판정보다 급하지 않아 기존 딜 층 아래로 내린다.
+ * 요약만·본문 재시도는 새 판정보다 급하지 않아 기존 딜 층 아래로 내린다.
  */
 function judgeNeed(r, { playerKey, player, clubs, mode, tier }) {
   const t = Number.isFinite(ts(r)) ? ts(r) : 0;
   const layer = RULE_SETTLED.has(r.stage) ? JUDGE_TIER.settled : tier;
   // 이월된 행(앞 실행에서 일시 실패로 판정을 못 받았다 — 판정 시각 없이 `verdict_attempts`만 있다)은 같은 층에서 먼저 묻는다.
   // 같은 층의 새 보도보다 뒤에 서면 대기열이 길 때 계속 밀려 판정 없이 남는다
-  const carried = !r.verdict_at && (Number(r.verdict_attempts) || 0) > 0;
-  const priority = Math.max(layer, mode === "summary" ? JUDGE_TIER.existing : layer) * TIER_SPAN + (TIER_SPAN - t) - (carried ? CARRIED_LEAD : 0);
+  // ⚠ 하루 한 번으로 늦춘 행(`CARRIED_DAILY_ATTEMPTS`)은 앞당기지 않는다 — 거듭 실패하는 행이 그 시간의 앞줄을 먹지 않게
+  const carried = isCarried(r) && (Number(r.verdict_attempts) || 0) < CARRIED_DAILY_ATTEMPTS;
+  // 요약만·본문 재시도는 이미 판정이 있는 행이라 새 판정보다 급하지 않다 — 기존 딜 층 아래로 내린다
+  const floor = mode === "summary" || mode === "article" ? JUDGE_TIER.existing : layer;
+  const priority = Math.max(layer, floor) * TIER_SPAN + (TIER_SPAN - t) - (carried ? CARRIED_LEAD : 0);
   return {
     id: r.id, playerKey, player, body: r.body, clubs, source_id: r.source_id, external_id: r.external_id, url: r.url, summary_ko: r.summary_ko ?? null,
     published_at: r.published_at ?? null, mode, prev: prevVerdict(r), priority,
@@ -537,10 +564,12 @@ function resolveSettledAt(items, stage) {
       if (it.stage === "official") official = true;
     } else if (isDead(it.stage) && !official) since = null;
   }
-  // 폴백 — 판정 이력과 대표 단계가 갈린 드문 경우(합의 완료 보도 뒤에 결렬만 있는데 대표가 합의 완료)라도 값을 비우지 않는다
+  // 폴백 — 판정 이력과 대표 단계가 갈린 드문 경우(합의 완료 보도 뒤에 결렬만 있는데 대표가 합의 완료)는 첫 합의 완료·오피셜 보도.
+  // 그런 보도가 하나도 없으면 null이다(아래 `settledAtFor`) — 아무 보도의 시각이나 지으면 결과 시각을 꾸며 내는 것이다
   if (since === null) {
     const first = sorted.find((it) => SETTLED.has(it.stage));
-    since = first ? ts(first.row) : Math.min(...items.map((it) => ts(it.row)));
+    if (!first) return null;
+    since = ts(first.row);
   }
   return new Date(since).toISOString();
 }
@@ -562,9 +591,17 @@ export function holdStage(next, storedStage) {
  * 시각이 생겼다 사라지거나 움직이면 예측 채점·순위가 시간마다 흔들렸다. 커버리지가 차면 보도로 다시 정한다(순수 — 도착 순서와 무관).
  * @param {{ settled_at?: string | null } | null} stored 커버리지가 차지 않았을 때만 넘긴다
  */
-function settledAtFor(items, stage, stored) {
+function settledAtFor(items, stage, stored, reported = items) {
   if (!SETTLED.has(stage)) return null;
   if (stored?.settled_at) return new Date(Date.parse(stored.settled_at)).toISOString();
+  /*
+   * 저장된 딜이 오피셜인데 결과 시각이 비어 있는 옛 데이터 — 커버리지가 덜 차 단계는 `holdStage`가 지켰지만 판정받은 보도에는 합의 완료·
+   * 오피셜이 없을 수 있다. 그때는 **판정 전 보도까지**(규칙 단계) 보고 합의 완료·오피셜 보도의 시각을 쓰고, 그것도 없으면 null이다.
+   * DB CHECK(`transfer_deal_settled_stage`)는 "결과 시각이 있으면 단계가 합의 완료·오피셜"만 요구해 null을 받는다. 가장 이른 루머의
+   * 시각을 지으면 예측 채점이 그 뒤의 표를 전부 "결과 뒤의 표"로 빼고 그 앞의 표를 적중으로 센다 — 없는 사실을 만드는 쪽이다.
+   * null은 "모른다"이고 커버리지가 차면 보도로 다시 정해진다.
+   */
+  if (stored) return resolveSettledAt(items, stage) ?? resolveSettledAt(reported, stage);
   return resolveSettledAt(items, stage);
 }
 
@@ -610,6 +647,263 @@ function resolveFee(items) {
   const prev = [...same].reverse().slice(1).find((f) => f.amount !== latest.amount)?.amount ?? null;
   const amounts = same.map((f) => f.amount);
   return { fee: latest, prev, low: Math.min(...amounts), high: Math.max(...amounts) };
+}
+
+/*
+ * ── 딜 금액으로 쓸 수 있는 금액 ─────────────────────────────────────────
+ * 보도 한 건의 금액(`feeFor`)이 곧 딜의 금액이 되지는 않는다. 판정자는 "그 선수의 금액 하나"를 고르는데, 이적설 기사는 그 선수의
+ * **지난** 금액(지난 창에 거절된 제안 · 지금 구단이 데려올 때 낸 이적료)이나 **다른 구단의** 제안을 함께 적는다. 그 금액이 딜의
+ * 금액이 되면 화면이 "첼시 → 제안액 £55.5M"처럼 남의 제안을 지금 딜의 값으로 그린다(운영 — 콴사: TO 맨 앞은 첼시인데 £55.5m은
+ * 거절된 아스날의 제안 · 스콧: "지난여름 £64m 제안이 거절됐다" · 무하레모비치: 리즈가 사수올로에 낸 £34m이 "추정 이적료").
+ * 그래서 딜 금액 후보는 아래를 모두 지난 것만이다(`dealFee`). 판정 원출력에는 금액별 시점이 없다(시점 `timing`은 보도 전체의 것이고
+ * `past`면 이미 "이동 아님"으로 접혀 여기 오지 않는다) — 그래서 금액의 시점은 그 금액이 적힌 문장에서 읽는다.
+ *   1. 판정이 있는 딜에서 **성격 없는 규칙 금액은 쓰지 않는다** — 판정자가 그 보도의 금액이 없다고 했거나(남의 금액),
+ *      옛 형식 판정이라 누구의 금액인지 모른다.
+ *   2. 사는 쪽에 묶인 금액(`fee` 이적료 · `bid` 제안액)은 **그 금액을 낸 구단이 딜의 상대**여야 한다 — 딜의 상대 = 행선지,
+ *      없으면 관심 구단 맨 앞(화면의 TO 맨 앞). 낸 구단은 그 금액이 적힌 문장의 구단(출발 구단 빼고)이고, 문장에 구단이 없으면
+ *      그 보도 판정의 행선지(없으면 관심 구단이 하나뿐일 때 그 구단)다. 요구액·바이아웃·평가액은 파는 쪽의 값이라 상대와 무관하다.
+ *   3. **지난 금액은 쓰지 않는다** — 지난 때를 말하는 표현이 **그 금액에 붙어 있을 때만**(`isPastFee`). 같은 문장에 금액이 둘이면
+ *      표현은 가장 가까운 금액의 것이다("submitted a £70m bid after a previous £60m offer was rejected"의 previous는 £60m의 것).
+ *      완료·확정·합의 보도의 이적료는 보지 않는다(그 딜의 값이다).
+ * ⚠ 한계 — 문장에서 구단을 못 읽으면(별칭 "the Blues") 판정의 행선지로 대신 본다. 금액이 원문 발췌에 없고 기사 본문에만 있으면
+ *   (본문은 저장하지 않는다) 근거 구절·요약만 보므로 시점을 놓칠 수 있다. 한 문장이 두 구단의 제안을 함께 말하면 딜의 상대가
+ *   그 문장에 있는 한 받는다(지우는 쪽보다 남기는 쪽으로 기운다 — 빈 칸보다 틀린 칸이 나쁘지만 이 경우는 상대의 금액일 수 있다).
+ */
+const BUYER_BOUND_KINDS = new Set(["fee", "bid"]);
+/**
+ * 지난 때를 혼자서 말하는 표현. ⚠ "in the January window"·"over the summer"는 여기 없다 — 앞으로의 일("are planning a £60m bid
+ * in the January transfer window"·"will table a £60m bid over the summer")에도 그대로 쓰여, 과거 동사와 함께일 때만 지난 때다(`AMBIGUOUS_TIME_EN`).
+ */
+const PAST_TIME_EN = /\b(?:last\s+(?:summer|season|year|window|january|winter|month)|earlier\s+(?:this|in\s+the)\s+(?:year|summer|window|month)|back\s+in|(?:a|one|two|three|four|\d+)\s+(?:years?|months?)\s+ago|previous(?:ly)?|this\s+past\s+summer)\b/giu;
+/** 앞으로의 일일 수 있는 때 — 달 이름("in January")·창("in the summer window")·"over the summer". 과거 동사와 함께일 때만 지난 때다 */
+const AMBIGUOUS_TIME_EN = /\b(?:(?:in|during|since)\s+(?:january|february|march|april|may|june|july|august|september|october|november|december)|in\s+the\s+(?:summer|january|winter)\s+(?:transfer\s+)?window|(?:over|during|in)\s+the\s+summer)\b/giu;
+const PAST_DEAL_VERB = /\b(?:had|was|were|been)\b[^.]{0,80}?\b(?:rejected|knocked\s+back|turned\s+down|snubbed|refused|rebuffed)\b|\b(?:paid|spent|splashed|forked\s+out|bought\s+him|signed\s+him)\b/iu;
+/**
+ * 지난 때 표현이 금액에 붙었다고 보는 거리(낱말 수). 운영 사례의 거리는 7낱말 이하다(스콧 "£64million offer knocked back by the
+ * Cherries in July" — 7 · "a £64m offer for X rejected by Benfica last summer" — 7). 그보다 멀면 대개 다른 동사구의 때라 10에서 끊는다.
+ * 같은 문장의 다른 금액이 더 가까우면 거리와 무관하게 그 금액의 것이다(`nearestMoney`).
+ */
+const PAST_CUE_WORDS = 10;
+const PAST_TIME_KO = /지난\s?(?:여름|겨울|시즌|해|\d+\s?월|이적\s?시장|이적\s?창)|작년|지난해|당시|과거/gu;
+/** 절 나누기 — 지난 제안과 지금의 관심이 한 문장에 함께 나온다("had a £64m offer knocked back in July but their interest remains") */
+const CLAUSE_EN = /[,;:—–]|\s(?:but|while|whereas|although|though|however)\s/iu;
+const CLAUSE_KO = /[,，.;]|(?:으나|지만|는데)\s/u;
+
+/** 그 금액(같은 통화)이 적힌 문장 — 저장된 글과 판정 근거 구절에서 찾는다 */
+function feeSentences(r, fee, memo) {
+  const same = (m) => m.currency === fee.currency && Math.abs(m.amount - fee.amount) < 0.011;
+  const pool = [...memo.sentences(r), ...(r.verdict_evidence ? [r.verdict_evidence] : [])];
+  return pool.filter((s) => moneyMentions(s).some(same));
+}
+
+/** 글을 낱말로 나눈다 — 각 낱말의 시작 위치와 함께(정규식 일치 위치를 낱말 번호로 옮기는 데 쓴다) */
+function wordsOf(text) {
+  return [...text.matchAll(/\S+/gu)].map((m) => ({ text: m[0], start: m.index, end: m.index + m[0].length }));
+}
+const wordAt = (words, index) => Math.max(0, words.findIndex((w) => w.end > index));
+
+/** 영문 절의 금액 위치 — 금액 표기가 **시작되는** 낱말 번호와 그 금액들(`moneyMentions` — "60 million euros"처럼 세 낱말까지) */
+function moneyWordsEn(words) {
+  const out = [];
+  const read = (from) => moneyMentions(words.slice(from, from + 3).map((w) => w.text).join(" "));
+  for (let i = 0; i < words.length; i++) {
+    if (!/^[("'“‘]?[£€$\d]/u.test(words[i].text)) continue;
+    // 이 낱말에서 시작하는 금액만 — 뒤 낱말에서 시작하는 금액("20 goals £60m"의 £60m)은 그 낱말의 몫이다
+    const rest = read(i + 1).map((m) => `${m.currency}:${m.amount}`);
+    const mentions = read(i).filter((m) => {
+      const at = rest.indexOf(`${m.currency}:${m.amount}`);
+      if (at < 0) return true;
+      rest.splice(at, 1);
+      return false;
+    });
+    if (mentions.length) out.push({ index: i, mentions });
+  }
+  return out;
+}
+
+/** 표현(낱말 범위 [from, to])에서 가장 가까운 금액 위치와 거리 — 같으면 뒤의 금액("previous £60m"처럼 앞에서 꾸민다) */
+function nearestMoney(spots, from, to) {
+  let best = null;
+  for (const spot of spots) {
+    const d = spot.index > to ? spot.index - to : spot.index < from ? from - spot.index : 0;
+    if (!best || d < best.d || (d === best.d && spot.index > best.spot.index)) best = { spot, d };
+  }
+  return best;
+}
+
+/** 영문 절에서 지난 때 표현이 그 금액에 붙어 있는가 — 가장 가까운 금액이 그 금액이고 `PAST_CUE_WORDS` 안 */
+function pastCueOnAmountEn(clause, same) {
+  const words = wordsOf(clause);
+  const spots = moneyWordsEn(words);
+  if (!spots.some((x) => x.mentions.some(same))) return false;
+  const attached = (re) => [...clause.matchAll(re)].some((m) => {
+    const near = nearestMoney(spots, wordAt(words, m.index), wordAt(words, m.index + m[0].length - 1));
+    return near && near.d <= PAST_CUE_WORDS && near.spot.mentions.some(same);
+  });
+  return attached(PAST_TIME_EN) || (PAST_DEAL_VERB.test(clause) && attached(AMBIGUOUS_TIME_EN));
+}
+
+/** 한국어 금액 표기 → 백만 단위("£64m"·"6400만 파운드"·"1억 2000만 유로")와 시작 위치 */
+function koMoney(clause) {
+  const out = [];
+  const SYMBOL = { "£": "GBP", "€": "EUR", "$": "USD" };
+  const WORD = { 파운드: "GBP", 유로: "EUR", 달러: "USD" };
+  const num = (raw) => Number(String(raw).replace(/,/gu, ""));
+  // 뒤에 한국어 조사가 붙는다("£60m을") — 영문 글자·숫자만 이어지지 않으면 된다
+  for (const m of clause.matchAll(/([£€$])\s?(\d[\d.,]*)\s?(bn|billion|million|mn|m|k)?(?![A-Za-z\d])/giu)) {
+    const unit = (m[3] ?? "").toLowerCase();
+    const n = num(m[2]);
+    const amount = unit.startsWith("b") ? n * 1000 : unit.startsWith("k") ? n / 1000 : unit ? n : n >= 10_000 ? n / 1_000_000 : null;
+    if (Number.isFinite(amount) && amount > 0) out.push({ amount: Math.round(amount * 100) / 100, currency: SYMBOL[m[1]], index: m.index });
+  }
+  // "6400만 파운드" — 만은 1만(1e4), 억은 1e8. 백만 단위로 옮기면 만 ÷ 100, 억 × 100
+  for (const m of clause.matchAll(/(?:(\d[\d.,]*)\s?억\s?)?(?:(\d[\d,]*)\s?만\s?)?(파운드|유로|달러)/gu)) {
+    if (m[1] == null && m[2] == null) continue;
+    const amount = (m[1] != null ? num(m[1]) * 100 : 0) + (m[2] != null ? num(m[2]) / 100 : 0);
+    if (amount > 0) out.push({ amount: Math.round(amount * 100) / 100, currency: WORD[m[3]], index: m.index });
+  }
+  return out;
+}
+
+/**
+ * 관형형으로 끝나는 낱말("거절된"·"낸"·"넣은"·"제시했던") — 끝 음절의 받침이 ㄴ이거나 "던". 한 글자 관형형("낸")은 금액 바로 앞에서만
+ * 센다(`minLength` 1) — 사이의 낱말로는 한 글자 이름("존 도"의 "존")과 갈리지 않는다.
+ */
+function isAdnominal(word, minLength = 2) {
+  const w = word.replace(/[^가-힣]+$/u, "");
+  if ([...w].length < minLength) return false;
+  const last = w.at(-1);
+  if (last === "던") return true;
+  const code = last.charCodeAt(0) - 0xac00;
+  return code >= 0 && code < 11172 && code % 28 === 4;
+}
+
+/**
+ * 한국어 요약 절에서 "지난 …" 표현이 그 금액을 **꾸미는가**. 받는 형태는 둘이다:
+ *   - 바로 앞("지난여름 £64m 제안" · "당시 £64m")
+ *   - 표현이 여는 관형절이 그 금액 바로 앞에서 닫힌다("지난여름 본머스의 존 도에게 낸 £64m 제안" · "지난여름 거절된 £64m 제안").
+ *     그 사이에 다른 관형형이 끼면 표현은 다른 명사를 꾸민다("지난 시즌 20골을 넣은 벤피카의 존 도에게 6000만 파운드 제안" —
+ *     "지난 시즌"은 선수의 활약이다).
+ * 절 첫머리의 때 부사("지난 7월 본머스 소속 존 도에게 £64m 제안을 넣었지만")는 받지 않는다 — 한국어 요약은 지금의 소식도
+ * 과거형으로 쓰므로 그 꼴로는 지금의 제안과 가를 수 없다. 영문 쪽(근거 구절·원문)이 시점을 말하면 그쪽이 거른다.
+ */
+function pastCueOnAmountKo(clause, fee) {
+  const words = wordsOf(clause);
+  const targets = koMoney(clause).filter((m) => m.currency === fee.currency && Math.abs(m.amount - fee.amount) < 0.011).map((m) => wordAt(words, m.index));
+  if (!targets.length) return false;
+  return [...clause.matchAll(PAST_TIME_KO)].some((m) => {
+    const cueEnd = wordAt(words, m.index + m[0].length - 1);
+    return targets.some((t) => {
+      if (t <= cueEnd) return false;
+      if (t === cueEnd + 1) return true;
+      const between = words.slice(cueEnd + 1, t);
+      return isAdnominal(between.at(-1).text, 1) && !between.slice(0, -1).some((w) => isAdnominal(w.text));
+    });
+  });
+}
+
+/** 그 금액이 지난 일의 것인가 — 영문 절 또는 한국어 요약 절에서 지난 때 표현이 그 금액에 붙어 있다 */
+function isPastFee(r, fee, sentences) {
+  if (fee.kind === "fee" && ["official", "here_we_go", "agreement"].includes(r.verdict_stage)) return false;
+  const same = (m) => m.currency === fee.currency && Math.abs(m.amount - fee.amount) < 0.011;
+  for (const s of sentences) for (const clause of s.split(CLAUSE_EN)) if (pastCueOnAmountEn(clause, same)) return true;
+  if (r.summary_ko) for (const clause of r.summary_ko.split(CLAUSE_KO)) if (pastCueOnAmountKo(clause, fee)) return true;
+  return false;
+}
+/** 그 금액을 낸 구단 — 금액 문장에 나온 구단(출발 구단 빼고). 없으면 그 보도 판정의 행선지 · 관심 구단이 하나뿐이면 그 구단 */
+function feePayers(r, sentences, sellers, memo) {
+  const named = new Set(sentences.flatMap((s) => memo.extract(s).clubs).map((c) => canonicalClubName(c)).filter((c) => !sellers.has(c)));
+  if (named.size) return named;
+  const fallback = r.verdict_to ?? (r.verdict_suitors?.length === 1 ? r.verdict_suitors[0] : null);
+  return new Set(fallback ? [fallback] : []);
+}
+/**
+ * 딜 금액 후보로 쓸 수 있는 금액만 남긴다(위 절의 1~3). 판정이 없는 딜(규칙만으로 열린 옛 딜)은 지금처럼 규칙 금액을 쓴다.
+ * @param {{ judged: boolean, target: string | null, sellers: Set<string> }} ctx target = 딜의 상대(행선지, 없으면 관심 구단 맨 앞)
+ */
+export function dealFee(it, ctx, memo) {
+  const fee = it.fee;
+  if (!fee) return null;
+  if (ctx.judged && fee.kind == null) return null;
+  if (fee.kind == null) return fee;
+  const sentences = feeSentences(it.row, fee, memo);
+  if (isPastFee(it.row, fee, sentences)) return null;
+  if (BUYER_BOUND_KINDS.has(fee.kind)) {
+    const sellers = new Set([...ctx.sellers, it.row.verdict_from].filter(Boolean));
+    const payers = feePayers(it.row, sentences, sellers, memo);
+    if (!ctx.target || !payers.has(ctx.target)) return null;
+  }
+  return fee;
+}
+
+/*
+ * ── 같은 보도를 옮긴 두 매체 — 판정 뒤에 접는다 ────────────────────────────
+ * `dedupeRows`는 판정 전 신호(URL · 본문 앞 180자)로만 같은 보도를 안다. 가십 칼럼 둘(BBC 가십 · 스카이 신문 요약)이 같은 빌트
+ * 보도를 **다른 문장으로** 옮기면 본문이 달라 두 행이 되고, 딜의 타임라인에 같은 소식이 두 줄로 나오고 보도 수가 부푼다(운영 — 콴사:
+ * 보도 20391·20418, 판정 요약까지 같다). 판정이 난 뒤에는 판정자가 두 글을 같은 말로 읽었다는 신호가 생긴다 — 그것으로 접는다.
+ *
+ * 같은 선수의 "이동" 판정 두 건이 **게시 48시간 안**이고 **판정 단계가 같고** 아래 중 하나면 한 보도다(`isEcho` · `foldEchoes`):
+ *   a. 한국어 요약이 같다(공백·끝 문장부호만 접는다 · `ECHO_SUMMARY_MIN`자 이상) — 판정자는 같은 사실을 같은 문장으로 쓴다. 다른 사실이면 요약이 갈린다.
+ *   b. 두 행 다 **같은 신문을 인용한** 가십 항목(`attribution = 'cited'`, `attributed_to`가 같다)이고 판정 필드(단계·출발·행선지·
+ *      관심 구단·금액)가 전부 같다 — 같은 신문의 같은 이적설을 두 칼럼이 옮긴 것이다.
+ *   c. 근거 구절이 같다(40자 이상) — 원문에서 같은 문장을 인용했다.
+ * 대표는 **원보도(인용이 아닌 행)**, 그다음 먼저 게시된 행, 같으면 id가 작은 행이다. 접힌 행은 딜의 보도 수·방향·단계·금액에 들지 않고
+ * **딜에 배정되지 않는다**(화면의 타임라인은 `deal_id`로 그리므로 한 줄만 남는다). 다만 접힌 행의 게시 시각은 딜의 첫·최근 보도 시각에
+ * 든다 — 줄이는 것은 보도 수뿐이다(같은 소식이 다시 나왔다는 것은 사실이고, 알림의 나이 판정도 최근 보도 시각을 본다).
+ * 행은 지우지 않는다 — 파생에서만 접는다.
+ * ⚠ 공신력 등급(`reporters.json`의 `credibility`)으로 대표를 고르지 않는다 — 등급 판정(`credibilityOf`)은 화면(TS)이 단독으로 갖는다
+ *   (`api-and-db.md`). 인용(cited)과 원보도의 구분은 행의 컬럼이라 여기서 갈라도 갈리지 않는다.
+ * ⚠ 위험 — 서로 다른 매체가 **따로** 같은 사실을 보도해도 요약이 같으면 접힌다(보도 수가 하나 준다). 짧은 요약("X가 Y의 관심을 받고
+ *   있다")일수록 그렇다 — 그래서 48시간으로 묶는다. 출처 수를 세는 관문(`canOpenUnverified`)도 접힌 뒤의 행으로 센다.
+ */
+export const ECHO_WINDOW_MS = 48 * 3_600_000;
+const ECHO_EVIDENCE_MIN = 40;
+/** 요약 대조의 하한(코드포인트) — 아주 짧은 요약("X가 이적한다")은 다른 보도끼리도 같다. 운영 요약은 1~2문장(수십 자)이다 */
+const ECHO_SUMMARY_MIN = 20;
+const normSummary = (s) => String(s).normalize("NFC").replace(/\s+/gu, " ").replace(/[.。!?\s]+$/u, "").trim();
+const judgedFields = (r) => JSON.stringify([r.verdict_stage ?? null, r.verdict_from ?? null, r.verdict_to ?? null, [...(r.verdict_suitors ?? [])].sort(), r.verdict_fee_amount == null ? null : Number(r.verdict_fee_amount), r.verdict_fee_currency ?? null]);
+const citedOutlet = (r) => (r.attribution === "cited" && r.attributed_to ? normalizeQuote(r.attributed_to) : null);
+
+/** 두 판정 행이 같은 보도를 옮긴 것인가(위 a~c). 같은 선수의 "이동" 판정끼리만 부른다 */
+export function isEcho(a, b) {
+  if (Math.abs(ts(a) - ts(b)) > ECHO_WINDOW_MS) return false;
+  // 단계가 다르면 같은 보도가 아니다 — 요약·근거가 같아도 한쪽이 더 진전된 판정이면 접는 순간 그 판정이 사라진다
+  if ((a.verdict_stage ?? null) !== (b.verdict_stage ?? null)) return false;
+  const sa = a.summary_ko ? normSummary(a.summary_ko) : "";
+  if ([...sa].length >= ECHO_SUMMARY_MIN && sa === (b.summary_ko ? normSummary(b.summary_ko) : "")) return true;
+  const outlet = citedOutlet(a);
+  if (outlet && outlet === citedOutlet(b) && judgedFields(a) === judgedFields(b)) return true;
+  const ea = a.verdict_evidence ? normalizeQuote(a.verdict_evidence) : "";
+  return ea.length >= ECHO_EVIDENCE_MIN && ea === (b.verdict_evidence ? normalizeQuote(b.verdict_evidence) : "");
+}
+
+/**
+ * 한 선수의 보도 항목에서 같은 보도를 옮긴 행을 접는다 — 대표만 남긴 항목, 접힌 항목, 접힌 행 수.
+ * ⚠ **대표와 직접** 같은 보도인 행만 접는다(연쇄 금지). 서로 닮은 행을 이어 묶으면 0·40·80·120시간의 같은 요약 네 건이 한 덩어리가
+ *   되어 닷새에 걸친 보도가 한 건으로 줄었다(48시간 창이 무의미해진다). 그래서 가장 나은 행을 대표로 세우고 그 대표와 같은 보도인
+ *   행만 접은 뒤, 남은 행에서 다시 대표를 세운다.
+ * @template {{ row: object }} T
+ * @param {T[]} items
+ * @returns {{ kept: T[], dropped: T[], folded: number }}
+ */
+export function foldEchoes(items, key) {
+  const moves = items.filter((it) => verdictOf(it.row, key) === "move");
+  if (moves.length < 2) return { kept: items, dropped: [], folded: 0 };
+  const rank = (it) => [it.row.attribution === "cited" ? 1 : 0, ts(it.row), it.row.id];
+  const order = (a, b) => {
+    const [x, y] = [rank(a), rank(b)];
+    for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] < y[i] ? -1 : 1;
+    return 0;
+  };
+  let rest = [...moves].sort(order);
+  const dropped = new Set();
+  while (rest.length > 1) {
+    const [rep, ...others] = rest;
+    const echoes = others.filter((it) => isEcho(rep.row, it.row));
+    for (const it of echoes) dropped.add(it);
+    rest = others.filter((it) => !echoes.includes(it));
+  }
+  return { kept: items.filter((it) => !dropped.has(it)), dropped: items.filter((it) => dropped.has(it)), folded: dropped.size };
 }
 
 /**
@@ -670,7 +964,7 @@ export function clubRowsToWrite(derivedClubs, names = createNameBook()) {
  *   `judgeNeeds`는 LLM에 물어야 할 보도(행 id · 선수 키 · 표시 이름 · 원문 · 언급된 구단 · 게시 시각 · 방식 `mode` · 옛 판정 `prev` ·
  *     `priority`) — 5대 리그 구단이 걸린 딜의 행(확인되지 않은 두 토큰 이상 이름 포함)과 선수 없이 묻는 행(규칙이 선수를 못 뽑았거나
  *     넓힌 후보)이다. **우선순위로 정렬돼 있다**(`orderJudgeNeeds`) — 호출부는 앞에서 상한만큼 자른다.
- *   `repeatedFailures`는 연달아 `REPEATED_FAILURE_ATTEMPTS`번 이상 실패한 대표 행 수다.
+ *   `repeatedFailures`는 판정 없이 연달아 `REPEATED_FAILURE_ATTEMPTS`번 이상 실패한 대표 행 수다.
  *   `nameNeeds`는 딜마다 선수 키·구단 정규명 — 이름 사전에서 빠진 것을 찾는 데 쓴다(저장하지 않는다).
  */
 /**
@@ -776,6 +1070,16 @@ export function deriveDeals(rows, opts) {
       items.push({ row: r, stage, sentences, storySentences, fee: feeFor(r, key, storySentences, memo) });
     }
     if (!items.length) continue;
+    // 판정을 다시 물을 대상은 접기 전의 전 보도다 — 접힌 행도 판정 갱신(옛 형식·요약 재시도)은 받는다
+    const reportedAll = items;
+    // 같은 보도를 옮긴 두 매체는 판정 뒤의 신호로 한 보도로 접는다(`foldEchoes`) — 보도 수·배정·단계·방향·금액에서 대표 하나만 센다
+    const echoes = foldEchoes(items, key);
+    // 접힌 행의 게시 시각 — 보도 수에는 들지 않지만 첫·최근 보도 시각에는 든다(위 절)
+    const echoTimes = echoes.dropped.map((it) => ts(it.row));
+    if (echoes.folded) {
+      skipped["같은 보도 인용(판정 뒤)"] = (skipped["같은 보도 인용(판정 뒤)"] ?? 0) + echoes.folded;
+      items = echoes.kept;
+    }
     /*
      * 판정받은 보도가 있는 딜은 **단계·방향·금액·관심 구단을 판정받은 보도만으로** 정한다. 아직 판정 전인 보도는 규칙이 읽은
      * 단계·금액·방향을 들고 있는데, 그 값이 판정받은 값을 덮는다 — 이름만으로 묶인 부상 기사의 "medical"이 루머 딜의 단계가 됐다.
@@ -830,7 +1134,9 @@ export function deriveDeals(rows, opts) {
     const suitorCanonicals = rankSuitors(items, key).filter((c) => c !== dir.from && c !== dir.to);
     const stored = storedDeal(dealKey(key));
     const stage = opts.requireVerdict && awaiting && stored ? holdStage(resolveStage(items), stored.stage) : resolveStage(items);
-    const { fee, prev, low, high } = resolveFee(items);
+    // 딜 금액 후보 — 딜의 상대(행선지, 없으면 관심 구단 맨 앞)가 낸 지금의 금액만(`dealFee`). 직전 보도·범위도 이 후보로 센다
+    const feeCtx = { judged: items.some((it) => verdictOf(it.row, key) === "move"), target: dir.to ?? suitorCanonicals[0] ?? null, sellers: new Set([dir.from].filter(Boolean)) };
+    const { fee, prev, low, high } = resolveFee(items.map((it) => ({ ...it, fee: dealFee(it, feeCtx, memo) })));
     const addOn = fee ? firstOf(items.flatMap((it) => it.storySentences), (ex) => (ex.addOnAmount != null && ex.addOnCurrency === fee.currency ? ex.addOnAmount : null), memo) : null;
     const wage = firstOf(items.flatMap((it) => it.storySentences), (ex) => ex.wageText, memo);
     const contract = contractText(parseContract(items.flatMap((it) => it.storySentences)));
@@ -850,14 +1156,16 @@ export function deriveDeals(rows, opts) {
     // 이 딜의 보도 중 지금 물어야 할 것 — 아래 두 관문(미확인 선수 · 판정)이 함께 쓴다
     const askJudge = () => {
       const tier = existing.has(dealKey(key)) ? JUDGE_TIER.existing : JUDGE_TIER.newDeal;
-      for (const it of reported) {
+      for (const it of reportedAll) {
         const mode = judgeMode(it.row, key, opts.nowMs, modeOpts);
         if (mode) judgeNeeds.push(judgeNeed(it.row, { playerKey: key, player, clubs: [...mentioned], mode, tier }));
       }
     };
     if (opts.requireVerified && !names.isVerifiedPlayer(key)) {
       // 확인되지 않은 선수도 판정은 받는다 — 완료·확정이거나 출처 두 곳이 이동이라 하면 연다(`canOpenUnverified`)
-      const open = opts.requireVerdict && canOpenUnverified(items, key);
+      // 이미 저장된 딜은 남긴다 — 판정이 없는 기존 딜을 남기는 규칙과 같은 정신이다. 같은 보도 접기(`foldEchoes`)로 출처 수가 줄어
+      // 한 번 열린 딜이 다음 실행에 사라지면 보드·관심 목록에서 딜이 깜빡인다. 새 딜만 접은 뒤의 출처 수로 연다
+      const open = opts.requireVerdict && (existing.has(dealKey(key)) || canOpenUnverified(items, key));
       if (!open) {
         if (opts.requireVerdict && tokens(key).length >= 2) askJudge();
         unverified.push({ player, stage });
@@ -906,7 +1214,7 @@ export function deriveDeals(rows, opts) {
     for (const c of [fromClub, toClub, ...suitorClubs]) if (c) clubs.set(c.code, c);
     if (!playerKo) missingKo.push(player);
 
-    const times = reported.map((it) => ts(it.row));
+    const times = [...reported.map((it) => ts(it.row)), ...echoTimes];
     deals.push({
       deal_key: dealKey(key),
       player: clampCp(player, 120),
@@ -930,7 +1238,7 @@ export function deriveDeals(rows, opts) {
       // ⚠ 이적료가 확인되면 자유계약이 아니다(DB CHECK `transfer_deal_free_agent_no_fee`) — 화면은
       //   이적료가 있으면 금액, 없고 이 값이 켜졌으면 "FA(자유 계약)", 둘 다 아니면 "미공개"를 그린다
       is_free_agent: dir.isFree && !fee,
-      settled_at: settledAtFor(items, stage, awaiting ? stored : null),
+      settled_at: settledAtFor(items, stage, awaiting ? stored : null, reported),
       first_reported_at: new Date(Math.min(...times)).toISOString(),
       latest_reported_at: new Date(Math.max(...times)).toISOString(),
       report_count: reported.length,
@@ -945,8 +1253,9 @@ export function deriveDeals(rows, opts) {
   if (unverified.length) warnings.push(`확인되지 않은 선수 ${unverified.length}명 — 보드에 올리지 않았다(완료·확정 판정이나 출처 두 곳의 이동 판정이 오면 열린다. 선수가 맞으면 players-ko.json에 넣어 바로 연다): ${unverified.map((u) => u.player).join(", ")}`);
   if (missingKo.length) warnings.push(`한국어 표기가 없는 선수 ${missingKo.length}명(사람 사전·위키데이터 모두 없음) — 영문명으로 그려진다: ${missingKo.join(", ")}`);
   deals.sort((a, b) => b.latest_reported_at.localeCompare(a.latest_reported_at));
-  // 같은 이유로 연달아 실패한 행 — 실행 요약과 Actions 경고가 센다(사람이 원인을 봐야 한다)
-  const repeatedFailures = reps.filter((r) => (Number(r.verdict_attempts) || 0) >= REPEATED_FAILURE_ATTEMPTS).length;
+  // 같은 이유로 연달아 실패한 행 — 실행 요약과 Actions 경고가 센다(사람이 원인을 봐야 한다). **판정이 없는** 행만 센다 — 본문만 못 받은
+  // 성공 판정(`verdict_attempts`가 본문 재시도로 오른다)은 판정이 있어 실패가 아니다
+  const repeatedFailures = reps.filter((r) => r.verdict == null && (Number(r.verdict_attempts) || 0) >= REPEATED_FAILURE_ATTEMPTS).length;
   return {
     deals, clubs: [...clubs.values()], assignments, nameNeeds, judgeNeeds: orderJudgeNeeds(judgeNeeds, { limit: opts.judgeLimit ?? JUDGE_MAX_PER_RUN }),
     clubNeeds, fromFallback, warnings, skipped, startMs, repeatedFailures,

@@ -13,6 +13,7 @@
     "cited: 가십 칼럼(BBC 이적 가십·스카이 신문 요약)이 인용한 신문 → { ko, credibility }. 항목 행은 attribution = 'cited'이고 attributed_to가 칼럼이 적은 신문 표기(원문 그대로)다.",
     "  키는 그 표기를 **소문자로 접고 앞의 'the'와 영숫자 아닌 글자를 걷은 것**이다(TeamTalk·Teamtalk → teamtalk, The Sun → sun, L'Equipe → lequipe) — 접는 규칙은 entities/transfer/lib/reporter.ts의 citedKey 하나가 갖는다.",
     "  credibility는 1~5뿐이다(🎖️ 없음 — 칼럼이 옮겨 적은 글이라 원 보도를 직접 읽은 것이 아니다). 비우면 ko 표기로 credibility.journalists를 찾는다(기자를 인용한 항목). 등재되지 않은 신문은 원문 표기 그대로 그리고 등급은 표시하지 않는다.",
+    "  근거가 약한 매체(팬 사이트·처음 보는 지역 매체)는 등급을 매기지 않고 { ko, unrated: true }로 표기만 둔다 — 화면은 이름만 그리고 등급은 표시하지 않는다.",
     "등급의 근거: 커뮤니티 티어표(레딧 구단별 가이드 → 에펨코리아 2023 번역 · The False 9 2020 · r/RealMadrid 2025 · ITK+ 기자 244명 명단)와 Football Transfer League의 매체별 적중률(2006~)을 겹쳐 매겼다.",
     "  기자는 ITK+ 티어를 기준으로 0·1티어 → 5, 1.5 → 4, 2 → 3, 3 → 2로 옮기고, 다른 표와 갈리면 다수를 따른다(디 마르지오·로마노는 ITK+ 1.5지만 나머지 표 전부 1티어라 5).",
     "  매체는 적중률 구간으로 매긴다 — 40%↑ 4, 30%대 3~4(정론지), 20%대 2(타블로이드), 15% 아래 1(어그리게이터). 🎖️는 BBC·The Athletic처럼 어느 표에서나 1티어인 매체만."
@@ -394,6 +395,122 @@
     "bbc": {
       "ko": "BBC",
       "credibility": 4
+    },
+    "lagazzettadellosport": {
+      "ko": "가제타 델로 스포르트",
+      "credibility": 3
+    },
+    "dailytelegraph": {
+      "ko": "텔레그래프",
+      "credibility": 4
+    },
+    "skysportsgermany": {
+      "ko": "스카이스포츠 독일",
+      "credibility": 4
+    },
+    "skysportgermany": {
+      "ko": "스카이스포츠 독일",
+      "credibility": 4
+    },
+    "skygermany": {
+      "ko": "스카이스포츠 독일",
+      "credibility": 4
+    },
+    "calciomercato": {
+      "ko": "칼치오메르카토",
+      "credibility": 2
+    },
+    "calciomercatocom": {
+      "ko": "칼치오메르카토",
+      "credibility": 2
+    },
+    "corrieredellosport": {
+      "ko": "코리에레 델로 스포르트",
+      "credibility": 2
+    },
+    "cadenaser": {
+      "ko": "카데나 세르",
+      "credibility": 3
+    },
+    "estadiodeportivo": {
+      "ko": "에스타디오 데포르티보",
+      "credibility": 2
+    },
+    "tuttomercato": {
+      "ko": "투토메르카토웹",
+      "credibility": 3
+    },
+    "mirror": {
+      "ko": "미러",
+      "credibility": 2
+    },
+    "record": {
+      "ko": "레코드",
+      "credibility": 3
+    },
+    "standard": {
+      "ko": "이브닝 스탠더드",
+      "credibility": 3
+    },
+    "eveningstandard": {
+      "ko": "이브닝 스탠더드",
+      "credibility": 3
+    },
+    "newcastlechronicle": {
+      "ko": "뉴캐슬 크로니클",
+      "credibility": 2
+    },
+    "goal": {
+      "ko": "골닷컴",
+      "credibility": 2
+    },
+    "footballitalia": {
+      "ko": "풋볼 이탈리아",
+      "credibility": 1
+    },
+    "givemesport": {
+      "ko": "기브미스포츠",
+      "credibility": 1
+    },
+    "sportsmole": {
+      "ko": "스포츠 몰",
+      "credibility": 1
+    },
+    "kickfootball": {
+      "ko": "킥풋볼",
+      "unrated": true
+    },
+    "442ch": {
+      "ko": "4-4-2",
+      "unrated": true
+    },
+    "webaslan": {
+      "ko": "웹아슬란",
+      "unrated": true
+    },
+    "fotospor": {
+      "ko": "포토스포르",
+      "unrated": true
+    },
+    "mondo": {
+      "ko": "몬도",
+      "unrated": true
+    },
+    "15minit": {
+      "ko": "15min",
+      "unrated": true
+    },
+    "15minlt": {
+      "ko": "15min",
+      "unrated": true
+    },
+    "opengoal": {
+      "ko": "오픈 골",
+      "unrated": true
+    },
+    "opengoalpodcast": {
+      "ko": "오픈 골",
+      "unrated": true
     },
     "gianlucadimarzio": {
       "ko": "잔루카 디 마르지오"

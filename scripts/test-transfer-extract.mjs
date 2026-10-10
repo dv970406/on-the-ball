@@ -343,12 +343,14 @@ for (const [wrong, right] of Object.entries(glossary.corrections ?? {})) {
     if (!(Number.isInteger(v) && v >= 1 && v <= 5)) bad(`reporters.json credibility.journalists["${name}"]: 1~5`);
   }
   // cited — 가십 칼럼이 인용한 신문. 키는 접힌 표기(소문자·앞의 the와 영숫자 아닌 글자 제거 — 규칙은 reporter.ts의 citedKey),
-  // 등급은 1~5뿐이다(칼럼이 옮겨 적은 글이라 🎖️는 없다). 등급을 비우면 ko 표기가 credibility.journalists에 있어야 한다.
+  // 등급은 1~5뿐이다(칼럼이 옮겨 적은 글이라 🎖️는 없다). 등급을 비우면 ko 표기가 credibility.journalists에 있거나 `unrated: true`(등급 없이 표기만)여야 한다.
   for (const [key, c] of Object.entries(rep.cited ?? {})) {
     if (!/^[a-z0-9]+$/.test(key)) bad(`reporters.json cited["${key}"]: 키는 접힌 표기(소문자·영숫자만)여야 한다`);
     if (!c || typeof c.ko !== "string" || !c.ko.trim()) bad(`reporters.json cited["${key}"]: ko 표기가 비었다`);
+    else if (c.unrated !== undefined && (c.unrated !== true || c.credibility !== undefined)) bad(`reporters.json cited["${key}"]: unrated는 true만, 그리고 credibility와 함께 쓰지 않는다`);
     else if (c.credibility === undefined) {
-      if (!(c.ko in (cred.journalists ?? {}))) bad(`reporters.json cited["${key}"]: 등급이 없으면 ko("${c.ko}")가 credibility.journalists에 있어야 한다`);
+      // unrated — 근거가 약해 등급을 매기지 않은 매체(표기만). 등급을 잊은 항목과 가르려고 명시한다
+      if (!c.unrated && !(c.ko in (cred.journalists ?? {}))) bad(`reporters.json cited["${key}"]: 등급이 없으면 ko("${c.ko}")가 credibility.journalists에 있거나 unrated: true여야 한다`);
     } else if (!(Number.isInteger(c.credibility) && c.credibility >= 1 && c.credibility <= 5)) bad(`reporters.json cited["${key}"]: credibility는 1~5("medal" 없음)`);
   }
 }
@@ -403,6 +405,30 @@ const CLUB_CASES = [
   { text: "Hull and Fulham are monitoring the winger.", expect: ["Hull City", "Fulham"] },
   { text: "Hull City want the striker.", expect: ["Hull City"] },
   { text: "Hull KR and Hull FC sign props; the hull of the ship.", expect: [] },
+  // 사우디·튀르키예 구단 — 하이픈 표기도 같은 구단이고(갈리면 같은 구단이 두 코드가 된다), 이집트의 "Al Ahly"는 사우디 알아흘리가 아니다
+  { text: "Al-Hilal and Al Nassr are battling Besiktas for the striker.", expect: ["Al Hilal", "Al Nassr", "Besiktas"] },
+  { text: "Beşiktaş JK reject Al-Ittihad bid; Al Ahly also keen.", expect: ["Besiktas", "Al Ittihad", "Al Ahly"] },
+  { text: "Al-Ahli and Al Ettifaq want the Fenerbahçe midfielder.", expect: ["Al Ahli", "Al Ettifaq", "Fenerbahce"] },
+  // "Ittihad" 단독은 다른 나라 구단의 머리다(Ittihad Kalba) — 사우디 알이티하드로 잡지 않는다
+  { text: "Ittihad Kalba sign the forward.", expect: [] },
+  // "Sporting Braga"는 스포르팅 CP가 아니라 브라가다
+  { text: "Sporting Braga and Sporting are tracking the winger.", expect: ["Braga", "Sporting CP"] },
+  // 아랍 구단 이름은 나라마다 겹친다 — 도시가 붙거나 다른 구단 이름의 꼬리면 사우디 구단이 아니다
+  { text: "Al-Ittihad Kalba sign the forward.", expect: [] },
+  { text: "Al Ittihad Tripoli sign the forward.", expect: [] },
+  { text: "Shabab Al Ahli and Shabab Al-Ahli sign the forward.", expect: [] },
+  { text: "Al Ahli Doha sign the forward.", expect: [] },
+  { text: "Al-Hilal Omdurman sign the forward.", expect: [] },
+  // 띄어쓴 사우디 표기는 그대로 잡는다(위 규칙이 사우디 구단까지 막지 않는지)
+  { text: "Al Ittihad and Al-Ahli Saudi want the Al Hilal midfielder.", expect: ["Al Ittihad", "Al Ahli", "Al Hilal"] },
+  // 도시로 쓰인 "Braga"는 구단이 아니다 — 이적 문형("from Braga")은 구단이다
+  { text: "The forward, born in Braga, trained in Braga as a boy.", expect: [] },
+  { text: "Benfica sign the forward from Braga.", expect: ["Benfica", "Braga"] },
+  // 비ASCII 글자로 끝나는 별칭도 단독 표기를 잡는다(JS `\b`는 ASCII 기준이라 끝 경계가 성립하지 않았다)
+  { text: "Beşiktaş reject the offer.", expect: ["Besiktas"] },
+  { text: "Arsenal de Sarandí sign the forward.", expect: ["Arsenal de Sarandi"] },
+  // 악센트 글자 앞은 낱말 안이다 — 스페인어 "Interés"는 인테르가 아니다
+  { text: "Hay interés del Real Madrid.", expect: ["Real Madrid"] },
 ];
 let clubPass = 0;
 for (const c of CLUB_CASES) {
