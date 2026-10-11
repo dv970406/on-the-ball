@@ -16,8 +16,8 @@ function HeroClub({ label, club, text, note }: { label: string; club: TransferCl
     <div className="row-span-4 grid w-[124px] grid-rows-subgrid justify-items-center text-center">
       <span className="font-mono text-[10px] uppercase tracking-[0.5px] text-ink-mute-2">{label}</span>
       <TransferCrest club={club} size={56} priority className="mt-2" />
-      {/* 정식명이 길면 두 줄로 흘린다 — 잘린 구단 이름은 어느 구단인지 알 수 없다 */}
-      <span className="mt-2 line-clamp-2 text-[15px] font-semibold leading-[1.3] tracking-[-0.3px] text-ink">{text}</span>
+      {/* 정식명이 길면 두 줄로 흘린다 — 잘린 구단 이름은 어느 구단인지 알 수 없다. 낱말 단위로 꺾는다(`break-keep` — "토트/넘" 방지) */}
+      <span className="mt-2 line-clamp-2 break-keep text-[15px] font-semibold leading-[1.3] tracking-[-0.3px] text-ink">{text}</span>
       {note && <span className="mt-0.5 text-[11px] text-ink-mute">{note}</span>}
     </div>
   );

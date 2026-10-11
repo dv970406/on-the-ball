@@ -1,11 +1,11 @@
-// ⚠ `"use client"`가 없다 — 상호작용이 없는 렌더러라 서버 렌더 여지를 남긴다(`architecture.md`).
-//    그래서 순수 함수는 배럴이 아니라 직접 경로로 가져온다(`credibility-badge.tsx`와 같은 이유).
+"use client";
+
+// `memo`(훅)를 쓰는 조각이라 서버에서 렌더되지 않는다 → 지시어를 달고 `@/shared/lib`도 배럴로 가져온다(`architecture.md`).
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { memo } from "react";
 import { ROUTES } from "@/shared/config";
-import { cn } from "@/shared/lib/cn";
-import { formatRelativeTime } from "@/shared/lib/format";
+import { formatRelativeTime } from "@/shared/lib";
 import { Icon } from "@/shared/ui";
 import { reporterName } from "../lib/reporter";
 import { destinationClubs, routeLabels } from "../lib/route-label";
@@ -25,8 +25,6 @@ interface RumorCardProps {
   nowMs: number | null;
   /** 트랙의 첫 카드 — 첫 화면에 보이므로 엠블럼을 지연 로드하지 않는다 */
   priority?: boolean;
-  /** 항목(`li`)에 더할 클래스 — 넓은 화면의 그리드에서 몇 장까지 보일지를 뷰가 정한다 */
-  className?: string;
 }
 
 /**
@@ -35,25 +33,26 @@ interface RumorCardProps {
  * ⚠ **확률이 없다** — 푸터는 상태 뱃지 · 우측 이적료뿐(`확률 N%`는 보류).
  * ⚠ 보도 주체는 **목록·타임라인과 같은 한국어 표기**(`reporterName` — "벤 제이콥스")다. 소스 등록용 영어 라벨을
  *   쓰면 화면마다 같은 기자가 "Fabrizio Romano"·"파브리지오 로마노"로 갈린다.
- * ⚠ md+에서는 가로 트랙이 아니라 그리드의 칸이라 폭을 칸에 맡긴다(`md:w-auto`).
+ * ⚠ md+에서는 가로 트랙이 아니라 그리드의 칸이다 — 폭·높이를 칸에 맡기는 규칙과 넘친 카드 가리기는 카드마다 싣지 않고
+ *   캐러셀 목록(`views/transfer-board`의 `RumorCarousel`)이 범위에 한 번 건다(`styling.md`). 이 카드는 그 목록 안에서만 그린다.
  * ⚠ 링크의 `data-deal-id`는 lg+에서 보드가 클릭을 가로채 오른쪽 판에 여는 표지다(`DealRow`와 같다).
  * ⚠ 요지는 2줄 클램프 + `min-h-10`으로 카드 높이를 맞춘다 — 요지가 없는 보도가 섞여도 트랙이
  *   들쭉날쭉하지 않게.
  * ⚠ `memo`·`prefetch={false}` — 사유는 `DealRow`와 같다(행을 고를 때마다 보드가 다시 그려진다 · 동적 상세의 뷰포트 프리페치는
  *   받아 오는 것이 거의 없고 2분할 폭에서는 클릭이 선택으로 가로채진다).
  */
-export const RumorCard = memo(function RumorCard({ deal, report, nowMs, priority, className }: RumorCardProps) {
+export const RumorCard = memo(function RumorCard({ deal, report, nowMs, priority }: RumorCardProps) {
   const name = playerName(deal);
   const route = routeLabels(deal);
   const destinations = destinationClubs(deal);
 
   return (
-    <li className={cn("w-[300px] shrink-0 snap-start md:w-auto", className)}>
+    <li className="w-[300px] shrink-0 snap-start">
       <Link
         href={ROUTES.transfer(deal.id)}
         prefetch={false}
         data-deal-id={deal.id}
-        className="block rounded-lg border border-hairline bg-canvas px-4 py-3.5 transition-colors md:h-full duration-150 ease-otb active:bg-canvas-soft"
+        className="block rounded-lg border border-hairline bg-canvas px-4 py-3.5 transition-colors duration-150 ease-otb active:bg-canvas-soft"
       >
         <div className="flex items-center gap-[7px] text-[12px] text-ink">
           <CredibilityBadge report={report} />

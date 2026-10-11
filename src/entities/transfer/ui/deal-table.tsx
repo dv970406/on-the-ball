@@ -1,5 +1,5 @@
-// ⚠ `"use client"`가 없다 — 상호작용이 없는 렌더러다. 그래서 순수 함수는 배럴이 아니라 직접 경로로 가져온다
-//    (`deal-row.tsx`와 같은 이유).
+// ⚠ `"use client"`가 없다 — 상호작용이 없는 렌더러라 서버 렌더 여지를 남긴다. 그래서 순수 함수는 배럴이 아니라
+//    직접 경로로 가져온다(`architecture.md`).
 import type { ReactNode } from "react";
 import { cn } from "@/shared/lib/cn";
 import type { TransferSort } from "../model/types";
@@ -47,12 +47,20 @@ const TABLE_SCOPE = [
   "md:[&_[data-deal-row]+[data-deal-row]]:before:inset-x-0",
   // md+ 행 상자
   "md:[&_[data-deal-row]]:mx-0 md:[&_[data-deal-row]]:rounded-none md:[&_[data-deal-row]>a]:min-h-12 md:[&_[data-deal-row]>a]:gap-y-0 md:[&_[data-deal-row]>a]:rounded-none md:[&_[data-deal-row]>a]:px-5 md:[&_[data-deal-row]>a]:py-2",
+  // md+ 행 링크의 hover(모바일은 행이 `active:`만 갖는다)
+  "md:[&_[data-deal-row]>a]:hover:bg-canvas-soft",
+  // 모바일 묶음(링크의 직계 div)을 풀어 자식을 곧장 열에 놓는다
+  "md:[&_[data-deal-row]>a>div]:contents",
   // 포커스 링
   "[&_[data-deal-row]>a]:focus-visible:outline-2 [&_[data-deal-row]>a]:focus-visible:-outline-offset-2 [&_[data-deal-row]>a]:focus-visible:outline-ink",
   // 칸 — 상태
   "md:[&_[data-g=meta]>:first-child]:col-start-1 md:[&_[data-g=meta]>:first-child]:row-start-1 md:[&_[data-g=meta]>:first-child]:justify-self-start",
   // 칸 — 선수
   "md:[&_[data-col=name]]:col-start-2 md:[&_[data-col=name]]:row-start-1 md:[&_[data-col=name]]:min-w-0 md:[&_[data-col=name]]:text-[14px]",
+  // 선수 칸의 포지션 — 표에서만 보인다(모바일 행에서는 `hidden`)
+  "md:[&_[data-col=name]>[data-pos]]:inline",
+  // 메타 줄의 나머지(결렬 사유 · 출처·시각) — 표에는 열이 없다(업데이트 칸·상세 판이 말한다)
+  "md:[&_[data-g=meta]>:not(:first-child)]:hidden",
   // 칸 — 경로(줄바꿈 — 위 주석)
   "md:[&_[data-col=route]]:col-start-3 md:[&_[data-col=route]]:row-start-1 md:[&_[data-col=route]]:mt-0 md:[&_[data-col=route]]:flex-wrap md:[&_[data-col=route]]:items-center md:[&_[data-col=route]]:gap-y-0.5 md:[&_[data-col=route]]:whitespace-normal md:[&_[data-col=route]]:break-keep",
   // 행선지가 여럿이면 덩어리를 풀어(엠블럼 겹치기와 이름 글자가 따로 줄을 탄다) "출발 → 엠블럼들" / "이름들" 두 줄로 선다

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   TRANSFER_DEAL_LIMIT,
   type TransferClub,
@@ -157,11 +157,13 @@ export function TransferBoardView({
     active: activeGroup,
     jump,
   } = useGroupJump(groups.map((group) => group.key));
+  // J/K가 듣는 범위 — 구간 목록만이다. 구간 탭·정렬·필터 칩까지 담은 `panelRef`에 걸면 칩에 포커스가 있을 때도 선택이 바뀐다
+  const dealListRef = useRef<HTMLDivElement>(null);
   const handleDealClickCapture = useDealSelect({
     enabled: split,
     selectedId,
     requestedId: requestedDeal,
-    listRef: panelRef,
+    listRef: dealListRef,
     onSelect: select,
   });
 
@@ -284,7 +286,7 @@ export function TransferBoardView({
                   </div>
                 )}
 
-                {/* 구간 섹션들을 담으므로 점프 훅의 ref가 여기 붙는다. J/K는 포커스가 이 안에 있을 때만 듣는다(`useDealSelect`) */}
+                {/* 구간 섹션들을 담으므로 점프 훅의 ref가 여기 붙는다 */}
                 <div ref={panelRef} className="md:pt-2">
                   <GroupTabs
                     counts={counts}
@@ -320,14 +322,18 @@ export function TransferBoardView({
                       <EmptyState title="조건에 맞는 딜이 없어요" />
                     )
                   ) : (
-                    <BoardSections
-                      layouts={layouts}
-                      nowMs={nowMs}
-                      sort={sort}
-                      expanded={watch}
-                      reportScale={reportScale}
-                      selectedId={selectedId}
-                    />
+                    // J/K는 포커스가 이 목록 안에 있을 때만 듣는다(`useDealSelect`). 상자를 만들지 않아(`contents`) 구간의
+                    // sticky 머리는 그대로 바깥 패널을 기준으로 붙는다
+                    <div ref={dealListRef} className="contents">
+                      <BoardSections
+                        layouts={layouts}
+                        nowMs={nowMs}
+                        sort={sort}
+                        expanded={watch}
+                        reportScale={reportScale}
+                        selectedId={selectedId}
+                      />
+                    </div>
                   )}
 
                   {/*

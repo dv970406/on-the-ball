@@ -1,10 +1,11 @@
-// ⚠ `"use client"`가 없다 — 상호작용이 없는 렌더러라 서버 렌더 여지를 남긴다(`architecture.md`).
-//    그래서 순수 함수는 배럴이 아니라 직접 경로로 가져온다(`credibility-badge.tsx`와 같은 이유).
+"use client";
+
+// `memo`(훅)를 쓰는 조각이라 서버에서 렌더되지 않는다 → 지시어를 달고 `@/shared/lib`도 배럴로 가져온다(`architecture.md`).
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { memo } from "react";
 import { ROUTES } from "@/shared/config";
-import { formatRelativeTime } from "@/shared/lib/format";
+import { formatRelativeTime } from "@/shared/lib";
 import { Icon } from "@/shared/ui";
 import { destinationClubs, routeLabels } from "../lib/route-label";
 import type { TransferDealListItem } from "../model/types";

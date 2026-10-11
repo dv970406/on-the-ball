@@ -12,10 +12,10 @@ import { Button } from "@/shared/ui";
  *
  * ⚠ **그릴지는 `usePushNudge`가 정한다**(방금 담았고 · 지금 담겨 있고 · 알림이 꺼져 있을 때만). 이 컴포넌트는 그려졌으면 켤 수
  *   있는 상태라고 믿는다 — 켜지면 상태가 `on`이 되어 뷰가 걷어 낸다.
- * ⚠ 이 화면의 에메랄드는 아래 관심 토글이다 — 여기 버튼은 잉크(`dark`)다(`styling.md` "CTA가 둘이면 나중 것을 잉크로").
+ * ⚠ 이 화면의 에메랄드는 곁의 관심 토글이다 — 여기 버튼은 잉크(`dark`)다(`styling.md` "CTA가 둘이면 나중 것을 잉크로").
  * ⚠ 가드는 훅이 갖는다(`enable`). `disabled`는 시각 표시일 뿐이다.
+ * ⚠ 자리마다 여백이 다르다 — 하단 고정 바에서는 토글 위(`mb-2.5`, 기본값), 넓은 화면의 곁 칸에서는 토글 아래.
  */
-/** 자리마다 여백이 다르다 — 하단 고정 바에서는 토글 위(`mb-2.5`, 기본값), 넓은 화면의 곁 칸에서는 토글 아래 */
 export function PushNudge({ className = "mb-2.5" }: { className?: string }) {
   const toggle = usePushToggle("deal");
 

@@ -8,10 +8,15 @@ import type { RumorEntry } from "../model/use-transfer-board";
 /** 트랙의 카드 간격(px) — 아래 `gap-2.5`와 같은 값. 인디케이터 인덱스가 이 값으로 나눈다 */
 const TRACK_GAP_PX = 10;
 /**
- * md+ 그리드는 **한 줄만** 보인다 — md 2장, lg+ 3장. 그 뒤 카드는 넓은 화면에서 가린다(같은 딜이 바로 아래 표에 있고,
- * 소식이 여러 줄로 쌓이면 표가 첫 화면 밖으로 밀린다). 모바일 트랙은 전부 그대로다.
+ * md+ 그리드의 카드 규칙 — 카드마다 싣지 않고 목록에 한 번 건다(`styling.md`).
+ * - 칸에 폭·높이를 맡긴다(모바일은 300px 스냅 카드).
+ * - **한 줄만** 보인다 — md 2장, lg+ 3장. 그 뒤 카드는 넓은 화면에서 가린다(같은 딜이 바로 아래 표에 있고,
+ *   소식이 여러 줄로 쌓이면 표가 첫 화면 밖으로 밀린다). 모바일 트랙은 전부 그대로다.
  */
-const GRID_ROW_MD = 2;
+// ⚠ 가리는 규칙은 폭 구간이 겹치지 않게 둔다 — 선택자가 다른 arbitrary variant끼리는 Tailwind가 브레이크포인트 순으로 정렬하지
+//   않아, `md:…:hidden` 뒤에 `lg:…:block`을 얹으면 md 규칙이 나중에 생성되어 lg에서도 셋째 카드를 가린다(빌드 CSS 실측).
+const GRID_CARD_SCOPE =
+  "md:[&>li]:w-auto md:[&>li>a]:h-full md:max-lg:[&>li:nth-child(n+3)]:hidden lg:[&>li:nth-child(n+4)]:hidden";
 
 interface RumorCarouselProps {
   /** 비어 있으면 호출부가 섹션 자체를 그리지 않는다 — 빈 캡션이 첫 화면 세로 공간을 먹지 않게 */
@@ -49,7 +54,10 @@ export function RumorCarousel({ rumors, nowMs }: RumorCarouselProps) {
       </h2>
       <ul
         onScroll={handleScroll}
-        className="no-scrollbar flex snap-x snap-mandatory gap-2.5 overflow-x-auto scroll-px-5 px-5 pb-1 md:grid md:snap-none md:grid-cols-2 md:overflow-visible lg:grid-cols-3"
+        className={cn(
+          "no-scrollbar flex snap-x snap-mandatory gap-2.5 overflow-x-auto scroll-px-5 px-5 pb-1 md:grid md:snap-none md:grid-cols-2 md:overflow-visible lg:grid-cols-3",
+          GRID_CARD_SCOPE,
+        )}
       >
         {rumors.map(({ deal, report }, i) => (
           // 첫 카드만 즉시 로드 — 나머지는 트랙을 넘겨야 보인다
@@ -59,7 +67,6 @@ export function RumorCarousel({ rumors, nowMs }: RumorCarouselProps) {
             report={report}
             nowMs={nowMs}
             priority={i === 0}
-            className={cn(i >= GRID_ROW_MD && "md:hidden", i === GRID_ROW_MD && "lg:block")}
           />
         ))}
       </ul>

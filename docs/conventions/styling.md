@@ -18,7 +18,7 @@
   - arbitrary **value**: `border-[1.5px]`, `tracking-[-0.6px]`, `bg-[linear-gradient(...)]`
   - arbitrary **property**: `[clip-path:polygon(...)]`, `[transform:...]`, `[transition:...]`
 - ⚠ **`bg-linear-*` 그라데이션 유틸은 `in oklab` 보간이다.** sRGB `linear-gradient(...)`를 그대로 옮길 땐 `bg-[linear-gradient(...)]` arbitrary를 쓴다(중간색이 달라진다).
-- ⚠ **`[vertical-align:...]`·`[font-family:...]` arbitrary property는 생성되지 않는다(실측)** — Tailwind가 이미 그 이름의 표준 유틸(`align-*`·`font-*`)을 갖고 있으면 arbitrary property 형태를 스캐너가 인식하지 못한다. 대신 그 표준 유틸에 arbitrary **value**를 준다: `align-[-1px]`·`font-['Apple_Color_Emoji','Segoe_UI_Emoji','Noto_Color_Emoji',sans-serif]`(이적시장 상세의 국기 이모지 폰트 스택이 선례 — `views/transfer-detail/ui/transfer-detail-view.tsx`).
+- ⚠ **`[vertical-align:...]`·`[font-family:...]` arbitrary property는 생성되지 않는다(실측)** — Tailwind가 이미 그 이름의 표준 유틸(`align-*`·`font-*`)을 갖고 있으면 arbitrary property 형태를 스캐너가 인식하지 못한다. 대신 그 표준 유틸에 arbitrary **value**를 준다: `align-[-1px]`·`font-['Apple_Color_Emoji','Segoe_UI_Emoji','Noto_Color_Emoji',sans-serif]`(딜 정보줄의 국기 이모지 폰트 스택이 선례 — `entities/transfer/ui/deal-info-line.tsx`).
 - ⚠ **임의 브레이크포인트는 rem으로 쓴다**(`min-[90rem]:` — 1440px). `min-[1440px]:`처럼 단위가 다르면 Tailwind v4가 `md:`·`lg:`(rem)보다
   **앞에** 정렬해, 같은 속성을 `md:`·`lg:`로도 준 요소에서 넓은 폭의 값이 진다(실측: 3분할 격자가 2분할 값으로 그려졌다). `@theme` 동결이라
   브레이크포인트 토큰은 더하지 않는다.

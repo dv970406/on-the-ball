@@ -1,10 +1,10 @@
-// ⚠ `"use client"`가 없다 — 상호작용이 없는 렌더러라 서버 렌더 여지를 남긴다(`architecture.md`).
-//    그래서 순수 함수는 배럴이 아니라 직접 경로로 가져온다(`credibility-badge.tsx`와 같은 이유).
+"use client";
+
+// `memo`(훅)를 쓰는 조각이라 서버에서 렌더되지 않는다 → 지시어를 달고 `@/shared/lib`도 배럴로 가져온다(`architecture.md`).
 import Link from "next/link";
 import { memo } from "react";
 import { ROUTES } from "@/shared/config";
-import { cn } from "@/shared/lib/cn";
-import { formatRelativeTime } from "@/shared/lib/format";
+import { cn, formatRelativeTime } from "@/shared/lib";
 import { reporterName } from "../lib/reporter";
 import { isDeadStage } from "../lib/stage";
 import type { TransferDealListItem } from "../model/types";
@@ -46,12 +46,12 @@ interface DealRowProps {
  * 모바일 레이아웃: grid `minmax(0,1fr) auto` — 좌: 이름·경로 / 우: 이적료·변동폭 / 3행(meta)은 전폭.
  * 정렬선: `mx-2` + `px-3` = 콘텐츠 x=20 → 구간 제목·칩·카드와 같은 선.
  * md+ 레이아웃: 표의 한 줄 — 열·**칸 배치**·디바이더·md+ 행 상자·포커스 링·md+ 이름 줄바꿈은 전부 **표의 범위(`DealTable`)가**
- * 표지(`data-deal-row`·`data-deal-cols`·`data-col`·`data-g`·`data-name`·`data-dead`)를 보고 건다. 이 행은 md+ 전용 클래스를
+ * 표지(`data-deal-row`·`data-deal-cols`·`data-col`·`data-g`·`data-name`·`data-pos`·`data-dead`)를 보고 건다. 이 행은 md+ 전용 클래스를
  * 갖지 않고(백여 행에 같은 문자열을 싣지 않는다 — `styling.md`) `DealTable` 안에서만 그린다.
  * - md(768–1439): 상태 · 선수 · 경로 · 이적료 · 업데이트(5열) / `min-[90rem]`: 변동·보도를 더한 7열.
  *
- * ⚠ 모바일 묶음(이름·경로 / 이적료·변동 `data-g="money"` / 메타 줄 `data-g="meta"`)은 md+에서 `md:contents`로 풀려 자식이
- *   곧장 열에 놓인다 — 같은 요소를 두 벌 그리지 않으려는 배치다. 범위는 묶음 안의 **순서**로 이적료·변동폭·상태 뱃지를 찾는다
+ * ⚠ 모바일 묶음(이름·경로 / 이적료·변동 `data-g="money"` / 메타 줄 `data-g="meta"` — 링크의 직계 `div`)은 md+에서 범위가
+ *   `contents`로 풀어 자식이 곧장 열에 놓인다 — 같은 요소를 두 벌 그리지 않으려는 배치다. 범위는 묶음 안의 **순서**로 이적료·변동폭·상태 뱃지를 찾는다
  *   (그 컴포넌트들에 표지 prop을 열지 않으려고) → 묶음 안 순서를 바꾸면 `DealTable`도 함께 고친다. 묶음에 건 `opacity`는
  *   md+에서 효과가 없어(상자가 없다) 범위가 칸마다 다시 건다(`data-dead`).
  * ⚠ 결렬 변형: 행 `bg-[#f3f3f3] grayscale`(`@theme` 동결이라 arbitrary hex),
@@ -61,7 +61,7 @@ interface DealRowProps {
  * ⚠ 이 행의 에메랄드는 `WatchMark`(관심)와 변동폭의 상승 화살표뿐이다.
  * ⚠ 렌더 중에 시계를 읽지 않는다 — 상대시각은 `nowMs`를 받아 계산한다.
  * ⚠ 링크에 `data-deal-id`를 단다 — lg+에서 보드가 일반 클릭을 가로채 오른쪽 판에 연다(이벤트 위임이라 이 행은
- *   `"use client"`가 없다). 가로채지 않으면 그대로 상세로 이동한다.
+ *   클릭 핸들러를 갖지 않는다). 가로채지 않으면 그대로 상세로 이동한다.
  * ⚠ 선택 막대는 `after:`다 — `before:`는 디바이더가 쓴다. 그림자(`inset` shadow)로 그리지 않는다(그림자 예외 목록 밖).
  * ⚠ `memo`다 — 보드는 행을 고를 때마다(주소의 `?deal=`) 다시 그려지는데, 바뀌는 행은 `selected`가 달라진 둘뿐이다.
  *   그래서 넘기는 값은 원시값이거나 목록 캐시의 같은 참조여야 한다(뷰가 지킨다).
@@ -96,9 +96,9 @@ export const DealRow = memo(function DealRow({ deal, nowMs, hidden, reportScale,
         data-deal-id={deal.id}
         data-deal-cols=""
         aria-current={selected ? "true" : undefined}
-        className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-[9px] rounded-md px-3 py-3 transition-colors duration-150 ease-otb active:bg-canvas-soft md:hover:bg-canvas-soft"
+        className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-[9px] rounded-md px-3 py-3 transition-colors duration-150 ease-otb active:bg-canvas-soft"
       >
-        <div className={cn("min-w-0 md:contents", dead && "opacity-60")}>
+        <div className={cn("min-w-0", dead && "opacity-60")}>
           {/* 화면의 계층이 h1(`BoardHeader`의 이적시장) → h2(구간) → h3(선수) */}
           <h3
             data-col="name"
@@ -109,7 +109,7 @@ export const DealRow = memo(function DealRow({ deal, nowMs, hidden, reportScale,
               {name}
             </span>
             {deal.position && (
-              <span className="hidden shrink-0 text-[11px] font-normal text-ink-mute-2 md:inline">
+              <span data-pos="" className="hidden shrink-0 text-[11px] font-normal text-ink-mute-2">
                 {deal.position}
               </span>
             )}
@@ -120,7 +120,7 @@ export const DealRow = memo(function DealRow({ deal, nowMs, hidden, reportScale,
         {/* ⚠ 묶음 안의 순서(이적료 → 변동폭)를 표의 범위(`DealTable`)가 칸 자리로 쓴다 */}
         <div
           data-g="money"
-          className={cn("flex flex-col items-end gap-[3px] text-right md:contents", dead && "opacity-60")}
+          className={cn("flex flex-col items-end gap-[3px] text-right", dead && "opacity-60")}
         >
           <FeeValue
             deal={deal}
@@ -137,7 +137,7 @@ export const DealRow = memo(function DealRow({ deal, nowMs, hidden, reportScale,
         <div
           data-g="meta"
           className={cn(
-            "col-span-full flex min-w-0 items-center gap-2 text-[11px] text-ink-mute-2 md:contents",
+            "col-span-full flex min-w-0 items-center gap-2 text-[11px] text-ink-mute-2",
             dead && "opacity-85",
           )}
         >
@@ -145,12 +145,12 @@ export const DealRow = memo(function DealRow({ deal, nowMs, hidden, reportScale,
           {dead ? (
             // 결렬 사유 — 최신 보도 요지 1줄(한국어 요약, 없으면 영문 발췌). 표에는 열이 없다(상세 판이 말한다)
             report?.gist && (
-              <span lang={report.gist.lang} className="min-w-0 flex-1 truncate text-[12px] text-ink-mute md:hidden">
+              <span lang={report.gist.lang} className="min-w-0 flex-1 truncate text-[12px] text-ink-mute">
                 {report.gist.text}
               </span>
             )
           ) : (
-            <span className="ml-auto inline-flex shrink-0 items-center gap-[5px] whitespace-nowrap text-ink-mute md:hidden">
+            <span className="ml-auto inline-flex shrink-0 items-center gap-[5px] whitespace-nowrap text-ink-mute">
               {report && (
                 <>
                   <CredibilityBadge report={report} />

@@ -66,7 +66,6 @@ export { feeKindLabel, formatFee, formatFeeRange } from "./lib/fee";
 export { destinationClubs, routeLabels } from "./lib/route-label";
 // ⚠ 선수 표시명(`playerKo ?? player`)의 단일 소스 — 목록·카드·상세 제목·`<title>`이 같은 이름을 그린다
 export { playerName } from "./lib/player-name";
-// ⚠ 여러 구단이 노리는 루머의 행선지 자리 — 엠블럼 겹치기. 상세 경로 카드가 쓴다(목록 UI는 같은 슬라이스라 상대 경로)
 // ⚠ 이적료 칸은 금액 · FA(확인된 자유계약) · 미공개 셋 중 하나다 — 빈 이적료를 FA로 추정하지 않는다
 export { FeeValue } from "./ui/fee-value";
 export { DealRow } from "./ui/deal-row";
@@ -74,11 +73,7 @@ export { DealTable, DealTableHead } from "./ui/deal-table";
 export { DealMiniCard } from "./ui/deal-mini-card";
 export { RumorCard } from "./ui/rumor-card";
 // 상세 화면(`views/transfer-detail`)이 그리는 조각들 — 목록 UI는 같은 슬라이스라 상대 경로로 가져간다
-// ⚠ 보도 주체의 한국어 표기("벤 제이콥스") — 캐러셀·목록·타임라인이 모두 이 하나를 쓴다
-export { reporterName } from "./lib/reporter";
 export { StatusBadge } from "./ui/status-badge";
-// ⚠ 출처 공신력(🎖️ 매체 · 🌑~🌕 기자) — 등급의 단일 소스는 reporters.json의 credibility다
-export { CredibilityBadge } from "./ui/credibility-badge";
 export { FeeDelta } from "./ui/fee-delta";
 export { TransferCrest } from "./ui/transfer-crest";
 // 딜 상세(`views/transfer-detail`)와 보드의 오른쪽 판(`widgets/deal-panel`)이 **함께** 그리는 조각들 —

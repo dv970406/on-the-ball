@@ -46,9 +46,10 @@ function createDeadlineClock(closesMs: number, serverNowMs: number | null) {
   let nowMs: number | null = null;
   return {
     subscribe(onChange: () => void) {
-      // 이미 지났으면 돌릴 이유가 없다 — 기준 시각으로 계산해 "closed"가 된다
-      if (!(closesMs > Date.now())) return () => {};
       const skewMs = serverNowMs === null ? 0 : serverToClientTime(serverNowMs) - serverNowMs;
+      // 이미 지났으면 돌릴 이유가 없다 — 기준 시각으로 계산해 "closed"가 된다. 판정도 서버 시계로 옮긴 값으로 한다
+      // (기기 시계가 앞서 있으면 마감 전인데 구독하지 않아 카운트다운이 서버 시각에서 멈춘다)
+      if (!(closesMs > Date.now() - skewMs)) return () => {};
       let unsubscribe: () => void = () => {};
       unsubscribe = subscribeTick(() => {
         nowMs = Date.now() - skewMs;

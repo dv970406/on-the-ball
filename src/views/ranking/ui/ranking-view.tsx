@@ -135,11 +135,15 @@ export function RankingView({ initialRanking, initialUserId, serverNowMs }: Rank
                 <span className="w-28 shrink-0 text-right">점수</span>
                 <span className="w-28 shrink-0 text-right">적중</span>
               </div>
-              <ol className="mt-5 flex flex-col md:mt-0">
+              {/*
+                넓은 화면의 줄 규칙(줄 높이 · 점수·적중 두 칸 · 적중 라벨 숨김)은 줄마다 싣지 않고 목록에 한 번 건다 — 줄이
+                최대 `RANKING_LIMIT`개라 같은 문자열이 그만큼 HTML에 실린다(`styling.md`). 줄은 표지(`data-score`·`data-hits-label`)만 단다.
+              */}
+              <ol className="mt-5 flex flex-col md:mt-0 md:[&>li]:py-3.5 md:[&_[data-score]]:flex md:[&_[data-score]]:items-center md:[&_[data-score]]:gap-3 md:[&_[data-score]>span]:w-28 md:[&_[data-score]>:last-child]:text-[13px] md:[&_[data-score]>:last-child]:text-ink-mute md:[&_[data-hits-label]]:sr-only">
                 {ranking.data.map((score) => (
                   <li
                     key={score.userId}
-                    className="flex items-center gap-3 border-b border-hairline-cool py-3 last:border-b-0 md:py-3.5"
+                    className="flex items-center gap-3 border-b border-hairline-cool py-3 last:border-b-0"
                   >
                     <span className="w-7 shrink-0 text-center font-mono text-[14px] tabular-nums text-ink">
                       {score.rank}
@@ -151,13 +155,13 @@ export function RankingView({ initialRanking, initialUserId, serverNowMs }: Rank
                       {score.userId === userId && <Pill variant="dark">나</Pill>}
                     </span>
                     {/* 모바일은 점수 위·적중 아래 두 줄, 넓은 화면은 열 머리에 맞춘 두 칸 */}
-                    <span className="ml-auto shrink-0 text-right md:flex md:items-center md:gap-3">
-                      <span className="block font-mono text-[14px] tabular-nums text-ink md:w-28">
+                    <span data-score="" className="ml-auto shrink-0 text-right">
+                      <span className="block font-mono text-[14px] tabular-nums text-ink">
                         {formatCount(score.points)}점
                       </span>
-                      <span className="block font-mono text-[11px] tabular-nums text-ink-mute-2 md:w-28 md:text-[13px] md:text-ink-mute">
+                      <span className="block font-mono text-[11px] tabular-nums text-ink-mute-2">
                         {/* 넓은 화면에서는 열 머리가 "적중"을 말한다 — 글자는 스크린리더에만 남긴다 */}
-                        <span className="md:sr-only">적중 </span>
+                        <span data-hits-label="">적중 </span>
                         {formatCount(score.hits)}/{formatCount(score.scored)}
                       </span>
                     </span>

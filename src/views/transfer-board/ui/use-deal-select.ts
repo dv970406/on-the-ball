@@ -37,6 +37,21 @@ let initialRowScrolled = false;
 
 const dealIdOf = (el: HTMLElement) => Number(el.dataset.dealId);
 const isShown = (el: Element) => el.getClientRects().length > 0;
+/** 스크롤 영역 위쪽에 붙은 sticky 바(모바일 앱바)의 높이 — 그 아래부터가 보이는 자리다 */
+const stickyBarHeight = (main: HTMLElement) => main.querySelector<HTMLElement>(":scope > header")?.offsetHeight ?? 0;
+
+/**
+ * 행을 스크롤 영역(`main`) 안에 들인다 — 이미 보이면 그대로, 위로 벗어났으면 위에, 아래로 벗어났으면 아래에 붙인다.
+ * ⚠ `scrollIntoView`가 아니라 스크롤 영역의 `scrollTo`다 — `scrollIntoView`는 조상 전부를 스크롤해 `overflow-hidden`인
+ *   앱 프레임까지 밀 수 있다(`nextjs.md` 2분할 절).
+ */
+function scrollRowIntoArea(main: HTMLElement, row: HTMLElement) {
+  const view = main.getBoundingClientRect();
+  const top = view.top + stickyBarHeight(main);
+  const rect = row.getBoundingClientRect();
+  if (rect.top < top) main.scrollTo({ top: main.scrollTop + rect.top - top });
+  else if (rect.bottom > view.bottom) main.scrollTo({ top: main.scrollTop + rect.bottom - view.bottom });
+}
 
 /**
  * 키 한 번이 고를 링크. 목록 순서(DOM 순서)로 판정한다.
@@ -82,7 +97,7 @@ function pickNext(all: HTMLAnchorElement[], selectedId: number | null, step: 1 |
  *   ⚠ 판정은 `e.code`(`KeyJ`·`KeyK` — 자판의 자리)다. `e.key`는 한글 입력 상태에서 "ㅓ"·"ㅏ"라 듣지 못한다.
  *   ⚠ 듣지 않는 때: 입력칸·편집 영역에 포커스가 있다 · 수정 키 · 조합 중(`isComposing`) · 다른 처리기가 이미 막았다
  *     (`defaultPrevented`) · **모달이 열려 있다**(`aria-modal` — 시트·로그인 안내 뒤의 선택이 바뀌면 안 된다).
- *   ⚠ 옮긴 뒤 그 행의 링크로 **포커스를 옮긴다**(`preventScroll` — 스크롤은 `nearest`로 따로 한다). 포커스가 옛 행에 남으면
+ *   ⚠ 옮긴 뒤 그 행의 링크로 **포커스를 옮긴다**(`preventScroll` — 스크롤은 스크롤 영역에서 따로 한다). 포커스가 옛 행에 남으면
  *     Enter가 옛 행을 다시 고른다.
  */
 export function useDealSelect({ enabled, selectedId, listRef, requestedId, onSelect }: UseDealSelectArgs) {
@@ -123,7 +138,8 @@ export function useDealSelect({ enabled, selectedId, listRef, requestedId, onSel
       const next = pickNext([...list.querySelectorAll<HTMLAnchorElement>(DEAL_LINK)], selectedId, step, viewport);
       if (!next) return;
       e.preventDefault();
-      next.scrollIntoView({ block: "nearest" });
+      const main = list.closest("main");
+      if (main) scrollRowIntoArea(main, next);
       next.focus({ preventScroll: true });
       const id = dealIdOf(next);
       if (id !== selectedId) onSelect(id);
@@ -165,7 +181,7 @@ export function useDealSelect({ enabled, selectedId, listRef, requestedId, onSel
         if (moved || main.scrollTop > 0) return;
         const row = [...list.querySelectorAll<HTMLAnchorElement>(`a[data-deal-id="${requestedId}"]`)].find(isShown);
         if (!row) return;
-        const bar = main.querySelector<HTMLElement>(":scope > header")?.offsetHeight ?? 0;
+        const bar = stickyBarHeight(main);
         const view = main.getBoundingClientRect();
         const rect = row.getBoundingClientRect();
         if (rect.top >= view.top + bar && rect.bottom <= view.bottom) return;

@@ -6,16 +6,6 @@ const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
- * 모달·시트용 포커스 트랩 + Escape 닫힘 + 트리거로 포커스 복귀.
- *
- * ⚠ native `<dialog showModal>`을 쓰지 않는 이유: top-layer로 올라가 루트 layout의
- *   앱 프레임 **바깥**에 그려진다(768px 미만은 430px 열이라 그 밖까지 덮는다). 이 앱의 시트·다이얼로그는
- *   프레임 안쪽에 absolute로 얹히는 물건이라 형태가 달라진다.
- *
- * ⚠ Escape는 keydown에서 잡는다(keyup이면 다른 핸들러가 먼저 먹는다).
- *   스크림 클릭과 Escape 모두 **취소**로 처리해야 한다 — 파괴적 액션이 기본값이 되면 안 된다.
- */
-/**
  * 마지막 `pointerdown`의 대상과 시각 — **포커스를 주지 않는 클릭**의 복귀점이다.
  *
  * ⚠ 사파리(macOS)는 마우스 클릭으로 `<button>`에 포커스를 주지 않는다. 그래서 버튼을 눌러 연 오버레이가
@@ -51,6 +41,16 @@ function openerElement(): HTMLElement | null {
   return lastPointer.target.closest<HTMLElement>(FOCUSABLE);
 }
 
+/**
+ * 모달·시트용 포커스 트랩 + Escape 닫힘 + 트리거로 포커스 복귀.
+ *
+ * ⚠ native `<dialog showModal>`을 쓰지 않는 이유: top-layer로 올라가 루트 layout의
+ *   앱 프레임 **바깥**에 그려진다(768px 미만은 430px 열이라 그 밖까지 덮는다). 이 앱의 시트·다이얼로그는
+ *   프레임 안쪽에 absolute로 얹히는 물건이라 형태가 달라진다.
+ *
+ * ⚠ Escape는 keydown에서 잡는다(keyup이면 다른 핸들러가 먼저 먹는다).
+ *   스크림 클릭과 Escape 모두 **취소**로 처리해야 한다 — 파괴적 액션이 기본값이 되면 안 된다.
+ */
 export function useFocusTrap(
   containerRef: RefObject<HTMLElement | null>,
   active: boolean,

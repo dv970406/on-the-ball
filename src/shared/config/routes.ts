@@ -104,7 +104,7 @@ const AUTH_RETURN_PARAMS = ["code", "error", "error_code", "error_description", 
  * ⚠ 걷을 것이 없으면 입력을 **그대로** 돌려준다 — 다시 조립하면 한글 쿼리(`?league=라리가`)의 표기가 바뀐다.
  * ⚠ 조각(`#access_token=…`)은 implicit 흐름의 복귀 값이라 그런 조각이면 통째로 버린다(이 앱은 PKCE라 오지 않는다).
  */
-export function withoutAuthReturnParams(path: string): string {
+function withoutAuthReturnParams(path: string): string {
   const hashAt = path.indexOf("#");
   const beforeHash = hashAt === -1 ? path : path.slice(0, hashAt);
   let hash = hashAt === -1 ? "" : path.slice(hashAt);
