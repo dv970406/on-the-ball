@@ -157,9 +157,41 @@ button:not(:disabled) {
    커스텀 유틸리티
    ========================================================= */
 
-/* 숫자 고정폭 정렬 (mono 숫자·통계와 함께 사용) */
-@utility tnum {
-  font-feature-settings: "tnum";
+/*
+ * ⚠ 이 절의 유틸리티는 **여러 레이어가 같은 뜻으로 되풀이하던 조합**에만 이름을 붙인 것이다(styling.md
+ *   "커스텀 유틸리티" 절). `cn()`(tailwind-merge)은 이 이름들을 모른다 — 같은 속성의 표준 유틸을 함께 얹어
+ *   덮어쓰지 않는다(어느 쪽이 이길지 클래스 순서로 정해지지 않는다). 값이 다른 자리는 이 유틸을 쓰지 않는다.
+ */
+
+/* 칸 라벨 — 카드·표 안의 작은 대문자 mono 라벨(FROM/TO·이적료 성격·통계 칸·"마감까지") */
+@utility label-mono {
+  @apply font-mono text-[10px] uppercase tracking-[0.5px] text-ink-mute-2;
+}
+
+/* 섹션 제목 — 프로필 섹션·딜 상세 곁 칸·보드 판의 h2/h3. 제목 단계는 놓인 자리가 정하고 모양은 이것 하나다 */
+@utility section-title {
+  @apply text-[15px] font-semibold tracking-[-0.3px] text-ink;
+}
+
+/*
+ * 누르는 영역을 최소 44×44px로 넓힌다 — 보이는 크기는 그대로 두고 `::after`가 요소 가운데에서 넓어진다.
+ *
+ * ⚠ 이미 44px 이상인 축은 넓히지 않는다(`min(0px, …)`) — 높이 32px 버튼은 위아래로 6px씩, 폭 36px 글자 링크는
+ *   좌우로 4px씩 넓어진다. 자리마다 `after:-inset-y-*`를 (44 − 높이) ÷ 2로 손으로 셈하던 것을 대신한다 — 손셈은
+ *   글자 크기가 바뀌면 조용히 44px에 못 미친다(실제로 12px 글자 링크 둘이 42px이었다).
+ * ⚠ inset의 %는 **포함 블록**(= 이 요소, `position: relative`) 기준이라 top·bottom은 높이, left·right는 폭을 본다.
+ * ⚠ `position: relative`를 이 유틸이 준다 — 다른 position 유틸(`absolute` 등)과 함께 쓰지 않는다. 그런 요소는
+ *   안쪽에 감싸는 요소를 두고 거기에 건다. 같은 요소에 Tailwind `after:*`를 얹지 않는다(`::after`가 하나뿐이다).
+ * ⚠ 나란히 놓인 링크끼리는 넓어진 영역이 겹치지 않을 만큼 간격을 둔다 — 겹치면 뒤의 링크가 이긴다.
+ */
+@utility hit-area {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    inset-block: min(0px, (100% - 44px) / 2);
+    inset-inline: min(0px, (100% - 44px) / 2);
+  }
 }
 
 /*

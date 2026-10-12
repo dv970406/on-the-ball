@@ -53,9 +53,9 @@ const SORT_OPTIONS: { key: CommentSort; label: string }[] = [
 
 const PLACEHOLDER = "이 이적, 어떻게 보세요?";
 
-/** 표·답글·삭제 줄의 텍스트 버튼 — 32px, 히트 영역은 위아래로 넓혀 44px, 가로는 최소 폭 44px */
+/** 표·답글·삭제 줄의 텍스트 버튼 — 32px, 누르는 영역은 `hit-area`가 위아래로 넓혀 44px, 가로는 최소 폭 44px */
 const ACTION_BUTTON =
-  "relative inline-flex h-8 min-w-11 items-center justify-center whitespace-nowrap rounded-sm px-2 text-[12px] text-ink-mute after:absolute after:inset-x-0 after:-inset-y-1.5 after:content-[''] disabled:opacity-40";
+  "hit-area inline-flex h-8 min-w-11 items-center justify-center whitespace-nowrap rounded-sm px-2 text-[12px] text-ink-mute disabled:opacity-40";
 
 /**
  * 상세의 댓글 탭 — 입력칸 · 정렬 · 목록(답글 1단계) · 빈 상태.
@@ -140,8 +140,8 @@ export function CommentSection({
             aria-pressed={sort === option.key}
             onClick={() => setSort(option.key)}
             className={cn(
-              // 글자는 12px이지만 히트 영역은 투명 의사요소로 44px 이상(세로 18+28, 가로 글자+16)
-              "relative text-[12px] text-ink-mute-2 transition-colors duration-150 ease-otb after:absolute after:-inset-x-2 after:-inset-y-3.5 after:content-['']",
+              // 글자는 12px이지만 누르는 영역은 `hit-area`가 44px 이상으로 넓힌다
+              "hit-area text-[12px] text-ink-mute-2 transition-colors duration-150 ease-otb",
               sort === option.key && "font-medium text-ink",
             )}
           >

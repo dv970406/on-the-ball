@@ -44,9 +44,6 @@ interface PredictionCardProps {
   className?: string;
 }
 
-/** 칸 라벨 — 이적료 카드와 같은 mono 10 uppercase */
-const labelClassName = "font-mono text-[10px] uppercase tracking-[0.5px] text-ink-mute-2";
-
 /**
  * 성사 예측 카드 — "이번 창 안에 오피셜이 뜰까?" 성사·불발 두 버튼과 팬 예측 비율.
  *
@@ -119,10 +116,10 @@ export function PredictionCard({
   return (
     <section aria-labelledby={headingId} className={cn("rounded-lg border border-hairline p-3.5", className)}>
       <div className="flex items-center gap-2">
-        <span className={labelClassName}>성사 예측 · {round.label}</span>
+        <span className="label-mono">성사 예측 · {round.label}</span>
         <Link
           href={ROUTES.ranking}
-          className="relative ml-auto flex items-center text-[12px] text-ink-mute after:absolute after:-inset-x-2 after:-inset-y-3 after:content-['']"
+          className="hit-area ml-auto flex items-center text-[12px] text-ink-mute"
         >
           예측 랭킹
           <Icon as={ChevronRight} size={14} />

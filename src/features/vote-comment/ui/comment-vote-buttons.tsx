@@ -40,7 +40,7 @@ function VoteButton({
       onClick={onClick}
       aria-pressed={pressed}
       className={cn(
-        "relative inline-flex h-8 min-w-11 items-center justify-center gap-1 whitespace-nowrap rounded-sm px-2 text-[12px] text-ink-mute transition-colors duration-150 ease-otb after:absolute after:inset-x-0 after:-inset-y-1.5 after:content-['']",
+        "hit-area inline-flex h-8 min-w-11 items-center justify-center gap-1 whitespace-nowrap rounded-sm px-2 text-[12px] text-ink-mute transition-colors duration-150 ease-otb",
         pressed && activeClassName,
       )}
     >

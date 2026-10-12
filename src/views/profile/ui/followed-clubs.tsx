@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { TransferCrest, useFollowedClubsQuery } from "@/entities/transfer";
 import { useToggleClubFollow } from "@/features/follow-club";
 import { Button, EmptyState, Icon, Skeleton, StaleBanner, buttonClassName } from "@/shared/ui";
+import { ProfileSection } from "./profile-section";
 
 interface FollowedClubsProps {
   userId: string | undefined;
@@ -41,14 +42,10 @@ export function FollowedClubs({ userId, onOpenPicker }: FollowedClubsProps) {
   const justRemoved = (timeStamp: number) => timeStamp - lastRemovedAt.current < REMOVE_GUARD_MS;
 
   return (
-    <section aria-labelledby="clubs-heading" className="px-5 pt-7">
-      <h2 id="clubs-heading" className="text-[15px] font-semibold tracking-[-0.3px] text-ink">
-        응원 구단
-      </h2>
-      <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-mute">
-        고른 구단은 이적시장의 구단 필터 맨 앞에 놓이고, 알림을 켜면 새 딜 소식을 받아요.
-      </p>
-
+    <ProfileSection
+      title="응원 구단"
+      description="고른 구단은 이적시장의 구단 필터 맨 앞에 놓이고, 알림을 켜면 새 딜 소식을 받아요."
+    >
       {follows.isPending && <Skeleton className="mt-4 h-12 w-full" />}
 
       {/* 보여줄 데이터가 없을 때만 전체 대체한다(data-and-state.md) */}
@@ -117,6 +114,6 @@ export function FollowedClubs({ userId, onOpenPicker }: FollowedClubsProps) {
           구단 고르기
         </button>
       )}
-    </section>
+    </ProfileSection>
   );
 }

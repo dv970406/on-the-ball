@@ -56,9 +56,6 @@ const LATEST_REPORTS = 3;
  */
 const DWELL_MS = 150;
 
-/** 구역 제목 — 판 안의 h3(판 제목이 h2다) */
-const sectionTitle = "text-[15px] font-semibold tracking-[-0.3px] text-ink";
-
 /**
  * 딜 패널 — 넓은 화면의 이적 보드에서 고른 딜을 오른쪽에 펼치는 판. 부모 높이를 채우고 본문은 스스로 스크롤하며,
  * 아래에 "전체 화면" 링크와 관심 토글을 고정한다.
@@ -129,7 +126,7 @@ export function DealPanel({ deal, userId, nowMs, active, onSignInRequired }: Dea
 
         <ReportFlowChart
           className="mt-7"
-          title={<h3 className={sectionTitle}>보도 흐름</h3>}
+          title={<h3 className="section-title">보도 흐름</h3>}
           reports={reports.data}
           error={reports.error}
           onRetry={() => reports.refetch()}
@@ -138,7 +135,7 @@ export function DealPanel({ deal, userId, nowMs, active, onSignInRequired }: Dea
 
         <section className="mt-7">
           <div className="flex items-baseline justify-between">
-            <h3 className={sectionTitle}>관심 구단</h3>
+            <h3 className="section-title">관심 구단</h3>
             <span className="text-[11px] text-ink-mute-2">유력한 순</span>
           </div>
           <SuitorList deal={deal} className="mt-1.5" />
@@ -160,11 +157,11 @@ export function DealPanel({ deal, userId, nowMs, active, onSignInRequired }: Dea
 
         <section className="mt-7">
           <div className="flex items-baseline justify-between">
-            <h3 className={sectionTitle}>최신 보도</h3>
+            <h3 className="section-title">최신 보도</h3>
             <Link
               href={ROUTES.transfer(deal.id)}
               prefetch={false}
-              className="relative text-[12px] font-medium text-ink-mute after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] hover:text-ink"
+              className="hit-area text-[12px] font-medium text-ink-mute hover:text-ink"
             >
               전체 보기<span className="sr-only"> — 보도 {formatCount(deal.reportCount)}건</span>
             </Link>

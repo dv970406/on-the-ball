@@ -6,6 +6,7 @@ import { ROUTES } from "@/shared/config";
 import { formatCount } from "@/shared/lib";
 import { EmptyState, Icon, Skeleton, StaleBanner, buttonClassName } from "@/shared/ui";
 import { useMyScoreQuery } from "@/entities/prediction";
+import { ProfileSection } from "./profile-section";
 
 interface PredictionSummaryProps {
   userId: string | undefined;
@@ -20,14 +21,10 @@ export function PredictionSummary({ userId }: PredictionSummaryProps) {
   const score = useMyScoreQuery(userId);
 
   return (
-    <section aria-labelledby="prediction-heading" className="px-5 pt-7">
-      <h2 id="prediction-heading" className="text-[15px] font-semibold tracking-[-0.3px] text-ink">
-        내 예측
-      </h2>
-      <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-mute">
-        딜 상세에서 이번 창 안의 성사 여부를 예측하면, 결과가 나온 뒤 채점돼 랭킹에 올라요.
-      </p>
-
+    <ProfileSection
+      title="내 예측"
+      description="딜 상세에서 이번 창 안의 성사 여부를 예측하면, 결과가 나온 뒤 채점돼 랭킹에 올라요."
+    >
       {score.isPending && <Skeleton className="mt-4 h-[62px] w-full" />}
 
       {/* 보여줄 데이터가 없을 때만 전체 대체한다(data-and-state.md) */}
@@ -56,7 +53,7 @@ export function PredictionSummary({ userId }: PredictionSummaryProps) {
             { label: "적중", value: `${formatCount(score.data.hits)}/${formatCount(score.data.scored)}` },
           ].map(({ label, value }, i) => (
             <div key={label} className={i > 0 ? "border-l border-hairline-cool px-3 py-2.5" : "px-3 py-2.5"}>
-              <dt className="font-mono text-[10px] uppercase tracking-[0.5px] text-ink-mute-2">{label}</dt>
+              <dt className="label-mono">{label}</dt>
               <dd className="mt-1 font-mono text-[15px] tabular-nums text-ink">{value}</dd>
             </div>
           ))}
@@ -70,6 +67,6 @@ export function PredictionSummary({ userId }: PredictionSummaryProps) {
         <Icon as={Trophy} size={16} />
         예측 랭킹 보기
       </Link>
-    </section>
+    </ProfileSection>
   );
 }

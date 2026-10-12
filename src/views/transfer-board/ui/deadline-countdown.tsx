@@ -32,7 +32,7 @@ export function DeadlineCountdown({ closesAt, serverNowMs }: DeadlineCountdownPr
 
   return (
     <div className="flex-none text-right">
-      <span className="font-mono text-[10px] uppercase tracking-[0.5px] text-ink-mute-2">마감까지</span>
+      <span className="label-mono">마감까지</span>
       <time
         dateTime={closesAt}
         className="mt-1 block whitespace-nowrap font-mono text-[15px] leading-none tabular-nums text-ink"

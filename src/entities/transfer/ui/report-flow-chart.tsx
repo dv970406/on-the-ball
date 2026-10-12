@@ -58,7 +58,9 @@ export function ReportFlowChart({ title, reports, error, onRetry, nowMs, classNa
         <div className="min-w-0 flex-1">{title}</div>
         {reports !== undefined && reports.length > 0 && (
           // 기간 — 제자리에서 다시 그리는 선택 토글이라 `aria-pressed`(보도 정렬과 같은 형태)
-          <div className="flex shrink-0 overflow-hidden rounded-sm border border-hairline">
+          // ⚠ `overflow-hidden`으로 모서리를 깎지 않는다 — 버튼의 넓힌 누르는 영역(`hit-area`)까지 잘려 28px로 줄어든다.
+          //   선택된 칸의 잉크 면은 양 끝 버튼이 안쪽 반경(6px − 테두리 1px)으로 직접 둥근다.
+          <div className="flex shrink-0 rounded-sm border border-hairline">
             {RANGES.map((key) => (
               <button
                 key={key}
@@ -66,8 +68,9 @@ export function ReportFlowChart({ title, reports, error, onRetry, nowMs, classNa
                 aria-pressed={range === key}
                 onClick={() => setPicked(key)}
                 className={cn(
-                  // 글자는 12px이지만 히트 영역은 투명 의사요소로 세로 44px
-                  "relative h-7 px-2.5 text-[12px] text-ink-mute transition-colors duration-150 ease-otb after:absolute after:inset-x-0 after:-inset-y-2 after:content-['']",
+                  // 글자는 12px이지만 누르는 영역은 `hit-area`가 위아래로 넓혀 44px — 칸이 붙어 있어 옆으로 넓히면 이웃 칸을
+                  // 덮으므로 폭은 최소 44px(`min-w-11`)로 잡아 옆으로는 넓히지 않게 한다
+                  "hit-area h-7 min-w-11 px-2.5 text-[12px] text-ink-mute transition-colors duration-150 ease-otb first:rounded-l-[5px] last:rounded-r-[5px]",
                   range === key && "bg-ink font-medium text-white",
                 )}
               >

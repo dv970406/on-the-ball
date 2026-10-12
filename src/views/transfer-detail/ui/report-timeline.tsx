@@ -67,7 +67,7 @@ export function ReportTimeline({ reports, error, onRetry, nowMs }: ReportTimelin
 
       {sorted !== undefined && sorted.length > 1 && (
         // 정렬 — 댓글 탭과 같은 형태(제자리에서 다시 늘어놓는 선택 토글이라 `aria-pressed`)
-        // gap 16 — 두 버튼의 히트 영역(좌우 8px씩)이 겹치지 않는 간격
+        // gap 16 — 두 버튼의 넓힌 누르는 영역(`hit-area`)이 겹치지 않는 간격
         <div className="flex gap-4 pb-1 pt-4">
           {SORT_OPTIONS.map((option) => (
             <button
@@ -76,8 +76,8 @@ export function ReportTimeline({ reports, error, onRetry, nowMs }: ReportTimelin
               aria-pressed={sort === option.key}
               onClick={() => setSort(option.key)}
               className={cn(
-                // 글자는 12px이지만 히트 영역은 투명 의사요소로 44px 이상(세로 18+28, 가로 글자+16)
-                "relative text-[12px] text-ink-mute-2 transition-colors duration-150 ease-otb after:absolute after:-inset-x-2 after:-inset-y-3.5 after:content-['']",
+                // 글자는 12px이지만 누르는 영역은 `hit-area`가 44px 이상으로 넓힌다
+                "hit-area text-[12px] text-ink-mute-2 transition-colors duration-150 ease-otb",
                 sort === option.key && "font-medium text-ink",
               )}
             >

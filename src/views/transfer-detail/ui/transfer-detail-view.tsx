@@ -66,8 +66,6 @@ interface TransferDetailViewProps {
 
 /** 넓은 화면의 카드 — 1px 헤어라인 + 16px 라운드. 좁은 화면에서는 아무것도 입히지 않는다(카드가 아니라 흐름이다) */
 const wideCard = "lg:rounded-xl lg:border lg:border-hairline lg:bg-canvas lg:p-6";
-/** 넓은 화면의 곁 칸 카드 제목 */
-const asideTitle = "text-[15px] font-semibold tracking-[-0.3px] text-ink";
 
 /**
  * 이적 상세 — 선수 · 경로 · 이적료 · `댓글 | 보도 타임라인` + 관심 토글.
@@ -440,14 +438,14 @@ export function TransferDetailView({
                     )}
                   </section>
                   <section aria-labelledby="detail-terms-heading" className={wideCard}>
-                    <h2 id="detail-terms-heading" className={asideTitle}>
+                    <h2 id="detail-terms-heading" className="section-title">
                       계약 조건
                     </h2>
                     <ContractTerms deal={deal} className="mt-1.5" />
                   </section>
                   <section aria-labelledby="detail-suitors-heading" className={wideCard}>
                     <div className="flex items-baseline justify-between">
-                      <h2 id="detail-suitors-heading" className={asideTitle}>
+                      <h2 id="detail-suitors-heading" className="section-title">
                         관심 구단
                       </h2>
                       <span className="text-[11px] text-ink-mute-2">유력한 순</span>

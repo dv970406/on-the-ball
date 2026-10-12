@@ -25,7 +25,7 @@ function RouteCell({
   const listed = clubs && clubs.length > 1 ? clubs : null;
   return (
     <div className={cn("min-w-0 p-[12px_14px]", className)}>
-      <span className="font-mono text-[10px] uppercase tracking-[0.5px] text-ink-mute-2">
+      <span className="label-mono">
         {label}
       </span>
       {listed ? (

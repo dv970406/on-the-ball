@@ -6,9 +6,6 @@ import { cn } from "@/shared/lib/cn";
 /** 값이 없는 칸 — 전부 같은 글자(`—`)로 말한다 */
 const EMPTY = "—";
 
-/** KV 칸의 라벨 — mono 10 uppercase ink-mute-2 */
-const labelClassName = "font-mono text-[10px] uppercase tracking-[0.5px] text-ink-mute-2";
-
 interface FeeCardProps {
   deal: TransferDeal;
   className?: string;
@@ -54,7 +51,7 @@ export function FeeCard({ deal, className }: FeeCardProps) {
     >
       <div className="p-3.5">
         {/* 제목이 금액의 성격을 말한다(제안액·요구액…) — 금액이 없으면(FA·미공개) 성격도 없다 */}
-        <span className={labelClassName}>{feeKindLabel(hasFee ? deal.feeKind : null)}</span>
+        <span className="label-mono">{feeKindLabel(hasFee ? deal.feeKind : null)}</span>
         <FeeValue
           deal={deal}
           caption={false}
@@ -83,14 +80,14 @@ export function FeeCard({ deal, className }: FeeCardProps) {
         {hasFee && (
           <>
             <div className={cell(0)}>
-              <dt className={labelClassName}>직전 보도 대비</dt>
+              <dt className="label-mono">직전 보도 대비</dt>
               {/* 색(상승 primary-deep · 하락 crimson)은 `FeeDelta`가 갖고 방향은 아이콘이 함께 진다 */}
               <dd className="mt-1">
                 <FeeDelta deal={deal} className="text-[14px]" />
               </dd>
             </div>
             <div className={cell(1)}>
-              <dt className={labelClassName}>보도 범위</dt>
+              <dt className="label-mono">보도 범위</dt>
               <dd className="mt-1 font-mono text-[14px] tabular-nums text-ink">
                 {formatFeeRange(deal) ?? EMPTY}
               </dd>
@@ -98,13 +95,13 @@ export function FeeCard({ deal, className }: FeeCardProps) {
           </>
         )}
         <div className={cell(offset)}>
-          <dt className={labelClassName}>계약</dt>
+          <dt className="label-mono">계약</dt>
           <dd className="mt-1 font-mono text-[14px] tabular-nums text-ink">
             {deal.contractText ?? EMPTY}
           </dd>
         </div>
         <div className={cell(offset + 1)}>
-          <dt className={labelClassName}>주급</dt>
+          <dt className="label-mono">주급</dt>
           <dd className="mt-1 font-mono text-[14px] tabular-nums text-ink">
             {deal.wageText ?? EMPTY}
           </dd>

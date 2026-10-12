@@ -17,6 +17,7 @@ import { ClubPickerSheet } from "./club-picker-sheet";
 import { FollowedClubs } from "./followed-clubs";
 import { LinkedAccounts } from "./linked-accounts";
 import { PredictionSummary } from "./prediction-summary";
+import { ProfileSection } from "./profile-section";
 import { PushSettings } from "./push-settings";
 
 interface ProfileViewProps {
@@ -250,15 +251,14 @@ export function ProfileView({
             프로필로 가는 진입점은 늘 따로 있으므로(1024px 미만은 하단 탭바, 그 이상은 데스크톱 상단 바), 계정 관련 동작은 이 화면이
             단독으로 갖는다(헤더에는 비로그인 로그인 링크만 남는다).
           */}
-          <section aria-labelledby="account-heading" className="px-5 pt-7">
-            <h2 id="account-heading" className="text-[15px] font-semibold tracking-[-0.3px] text-ink">
-              계정
-            </h2>
-            {user?.email && (
-              <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-mute">
-                로그인 계정 · {user.email}
-              </p>
-            )}
+          <ProfileSection
+            title="계정"
+            description={user?.email && `로그인 계정 · ${user.email}`}
+            // 훅이 한국어로 바꿔 던진 에러를 노출한다(변환은 훅, 노출은 컴포넌트).
+            // 토스트는 1.8초 뒤 사라지므로 지속 표시를 함께 남긴다 — 로그아웃은 성공하면
+            // 화면이 통째로 바뀌는 동작이라, 실패를 놓치면 "됐는지 안 됐는지" 알 수 없다.
+            error={signOut.error?.message}
+          >
             <Button
               variant="secondary"
               block
@@ -269,17 +269,7 @@ export function ProfileView({
             >
               {signOut.isPending ? "로그아웃 중…" : "로그아웃"}
             </Button>
-            {/*
-              훅이 한국어로 바꿔 던진 에러를 노출한다(변환은 훅, 노출은 컴포넌트).
-              토스트는 1.8초 뒤 사라지므로 지속 표시를 함께 남긴다 — 로그아웃은 성공하면
-              화면이 통째로 바뀌는 동작이라, 실패를 놓치면 "됐는지 안 됐는지" 알 수 없다.
-            */}
-            {signOut.error && (
-              <p className="mt-3 text-[13px] leading-[1.5] text-crimson">
-                {signOut.error.message}
-              </p>
-            )}
-          </section>
+          </ProfileSection>
         </div>
       </main>
       {tabBar}

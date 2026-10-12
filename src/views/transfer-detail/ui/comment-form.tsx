@@ -25,10 +25,10 @@ export const COMMENT_FIELD_BOX =
 /**
  * `등록` 버튼 — 34px · radius 6. ⚠ **잉크다(에메랄드가 아니다).** 이 화면의 CTA는 하단 관심 토글이라
  * 에메랄드를 하나 더 칠하지 않는다(styling.md "한 화면의 에메랄드는 하나"). 빈 값이면 꺼진다.
- * 히트 영역은 최소 폭 44 + 위아래로만 넓힌 투명 의사요소로 44px를 채운다(옆 `취소`를 덮지 않게).
+ * 누르는 영역은 최소 폭 44 + `hit-area`가 위아래로만 넓혀 44px를 채운다(폭이 이미 44 이상이라 옆 `취소`를 덮지 않는다).
  */
 export const COMMENT_SUBMIT =
-  "relative h-[34px] min-w-11 shrink-0 whitespace-nowrap rounded-sm bg-ink px-3 text-[13px] font-medium text-white transition-colors duration-150 ease-otb after:absolute after:inset-x-0 after:-inset-y-[5px] after:content-[''] disabled:bg-canvas-soft disabled:text-ink-faint";
+  "hit-area h-[34px] min-w-11 shrink-0 whitespace-nowrap rounded-sm bg-ink px-3 text-[13px] font-medium text-white transition-colors duration-150 ease-otb disabled:bg-canvas-soft disabled:text-ink-faint";
 
 /**
  * 댓글·답글 입력칸 — 조립(검증·가드·롤백)은 `useCommentComposer`가 하고 여기는 펼치기만 한다.
@@ -68,8 +68,8 @@ export function CommentForm({
           <button
             type="button"
             onClick={onCancel}
-            // 폭 최소 44 + 위아래 히트 영역 확장 — 옆 `등록`의 히트 영역은 위아래로만 넓혀 서로 덮지 않는다
-            className="relative h-[34px] min-w-11 shrink-0 whitespace-nowrap px-2 text-[13px] text-ink-mute after:absolute after:inset-x-0 after:-inset-y-[5px] after:content-['']"
+            // 폭 최소 44 + `hit-area`가 위아래로만 넓힌다 — 둘 다 폭이 44 이상이라 옆 `등록`과 서로 덮지 않는다
+            className="hit-area h-[34px] min-w-11 shrink-0 whitespace-nowrap px-2 text-[13px] text-ink-mute"
           >
             취소
           </button>

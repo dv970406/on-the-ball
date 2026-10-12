@@ -33,14 +33,16 @@ interface SortLinksProps {
  */
 export function SortLinks({ league, sort, club, watch }: SortLinksProps) {
   return (
-    <nav aria-label="정렬" className="flex items-center gap-3">
+    // gap 20 — 넓힌 누르는 영역(`hit-area` — 두 글자 "최신"은 좌우로 12px 가까이)이 서로 겹치지 않는 간격.
+    //   16이면 "이적료"의 영역과 2px 겹쳐 "최신"의 오른쪽 끝을 누르면 이적료순이 된다(실측)
+    <nav aria-label="정렬" className="flex items-center gap-5">
       {SORTS.map((item) => (
         <BoardLink
           key={item}
           href={boardHref(league, item, club, watch)}
           aria-current={sort === item ? "page" : undefined}
           className={cn(
-            "py-1.5 text-[12px] transition-colors duration-150 ease-otb",
+            "hit-area py-1.5 text-[12px] transition-colors duration-150 ease-otb",
             sort === item ? "font-medium text-ink" : "text-ink-mute-2",
           )}
         >

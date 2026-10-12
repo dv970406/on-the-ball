@@ -44,6 +44,8 @@ export function SubHeader({ title, fallbackHref = ROUTES.transferList }: SubHead
         <Icon as={ChevronLeft} size={22} />
       </button>
 
+      {/* 지금은 `section-title`과 같은 모양이지만 쓰지 않는다 — 섹션 제목이 아니라 크롬(도구 줄)의 화면 이름이라
+          섹션 제목의 모양을 바꿀 때 함께 바뀌면 안 된다 */}
       <div className="text-[15px] font-semibold tracking-[-0.3px] text-ink">{title}</div>
 
       <div className="ml-auto flex items-center">

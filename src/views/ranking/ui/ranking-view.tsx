@@ -70,7 +70,7 @@ export function RankingView({ initialRanking, initialUserId, serverNowMs }: Rank
           {/* 내 순위 — 로그인 사용자에게만. 목록 밖이면 따로 받은 점수를 쓴다 */}
           {userId && (
             <section aria-labelledby="my-rank-heading" className="mt-4 rounded-lg border border-hairline p-3.5">
-              <h2 id="my-rank-heading" className="font-mono text-[10px] uppercase tracking-[0.5px] text-ink-mute-2">
+              <h2 id="my-rank-heading" className="label-mono">
                 내 순위
               </h2>
               {mine ? (
@@ -128,7 +128,7 @@ export function RankingView({ initialRanking, initialUserId, serverNowMs }: Rank
               */}
               <div
                 aria-hidden
-                className="mt-6 hidden items-center gap-3 border-b border-hairline pb-2 font-mono text-[10px] uppercase tracking-[0.5px] text-ink-mute-2 md:flex"
+                className="mt-6 hidden items-center gap-3 border-b border-hairline pb-2 label-mono md:flex"
               >
                 <span className="w-7 shrink-0 text-center">순위</span>
                 <span className="flex-1 pl-11">팬</span>

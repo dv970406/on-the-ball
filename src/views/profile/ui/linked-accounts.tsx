@@ -5,6 +5,7 @@ import { OAUTH_PROVIDERS, OAUTH_PROVIDER_LABEL } from "@/shared/config";
 import { Button, EmptyState, Skeleton, StaleBanner } from "@/shared/ui";
 import { useLinkedIdentitiesQuery } from "@/entities/session";
 import { useLinkIdentity, useUnlinkIdentity } from "@/features/link-identity";
+import { ProfileSection } from "./profile-section";
 
 /**
  * 연결된 로그인 수단 — 카카오·구글을 한 계정에 붙인다.
@@ -36,14 +37,11 @@ export function LinkedAccounts({ userId }: { userId: string | undefined }) {
   const actionError = unlink.error?.message ?? link.error?.message ?? null;
 
   return (
-    <section aria-labelledby="linked-heading" className="px-5 pt-7">
-      <h2 id="linked-heading" className="text-[15px] font-semibold tracking-[-0.3px] text-ink">
-        로그인 수단
-      </h2>
-      <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-mute">
-        연결해 두면 어느 쪽으로 로그인해도 같은 계정으로 들어옵니다.
-      </p>
-
+    <ProfileSection
+      title="로그인 수단"
+      description="연결해 두면 어느 쪽으로 로그인해도 같은 계정으로 들어옵니다."
+      error={actionError}
+    >
       {identities.isPending && (
         <div className="mt-4 flex flex-col gap-2">
           <Skeleton className="h-12 w-full" />
@@ -62,7 +60,9 @@ export function LinkedAccounts({ userId }: { userId: string | undefined }) {
 
       {/* 캐시된 목록은 그대로 두고 최신화 실패만 알린다 */}
       {identities.error && identities.data && (
-        <StaleBanner noun="연결 정보" onRetry={() => identities.refetch()} />
+        <div className="mt-4">
+          <StaleBanner noun="연결 정보" onRetry={() => identities.refetch()} />
+        </div>
       )}
 
       {identities.data && (
@@ -102,12 +102,6 @@ export function LinkedAccounts({ userId }: { userId: string | undefined }) {
           로그인 수단이 하나뿐이라 해제할 수 없어요. 다른 수단을 먼저 연결해 주세요.
         </p>
       )}
-
-      {actionError && (
-        <p className="mt-3 text-[13px] leading-[1.5] text-crimson">
-          {actionError}
-        </p>
-      )}
-    </section>
+    </ProfileSection>
   );
 }

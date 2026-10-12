@@ -5,6 +5,7 @@ import { usePushStatusQuery, type PushStatus } from "@/entities/push";
 import { usePushToggle } from "@/features/push-notification";
 import { env } from "@/shared/config";
 import { Button, EmptyState, Skeleton, StaleBanner } from "@/shared/ui";
+import { ProfileSection } from "./profile-section";
 
 /**
  * 켤 수 없는 상태의 안내 — 이유마다 **무엇을 하면 되는지**까지 말한다.
@@ -47,14 +48,14 @@ export function PushSettings({ userId }: { userId: string | undefined }) {
   const blocked = status.data ? BLOCKED_MESSAGE[status.data] : null;
 
   return (
-    <section aria-labelledby="push-heading" className="px-5 pt-7">
-      <h2 id="push-heading" className="text-[15px] font-semibold tracking-[-0.3px] text-ink">
-        알림
-      </h2>
-      <p className="mt-1.5 text-[13px] leading-[1.6] text-ink-mute">
-        관심 목록에 담은 딜의 상태가 바뀌거나 응원 구단에 새 딜이 생기면 이 기기로 알려드려요.
-      </p>
-
+    <ProfileSection
+      title="알림"
+      description="관심 목록에 담은 딜의 상태가 바뀌거나 응원 구단에 새 딜이 생기면 이 기기로 알려드려요."
+      // 훅이 한국어로 바꿔 던진 에러 — 토스트는 곧 사라지므로 지속 표시를 함께 남긴다.
+      // ⚠ 켤 수 없는 이유의 안내가 떠 있으면 내지 않는다 — 권한을 거절하면 상태가 `denied`로 바뀌어 그 안내가 같은 말을
+      //   더 자세히 한다(같은 실패를 두 번 적지 않는다).
+      error={blocked === null ? toggle.error?.message : null}
+    >
       {status.isPending && <Skeleton className="mt-4 h-12 w-full" />}
 
       {/* 보여줄 데이터가 없을 때만 전체 대체한다(data-and-state.md) */}
@@ -110,14 +111,6 @@ export function PushSettings({ userId }: { userId: string | undefined }) {
         </div>
       )}
 
-      {/*
-        훅이 한국어로 바꿔 던진 에러 — 토스트는 곧 사라지므로 지속 표시를 함께 남긴다.
-        ⚠ 켤 수 없는 이유의 안내가 떠 있으면 내지 않는다 — 권한을 거절하면 상태가 `denied`로 바뀌어 위 안내가 같은 말을
-          더 자세히 한다(같은 실패를 두 번 적지 않는다).
-      */}
-      {toggle.error && blocked === null && (
-        <p className="mt-3 text-[13px] leading-[1.5] text-crimson">{toggle.error.message}</p>
-      )}
-    </section>
+    </ProfileSection>
   );
 }

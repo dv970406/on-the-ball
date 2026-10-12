@@ -27,7 +27,7 @@ export function FeeHighlight({ deal, valueClassName, className }: FeeHighlightPr
   const hasFee = deal.feeAmount !== null;
   return (
     <section aria-label="이적료" className={className}>
-      <span className="font-mono text-[10px] uppercase tracking-[0.5px] text-ink-mute-2">
+      <span className="label-mono">
         {feeKindLabel(hasFee ? deal.feeKind : null)}
       </span>
       <FeeValue
