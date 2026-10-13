@@ -127,7 +127,8 @@ export function usePredictDeal(dealId: number) {
       if (last && needsResync.delete(dealId)) {
         queryClient.invalidateQueries({ queryKey: scope });
         // 실패의 흔한 사유가 "결과가 나왔다"(P0001)다 — 화면이 연 사이 딜이 오피셜이 됐으면 카드를 닫으려면 딜 단계도 다시 받아야 한다
-        queryClient.invalidateQueries({ queryKey: transferKeys.details() });
+        //   이 딜의 상세만이다(사용자 스코프 무관 — `detail(id, userId)`의 앞부분). 다른 딜의 상세까지 다시 받지 않는다
+        queryClient.invalidateQueries({ queryKey: transferKeys.detailAll(dealId) });
         return;
       }
       queryClient.invalidateQueries({ queryKey: scope, refetchType: "none" });

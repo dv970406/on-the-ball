@@ -22,8 +22,10 @@ export const transferKeys = {
   list: (userId: string | undefined, scopeStartIso: string) =>
     [...transferKeys.lists(), userScope(userId), scopeStartIso] as const,
   details: () => [...transferKeys.all, "detail"] as const,
+  /** 한 딜의 상세 — 사용자 스코프와 무관하게(무효화 prefix) */
+  detailAll: (id: number) => [...transferKeys.details(), id] as const,
   detail: (id: number, userId: string | undefined) =>
-    [...transferKeys.details(), id, userScope(userId)] as const,
+    [...transferKeys.detailAll(id), userScope(userId)] as const,
   /** 상세의 보도 타임라인 — 딜 단건과 키를 나눈다(관심 토글이 상세만 무효화한다) */
   reports: (id: number) => [...transferKeys.all, "reports", id] as const,
   /** 5대 리그 구단 목록 — 응원 구단을 고르는 화면 */
