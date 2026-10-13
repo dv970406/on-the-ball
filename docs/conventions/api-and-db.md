@@ -186,6 +186,9 @@ enum이면 양쪽에 라벨 → 부호 변환이 한 벌씩 생긴다. 라벨이
   - ⚠ 주기를 줄일 때는 **비공개 저장소의 무료 한도(월 2,000분)** 를 함께 본다 — 1회 1~2분이라
     매시(월 720회)까지가 여유 있게 들어가고 30분이면 넘는다. 공개 저장소는 무제한이다.
   - ⚠ 공개 저장소의 예약 실행은 **60일간 활동이 없으면 GitHub이 끈다** — 수집이 멈췄다면 Actions 탭부터 본다.
+  - 설치는 `pnpm install --frozen-lockfile --no-optional --ignore-scripts`다(pnpm 저장소는 `setup-node`가 캐시한다) — 스크립트는
+    JS 패키지만 쓰고, optionalDependencies는 앱 빌드용 네이티브 바이너리(SWC·sharp 등)다. ⚠ 스크립트가 네이티브 패키지(`sharp` 등)를
+    import하게 되면 `--no-optional`을 뺀다 — 로컬은 멀쩡하고 Actions에서만 import가 실패한다.
 - ⚠ **원문 전문(`body`)은 공개 키로 읽을 수 없다 — 재배포 범위는 컬럼 권한이 정한다.**
   읽기가 공개라 화면만 조심해서는 막을 수 없다(anon 키로 REST를 부르면 전문이 나간다).
   anon·authenticated에는 `body`를 뺀 컬럼만 grant하고, 앞부분은 생성 컬럼 `body_excerpt`(280자)로

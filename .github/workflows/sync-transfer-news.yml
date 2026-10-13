@@ -46,7 +46,12 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      # 수집 스크립트가 쓰는 패키지는 JS뿐이다(supabase-js · anthropic SDK · cheerio · fast-xml-parser · web-push).
+      # --no-optional: 플랫폼별 네이티브 바이너리(Next의 SWC · sharp · lightningcss · tailwind oxide — 전부 optionalDependencies)를
+      #   받지 않는다 — node_modules가 약 30% 준다(로컬 실측 540MB → 378MB). 스크립트가 그 패키지를 import하게 되면 이 플래그를 뺀다.
+      # --ignore-scripts: 설치 스크립트를 돌리지 않는다(이 작업은 빌드하지 않는다).
+      # ⚠ 워크스페이스로 쪼개 필요한 것만 설치하지 않는다 — 잠금 파일이 갈려 앱 빌드와 다른 버전을 쓰게 된다.
+      - run: pnpm install --frozen-lockfile --no-optional --ignore-scripts
 
       - name: 수집
         env:
