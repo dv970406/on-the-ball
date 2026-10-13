@@ -3,10 +3,13 @@
 import { useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/entities/session";
+import { useInAppNavigationTracker } from "@/shared/lib";
 import { ToastViewport } from "@/shared/ui";
 
 /** 전역 프로바이더 — TanStack Query + supabase 세션 동기화 */
 export function AppProviders({ children }: { children: ReactNode }) {
+  // 앱 안의 이동을 센다 — 화면의 뒤로가기(`SubHeader`)가 검색 유입 사용자를 사이트 밖으로 내보내지 않게. 늘 마운트된 이 자리에 한 번만
+  useInAppNavigationTracker();
   const [queryClient] = useState(
     () =>
       new QueryClient({

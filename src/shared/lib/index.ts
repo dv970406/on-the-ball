@@ -1,5 +1,7 @@
 export { cn } from "./cn";
 export { useScrollRestore } from "./use-scroll-restore";
+// 앱 안의 이동 기록이 있는가 — 화면의 뒤로가기가 사이트를 빠져나가지 않게 하는 판정(사유는 그 파일 주석)
+export { hasInAppHistory, useInAppNavigationTracker } from "./in-app-history";
 export { formatCount, formatRelativeTime } from "./format";
 export { useNowMs } from "./use-now";
 // 서버 시각 → 기기 시계 기준(쿼리의 initialDataUpdatedAt 등 기기 시계와 빼는 자리) — 사유는 그 파일 주석
