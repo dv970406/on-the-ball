@@ -63,15 +63,19 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(
     (async () => {
       // 이미 열린 창이 있으면 그 창을 앞으로 가져와 그 화면으로 보낸다 — 누를 때마다 창이 늘지 않게
-      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-      for (const client of windows) {
-        if (new URL(client.url).origin !== self.location.origin) continue;
+      // ⚠ **워커가 맡은 창만** 고른다(`includeUncontrolled` 없음). navigate는 맡은 창에서만 되므로, 맡지 않은 창(강제
+      //   새로고침한 탭)을 앞으로 가져오면 보내기가 실패한 채 그 위에 새 창이 또 열린다.
+      // ⚠ 앞으로 가져오기(`focus`)가 보내기보다 **먼저**다 — 창을 앞에 내는 권한은 알림을 누른 직후 짧게만 열려 있다
+      //   (Firefox 약 1초). 동적 화면의 서버 렌더를 기다린 뒤에 부르면 거부되어, 창이 뒤에서만 바뀌고 아무것도 뜨지 않는다.
+      const windows = await self.clients.matchAll({ type: "window" });
+      const client = windows.find((c) => new URL(c.url).origin === self.location.origin);
+      if (client) {
         try {
           await client.focus();
           await client.navigate(target);
           return;
         } catch {
-          // 워커가 아직 그 창을 맡지 않았다(navigate는 맡은 창에서만 된다) — 새 창으로 연다
+          // 그 사이 창이 닫혔거나 워커의 관할을 벗어났다 — 새 창으로 연다
         }
       }
       await self.clients.openWindow(target);
