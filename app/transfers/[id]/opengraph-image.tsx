@@ -79,6 +79,19 @@ async function dataUri(path: string, mime: string): Promise<string | null> {
   }
 }
 
+/**
+ * 브랜드 마크(`app/icon.svg`)의 data URI — 폰트처럼 한 번 만든 것을 들고 있는다(요청마다 읽고 base64로 바꾸지 않는다).
+ * 읽지 못했으면(`null`) 들고 있지 않는다 — 다음 요청이 다시 읽는다.
+ */
+let markData: Promise<string | null> | null = null;
+function loadMark(): Promise<string | null> {
+  markData ??= dataUri(join(ROOT, "app/icon.svg"), "image/svg+xml").then((uri) => {
+    if (uri === null) markData = null;
+    return uri;
+  });
+  return markData;
+}
+
 /** 구단 엠블럼 — `code`는 DB CHECK(`^[a-z0-9-]{1,60}$`)가 슬러그로 강제해 경로를 벗어날 수 없다 */
 function crestUri(club: TransferClub): Promise<string | null> {
   return dataUri(join(ROOT, "public/crests", `${club.code}.png`), "image/png");
@@ -151,6 +164,13 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const dealId = parsePostId(id);
   if (dealId === null) return new Response("Not Found", { status: 404 });
 
+  // 폰트(약 1.6MB)·마크 읽기를 딜 조회와 나란히 시작한다 — 첫 요청(메모가 빈 인스턴스)에서 조회 왕복 뒤로 밀리지 않게.
+  // ⚠ 아래에서 일찍 돌아가면(없는 딜·조회 실패) 이 promise를 기다리는 쪽이 없다 → 실패를 여기서 받아 둔다
+  //   (처리되지 않은 rejection이 되지 않게). 기다리는 쪽은 같은 promise라 실패를 그대로 받는다.
+  const fontPromise = loadFont();
+  fontPromise.catch(() => {});
+  const markPromise = loadMark();
+
   const card = await fetchDeal(dealId);
   if (card.state === "missing") return new Response("Not Found", { status: 404 });
   if (card.state === "unknown") return fallbackImage();
@@ -165,8 +185,8 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const name = playerName(deal);
 
   const [font, mark, fromCrest, ...toCrests] = await Promise.all([
-    loadFont(),
-    dataUri(join(ROOT, "app/icon.svg"), "image/svg+xml"),
+    fontPromise,
+    markPromise,
     deal.fromClub ? crestUri(deal.fromClub) : null,
     ...destinations.map(crestUri),
   ]);
