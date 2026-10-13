@@ -84,23 +84,24 @@ const fetchTransferBoard = cache(async (): Promise<TransferBoard> => {
     const supabase = signedIn ? await createSupabaseServerClient() : createSupabaseAnonClient();
     if (!supabase) return { userId: undefined, nowMs, scopeStartIso };
 
-    // ⚠ 두 요청은 서로의 결과를 쓰지 않는다 → **병렬로** 보낸다. `getUser()`는 세션이 있을 때만 —
-    //   익명 경로에 GoTrue 왕복을 붙일 이유가 없다.
+    // ⚠ 두 요청은 서로의 결과를 쓰지 않는다 → **병렬로** 보낸다. 사용자 확인은 세션이 있을 때만이고 `getUser()`가 아니라
+    //   `getClaims()`다 — 서명 키로 토큰을 로컬 검증해 GoTrue 왕복이 붙지 않는다(사유는 `proxy.ts` 주석). 여기서 얻는 것은
+    //   쿼리 스코프(`userId`)뿐이고, 서버가 세션을 부정한 경우의 정리는 클라이언트의 1회 서버 확인이 갖는다(`data-and-state.md`).
     // ⚠ 목록 조립은 `buildDealListQuery`가 소유한다 — 서버가 정렬·상한·select를 다시 짜면
     //   하이드레이션 직후 목록이 재배열된다.
     // ⚠ 응원 구단은 **세션이 있을 때만** 읽는다 — 익명에는 그 표의 SELECT grant가 없고(42501), 익명 경로의
     //   조회는 Data Cache를 타므로 사용자별 값을 실으면 안 된다. 칩 순서를 서버가 그려야 하이드레이션 뒤에 칩이
     //   자리를 바꾸지 않는다(`nextjs.md` "사용자별 상태도 끝까지 서버가 그린다").
     const [auth, dealsResult, followsResult] = await Promise.all([
-      signedIn ? supabase.auth.getUser() : null,
+      signedIn ? supabase.auth.getClaims() : null,
       buildDealListQuery(supabase, scopeStartIso),
       signedIn ? buildFollowedClubsQuery(supabase) : null,
     ]);
-    const userId = auth?.data.user?.id;
+    const userId = auth?.data?.claims.sub;
     // 곁다리 조회다 — 실패해도 본문(딜 목록)은 그대로 내보낸다. 세션 쿠키가 헛짚인 경우(로그인이 아닌데 쿠키만
     // 남았다)도 여기로 와서 `undefined`가 된다.
-    // ⚠ `userId`가 없으면 내리지 않는다 — 사용자 확인(`getUser`)은 실패했는데 조회는 통과하는 구간이 있고(서버가 세션을
-    //   부정하는데 토큰은 아직 유효하다), 그 값을 내리면 클라이언트가 비로그인 키에 그 사람의 응원 구단을 앉힌다.
+    // ⚠ `userId`가 없으면 내리지 않는다 — 사용자 확인(`getClaims`)은 실패했는데 조회는 통과하는 구간이 있고, 그 값을
+    //   내리면 클라이언트가 비로그인 키에 그 사람의 응원 구단을 앉힌다.
     const followedClubs =
       userId && followsResult && !followsResult.error
         ? buildFollowedClubs(followsResult.data ?? [])

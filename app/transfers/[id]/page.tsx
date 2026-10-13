@@ -86,7 +86,8 @@ const fetchDealHead = cache(async (dealId: number): Promise<DealHead> => {
       { data: tallyRows, error: tallyError },
       { data: myPredictionRows, error: myPredictionsError },
     ] = await Promise.all([
-      supabase.auth.getUser(),
+      // `getClaims()` — 서명 키로 토큰을 로컬 검증한다(GoTrue 왕복 없음 — `proxy.ts` 주석)
+      supabase.auth.getClaims(),
       buildDealQuery(supabase, dealId),
       buildReportsQuery(supabase, dealId),
       // ⚠ 조립·자르기·뒤집기는 클라이언트 훅과 같은 함수다 — 갈리면 하이드레이션 직후 목록이 흔들린다
@@ -115,7 +116,7 @@ const fetchDealHead = cache(async (dealId: number): Promise<DealHead> => {
       reports,
       comments,
       prediction,
-      userId: auth.user?.id,
+      userId: auth?.claims.sub,
       nowMs,
     };
   } catch (e) {

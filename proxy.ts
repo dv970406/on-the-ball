@@ -20,7 +20,7 @@ import { env, isSupabaseConfigured } from "@/shared/config";
  *   걸려 세션이 무효화된다. 화면은 멀쩡히 그려지므로 **재현도 로그도 없이** 터진다.
  *
  * ⚠ **라우트 가드는 여기 없다.** 인증 판정은 `AuthRequired`/`GuestOnly`(화면)와 **RLS**(실차단)가
- *   갖는다. proxy에 낙관적 가드를 함께 두면 서버는 `getUser()`로 GoTrue에 검증하고 클라이언트는
+ *   갖는다. proxy에 낙관적 가드를 함께 두면 서버는 GoTrue에 검증하고 클라이언트는
  *   쿠키의 `expires_at`만 로컬 검사해 **판정이 갈리고, 그 불일치가 무한 리다이렉트가 된다**
  *   (`data-and-state.md`). 판정자를 하나로 두어 그 부채를 없앴다 — 되돌리지 말 것.
  *   여기에 리다이렉트를 다시 넣는다면 갱신된 쿠키를 그 응답에 **손으로 옮겨 실어야** 한다
@@ -49,11 +49,17 @@ export async function proxy(request: NextRequest) {
 
   /**
    * 이 호출이 곧 이 파일의 일이다 — 만료됐으면 리프레시하고, 그 결과가 위 `setAll`을 통해
-   * 응답 쿠키에 실린다. 반환값(user)은 쓰지 않는다.
-   * ⚠ 비로그인 요청은 네트워크를 타지 않는다 — auth-js가 쿠키에 access_token이 없으면
-   *   `AuthSessionMissingError`로 바로 빠져나간다(2.110 `_getUser`). 크롤러 비용이 0인 이유다.
+   * 응답 쿠키에 실린다. 반환값(claims)은 쓰지 않는다.
+   * ⚠ `getUser()`가 아니라 `getClaims()`다 — 둘 다 먼저 `getSession()`으로 세션을 읽어 만료가 가까우면 리프레시하지만
+   *   (auth-js 2.110), `getUser()`는 그 뒤 **매 요청 GoTrue에 왕복**하고 `getClaims()`는 서명 키(JWKS — 모듈 전역 캐시
+   *   10분)로 토큰을 **로컬 검증**한다. 원격 프로젝트는 비대칭 키(ES256)라 로그인 사용자의 화면 이동마다 붙던 왕복이
+   *   빠진다. 대칭 키(HS256 — 로컬 스택)로 서명된 토큰이면 auth-js가 스스로 `getUser()`로 떨어진다.
+   * ⚠ 서버가 세션을 부정했는지(다른 기기의 로그아웃 등)는 여기서 보지 않는다 — 이 파일은 판정자가 아니다. 그 정리는
+   *   클라이언트의 1회 서버 확인(`use-server-session-check`)이 갖는다(`data-and-state.md`).
+   * ⚠ 비로그인 요청은 네트워크를 타지 않는다 — 쿠키에 세션이 없으면 `getSession()`이 비어 바로 빠져나간다.
+   *   크롤러 비용이 0인 이유다.
    */
-  await supabase.auth.getUser();
+  await supabase.auth.getClaims();
 
   return response;
 }
@@ -68,16 +74,16 @@ export const config = {
   //   **일반 화면까지 세션 갱신이 조용히 멈추기** 때문이다.
   // ⚠ 반대로 `_next/image`에는 경계를 두지 말 것. Next의 이미지 최적화 엔드포인트는
   //   뒤에 슬래시가 없는 `/_next/image?url=...` 형태라, `_next/image/`로 적으면 제외가
-  //   무효가 되어 **이미지 요청마다 proxy + getUser() 왕복**이 붙는다(Next 공식 예제도
+  //   무효가 되어 **이미지 요청마다 proxy + 세션 확인**이 붙는다(Next 공식 예제도
   //   경계 없이 `_next/image`로 적는다).
   // ⚠ **프리페치 요청은 제외한다.** `<Link>`가 뷰포트에 들어오면 프리페치 요청이 나가는데,
   //   이 앱의 동적 라우트는 `loading.tsx`가 없어 **페이지 세그먼트가 없는 빈 라우터 트리**만
   //   돌려준다(실측: 75~252B, 서버 조회는 돌지 않는다). 그런데 proxy는 그대로 타서
-  //   **로그인 사용자에게 링크당 GoTrue 왕복이 하나씩** 붙었다 — 목록 화면에는 딜 행
+  //   **로그인 사용자에게 링크당 세션 확인이 하나씩**(만료가 가까우면 refresh 왕복까지) 붙는다 — 목록 화면에는 딜 행
   //   링크가 수십 개다. 프리페치에서 세션을 갱신하지 못해도 실제 이동이 곧바로 갱신한다.
   // ⚠ **서비스 워커와 매니페스트도 제외한다**(`sw.js`·`manifest.webmanifest`). 브라우저는 워커가 깔린 사이트를
   //   열 때마다 워커 스크립트가 바뀌었는지 다시 받아 보는데, 그 요청이 proxy를 타면 **로그인 사용자의 화면 이동마다
-  //   GoTrue 왕복이 하나씩** 붙는다. 둘 다 사용자와 무관한 정적 응답이다.
+  //   세션 확인이 하나씩** 붙는다(만료가 가까우면 refresh 왕복까지). 둘 다 사용자와 무관한 정적 응답이다.
   // ⚠ 헤더 이름은 Next 내부 상수다(`next/dist/client/components/app-router-headers.js`의
   //   `NEXT_ROUTER_PREFETCH_HEADER = 'next-router-prefetch'`). 버전이 올라 이름이 바뀌면
   //   제외가 조용히 무효가 되는데, 그때의 대가는 예전 동작(왕복이 도로 붙는다)이라 안전한 방향이다.
