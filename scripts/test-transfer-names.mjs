@@ -3,8 +3,8 @@
  *
  *   node scripts/test-transfer-names.mjs
  */
-import { CLUB_RECHECK_MS, RECHECK_MS, cacheLlmNames, canonicalClubName, createNameBook, formatNewNameLog, lookupAndCache, missingNames, pickConsensusKo, renameInSummary, shortClubName, shortKoClubName, syncDictionaryNames } from "./lib/transfer/names-ko.mjs";
-import { koLabel, lookupKo, normalizeName, pickCurrentClub, pickEntity, toHits } from "./lib/transfer/wikidata.mjs";
+import { CLUB_RECHECK_MS, RECHECK_MS, cacheLlmNames, canonicalClubName, createNameBook, formatNewNameLog, lookupAndCache, lookupCurrentClubs, missingNames, overlayNameRows, pickConsensusKo, renameInSummary, shortClubName, shortKoClubName, syncDictionaryNames } from "./lib/transfer/names-ko.mjs";
+import { currentClubsOf, koLabel, lookupKo, lookupKoMany, normalizeName, pickCurrentClub, pickEntity, toHits } from "./lib/transfer/wikidata.mjs";
 
 let pass = 0;
 let fail = 0;
@@ -88,6 +88,79 @@ check("선수 — 동명이인의 유명도가 비슷하면 비운다", eq(pickE
   check("선수 — 40세를 넘은 동명이인은 받지 않는다(은퇴 선수)", eq(pickEntity([hit("Q1", "Alessandro Romano")], AR, "player", "Alessandro Romano", 2026), { wikidataId: null, nameKo: null }));
   check("선수 — 같은 이름이라도 나이가 맞는 쪽을 고른다", eq(pickEntity([hit("Q1", "Alessandro Romano"), hit("Q2", "Alessandro Romano")], AR, "player", "Alessandro Romano", 2026), { wikidataId: "Q2", nameKo: "젊은 로마노" }));
   check("선수 — 출생일이 없으면 나이로 거르지 않는다", pickEntity([hit("Q3", "Alessandro Romano")], AR, "player", "Alessandro Romano", 2026).wikidataId === "Q3");
+}
+{
+  // 묶음 조회 — 이름마다 검색 한 번, 후보 항목은 모든 이름의 것을 모아 한 번에 받는다
+  const calls = [];
+  const SEARCH = {
+    "Federico Chiesa": [{ id: "Q3", label: "Federico Chiesa" }],
+    Watford: [{ id: "Q1", label: "Watford" }, { id: "Q2", label: "Watford F.C." }],
+    "Broken Name": "fail",
+    "Nobody Here": [],
+  };
+  const fakeFetch = (failEntities = false) => async (url) => {
+    const q = new URL(url).searchParams;
+    calls.push(q.get("action"));
+    if (q.get("action") === "wbsearchentities") {
+      const r = SEARCH[q.get("search")];
+      if (r === "fail") return { ok: false, status: 503 };
+      return { ok: true, json: async () => ({ search: r }) };
+    }
+    if (failEntities) return { ok: false, status: 500 };
+    const ids = q.get("ids").split("|");
+    return { ok: true, json: async () => ({ entities: Object.fromEntries(ids.filter((id) => ENT[id]).map((id) => [id, ENT[id]])) }) };
+  };
+  const items = [{ name: "Federico Chiesa", kind: "player" }, { name: "Watford", kind: "club" }, { name: "Broken Name", kind: "player" }, { name: "Nobody Here", kind: "player" }, { name: "Joao", kind: "player" }];
+  const { results } = await lookupKoMany(items, fakeFetch());
+  check(
+    "묶음 조회 — 검색은 이름마다(한 토큰 선수는 빼고), 항목은 한 번에 받아 이름마다 따로 판정한다",
+    eq(calls.filter((c) => c === "wbsearchentities").length, 4) && eq(calls.filter((c) => c === "wbgetentities").length, 1) &&
+      eq(results.map((r) => (r.ok ? r.value : "실패")), [{ wikidataId: "Q3", nameKo: "페데리코 키에사" }, { wikidataId: "Q2", nameKo: "왓퍼드 FC" }, "실패", { wikidataId: null, nameKo: null }, { wikidataId: null, nameKo: null }]),
+    JSON.stringify([calls, results]),
+  );
+  calls.length = 0;
+  const failed = await lookupKoMany(items.slice(0, 2), fakeFetch(true));
+  check("묶음 조회 — 항목 묶음이 실패하면 그 묶음에 후보가 든 이름만 실패다(캐시하지 않고 다음 실행이 찾는다)", failed.results.every((r) => !r.ok), JSON.stringify(failed.results));
+  {
+    // 잠깐의 끊김 — 첫 묶음 요청만 실패하면 한 번 다시 받아 메운다(무관한 이름까지 실패로 남지 않게)
+    let entityCalls = 0;
+    const flaky = async (url) => {
+      const q = new URL(url).searchParams;
+      if (q.get("action") === "wbgetentities" && ++entityCalls === 1) return { ok: false, status: 503 };
+      return fakeFetch()(url);
+    };
+    const r = await lookupKoMany(items.slice(0, 2), flaky);
+    check("묶음 조회 — 묶음 요청이 한 번 실패해도 다시 받아 이름들이 실패로 남지 않는다", entityCalls === 2 && r.results.every((x) => x.ok), JSON.stringify(r.results));
+  }
+  {
+    // 다시 받기는 호출당 한 번 — 장애 중이면 묶음마다 두 번씩 기다리지 않는다
+    let entityCalls = 0;
+    const down = async (url) => {
+      const q = new URL(url).searchParams;
+      if (q.get("action") === "wbgetentities") { entityCalls += 1; return { ok: false, status: 503 }; }
+      return fakeFetch()(url);
+    };
+    await lookupKoMany(items.slice(0, 2), down);
+    check("묶음 조회 — 장애 중의 다시 받기는 호출당 한 번뿐이다", entityCalls === 2, String(entityCalls));
+  }
+
+  // 현 소속 — 선수 항목과 소속팀 항목을 각각 한 번에. 이미 받은 선수 항목은 다시 받지 않는다
+  const p54 = (id) => ({ mainsnak: { datavalue: { value: { id } } }, qualifiers: {} });
+  const PLAYERS = { Q10: { claims: { P54: [p54("Q2")] } }, Q11: { claims: { P54: [p54("Q2"), p54("Q1")] } } };
+  const TEAMS = { Q1: ENT.Q1, Q2: { ...ENT.Q2, labels: { ...ENT.Q2.labels, en: { value: "Watford F.C." } } } };
+  const asked = [];
+  const clubFetch = async (url) => {
+    const q = new URL(url).searchParams;
+    asked.push(q.get("ids"));
+    const src = q.get("props") === "claims" ? PLAYERS : TEAMS;
+    return { ok: true, json: async () => ({ entities: Object.fromEntries(q.get("ids").split("|").filter((id) => src[id]).map((id) => [id, src[id]])) }) };
+  };
+  const clubs = await currentClubsOf(["Q10", "Q11", "Q12"], clubFetch, { known: { Q12: { claims: {} } } });
+  check(
+    "현 소속 묶음 — 선수 한 번 · 소속팀 한 번, 이미 받은 선수(Q12)는 다시 받지 않는다",
+    eq(asked, ["Q10|Q11", "Q2|Q1"]) && clubs.get("Q10").club?.wikidataId === "Q2" && clubs.get("Q11").club?.wikidataId === "Q2" && clubs.get("Q12").ok && clubs.get("Q12").club === null,
+    JSON.stringify([asked, [...clubs]]),
+  );
 }
 check("normalizeName — 악센트·대소문자·기호를 접는다", normalizeName("João  Pedro-") === normalizeName("joao pedro"));
 check("koLabel — 한글이 있어야 한다", koLabel(ENT.Q3) === "페데리코 키에사" && koLabel(ENT.Q4) === null);
@@ -218,7 +291,45 @@ check("사전 — 조회 대상: 없는 행·재확인 주기가 지난 행(찾�
 
   const db3 = fake([{ id: 9, summary_ko: "리버풀이 가크포를 판다." }]);
   const sync = await syncDictionaryNames(db3, book, { "cody gakpo": { ko: "코디 각포" }, "erling haaland": { ko: "엘링 홀란드" } });
-  check("사전 맞춤 — 사람 사전과 다른 캐시 표기를 사전 표기로 고치고 요약도 바꾼다(캐시에 없는 선수는 대상이 아니다)", sync.synced === 1 && sync.summariesFixed === 1 && eq(db3.log.updates, [{ table: "transfer_name_ko", key: "cody gakpo", name_ko: "코디 각포" }, { table: "transfer_news", id: 9, summary_ko: "리버풀이 각포를 판다." }]), JSON.stringify([sync, db3.log.updates]));
+  check("사전 맞춤 — 사람 사전과 다른 캐시 표기를 사전 표기로 고치고 요약도 바꾼다(요약이 먼저, 캐시에 없는 선수는 대상이 아니다)", sync.synced === 1 && sync.summariesFixed === 1 && eq(db3.log.updates, [{ table: "transfer_news", id: 9, summary_ko: "리버풀이 각포를 판다." }, { table: "transfer_name_ko", key: "cody gakpo", name_ko: "코디 각포" }]) && eq(sync.written, [{ key: "cody gakpo", name_ko: "코디 각포" }]) && sync.warnings.length === 0, JSON.stringify([sync, db3.log.updates]));
+
+  // 요약을 못 고치면 캐시를 두고 경고한다 — 캐시를 먼저 고치면 그 선수는 다시 대상이 되지 않아 옛 표기의 요약이 영구히 남는다
+  const db5 = fake([{ id: 11, summary_ko: "리버풀이 가크포를 판다." }]);
+  db5.from = ((orig) => (t) => {
+    const q = orig(t);
+    return t === "transfer_news" ? { ...q, update: () => ({ eq: async () => ({ error: { message: "쓰기 거부" } }) }) } : q;
+  })(db5.from);
+  const sync2 = await syncDictionaryNames(db5, book, { "cody gakpo": { ko: "코디 각포" } });
+  check("사전 맞춤 — 요약 고치기가 실패하면 캐시를 그대로 두고(다음 실행이 다시 맞춘다) 경고를 남긴다", sync2.synced === 0 && db5.log.updates.length === 0 && sync2.warnings.some((w) => w.includes("쓰기 거부")) && sync2.warnings.some((w) => w.includes("보류")), JSON.stringify([sync2, db5.log.updates]));
+
+  // 조회 결과를 덧입힌다 — 표를 다시 읽지 않는다
+  const merged = overlayNameRows([{ kind: "player", key: "a b", name_ko: "에이 비", wikidata_id: "Q1", source: "wikidata", checked_at: fresh }], [{ kind: "player", key: "a b", name_ko: "에이비" }, { kind: "club", key: "X", name_ko: null, wikidata_id: null, checked_at: fresh }]);
+  check("덧입히기 — 같은 키는 준 컬럼만 덮고 새 키는 더한다", eq(merged, [{ kind: "player", key: "a b", name_ko: "에이비", wikidata_id: "Q1", source: "wikidata", checked_at: fresh }, { kind: "club", key: "X", name_ko: null, wikidata_id: null, checked_at: fresh }]), JSON.stringify(merged));
+}
+
+{
+  // 현 소속 캐시 — 이름으로 먼저 찾은 선수의 항목은 다시 받지 않고, 같은 사전 밖 구단은 한 행만 쓴다(한 upsert에 같은 키가 둘이면 거부된다)
+  const claim = (id) => ({ mainsnak: { datavalue: { value: { id } } } });
+  const E = {
+    Q20: { labels: { ko: { value: "아무개 선수" } }, claims: { P106: [claim("Q937857")], P54: [{ mainsnak: { datavalue: { value: { id: "Q30" } } }, qualifiers: {} }] } },
+    Q21: { claims: { P54: [{ mainsnak: { datavalue: { value: { id: "Q30" } } }, qualifiers: {} }] } },
+    Q30: { labels: { en: { value: "Kolkheti 1913" }, ko: { value: "콜헤티 1913" } }, claims: { P31: [claim("Q476028")] } },
+  };
+  const seen = [];
+  const f = async (url) => {
+    const q = new URL(url).searchParams;
+    seen.push(`${q.get("action")}:${q.get("ids") ?? q.get("search")}`);
+    if (q.get("action") === "wbsearchentities") return { ok: true, json: async () => ({ search: [{ id: "Q20", label: "Amu Gae" }] }) };
+    return { ok: true, json: async () => ({ entities: Object.fromEntries(q.get("ids").split("|").filter((id) => E[id]).map((id) => [id, E[id]])) }) };
+  };
+  const upserts = [];
+  const db = { from: () => ({ upsert: async (rows) => { upserts.push(...rows); return { error: null }; } }) };
+  const r = await lookupCurrentClubs(db, [{ playerKey: "amu gae", player: "Amu Gae", wikidataId: null }, { playerKey: "dul gae", player: "Dul Gae", wikidataId: "Q21" }], { fetchImpl: f });
+  check(
+    "현 소속 캐시 — 검색 1 · 선수 항목 1(Q21만) · 소속팀 1, 구단 행은 한 번",
+    eq(seen, ["wbsearchentities:Amu Gae", "wbgetentities:Q20", "wbgetentities:Q21", "wbgetentities:Q30"]) && r.found === 2 && upserts.filter((x) => x.kind === "club").length === 1 && eq(r.written, upserts),
+    JSON.stringify([seen, upserts, r]),
+  );
 }
 
 console.log(`\n이름 사전 ${pass}/${pass + fail} 통과`);

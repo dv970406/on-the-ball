@@ -15,30 +15,27 @@
  * ⚠ **찾는 대상은 딜에 오른 이름뿐이다**(`missingNames`). 보도에 스친 모든 이름을 찾지 않는다 — 화면과 요약에
  *   나오는 것은 딜의 선수·구단뿐이다.
  */
-import { readFileSync } from "node:fs";
 import { clubDisplay } from "./club-display.mjs";
 export { shortKoClubName } from "./club-display.mjs";
 import { detectClubs, isKnownClub } from "./clubs.mjs";
-import { currentClubOf, lookupKo } from "./wikidata.mjs";
+import { readJson as readJsonFile } from "./util.mjs";
+import { currentClubsOf, lookupKoMany } from "./wikidata.mjs";
 
 export const NAME_TABLE = "transfer_name_ko";
 /** 찾지 못한 이름을 다시 찾기까지 — 위키데이터에 표기가 새로 생긴다 */
 export const RECHECK_MS = 30 * 86_400_000;
-/** 한 번 실행의 조회 상한 — 백필이 한 시간에 몰리지 않게 한다(이름 하나에 요청 두 번). 남은 이름은 다음 실행이 찾는다 */
+/**
+ * 한 번 실행의 조회 상한 — 백필이 한 시간에 몰리지 않게 한다(이름 하나에 검색 한 번 + 후보 항목은 실행의 이름 전부를 묶어 받는다 —
+ * `lookupKoMany`). 남은 이름은 다음 실행이 찾는다
+ */
 export const LOOKUP_MAX_PER_RUN = 60;
 /** 현 소속(P54) 재확인 주기 — 창이 열리면 소속이 바뀌므로 이름 표기(30일)보다 짧다 */
 export const CLUB_RECHECK_MS = 14 * 86_400_000;
 /** 실행당 현 소속 조회 상한 — 출발 구단이 빈 딜의 선수만 대상이라 많지 않다 */
 export const CLUB_LOOKUP_MAX_PER_RUN = 20;
 
-function readJson(rel) {
-  const url = new URL(rel, import.meta.url);
-  try {
-    return JSON.parse(readFileSync(url, "utf8"));
-  } catch (e) {
-    throw new Error(`${url.pathname}를 읽지 못했습니다 — ${e instanceof Error ? e.message : String(e)}`);
-  }
-}
+/** 사람 JSON — 프로세스 안에서 한 번만 읽는다(`util.mjs`). 한 실행이 사전을 여러 번 다시 만들어도 파일은 다시 읽지 않는다 */
+const readJson = (rel) => readJsonFile(new URL(rel, import.meta.url));
 const withoutComment = (o) => Object.fromEntries(Object.entries(o ?? {}).filter(([k]) => !k.startsWith("_")));
 
 /** 사람이 고친 선수 표기(+ 포지션·생년·국적) — 키는 `normalizePlayer` 결과 */
@@ -139,8 +136,8 @@ export function createNameBook({ players = {}, clubs = {}, cache = [] } = {}) {
   };
 }
 
-/** 사전 전체 — 사람 JSON + DB 캐시 */
-export async function loadNameBook(supabase) {
+/** 이름 캐시(`transfer_name_ko`) 전체 — 키셋 없이 범위로 끝까지 읽는다 */
+export async function loadNameCache(supabase) {
   const cache = [];
   let from = 0;
   for (;;) {
@@ -150,7 +147,31 @@ export async function loadNameBook(supabase) {
     if (data.length < 1000) break;
     from += 1000;
   }
-  return createNameBook({ players: loadPlayerDictionary(), clubs: loadGlossary().clubs, cache });
+  return cache;
+}
+
+/** 캐시 행 → 사전(사람 JSON과 합친다 — JSON은 프로세스 안에서 한 번만 읽는다) */
+export const buildNameBook = (cache) => createNameBook({ players: loadPlayerDictionary(), clubs: loadGlossary().clubs, cache });
+
+/**
+ * 캐시 행에 **이번 실행이 쓴 행**을 덧입힌다(같은 `kind:key`면 준 컬럼만 덮는다) — 쓴 직후 표 전체를 다시 읽지 않기 위해서다.
+ * ⚠ 저장에 성공한 행만 넘긴다(`lookupAndCache`·`lookupCurrentClubs`의 `written`, `syncDictionaryNames`의 `written`). 무엇을 썼는지
+ *   모르는 쓰기(판정의 이름 쓰기)는 덧입히지 말고 다시 읽는다(`loadNameCache`).
+ * @param {object[]} cache
+ * @param {{ kind: string, key: string }[]} rows
+ */
+export function overlayNameRows(cache, rows) {
+  const byKey = new Map(cache.map((r) => [`${r.kind}:${r.key}`, r]));
+  for (const r of rows) {
+    const k = `${r.kind}:${r.key}`;
+    byKey.set(k, { ...(byKey.get(k) ?? {}), ...r });
+  }
+  return [...byKey.values()];
+}
+
+/** 사전 전체 — 사람 JSON + DB 캐시 */
+export async function loadNameBook(supabase) {
+  return buildNameBook(await loadNameCache(supabase));
 }
 
 /** 표기 비교용 — 공백 차이("에마누엘마누"·"에마누엘 마누")는 같은 표기다 */
@@ -195,8 +216,8 @@ export const formatNewNameLog = ({ key, ko, reference }) => `신규 통용 표�
  * 레이블을 덮었으면 이미 쓴 요약 속 옛 표기도 함께 바꾼다(`fixSummaryNames`).
  * 같은 선수에게 표기가 여럿 오면(한 실행의 여러 보도) `pickConsensusKo`로 하나를 고르고, 갈리면 그 선수는 쓰지 않는다(`split`).
  * @param {{ key: string, name: string, ko: string }[]} entries
- * @returns {{ written: number, added: { key: string, ko: string, reference: string | null }[], split: { key: string, candidates: string[] }[] }}
- *   `added`는 새로 쓴 통용 표기(로그는 `formatNewNameLog`).
+ * @returns {{ written: number, added: { key: string, ko: string, reference: string | null }[], split: { key: string, candidates: string[] }[], warnings: string[] }}
+ *   `added`는 새로 쓴 통용 표기(로그는 `formatNewNameLog`). `warnings`는 요약 고치기의 조회·쓰기 실패다.
  */
 export async function cacheLlmNames(supabase, entries, book) {
   const trusted = book.playerKoTrusted ?? book.playerKo;
@@ -223,11 +244,12 @@ export async function cacheLlmNames(supabase, entries, book) {
     rows.push({ kind: "player", key, name_en: list[0].name.slice(0, 120), name_ko: pick.ko, wikidata_id: prev?.wikidata_id ?? null, source: "llm", checked_at: prev?.checked_at ?? NEVER_CHECKED });
     added.push({ key, ko: pick.ko, reference });
   }
-  const result = (written, done) => ({ written, added: done, split });
+  const warnings = [];
+  const result = (written, done) => ({ written, added: done, split, warnings });
   if (!rows.length) return result(0, []);
   const { error } = await supabase.from(NAME_TABLE).upsert(rows, { onConflict: "kind,key" });
   if (error) throw new Error(`통용 표기 저장 실패: ${error.message}`);
-  await fixSummaryNames(supabase, renamed);
+  await fixSummaryNames(supabase, renamed, warnings);
   return result(rows.length, added);
 }
 
@@ -235,17 +257,30 @@ export async function cacheLlmNames(supabase, entries, book) {
  * 사람 사전과 캐시의 선수 표기를 맞춘다 — 사전 표기가 캐시(위키데이터 레이블·옛 통용 표기)와 다르면 **캐시를 사전 표기로 고치고**
  * 이미 쓴 요약 속 옛 표기도 바꾼다. 화면의 딜 이름은 사전이 늘 이기지만, 요약은 쓴 시점의 표기로 남아 딜 제목("코디 각포")과
  * 요약("코디 가크포")이 갈린다. 캐시를 고쳐 두므로 한 번 맞춘 표기는 다시 대상이 되지 않는다.
- * @returns {{ synced: number, summariesFixed: number }}
+ * ⚠ **요약을 먼저 고치고 캐시는 그 뒤에 고친다** — 캐시를 먼저 고치면 요약 고치기가 실패해도 그 선수는 다시 대상이 되지 않아
+ *   옛 표기의 요약이 영구히 남는다. 요약 하나라도 못 고쳤으면 캐시를 두고(다음 실행이 다시 맞춘다) 경고로 남긴다.
+ *   이미 고친 요약은 다시 바꿀 것이 없어 되풀이해도 같다(`renameInSummary`).
+ * @returns {{ synced: number, summariesFixed: number, warnings: string[], written: { key: string, name_ko: string }[] }}
+ *   `written`은 캐시에 고쳐 쓴 표기 — 호출부가 사전을 다시 읽지 않고 덧입힌다
  */
 export async function syncDictionaryNames(supabase, book, players = loadPlayerDictionary()) {
-  const out = { synced: 0, summariesFixed: 0 };
+  const out = { synced: 0, summariesFixed: 0, warnings: [], written: [] };
   for (const [key, info] of Object.entries(players)) {
     const row = book.entry("player", key);
     if (!info?.ko || !row?.name_ko || row.name_ko === info.ko) continue;
+    const fixed = await fixSummaries(supabase, [{ key, from: row.name_ko, to: info.ko }]);
+    out.summariesFixed += fixed.fixed;
+    if (fixed.failures.length) {
+      out.warnings.push(...fixed.failures, `사전 표기 맞춤 보류(${key}): 요약을 다 고치지 못해 캐시를 그대로 둔다 — 다음 실행이 다시 맞춘다`);
+      continue;
+    }
     const { error } = await supabase.from(NAME_TABLE).update({ name_ko: info.ko }).eq("kind", "player").eq("key", key);
-    if (error) continue;
+    if (error) {
+      out.warnings.push(`사전 표기 맞춤 실패(${key}): ${error.message}`);
+      continue;
+    }
     out.synced += 1;
-    out.summariesFixed += await fixSummaryNames(supabase, [{ key, from: row.name_ko, to: info.ko }]);
+    out.written.push({ key, name_ko: info.ko });
   }
   return out;
 }
@@ -281,28 +316,49 @@ export function canonicalClubName(label) {
  * @param {{ playerKey: string, player: string, wikidataId: string | null }[]} needs
  */
 export async function lookupCurrentClubs(supabase, needs, { fetchImpl = fetch, limit = CLUB_LOOKUP_MAX_PER_RUN, book } = {}) {
-  const out = { tried: 0, found: 0, notFound: 0, failed: 0, warnings: [] };
+  const out = { tried: 0, found: 0, notFound: 0, failed: 0, warnings: [], written: [] };
   const rows = [];
   const now = new Date().toISOString();
-  for (const n of needs.slice(0, limit)) {
-    out.tried += 1;
-    try {
-      const qid = n.wikidataId ?? (await lookupKo(n.player, "player", fetchImpl)).wikidataId;
-      const club = qid ? await currentClubOf(qid, fetchImpl) : null;
-      if (club?.nameEn) {
-        const canonical = canonicalClubName(club.nameEn);
-        rows.push({ kind: "player_club", key: n.playerKey, name_en: canonical.slice(0, 120), name_ko: null, wikidata_id: club.wikidataId, source: "wikidata", checked_at: now });
-        if (!isKnownClub(canonical) && !clubDisplay(canonical).league && !book?.entry("club", canonical)?.wikidata_id) {
-          rows.push({ kind: "club", key: canonical, name_en: canonical.slice(0, 120), name_ko: club.nameKo, wikidata_id: club.wikidataId, source: "wikidata", checked_at: now });
-        }
-        out.found += 1;
-      } else {
-        rows.push({ kind: "player_club", key: n.playerKey, name_en: n.player.slice(0, 120), name_ko: null, wikidata_id: null, source: "wikidata", checked_at: now });
-        out.notFound += 1;
+  const batch = needs.slice(0, limit);
+  out.tried = batch.length;
+  const failWith = (n, e) => {
+    out.failed += 1;
+    out.warnings.push(`현 소속 조회 실패(${n.player}): ${e instanceof Error ? e.message : String(e)}`);
+  };
+  // 항목 id가 없는 선수(사람 사전만)는 먼저 이름으로 찾는다 — 찾을 때 받은 선수 항목(claims)은 현 소속 조회가 다시 받지 않는다
+  const unresolved = batch.filter((n) => !n.wikidataId);
+  const found = unresolved.length ? await lookupKoMany(unresolved.map((n) => ({ name: n.player, kind: "player" })), fetchImpl) : { results: [], entities: {} };
+  const qidOf = new Map();
+  const failedNeeds = new Set();
+  unresolved.forEach((n, i) => {
+    const r = found.results[i];
+    if (r.ok) qidOf.set(n, r.value.wikidataId);
+    else {
+      failedNeeds.add(n);
+      failWith(n, r.error);
+    }
+  });
+  for (const n of batch) if (n.wikidataId) qidOf.set(n, n.wikidataId);
+  const clubs = await currentClubsOf([...new Set([...qidOf.values()].filter(Boolean))], fetchImpl, { known: found.entities });
+  for (const n of batch) {
+    if (failedNeeds.has(n)) continue;
+    const qid = qidOf.get(n);
+    const r = qid ? clubs.get(qid) : { ok: true, club: null };
+    if (!r.ok) {
+      failWith(n, r.error);
+      continue;
+    }
+    const club = r.club;
+    if (club?.nameEn) {
+      const canonical = canonicalClubName(club.nameEn);
+      rows.push({ kind: "player_club", key: n.playerKey, name_en: canonical.slice(0, 120), name_ko: null, wikidata_id: club.wikidataId, source: "wikidata", checked_at: now });
+      if (!isKnownClub(canonical) && !clubDisplay(canonical).league && !book?.entry("club", canonical)?.wikidata_id && !rows.some((x) => x.kind === "club" && x.key === canonical)) {
+        rows.push({ kind: "club", key: canonical, name_en: canonical.slice(0, 120), name_ko: club.nameKo, wikidata_id: club.wikidataId, source: "wikidata", checked_at: now });
       }
-    } catch (e) {
-      out.failed += 1;
-      out.warnings.push(`현 소속 조회 실패(${n.player}): ${e instanceof Error ? e.message : String(e)}`);
+      out.found += 1;
+    } else {
+      rows.push({ kind: "player_club", key: n.playerKey, name_en: n.player.slice(0, 120), name_ko: null, wikidata_id: null, source: "wikidata", checked_at: now });
+      out.notFound += 1;
     }
   }
   if (needs.length > limit) out.warnings.push(`현 소속 조회 상한(${limit}) — 남은 ${needs.length - limit}명은 다음 실행이 찾는다`);
@@ -311,7 +367,7 @@ export async function lookupCurrentClubs(supabase, needs, { fetchImpl = fetch, l
     if (error) {
       out.warnings.push(`현 소속 캐시 저장 실패: ${error.message}`);
       out.found = 0;
-    }
+    } else out.written = rows;
   }
   return out;
 }
@@ -325,22 +381,26 @@ export async function lookupCurrentClubs(supabase, needs, { fetchImpl = fetch, l
  */
 export async function lookupAndCache(supabase, names, { fetchImpl = fetch, limit = LOOKUP_MAX_PER_RUN, book } = {}) {
   // verified: 항목을 찾았다(한국어 표기가 없어도) — 검증 게이트가 열리므로 다시 파생할 이유가 된다
-  const out = { tried: 0, found: 0, notFound: 0, verified: 0, failed: 0, summariesFixed: 0, warnings: [] };
+  // written: 실제로 저장한 행 — 호출부가 사전을 다시 읽지 않고 이 행을 덧입힌다(`overlayNameRows`)
+  const out = { tried: 0, found: 0, notFound: 0, verified: 0, failed: 0, summariesFixed: 0, warnings: [], written: [] };
   const rows = [];
-  for (const n of names.slice(0, limit)) {
-    out.tried += 1;
-    try {
-      const r = await lookupKo(n.name, n.kind, fetchImpl);
-      const prev = book?.entry(n.kind, n.key);
-      const keepLlm = prev?.source === "llm" && prev.name_ko;
-      rows.push({ kind: n.kind, key: n.key, name_en: n.name.slice(0, 120), name_ko: keepLlm ? prev.name_ko : r.nameKo, wikidata_id: r.wikidataId, source: keepLlm ? "llm" : "wikidata", checked_at: new Date().toISOString() });
-      out[r.nameKo ? "found" : "notFound"] += 1;
-      if (r.wikidataId) out.verified += 1;
-    } catch (e) {
+  const batch = names.slice(0, limit);
+  out.tried = batch.length;
+  const { results } = await lookupKoMany(batch.map((n) => ({ name: n.name, kind: n.kind })), fetchImpl);
+  batch.forEach((n, i) => {
+    const res = results[i];
+    if (!res.ok) {
       out.failed += 1;
-      out.warnings.push(`이름 조회 실패(${n.kind} ${n.name}): ${e instanceof Error ? e.message : String(e)}`);
+      out.warnings.push(`이름 조회 실패(${n.kind} ${n.name}): ${res.error.message}`);
+      return;
     }
-  }
+    const r = res.value;
+    const prev = book?.entry(n.kind, n.key);
+    const keepLlm = prev?.source === "llm" && prev.name_ko;
+    rows.push({ kind: n.kind, key: n.key, name_en: n.name.slice(0, 120), name_ko: keepLlm ? prev.name_ko : r.nameKo, wikidata_id: r.wikidataId, source: keepLlm ? "llm" : "wikidata", checked_at: new Date().toISOString() });
+    out[r.nameKo ? "found" : "notFound"] += 1;
+    if (r.wikidataId) out.verified += 1;
+  });
   if (names.length > limit) out.warnings.push(`이름 조회 상한(${limit}) — 남은 ${names.length - limit}개는 다음 실행이 찾는다`);
   if (rows.length) {
     const { error } = await supabase.from(NAME_TABLE).upsert(rows, { onConflict: "kind,key" });
@@ -348,7 +408,7 @@ export async function lookupAndCache(supabase, names, { fetchImpl = fetch, limit
       out.warnings.push(`이름 사전 저장 실패: ${error.message}`);
       out.found = 0;
       out.verified = 0;
-    }
+    } else out.written = rows;
   }
   return out;
 }
@@ -402,22 +462,37 @@ export function renameInSummary(text, from, to) {
   return out;
 }
 
-/**
- * 요약 속 옛 표기를 새 표기로 바꾼다 — 선수의 표기가 바뀌면(통용 표기가 레이블을 덮거나, 사람 사전이 고치면) 요약은 쓴 시점의
- * 표기로 남아 딜 제목과 갈린다. 그 선수로 판정된 보도의 요약에서만 바꾼다 — 요약은 추출 컬럼이라 다시 써도 된다.
- * @param {{ key: string, from: string, to: string }[]} renamed
- */
-export async function fixSummaryNames(supabase, renamed) {
+/** 요약 고치기 — 고친 수와 실패(조회·쓰기) 문구 */
+async function fixSummaries(supabase, renamed) {
   let fixed = 0;
+  const failures = [];
   for (const { key, from, to } of renamed) {
     const { data, error } = await supabase.from("transfer_news").select("id, summary_ko").eq("verdict_player", key).not("summary_ko", "is", null);
-    if (error || !data?.length) continue;
-    for (const r of data) {
+    if (error) {
+      failures.push(`요약 표기 조회 실패(${key}): ${error.message}`);
+      continue;
+    }
+    for (const r of data ?? []) {
       const next = renameInSummary(r.summary_ko, from, to);
       if (next === r.summary_ko || [...next].length > 160) continue;
       const { error: e2 } = await supabase.from("transfer_news").update({ summary_ko: next }).eq("id", r.id);
-      if (!e2) fixed += 1;
+      if (e2) failures.push(`요약 표기 고치기 실패(#${r.id} ${key}): ${e2.message}`);
+      else fixed += 1;
     }
   }
+  return { fixed, failures };
+}
+
+/**
+ * 요약 속 옛 표기를 새 표기로 바꾼다 — 선수의 표기가 바뀌면(통용 표기가 레이블을 덮거나, 사람 사전이 고치면) 요약은 쓴 시점의
+ * 표기로 남아 딜 제목과 갈린다. 그 선수로 판정된 보도의 요약에서만 바꾼다 — 요약은 추출 컬럼이라 다시 써도 된다.
+ * ⚠ 조회·쓰기 실패를 삼키지 않는다 — `warnings`를 주면 거기에 담는다(실행 요약의 경고로 나간다).
+ * @param {{ key: string, from: string, to: string }[]} renamed
+ * @param {string[] | null} [warnings]
+ * @returns {Promise<number>} 고친 요약 수
+ */
+export async function fixSummaryNames(supabase, renamed, warnings = null) {
+  const { fixed, failures } = await fixSummaries(supabase, renamed);
+  if (warnings) warnings.push(...failures);
   return fixed;
 }

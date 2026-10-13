@@ -86,15 +86,6 @@ async function existingUrls(supabase, sourceId, urls) {
   return found;
 }
 
-async function countRows(supabase, sourceId) {
-  const { count, error } = await supabase
-    .from(TABLE)
-    .select("id", { count: "exact", head: true })
-    .eq("source_id", sourceId);
-  if (error) throw new Error(`행 수 조회 실패: ${error.message}`);
-  return count ?? 0;
-}
-
 function httpUrlOrNull(v) {
   return typeof v === "string" && /^https?:\/\//.test(v) && v.length <= 2048 ? v : null;
 }
@@ -251,10 +242,11 @@ async function syncSource(supabase, def, opts = {}) {
         result.ms = Date.now() - started;
         return result;
       }
-      const before = await countRows(supabase, def.id);
       // ⚠ 충돌 무시는 그대로 둔다 — 조회와 저장 사이에 다른 실행이 같은 항목을 넣을 수 있다
       const up = await upsertRows(supabase, TABLE, fresh, { onConflict: CONFLICT, ignoreDuplicates: true }, { log });
-      result.inserted = (await countRows(supabase, def.id)) - before;
+      // 새로 저장된 수 = 넣기 전에 없던 키(`fresh`) 중 지금 있는 것. 소스 전체 행 수를 앞뒤로 두 번 세지 않는다(정확한 count는 그 소스의
+      // 행 전부를 훑는다). 겹쳐 도는 실행은 없다(워크플로 concurrency) — 그 사이 다른 실행이 같은 키를 넣었다면 그것도 센다(전과 같다)
+      result.inserted = (await existingIds(supabase, def.id, fresh.map((r) => r.external_id))).size;
       if (up.aborted) throw new Error("계통적 실패로 저장을 중단했다");
       // ⚠ 행 단위 실패도 실패다 — 경고로만 남기면 그 글은 영구히 빠지는데 정기 실행은 초록으로
       //   지나간다. 읽는 화면이 없어 종료 코드가 유일한 신호다.
@@ -268,20 +260,52 @@ async function syncSource(supabase, def, opts = {}) {
   return result;
 }
 
+/** 전체 동시 실행 수 — 서로 다른 호스트는 함께 돌린다 */
+export const SOURCE_CONCURRENCY = 6;
+/** 같은 호스트의 동시 실행 수 — Bluesky 계정들은 전부 한 API 호스트(`public.api.bsky.app`)이고 레이트리밋을 알 수 없다 */
+export const SOURCE_PER_HOST = 2;
+
+/** 소스가 부르는 호스트 — 같은 호스트끼리 동시성을 나눠 쓴다 */
+export function sourceHost(def) {
+  if (def.kind === "bluesky") return "public.api.bsky.app";
+  if (def.kind === "telegram") return "t.me";
+  try {
+    return new URL(def.config?.url).host;
+  } catch {
+    return def.id;
+  }
+}
+
 /**
- * 여러 소스를 동시성 제한을 두고 돌린다.
- * ⚠ 소스마다 다른 호스트지만 동시성을 낮게 유지해 상대 서버를 배려한다.
+ * 여러 소스를 동시성 제한을 두고 돌린다 — 전체 `SOURCE_CONCURRENCY`개, 같은 호스트는 `SOURCE_PER_HOST`개까지.
+ * ⚠ 같은 호스트에 요청을 몰지 않는다(상대 서버 배려 · 알 수 없는 레이트리밋). 호스트가 다른 매체 RSS는 함께 돌려 실행 시간을 줄인다.
  */
 export async function syncSources(supabase, defs, opts = {}) {
   const queue = [...defs];
   const results = [];
-  const concurrency = Math.min(opts.concurrency ?? 3, queue.length || 1);
-  async function worker() {
-    for (let def = queue.shift(); def; def = queue.shift()) {
-      results.push(await syncSource(supabase, def, opts));
+  const limit = Math.max(1, opts.concurrency ?? SOURCE_CONCURRENCY);
+  const perHost = Math.max(1, opts.perHost ?? SOURCE_PER_HOST);
+  const busy = new Map();
+  const running = new Set();
+  while (queue.length || running.size) {
+    while (running.size < limit) {
+      const i = queue.findIndex((d) => (busy.get(sourceHost(d)) ?? 0) < perHost);
+      if (i < 0) break;
+      const [def] = queue.splice(i, 1);
+      const host = sourceHost(def);
+      busy.set(host, (busy.get(host) ?? 0) + 1);
+      const task = (opts.runSource ?? syncSource)(supabase, def, opts)
+        .then((r) => {
+          results.push(r);
+        })
+        .finally(() => {
+          busy.set(host, busy.get(host) - 1);
+          running.delete(task);
+        });
+      running.add(task);
     }
+    if (running.size) await Promise.race(running);
   }
-  await Promise.all(Array.from({ length: concurrency }, worker));
   return results.sort((a, b) => a.sourceId.localeCompare(b.sourceId));
 }
 

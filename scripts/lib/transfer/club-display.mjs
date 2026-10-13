@@ -6,21 +6,14 @@
  *   단계에서 죽는다**(QA에서 재현 — 에러에 파일명도 없었다).
  * ⚠ 파일은 처음 부를 때 읽는다 — 같은 이유로, 표시를 쓰지 않는 경로는 이 파일들과 무관해야 한다.
  */
-import { readFileSync } from "node:fs";
+import { readJson as readJsonFile } from "./util.mjs";
 
 /** 한국어 표기·엠블럼을 갖는 리그 — 이 밖의 구단은 원문 영문명 그대로, 엠블럼 없이 그린다 */
 const EPL = "프리미어리그";
 
 let cache = null;
 
-function readJson(rel) {
-  const url = new URL(rel, import.meta.url);
-  try {
-    return JSON.parse(readFileSync(url, "utf8"));
-  } catch (e) {
-    throw new Error(`${url.pathname}를 읽지 못했습니다 — ${e instanceof Error ? e.message : String(e)}`);
-  }
-}
+const readJson = (rel) => readJsonFile(new URL(rel, import.meta.url));
 
 function load() {
   cache ??= {

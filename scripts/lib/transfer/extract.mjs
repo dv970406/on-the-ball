@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
 import { detectClubs, isClubName } from "./clubs.mjs";
+import { readJson } from "./util.mjs";
 
 /**
  * 규칙 기반 구조화 추출 — 단계·선수·구단·이적료·주급·옵션·관련성.
@@ -470,7 +470,7 @@ function isKnownMononym(name) {
   if (!mononyms) {
     let dict = {};
     try {
-      dict = JSON.parse(readFileSync(new URL("./players-ko.json", import.meta.url), "utf8"));
+      dict = readJson(new URL("./players-ko.json", import.meta.url));
     } catch {
       dict = {};
     }

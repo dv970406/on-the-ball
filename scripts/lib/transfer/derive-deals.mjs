@@ -34,7 +34,7 @@ import { contractText, parseContract } from "./contract.mjs";
 import { DEST, FORMER, FROM, LEFT_FREE, SUITOR_FROM, addVotes, collectVotes, topVote } from "./direction.mjs";
 import { extractTransfer } from "./extract.mjs";
 import { JUDGE_MAX_PER_RUN, JUDGE_RETRY_MS, SUMMARY_RETRY_WINDOW_MS, moneyMentions, normalizeQuote, replayJudgements, wantsArticle } from "./judge.mjs";
-import { createNameBook, loadGlossary, loadNameBook, loadPlayerDictionary, lookupAndCache, lookupCurrentClubs, missingNames, syncDictionaryNames } from "./names-ko.mjs";
+import { buildNameBook, createNameBook, loadGlossary, loadNameCache, loadPlayerDictionary, lookupAndCache, lookupCurrentClubs, missingNames, overlayNameRows, syncDictionaryNames } from "./names-ko.mjs";
 import { RANK, RENEWAL, cleanBody, isDead, isRoundup, isRoundupItem, mentionRe, sentencesOf } from "./story.mjs";
 import { normalizePlayer } from "./player-key.mjs";
 
@@ -44,6 +44,7 @@ export const MIN_RELEVANCE = 0.3;
 export const SCOPE_SLACK_MS = 14 * 86_400_000;
 
 // 창 일정 읽기는 windows.mjs가 갖는다(판정 요청도 쓴다) — 기존 소비자를 위해 다시 내보낸다
+import { chunks } from "./util.mjs";
 import { loadWindows, windowSpan } from "./windows.mjs";
 export { loadWindows, windowSpan };
 
@@ -167,6 +168,13 @@ export function retryDelayMs(attempts) {
  *   다시 물으면 비용만 들고, 비결정적인 답이 멀쩡한 판정을 뒤집는다.
  * - "이동"인데 요약이 없다 → 실패 간격이 지났고 최근 `SUMMARY_RETRY_WINDOW_MS` 안의 보도면 **요약만**(`judge.mjs`가 판정은 건드리지 않는다).
  */
+/**
+ * 원출력(`verdict_raw`)이 있는 행인가 — 금액까지 읽는 형식으로 판정된 행이라는 표지다.
+ * ⚠ 평소 파생은 원출력 값을 읽지 않고 표지(`has_raw`)만 단다(`loadRows`). 판정·재생이 그 행에 새 값을 입히면 `verdict_raw` 키가
+ *   생기므로 그때는 그 값이 이긴다(표지는 읽은 순간의 것이다).
+ */
+export const hasRawVerdict = (r) => ("verdict_raw" in r ? r.verdict_raw != null : r.has_raw === true);
+
 export function judgeMode(r, key, nowMs, { rejudge = false, upgrade = false, stalePrompt = null } = {}) {
   if (rejudge) return "full";
   const attempts = Number(r.verdict_attempts) || 0;
@@ -175,7 +183,7 @@ export function judgeMode(r, key, nowMs, { rejudge = false, upgrade = false, sta
   if (stalePrompt && r.verdict_prompt !== stalePrompt) return "full";
   const waited = nowMs - Date.parse(r.verdict_at) >= retryDelayMs(attempts);
   if (r.verdict == null) return waited ? "full" : null;
-  if (upgrade && r.verdict === "move" && r.verdict_raw == null && (attempts === 0 || waited)) return "full";
+  if (upgrade && r.verdict === "move" && !hasRawVerdict(r) && (attempts === 0 || waited)) return "full";
   if (r.verdict_article_chars === 0 && wantsArticle(r) && attempts <= ARTICLE_RETRY_MAX && waited && nowMs - ts(r) <= ARTICLE_RETRY_WINDOW_MS) return "article";
   if (r.verdict === "move" && r.summary_ko == null && waited && nowMs - ts(r) <= SUMMARY_RETRY_WINDOW_MS) return "summary";
   return null;
@@ -201,7 +209,7 @@ function carriedSlotDue(r, nowMs) {
 /** 물을 때 함께 넘기는 그 행의 기존 판정(`judge.mjs`가 새 답이 실패하면 옛 판정을 지키는 데 쓴다) */
 const PREV_COLUMNS = [
   "verdict", "verdict_player", "verdict_player_name", "verdict_evidence", "verdict_from", "verdict_to", "verdict_suitors", "verdict_stage",
-  "verdict_fee_amount", "verdict_fee_currency", "verdict_fee_kind", "verdict_raw", "verdict_at", "verdict_attempts",
+  "verdict_fee_amount", "verdict_fee_currency", "verdict_fee_kind", "verdict_at", "verdict_attempts",
 ];
 const prevVerdict = (r) => Object.fromEntries(PREV_COLUMNS.map((c) => [c, c === "verdict_attempts" ? Number(r[c]) || 0 : (r[c] ?? null)]));
 
@@ -312,24 +320,48 @@ function groupByPlayer(rows, names) {
   const multi = [...groups.keys()].filter((k) => tokens(k).length >= 2);
   // 두 묶음이 말하는 구단이 하나도 겹치지 않으면 다른 사람이다 — 도르트문트의 유망주 "Inacio"가 스포르팅의 "Goncalo Inacio" 딜에
   // 합쳐져 "곤살루 이나시우 도르트문트 → 유벤투스"가 됐다(운영). 어느 쪽이든 구단을 하나도 못 읽었으면 판단할 수 없어 합친다.
-  const clubsOf = (rs) => new Set(rs.flatMap((r) => [...(r.clubs ?? []), r.verdict_from, r.verdict_to, ...(r.verdict_suitors ?? [])].filter(Boolean)));
-  const sharesClub = (a, b) => { const x = clubsOf(a), y = clubsOf(b); return !x.size || !y.size || [...x].some((c) => y.has(c)); };
+  // 묶음의 구단 집합은 묶음마다 한 번 만들고, 묶음이 합쳐지면 합집합으로 갱신한다(비교마다 다시 모으지 않는다)
+  const rowClubs = (r) => [...(r.clubs ?? []), r.verdict_from, r.verdict_to, ...(r.verdict_suitors ?? [])].filter(Boolean);
+  const clubSets = new Map([...groups].map(([k, rs]) => [k, new Set(rs.flatMap(rowClubs))]));
+  const sharesClub = (a, b) => { const x = clubSets.get(a), y = clubSets.get(b); return !x.size || !y.size || [...x].some((c) => y.has(c)); };
+  const merge = (from, into) => {
+    groups.get(into).push(...groups.get(from));
+    for (const c of clubSets.get(from)) clubSets.get(into).add(c);
+    groups.delete(from);
+    clubSets.delete(from);
+  };
+  // 여러 토큰 이름을 마지막 토큰·첫 토큰으로 찾는 색인 — 한 토큰 이름마다 전체를 훑지 않는다
+  const byToken = (pick) => {
+    const index = new Map();
+    for (const m of multi) (index.get(pick(m)) ?? index.set(pick(m), []).get(pick(m))).push(m);
+    return index;
+  };
+  const byLast = byToken((m) => tokens(m).at(-1));
+  const byFirst = byToken((m) => tokens(m)[0]);
   for (const k of [...groups.keys()]) {
     if (tokens(k).length !== 1) continue;
     const known = Boolean(names.playerInfo(k));
-    const owners = multi.filter((m) => (tokens(m).at(-1) === k || (known && tokens(m)[0] === k)) && sharesClub(groups.get(k), groups.get(m)));
+    const candidates = new Set([...(byLast.get(k) ?? []), ...(known ? (byFirst.get(k) ?? []) : [])]);
+    const owners = [...candidates].filter((m) => sharesClub(k, m));
     if (owners.length !== 1) continue;
-    groups.get(owners[0]).push(...groups.get(k));
-    groups.delete(k);
+    merge(k, owners[0]);
   }
   // 여러 토큰 이름이 더 긴 이름의 **뒷부분**이면 같은 사람이다("Zambo Anguissa" ⊂ "André-Frank Zambo Anguissa", "Van Dijk" ⊂
   // "Virgil van Dijk") — 매체마다 이름을 줄여 써서 같은 선수의 딜이 둘로 갈렸다(재실행). 긴 이름이 하나뿐이고 구단이 겹칠 때만 합친다.
+  // 색인: 뒷부분(두 토큰 이상) → 그 뒷부분으로 끝나는 더 긴 이름들
+  const bySuffix = new Map();
+  for (const m of groups.keys()) {
+    const t = tokens(m);
+    for (let i = 1; i <= t.length - 2; i++) {
+      const suffix = t.slice(i).join(" ");
+      (bySuffix.get(suffix) ?? bySuffix.set(suffix, []).get(suffix)).push(m);
+    }
+  }
   for (const k of [...groups.keys()]) {
     if (tokens(k).length < 2 || !groups.has(k)) continue;
-    const owners = [...groups.keys()].filter((m) => m !== k && m.endsWith(` ${k}`) && sharesClub(groups.get(k), groups.get(m)));
+    const owners = (bySuffix.get(k) ?? []).filter((m) => m !== k && groups.has(m) && sharesClub(k, m));
     if (owners.length !== 1) continue;
-    groups.get(owners[0]).push(...groups.get(k));
-    groups.delete(k);
+    merge(k, owners[0]);
   }
   for (const list of groups.values()) list.sort((a, b) => ts(a) - ts(b) || a.id - b.id);
   return groups;
@@ -611,7 +643,7 @@ function settledAtFor(items, stage, stored, reported = items) {
  * 판정이 없거나 옛 형식이면 규칙이 읽은 금액이고 성격은 모른다(null).
  */
 function feeFor(r, key, storySentences, memo) {
-  if (verdictOf(r, key) === "move" && r.verdict_raw != null) {
+  if (verdictOf(r, key) === "move" && hasRawVerdict(r)) {
     if (r.verdict_fee_amount == null) return null;
     const amount = Number(r.verdict_fee_amount);
     const symbol = { GBP: "£", EUR: "€", USD: "$" }[r.verdict_fee_currency] ?? "";
@@ -1039,11 +1071,13 @@ export function deriveDeals(rows, opts) {
        * "이동 아님" 보도도 다시 물을 때가 있다 — 지시문이 바뀌었거나(`--rejudge-stale`·`--rejudge`) 매체 기사 본문 없이 난 판정이다
        * (발췌만 보고 "이동 아님"이 영구히 남지 않게). 그 행은 딜에 들지 않으니 여기서 따로 넘긴다(5대 리그 구단이 걸린 것만).
        */
+      let groupedName = null; // 묶음 전체의 표시 이름 — 행마다 다시 세지 않는다
       for (const r of grouped.filter((x) => verdictOf(x, key) === "not_move")) {
         const mode = judgeMode(r, key, opts.nowMs, modeOpts);
         const mentioned = mentionedClubs(memo.sentences(r));
         if (!mode || ![...mentioned].some(isTopLeague)) continue;
-        judgeNeeds.push(judgeNeed(r, { playerKey: key, player: displayName(grouped, key), clubs: [...mentioned], mode, tier: existing.has(dealKey(key)) ? JUDGE_TIER.existing : JUDGE_TIER.newDeal }));
+        groupedName ??= displayName(grouped, key);
+        judgeNeeds.push(judgeNeed(r, { playerKey: key, player: groupedName, clubs: [...mentioned], mode, tier: existing.has(dealKey(key)) ? JUDGE_TIER.existing : JUDGE_TIER.newDeal }));
       }
       for (let i = group.length; i < grouped.length; i++) skip("이동 아님(LLM 판정)");
       if (!group.length) continue;
@@ -1286,7 +1320,6 @@ const NEWS = "transfer_news";
 const DEALS = "transfer_deal";
 const CLUBS = "transfer_club";
 const SUITORS = "transfer_deal_suitor";
-const CHUNK = 100;
 
 /**
  * 범위 안에서 파생이 볼 행 — id 키셋으로 끝까지 읽는다(`max_rows`에 기대지 않는다 — pipeline.mjs와 같은 이유).
@@ -1300,27 +1333,47 @@ const CHUNK = 100;
  *   판정(`writeDeals`의 해제)이 이 행들을 봐야 한다. 빼면 그 행이 옛 딜을 계속 가리킨다.
  * ⚠ 걸러진 행은 `skipped`의 "단계 없음"·"관련성 미달" 집계에서도 빠진다(로그 숫자만 줄고 판정은 같다).
  */
-async function loadRows(supabase, startMs) {
+const ROW_COLUMNS = "id, source_id, external_id, url, stage, players, clubs, body, published_at, relevance, deal_id, verdict, verdict_player, verdict_player_name, verdict_evidence, verdict_at, verdict_from, verdict_to, verdict_suitors, verdict_stage, verdict_fee_amount, verdict_fee_currency, verdict_fee_kind, verdict_model, verdict_prompt, verdict_input, verdict_article_chars, verdict_attempts, summary_ko";
+
+/**
+ * @param {{ fullRaw?: boolean }} [opts] `fullRaw` — 원출력 값까지 읽는다(재생 `--replay`만 쓴다)
+ *
+ * ⚠ **원출력(`verdict_raw`, 최대 2000자)은 평소 읽지 않는다** — 파생은 "있는가"만 본다(금액까지 읽는 형식으로 판정된 행인가). 값까지
+ *   매시간 받으면 판정된 행 수 × 수백 자가 그대로 전송된다. 그래서 본 조회에서는 빼고, 같은 조건으로 **원출력이 있는 행의 id만**
+ *   한 번 더 읽어 `has_raw` 표지를 단다(text 컬럼 자리에 다른 타입을 넣지 않는다 — `hasRawVerdict`)(컬럼이 text라 PostgREST select로 "있는가"만 뽑을 수 없다). 값이 필요한 것은 재생뿐이다.
+ */
+async function loadRows(supabase, startMs, { fullRaw = false } = {}) {
+  const page = async (columns, extra, lastId, limit) => {
+    let q = supabase
+      .from(NEWS)
+      .select(columns)
+      .gte("published_at", new Date(startMs).toISOString())
+      .or(`deal_id.not.is.null,and(stage.neq.unknown,relevance.gte.${MIN_RELEVANCE}),and(stage.eq.unknown,players.neq.{})`);
+    if (extra) q = extra(q);
+    return q.gt("id", lastId).order("id").limit(limit);
+  };
   const rows = [];
   let lastId = 0;
   for (;;) {
-    const { data, error } = await supabase
-      .from(NEWS)
-      .select("id, source_id, external_id, url, stage, players, clubs, body, published_at, relevance, deal_id, verdict, verdict_player, verdict_player_name, verdict_evidence, verdict_at, verdict_from, verdict_to, verdict_suitors, verdict_stage, verdict_fee_amount, verdict_fee_currency, verdict_fee_kind, verdict_raw, verdict_model, verdict_prompt, verdict_input, verdict_article_chars, verdict_attempts, summary_ko")
-      .gte("published_at", new Date(startMs).toISOString())
-      .or(`deal_id.not.is.null,and(stage.neq.unknown,relevance.gte.${MIN_RELEVANCE}),and(stage.eq.unknown,players.neq.{})`)
-      .gt("id", lastId)
-      .order("id")
-      .limit(500);
+    const { data, error } = await page(fullRaw ? `${ROW_COLUMNS}, verdict_raw` : ROW_COLUMNS, null, lastId, 500);
     if (error) throw new Error(`보도 행 조회 실패: ${error.message}`);
     if (!data.length) break;
     rows.push(...data);
     lastId = data.at(-1).id;
   }
+  if (fullRaw) return rows;
+  const withRaw = new Set();
+  lastId = 0;
+  for (;;) {
+    const { data, error } = await page("id", (q) => q.not("verdict_raw", "is", null), lastId, 1000);
+    if (error) throw new Error(`원출력 표지 조회 실패: ${error.message}`);
+    if (!data.length) break;
+    for (const r of data) withRaw.add(r.id);
+    lastId = data.at(-1).id;
+  }
+  for (const r of rows) r.has_raw = withRaw.has(r.id);
   return rows;
 }
-
-const chunks = (arr) => Array.from({ length: Math.ceil(arr.length / CHUNK) }, (_, i) => arr.slice(i * CHUNK, (i + 1) * CHUNK));
 
 /** 파생이 쓰는 딜 컬럼 — 바뀌었는지 대조할 대상(`id`·`updated_at` 제외) */
 const DEAL_COLUMNS = [
@@ -1401,6 +1454,17 @@ async function findOrphanDeals(supabase, keep) {
 }
 
 /**
+ * 저장된 딜 전부(`id` + 파생이 쓰는 컬럼) — 파생의 `existingKeys`(저장된 단계·결과 시각)가 쓴다.
+ * ⚠ `writeDeals`의 대조에는 **넘기지 않는다** — 실행 초반에 읽은 값이라 판정 단계(수 분) 동안 다른 쓰기(사람이 돌린 `--derive-only`
+ *   등 — 정기 실행의 동시성 가드 밖이다)가 끼면 낡는다. 낡은 값과 대조하면 바뀐 딜이 "같다"로 보여 저장되지 않고, 알림의 옛 단계도
+ *   어긋난다. `writeDeals`는 쓰기 직전에 다시 읽는다.
+ * @returns {Promise<Map<string, object>>} deal_key → 저장된 행
+ */
+export async function loadStoredDeals(supabase) {
+  return new Map((await readAll(supabase, DEALS, `id, ${DEAL_COLUMNS.join(", ")}`, "deal_key")).map((d) => [d.deal_key, d]));
+}
+
+/**
  * 파생 결과를 쓴다 — 구단 → 딜 → 보도 행의 `deal_id` 순서(FK 방향).
  * ⚠ 행 단위 실패도 실패다(종료 코드 1) — 읽는 화면이 없어 종료 코드가 유일한 신호다.
  * 돌려주는 값은 저장 통계와 `changes`(이번 실행이 만든 새 딜·단계가 바뀐 딜 — 알림 단계가 읽는다)다.
@@ -1426,12 +1490,15 @@ export async function writeDeals(supabase, derived, rows, opts = {}) {
   stats.failed += clubUp.failed.length;
   if (clubUp.aborted) throw new Error("계통적 실패로 구단 저장을 중단했다");
 
-  // 저장된 딜(파생이 쓰는 컬럼 + id) — 바뀌었는지 대조하고, 바뀌지 않은 딜의 id도 여기서 얻는다
-  const stored = new Map();
-  for (const keys of chunks(derived.deals.map((d) => d.deal_key))) {
-    const { data, error } = await supabase.from(DEALS).select(`id, ${DEAL_COLUMNS.join(", ")}`).in("deal_key", keys);
-    if (error) throw new Error(`딜 조회 실패: ${error.message}`);
-    for (const d of data) stored.set(d.deal_key, d);
+  // 저장된 딜(파생이 쓰는 컬럼 + id) — 바뀌었는지 대조하고, 바뀌지 않은 딜의 id도 여기서 얻는다.
+  // 호출부가 이미 읽어 두었으면(`opts.stored` — `loadStoredDeals`) 다시 읽지 않는다
+  const stored = opts.stored ?? new Map();
+  if (!opts.stored) {
+    for (const keys of chunks(derived.deals.map((d) => d.deal_key))) {
+      const { data, error } = await supabase.from(DEALS).select(`id, ${DEAL_COLUMNS.join(", ")}`).in("deal_key", keys);
+      if (error) throw new Error(`딜 조회 실패: ${error.message}`);
+      for (const d of data) stored.set(d.deal_key, d);
+    }
   }
   const dealRows = derived.deals.map(({ rowIds: _rowIds, suitorCodes: _suitorCodes, ...d }) => d);
   const changedDeals = dealRows.filter((d) => !stored.has(d.deal_key) || !sameRow(DEAL_COLUMNS, stored.get(d.deal_key), d));
@@ -1573,13 +1640,27 @@ export async function runDerivation(supabase, opts = {}) {
   const log = opts.log ?? console;
   const nowMs = opts.nowMs ?? Date.now();
   const windows = loadWindows();
-  const rows = await loadRows(supabase, derivationStartMs(nowMs, windows));
-  let names = await loadNameBook(supabase);
+  const rows = await loadRows(supabase, derivationStartMs(nowMs, windows), { fullRaw: Boolean(opts.replay && !opts.dryRun) });
+  /*
+   * 이름 사전 — 캐시 표는 한 번 읽고, 이번 실행이 **무엇을 썼는지 아는** 쓰기(사전 맞춤·위키데이터 조회)는 쓴 행을 덧입혀 사전을 다시 만든다
+   * (`overlayNameRows`). 무엇을 썼는지 모르는 쓰기(판정·재생의 이름 쓰기)만 표를 다시 읽는다.
+   */
+  let nameCache = await loadNameCache(supabase);
+  let names = buildNameBook(nameCache);
+  const applyNames = (written) => {
+    if (!written?.length) return;
+    nameCache = overlayNameRows(nameCache, written);
+    names = buildNameBook(nameCache);
+  };
+  const reloadNames = async () => {
+    nameCache = await loadNameCache(supabase);
+    names = buildNameBook(nameCache);
+  };
   // 사람 사전이 캐시와 갈린 표기를 맞춘다(캐시·요약) — 한 번 맞추면 다시 대상이 되지 않는다. 드라이런은 쓰지 않는다
   let nameSync = null;
   if (!opts.dryRun) {
     nameSync = await syncDictionaryNames(supabase, names);
-    if (nameSync.synced) names = await loadNameBook(supabase);
+    applyNames(nameSync.written.map((w) => ({ kind: "player", key: w.key, name_ko: w.name_ko })));
   }
   /*
    * 재생 — 저장된 원출력(`verdict_raw`)을 지금의 해석으로 다시 읽는다(API를 부르지 않는다). 해석·구단 확인·요약 손질을 고친 뒤
@@ -1590,10 +1671,12 @@ export async function runDerivation(supabase, opts = {}) {
     replayed = await replayJudgements(supabase, rows, { names, fetchImpl: opts.fetchImpl, nowMs, log });
     const byId = new Map(rows.map((r) => [r.id, r]));
     for (const { id, ...fields } of replayed.updates) Object.assign(byId.get(id) ?? {}, fields);
-    if (replayed.namesWritten) names = await loadNameBook(supabase);
+    if (replayed.namesWritten) await reloadNames();
   }
-  // 이미 저장된 딜 — 판정이 없어도 남기고(판정이 멎은 시간에 보드가 통째로 비지 않게), 판정이 덜 찬 딜은 저장된 단계·결과 시각을 지킨다
-  const existingKeys = new Map((await readAll(supabase, DEALS, "deal_key, stage, settled_at", "deal_key")).map((d) => [d.deal_key, { stage: d.stage, settled_at: d.settled_at }]));
+  // 이미 저장된 딜 — 판정이 없어도 남기고(판정이 멎은 시간에 보드가 통째로 비지 않게), 판정이 덜 찬 딜은 저장된 단계·결과 시각을 지킨다.
+  // 같은 결과를 `writeDeals`가 대조에 다시 쓴다(`loadStoredDeals` — 딜 표는 실행당 한 번 읽는다)
+  const storedDeals = await loadStoredDeals(supabase);
+  const existingKeys = new Map([...storedDeals].map(([k, d]) => [k, { stage: d.stage, settled_at: d.settled_at }]));
   // 이름을 찾아 다시 파생할 때 추출을 되풀이하지 않도록 메모를 여러 번의 파생이 나눠 쓴다
   const memo = createExtractMemo();
   const derive = (rejudge = false) => deriveDeals(rows, {
@@ -1613,10 +1696,9 @@ export async function runDerivation(supabase, opts = {}) {
     if (!missing.length) return;
     const r = await lookupAndCache(supabase, missing, { fetchImpl: opts.fetchImpl, book: names });
     lookup = lookup ? Object.fromEntries(Object.entries(r).map(([k, v]) => [k, Array.isArray(v) ? [...lookup[k], ...v] : lookup[k] + v])) : r;
-    if (r.found > 0 || r.verified > 0) {
-      names = await loadNameBook(supabase);
-      derived = derive(Boolean(opts.rejudge));
-    }
+    // 못 찾은 이름도 덧입힌다 — 그래야 판정 뒤의 두 번째 조회가 같은 이름을 다시 찾지 않는다(`RECHECK_MS`)
+    applyNames(r.written);
+    if (r.found > 0 || r.verified > 0) derived = derive(Boolean(opts.rejudge));
   };
   if (!opts.dryRun && opts.lookupNames !== false) await lookupMissing();
 
@@ -1629,10 +1711,8 @@ export async function runDerivation(supabase, opts = {}) {
     if (!derived.clubNeeds.length) return;
     const r = await lookupCurrentClubs(supabase, derived.clubNeeds, { fetchImpl: opts.fetchImpl, book: names });
     clubLookup = clubLookup ? { ...r, tried: clubLookup.tried + r.tried, found: clubLookup.found + r.found, notFound: clubLookup.notFound + r.notFound, failed: clubLookup.failed + r.failed, warnings: [...clubLookup.warnings, ...r.warnings] } : r;
-    if (r.found > 0) {
-      names = await loadNameBook(supabase);
-      derived = derive(Boolean(opts.rejudge));
-    }
+    applyNames(r.written);
+    if (r.found > 0) derived = derive(Boolean(opts.rejudge));
   };
   if (!opts.dryRun && opts.lookupNames !== false) await lookupClubs();
 
@@ -1657,7 +1737,7 @@ export async function runDerivation(supabase, opts = {}) {
     judged = await opts.judge(derived.judgeNeeds, names);
     const byId = new Map(rows.map((r) => [r.id, r]));
     for (const { id, ...fields } of judged.updates) Object.assign(byId.get(id) ?? {}, fields);
-    if (judged.namesWritten) names = await loadNameBook(supabase);
+    if (judged.namesWritten) await reloadNames();
     if (judged.updates.length) {
       derived = derive();
       if (opts.lookupNames !== false) {
@@ -1673,7 +1753,7 @@ export async function runDerivation(supabase, opts = {}) {
     : await writeDeals(supabase, { ...derived, clubs: clubRowsToWrite(derived.clubs, names) }, rows, { log });
   return {
     summary: summarize(derived),
-    warnings: [...derived.warnings, ...(lookup?.warnings ?? []), ...(clubLookup?.warnings ?? []), ...(replayed?.warnings.filter((w) => !w.includes("판정 불가")) ?? []), ...(judged?.warnings ?? [])],
+    warnings: [...derived.warnings, ...(nameSync?.warnings ?? []), ...(lookup?.warnings ?? []), ...(clubLookup?.warnings ?? []), ...(replayed?.warnings.filter((w) => !w.includes("판정 불가")) ?? []), ...(judged?.warnings ?? [])],
     skipped: derived.skipped,
     deals: derived.deals,
     needStats,

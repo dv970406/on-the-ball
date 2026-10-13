@@ -23,6 +23,7 @@
  */
 import { parse as legacyParse } from "node:url";
 import webpush from "web-push";
+import { chunks } from "./util.mjs";
 
 /** 단계 → 상태 톤. ⚠ `stage.ts`의 `STAGE_STATUS`와 같아야 한다(테스트가 대조한다) */
 export const STATUS_OF_STAGE = {
@@ -74,8 +75,7 @@ const SEND_TIMEOUT_MS = 10_000;
 /** 한 건의 발송 전체에 주는 시간 — 응답을 조금씩 흘려 소켓을 살려 두는 서버가 워커를 붙잡지 못하게 한다 */
 const SEND_DEADLINE_MS = 15_000;
 const SEND_CONCURRENCY = 8;
-const CHUNK = 100;
-/** 죽은 구독을 지울 때의 묶음 — 주소가 길어 조회용 묶음(`CHUNK`)보다 작게 잡는다 */
+/** 죽은 구독을 지울 때의 묶음 — 주소가 길어 조회용 묶음(`util.mjs`의 `CHUNK`)보다 작게 잡는다 */
 const DELETE_CHUNK = 20;
 /** 한 번에 읽는 행 수 — PostgREST `max_rows`(1,000)보다 작아야 "덜 찬 페이지 = 끝" 판정이 성립한다 */
 const PAGE = 500;
@@ -217,7 +217,6 @@ export function payloadsFor(notices) {
   ];
 }
 
-const chunks = (arr) => Array.from({ length: Math.ceil(arr.length / CHUNK) }, (_, i) => arr.slice(i * CHUNK, (i + 1) * CHUNK));
 
 /**
  * `column in (values)`인 행을 **끝까지** 읽는다 — 키 하나에 행이 여럿 딸리는 조회라(딜 하나에 관심 여럿, 사용자 하나에 구독

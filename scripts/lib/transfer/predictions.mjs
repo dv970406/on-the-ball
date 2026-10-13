@@ -18,6 +18,7 @@
  */
 import { upsertRows } from "../sync-db.mjs";
 import { loadWindows } from "./derive-deals.mjs";
+import { chunks } from "./util.mjs";
 
 /** 창 마감 뒤 결과를 기다리는 유예 — 마감일에 등록된 이적은 발표가 하루 이틀 늦게 나온다 */
 export const SETTLE_GRACE_MS = 2 * 86_400_000;
@@ -28,9 +29,7 @@ const TALLIES = "transfer_deal_prediction_tally";
 const SCORES = "transfer_prediction_score";
 const DEALS = "transfer_deal";
 const PAGE = 500;
-const CHUNK = 100;
 
-const chunks = (arr) => Array.from({ length: Math.ceil(arr.length / CHUNK) }, (_, i) => arr.slice(i * CHUNK, (i + 1) * CHUNK));
 
 /**
  * 창 일정의 DB 사본을 JSON에 맞춘다 — 값이 바뀐(또는 없는) 행만 쓴다. **지우지 않는다**(예측이 회차로 이 키를 잡는다).

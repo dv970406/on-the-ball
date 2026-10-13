@@ -1,8 +1,8 @@
 /**
  * 이적 창 일정(`windows.json`) 읽기 — 파생(`derive-deals.mjs`)과 판정 요청(`judge-prompt.mjs`)이 함께 쓴다.
- * 순수 모듈이다(다른 파이프라인 모듈을 import하지 않는다 — 판정과 파생 사이의 순환 import를 막는다).
+ * 순수 모듈이다(다른 파이프라인 모듈을 import하지 않는다 — 판정과 파생 사이의 순환 import를 막는다). 잎 모듈인 `util.mjs`만 쓴다.
  */
-import { readFileSync } from "node:fs";
+import { readJson } from "./util.mjs";
 
 /**
  * 창 일정 — 리그별 일정을 **합친 기간**으로 돌려준다(개장 = 가장 먼저 여는 리그, 마감 = 가장 늦게 닫는 리그).
@@ -17,8 +17,9 @@ export function windowSpan(w) {
 
 export function loadWindows() {
   const url = new URL("./windows.json", import.meta.url);
+  const file = readJson(url);
   try {
-    return JSON.parse(readFileSync(url, "utf8")).windows.map(windowSpan);
+    return file.windows.map(windowSpan);
   } catch (e) {
     throw new Error(`${url.pathname}를 읽지 못했습니다 — ${e instanceof Error ? e.message : String(e)}`);
   }

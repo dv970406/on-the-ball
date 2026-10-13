@@ -7,7 +7,7 @@
  */
 import { createNameBook } from "./lib/transfer/names-ko.mjs";
 import { isRoundup } from "./lib/transfer/story.mjs";
-import { CARRIED_DAILY_ATTEMPTS, JUDGE_TIER, boardScopeStartMs, clubRecord, createExtractMemo, dealKey, dedupeRows, deriveDeals, derivationStartMs, holdStage, judgeMode, normalizePlayer, orderJudgeNeeds, retryDelayMs, windowSpan } from "./lib/transfer/derive-deals.mjs";
+import { CARRIED_DAILY_ATTEMPTS, JUDGE_TIER, boardScopeStartMs, clubRecord, createExtractMemo, dealKey, dedupeRows, deriveDeals, derivationStartMs, hasRawVerdict, holdStage, judgeMode, normalizePlayer, orderJudgeNeeds, retryDelayMs, windowSpan } from "./lib/transfer/derive-deals.mjs";
 
 const NOW = Date.parse("2026-09-25T00:00:00Z");
 const WINDOWS = [
@@ -843,7 +843,8 @@ const UNIT = [
     got: PRIO.judgeNeeds.map((x) => x.id),
     want: [904, 903, 902, 901, 905],
   },
-  { name: "우선순위 — 물을 대상에 게시 시각·방식·옛 판정을 싣는다", got: [PRIO.judgeNeeds[0].published_at === PRIO_ROWS()[3].published_at, PRIO.judgeNeeds[0].mode, Object.keys(PRIO.judgeNeeds[0].prev).length, PRIO.judgeNeeds[0].prev.verdict_attempts], want: [true, "full", 14, 0] },
+  { name: "원출력 표지 — 값을 읽지 않은 행은 표지로, 판정·재생이 값을 입힌 행은 그 값으로 판정한다", got: [hasRawVerdict({ has_raw: true }), hasRawVerdict({ has_raw: false }), hasRawVerdict({ has_raw: true, verdict_raw: null }), hasRawVerdict({ has_raw: false, verdict_raw: "{}" }), hasRawVerdict({})], want: [true, false, false, true, false] },
+  { name: "우선순위 — 물을 대상에 게시 시각·방식·옛 판정을 싣는다", got: [PRIO.judgeNeeds[0].published_at === PRIO_ROWS()[3].published_at, PRIO.judgeNeeds[0].mode, Object.keys(PRIO.judgeNeeds[0].prev).length, PRIO.judgeNeeds[0].prev.verdict_attempts], want: [true, "full", 13, 0] },
   { name: "우선순위 — 이월된 행은 같은 층의 새 보도보다 먼저, 다른 층은 넘지 않는다", got: CARRIED.judgeNeeds.map((x) => x.id), want: [904, 903, 901, 902, 905] },
   { name: "우선순위 — 이월된 행은 실패 수와 무관하게 다음 실행이 곧바로 묻는다(재시도 간격은 판정 시각이 있는 행에만)", got: judgeMode({ verdict: null, verdict_player: "john doe", verdict_at: null, verdict_attempts: 2 }, "john doe", NOW), want: "full" },
   { name: "금액 시점 — \"in the January transfer window\"의 제안은 앞으로의 일이다", got: PAST.futureWindow.deals[0]?.fee_amount, want: 60 },

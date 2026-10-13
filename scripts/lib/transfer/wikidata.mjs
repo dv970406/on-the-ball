@@ -164,34 +164,157 @@ export function pickCurrentClub(playerEntity, teams) {
   return { wikidataId: open[0].id, nameEn: typeof en === "string" ? en.trim() : null, nameKo: koLabel(team) };
 }
 
-/** 선수 항목 id → 현 소속 구단(`pickCurrentClub`). 네트워크·HTTP 오류는 던진다(호출부가 캐시하지 않는다) */
-export async function currentClubOf(playerId, fetchImpl = fetch) {
-  const got = await getJson({ action: "wbgetentities", ids: playerId, props: "claims" }, fetchImpl);
-  const player = got.entities?.[playerId];
-  const ids = [...new Set((player?.claims?.P54 ?? []).filter((c) => qualifierTime(c, "P582") === null).map((c) => c?.mainsnak?.datavalue?.value?.id).filter((id) => typeof id === "string"))].slice(0, 20);
-  if (!ids.length) return null;
-  const teams = await getJson({ action: "wbgetentities", ids: ids.join("|"), props: "labels|claims", languages: "en|ko" }, fetchImpl);
-  return pickCurrentClub(player, teams.entities ?? {});
+/** wbgetentities 한 번에 실을 항목 수 — API 상한(50) */
+const ENTITY_BATCH = 50;
+/** 항목 묶음 요청의 시간 상한 — 한 번에 여러 항목의 claims를 받아 이름 하나짜리 요청보다 응답이 크다 */
+const BATCH_TIMEOUT_MS = 20_000;
+/** 이름 검색(wbsearchentities)을 동시에 몇 개까지 — 위키미디어 API 예절(동시 요청을 적게) */
+const SEARCH_CONCURRENCY = 2;
+
+/** `items`를 최대 `n`개씩 동시에 돌린다 — 결과 순서는 입력 순서다 */
+async function mapLimit(items, n, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    for (let i = next++; i < items.length; i = next++) out[i] = await fn(items[i], i);
+  };
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, worker));
+  return out;
 }
 
-async function getJson(params, fetchImpl) {
+/**
+ * 항목들을 묶어서 받는다(`ENTITY_BATCH`개씩 한 요청) — 이름·선수마다 따로 부르던 wbgetentities를 한 실행에서 몇 번으로 줄인다.
+ * 묶음 하나가 실패하면 그 묶음의 id들을 `failed`에 담는다 — 호출부가 그 id에 기댄 이름만 실패로 돌린다(캐시하지 않고 다음 실행이 다시 찾는다).
+ * @returns {Promise<{ entities: Record<string, object>, failed: Map<string, Error> }>}
+ */
+async function getEntities(ids, params, fetchImpl) {
+  const entities = {};
+  const failed = new Map();
+  const unique = [...new Set(ids)];
+  // ⚠ 묶음 하나가 실패하면 그 묶음에 든 **무관한 이름들까지** 함께 실패한다(이름마다 따로 받던 때는 그 이름 하나였다) — 잠깐의
+  //   끊김이면 다시 받아 메운다. 다시 받기는 **호출당 한 번**뿐이다 — 장애 중이면 묶음마다 시간 상한을 두 번씩 기다리게 된다
+  let retryLeft = 1;
+  const fetchPart = (part) => getJson({ action: "wbgetentities", ids: part.join("|"), ...params }, fetchImpl, BATCH_TIMEOUT_MS);
+  for (let i = 0; i < unique.length; i += ENTITY_BATCH) {
+    const part = unique.slice(i, i + ENTITY_BATCH);
+    let got = null;
+    let err = null;
+    try {
+      got = await fetchPart(part);
+    } catch (e) {
+      err = e instanceof Error ? e : new Error(String(e));
+      if (retryLeft > 0) {
+        retryLeft -= 1;
+        try {
+          got = await fetchPart(part);
+          err = null;
+        } catch (e2) {
+          err = e2 instanceof Error ? e2 : new Error(String(e2));
+        }
+      }
+    }
+    if (got) Object.assign(entities, got.entities ?? {});
+    else for (const id of part) failed.set(id, err);
+  }
+  return { entities, failed };
+}
+
+/** 열린(종료일 없는) 소속팀 항목 id — 현 소속 후보 */
+const openTeamIds = (player) =>
+  [...new Set((player?.claims?.P54 ?? []).filter((c) => qualifierTime(c, "P582") === null).map((c) => c?.mainsnak?.datavalue?.value?.id).filter((id) => typeof id === "string"))].slice(0, 20);
+
+/**
+ * 선수 항목 id들 → 현 소속 구단(`pickCurrentClub`). 선수 항목과 소속팀 항목을 각각 묶음으로 받는다(선수마다 두 번 부르던 것을 실행당 몇 번으로).
+ * `known`에 이미 받은 선수 항목(claims 포함 — 이름 조회가 받은 것)이 있으면 다시 받지 않는다.
+ * @param {string[]} playerIds
+ * @returns {Promise<Map<string, { ok: true, club: ReturnType<typeof pickCurrentClub> } | { ok: false, error: Error }>>}
+ *   네트워크·HTTP 오류는 `ok: false`다(호출부가 그 선수를 캐시하지 않는다)
+ */
+export async function currentClubsOf(playerIds, fetchImpl = fetch, { known = {} } = {}) {
+  const ids = [...new Set(playerIds)];
+  const toFetch = ids.filter((id) => !known[id]?.claims);
+  const players = await getEntities(toFetch, { props: "claims" }, fetchImpl);
+  const entityOf = (id) => (known[id]?.claims ? known[id] : players.entities[id]);
+  const teamIds = ids.filter((id) => !players.failed.has(id)).flatMap((id) => openTeamIds(entityOf(id)));
+  const teams = await getEntities(teamIds, { props: "labels|claims", languages: "en|ko" }, fetchImpl);
+  const out = new Map();
+  for (const id of ids) {
+    const err = players.failed.get(id) ?? openTeamIds(entityOf(id)).map((t) => teams.failed.get(t)).find(Boolean);
+    if (err) {
+      out.set(id, { ok: false, error: err });
+      continue;
+    }
+    // 판정은 선수마다 감싼다 — 예상 밖 항목 데이터 하나가 나머지 선수까지 멈추지 않게(`lookupKoMany`와 같다)
+    try {
+      out.set(id, { ok: true, club: openTeamIds(entityOf(id)).length ? pickCurrentClub(entityOf(id), teams.entities) : null });
+    } catch (e) {
+      out.set(id, { ok: false, error: e instanceof Error ? e : new Error(String(e)) });
+    }
+  }
+  return out;
+}
+
+/** 선수 항목 id → 현 소속 구단(`pickCurrentClub`). 네트워크·HTTP 오류는 던진다(호출부가 캐시하지 않는다) */
+export async function currentClubOf(playerId, fetchImpl = fetch) {
+  const r = (await currentClubsOf([playerId], fetchImpl)).get(playerId);
+  if (!r.ok) throw r.error;
+  return r.club;
+}
+
+async function getJson(params, fetchImpl, timeoutMs = TIMEOUT_MS) {
   const url = `${API}?${new URLSearchParams({ format: "json", ...params })}`;
-  const res = await fetchImpl(url, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  const res = await fetchImpl(url, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(timeoutMs) });
   if (!res.ok) throw new Error(`위키데이터 ${res.status}`);
   return res.json();
 }
 
+const NONE = Object.freeze({ wikidataId: null, nameKo: null });
+
 /**
- * 이름 하나 → 한국어 표기. 찾지 못하면 `{ wikidataId: null, nameKo: null }`(정상값 — 캐시에 "없음"으로 남긴다).
+ * 이름들 → 한국어 표기. 이름마다 검색(wbsearchentities — 동시 `SEARCH_CONCURRENCY`개)하고, 후보 항목은 **모든 이름의 것을 모아 묶음으로**
+ * 받는다(`getEntities`). 판정(`pickEntity` — 종류·이름 일치·나이·동명이인)은 이름 하나씩 따로 받던 때와 같다.
+ * 찾지 못하면 `{ wikidataId: null, nameKo: null }`(정상값 — 캐시에 "없음"으로 남긴다).
+ * 네트워크·HTTP 오류는 그 이름만 `ok: false`다 — 검색이 실패했거나, 그 이름의 후보가 든 항목 묶음이 실패했다. 호출부가 그 이름을
+ * 캐시하지 않고 다음 실행에 다시 찾는다.
+ * @param {{ name: string, kind: "player" | "club" }[]} items
+ * @returns {Promise<{ results: ({ ok: true, value: { wikidataId: string | null, nameKo: string | null } } | { ok: false, error: Error })[], entities: Record<string, object> }>}
+ *   `entities`는 받은 후보 항목(claims 포함) — 현 소속 조회가 선수 항목을 다시 받지 않게 넘길 수 있다
+ */
+export async function lookupKoMany(items, fetchImpl = fetch) {
+  // ⚠ 선수는 이름 한 토큰("Joao"·"Fabio")으로 찾지 않는다 — 흔한 이름 하나로는 누구인지 특정할 수 없다
+  //   (시뮬레이션: 옛 규칙은 이름 첫 토큰만으로 671개 중 232개를 누군가로 특정했다). 한 토큰 선수(Neymar)는 사람 사전이 맡는다.
+  const searched = await mapLimit(items, SEARCH_CONCURRENCY, async ({ name, kind }) => {
+    if (kind === "player" && normalizeName(name).split(" ").length < 2) return { hits: [] };
+    try {
+      const search = await getJson({ action: "wbsearchentities", search: name, language: "en", uselang: "en", type: "item", limit: String(CANDIDATES) }, fetchImpl);
+      return { hits: toHits(search.search) };
+    } catch (e) {
+      return { error: e instanceof Error ? e : new Error(String(e)) };
+    }
+  });
+  const { entities, failed } = await getEntities(searched.flatMap((s) => (s.hits ?? []).map((h) => h.id)), { props: "labels|claims|sitelinks", languages: "ko" }, fetchImpl);
+  const results = items.map(({ name, kind }, i) => {
+    const s = searched[i];
+    if (s.error) return { ok: false, error: s.error };
+    if (!s.hits.length) return { ok: true, value: { ...NONE } };
+    const err = s.hits.map((h) => failed.get(h.id)).find(Boolean);
+    if (err) return { ok: false, error: err };
+    // ⚠ 판정은 이름마다 감싼다 — 예상 밖 항목 데이터 하나로 던지면 묶음 전체가, 나아가 파생이 멈춘다(그 이름만 실패로 둔다)
+    try {
+      return { ok: true, value: pickEntity(s.hits, entities, kind, name) };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e : new Error(String(e)) };
+    }
+  });
+  return { results, entities };
+}
+
+/**
+ * 이름 하나 → 한국어 표기(`lookupKoMany`의 한 건짜리). 찾지 못하면 `{ wikidataId: null, nameKo: null }`.
  * 네트워크·HTTP 오류는 던진다 — 호출부가 그 이름을 캐시하지 않고 다음 실행에 다시 찾는다.
  */
 export async function lookupKo(name, kind, fetchImpl = fetch) {
-  // ⚠ 선수는 이름 한 토큰("Joao"·"Fabio")으로 찾지 않는다 — 흔한 이름 하나로는 누구인지 특정할 수 없다
-  //   (시뮬레이션: 옛 규칙은 이름 첫 토큰만으로 671개 중 232개를 누군가로 특정했다). 한 토큰 선수(Neymar)는 사람 사전이 맡는다.
-  if (kind === "player" && normalizeName(name).split(" ").length < 2) return { wikidataId: null, nameKo: null };
-  const search = await getJson({ action: "wbsearchentities", search: name, language: "en", uselang: "en", type: "item", limit: String(CANDIDATES) }, fetchImpl);
-  const hits = toHits(search.search);
-  if (!hits.length) return { wikidataId: null, nameKo: null };
-  const got = await getJson({ action: "wbgetentities", ids: hits.map((h) => h.id).join("|"), props: "labels|claims|sitelinks", languages: "ko" }, fetchImpl);
-  return pickEntity(hits, got.entities ?? {}, kind, name);
+  const [r] = (await lookupKoMany([{ name, kind }], fetchImpl)).results;
+  if (!r.ok) throw r.error;
+  return r.value;
 }

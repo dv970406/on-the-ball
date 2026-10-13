@@ -7,6 +7,7 @@
 import { cleanByline, resolveAttribution } from "./lib/transfer/attribution.mjs";
 import { bylineOf, canonicalGuid, parseTelegram, stripHtml } from "./lib/transfer/sources.mjs";
 import { citedOutlet, itemExternalId, parseRoundupItems } from "./lib/transfer/roundup.mjs";
+import { sourceHost, syncSources } from "./lib/transfer/pipeline.mjs";
 
 let pass = 0;
 let fail = 0;
@@ -94,6 +95,32 @@ const cited = resolveAttribution(rssDef, { externalId: itemExternalId("col", bbc
 check("가십 — 항목 행은 cited로 인용 매체에 귀속된다(칼럼 소스의 등급을 물려받지 않는다)", cited?.attribution === "cited" && cited.attributedTo === "Mail" && cited.tier === 2);
 check("가십 — 칼럼 행·일반 기사는 그대로 매체 귀속이다", resolveAttribution(rssDef, { externalId: "col", authorHandle: "Susy Campanale", text: "… (Mail)" })?.attribution === "outlet");
 check("가십 — 괄호를 되읽지 못한 항목만 칼럼 매체로 남는다", resolveAttribution(rssDef, { externalId: "col#item-x", authorHandle: null, text: "no tail" })?.attribution === "outlet");
+
+// ── 소스 동시성 — 같은 호스트는 SOURCE_PER_HOST개까지, 전체는 SOURCE_CONCURRENCY개까지 ──
+{
+  const defs = [
+    ...Array.from({ length: 5 }, (_, i) => ({ id: `bsky:${i}`, kind: "bluesky", config: { handle: `h${i}` } })),
+    { id: "rss:a", kind: "rss", config: { url: "https://a.example/rss" } },
+    { id: "rss:b", kind: "rss", config: { url: "https://b.example/rss" } },
+    { id: "rss:a2", kind: "rss", config: { url: "https://a.example/other" } },
+    { id: "tg:x", kind: "telegram", config: { channel: "x" } },
+  ];
+  check("호스트 — Bluesky·텔레그램은 한 호스트, RSS는 주소의 호스트", sourceHost(defs[0]) === sourceHost(defs[4]) && sourceHost(defs[5]) === sourceHost(defs[7]) && sourceHost(defs[5]) !== sourceHost(defs[6]));
+  const live = new Map();
+  let peak = 0;
+  let peakHost = 0;
+  const runSource = async (_db, def) => {
+    const h = sourceHost(def);
+    live.set(h, (live.get(h) ?? 0) + 1);
+    peak = Math.max(peak, [...live.values()].reduce((a, b) => a + b, 0));
+    peakHost = Math.max(peakHost, live.get(h));
+    await new Promise((r) => setTimeout(r, 5));
+    live.set(h, live.get(h) - 1);
+    return { sourceId: def.id };
+  };
+  const results = await syncSources(null, defs, { runSource, concurrency: 4, perHost: 2 });
+  check("동시성 — 모든 소스를 한 번씩 돌리고, 전체·호스트별 상한을 넘지 않는다", results.length === defs.length && new Set(results.map((r) => r.sourceId)).size === defs.length && peak <= 4 && peak >= 3 && peakHost === 2, JSON.stringify({ peak, peakHost, n: results.length }));
+}
 
 console.log(`\n수집 어댑터 ${pass}/${pass + fail} 통과`);
 if (fail) process.exit(1);
