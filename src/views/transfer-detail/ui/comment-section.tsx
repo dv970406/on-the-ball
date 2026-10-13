@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, type RefObject, useMemo, useState } from "react";
+import { memo, type ReactNode, type RefObject, useMemo, useState } from "react";
 import {
   COMMENT_LIST_LIMIT,
   CommentItem,
@@ -11,14 +11,12 @@ import {
   type CommentSort,
 } from "@/entities/comment";
 import type { SessionStatus } from "@/entities/session";
-import { CommentVoteButtons } from "@/features/vote-comment";
+import { CommentVoteButtons, useCommentVote, type CommentVoteFn } from "@/features/vote-comment";
 import { cn, formatCount } from "@/shared/lib";
 import { EmptyState, Skeleton, StaleBanner } from "@/shared/ui";
 import { ReplyComposerProvider, useReplyField, useReplyTarget } from "../model/reply-composer";
 import { useCommentComposer } from "../model/use-comment-composer";
 import { CommentForm, CommentSignInField } from "./comment-form";
-
-type Thread = ReturnType<typeof buildCommentThreads>[number];
 
 interface CommentSectionProps {
   dealId: number;
@@ -36,7 +34,7 @@ interface CommentSectionProps {
   /** 비로그인이 누른 동작 — `~하려면` 구절. 안내는 뷰가 **한 벌** 그린다 */
   onSignInRequired: (action: string) => void;
   /**
-   * 댓글마다 붙는 `삭제` — 확인 요청과 진행 표시(`use-comment-deletion`의 `item` 묶음).
+   * 댓글마다 붙는 `삭제` — 확인 요청과 진행 표시(`use-comment-deletion`의 `item` 묶음). `request`는 안정된 참조여야 한다(행이 `memo`다).
    * 다이얼로그는 뷰가 프레임 자리에 그린다(`Dialog`가 `absolute`다).
    */
   deletion: { request: (commentId: number) => void; isDeleting: (commentId: number) => boolean };
@@ -67,6 +65,8 @@ const ACTION_BUTTON =
  * ⚠ **입력값 state를 이 컴포넌트에 두지 않는다.** 루트 입력칸은 `RootComposer`가, 답글 칸은
  *   `ReplyComposerProvider`가 훅을 든다 — 여기 두면 글자마다 댓글 목록 전체(최대 200개 + 표 버튼 400개)가
  *   다시 그려졌다(INP). 스레드 계산도 목록·정렬이 바뀔 때만 한다.
+ * ⚠ **행은 `ThreadRow`(`memo`)다** — 이 컴포넌트는 뷰가 다시 그릴 때마다 함께 그려지므로, 행에 넘기는 값을
+ *   원시값·안정된 참조로 맞춰 바뀐 행만 다시 그리게 한다(표 보내기 `useCommentVote` · 삭제 요청 `deletion.request`).
  */
 export function CommentSection({
   dealId,
@@ -89,33 +89,16 @@ export function CommentSection({
     [list, sort],
   );
 
-  /** 표·답글·삭제 줄 — 답글에는 `답글` 버튼이 없다(깊이 1 — DB 트리거도 같은 제한) */
-  const actions = (comment: Comment) => {
-    const canReply = comment.parentId === null;
-    const busy = deletion.isDeleting(comment.id);
-    return (
-      <>
-        <CommentVoteButtons
-          dealId={dealId}
-          comment={comment}
-          onSignInRequired={() => onSignInRequired("좋아요·싫어요를 남기려면")}
-        />
-        {canReply && (
-          <ReplyButton comment={comment} status={status} onSignInRequired={onSignInRequired} />
-        )}
-        {comment.userId === userId && (
-          <button
-            type="button"
-            disabled={busy}
-            className={cn(ACTION_BUTTON, "ml-auto text-ink-mute-2")}
-            onClick={() => deletion.request(comment.id)}
-          >
-            {busy ? "삭제 중…" : "삭제"}
-          </button>
-        )}
-      </>
-    );
-  };
+  /** 표 보내기 — 목록이 한 벌 든다(행마다 뮤테이션·세션 구독을 두지 않는다). 안정된 참조다 */
+  const vote = useCommentVote(dealId, () => onSignInRequired("좋아요·싫어요를 남기려면"));
+
+  // 답글 칸의 대상 소실 판정 재료 — 값이 같으면 같은 객체로 둔다
+  const signedIn = status === "authenticated";
+  const comments = list?.comments;
+  const watch = useMemo(
+    () => ({ comments, isPlaceholder, confirmedIds: confirmedDeletes, signedIn }),
+    [comments, isPlaceholder, confirmedDeletes, signedIn],
+  );
 
   return (
     <div className="pt-3.5">
@@ -184,34 +167,23 @@ export function CommentSection({
       <ReplyComposerProvider
         dealId={dealId}
         fallbackFocusRef={focusFallbackRef}
-        watch={{
-          comments: list?.comments,
-          isPlaceholder,
-          confirmedIds: confirmedDeletes,
-          signedIn: status === "authenticated",
-        }}
+        watch={watch}
       >
         {threads && threads.length > 0 && (
           <ul>
             {threads.map(({ comment, replies }) => (
-              // 구분선은 항목 사이에만 — 정렬 바로 아래 첫 항목에는 없다
-              <li key={comment.id} className="border-t border-hairline-cool first:border-t-0">
-                <CommentItem
-                  comment={comment}
-                  isMine={comment.userId === userId}
-                  nowMs={nowMs}
-                  actions={actions(comment)}
-                >
-                  <ReplyArea
-                    comment={comment}
-                    replies={replies}
-                    status={status}
-                    userId={userId}
-                    nowMs={nowMs}
-                    actions={actions}
-                  />
-                </CommentItem>
-              </li>
+              <ThreadRow
+                key={comment.id}
+                comment={comment}
+                replies={replies}
+                status={status}
+                userId={userId}
+                nowMs={nowMs}
+                deletingIds={deletingIn(comment, replies, deletion.isDeleting)}
+                vote={vote}
+                onSignInRequired={onSignInRequired}
+                onDelete={deletion.request}
+              />
             ))}
           </ul>
         )}
@@ -287,30 +259,86 @@ function ReplyButton({
   );
 }
 
-/** 답글 목록과 답글 입력칸 — 본문 칸 안쪽 · 왼쪽 1px 레일. 둘 다 없으면 아무것도 그리지 않는다 */
-function ReplyArea({
+/** 스레드(루트 + 답글) 안에서 지우는 중인 댓글 — 없으면 `undefined`라 그 행의 `memo`가 깨지지 않는다 */
+function deletingIn(
+  comment: Comment,
+  replies: Comment[],
+  isDeleting: (commentId: number) => boolean,
+): ReadonlySet<number> | undefined {
+  // 섹션이 그려질 때마다 스레드 수만큼 돈다 — 지우는 중인 댓글이 없는 흔한 경우에는 아무것도 만들지 않는다
+  let ids: Set<number> | undefined;
+  if (isDeleting(comment.id)) (ids ??= new Set()).add(comment.id);
+  for (const reply of replies) if (isDeleting(reply.id)) (ids ??= new Set()).add(reply.id);
+  return ids;
+}
+
+interface ThreadRowProps {
+  comment: Comment;
+  replies: Comment[];
+  status: SessionStatus;
+  userId: string | undefined;
+  nowMs: number | null;
+  /** 이 스레드에서 지우는 중인 댓글 — 대개 `undefined`다 */
+  deletingIds: ReadonlySet<number> | undefined;
+  vote: CommentVoteFn;
+  onSignInRequired: (action: string) => void;
+  onDelete: (commentId: number) => void;
+}
+
+/**
+ * 행 비교 — `replies`만 원소끼리 본다. 스레드는 목록이 바뀔 때마다 새로 묶여(`buildCommentThreads`) 답글 배열이
+ * 늘 새 참조지만, 그 안의 댓글은 캐시가 바뀐 것만 새 객체다(`applyVote`·구조 공유). 나머지 prop은 원시값이거나
+ * 안정된 참조라 그대로 비교한다.
+ */
+function sameThreadRow(prev: ThreadRowProps, next: ThreadRowProps) {
+  for (const key of Object.keys(next) as (keyof ThreadRowProps)[]) {
+    if (key === "replies") continue;
+    if (!Object.is(prev[key], next[key])) return false;
+  }
+  return (
+    prev.replies.length === next.replies.length &&
+    prev.replies.every((r, i) => r === next.replies[i])
+  );
+}
+
+/**
+ * 스레드 한 줄 — `memo`다. 표 하나·삭제 하나·정렬 토글에 **바뀐 행만** 다시 그린다(댓글 최대 200개 + 표 버튼 400개).
+ * ⚠ 넘기는 값은 원시값이거나 안정된 참조로 둔다 — 콜백(`vote`·`onDelete`·`onSignInRequired`)이 렌더마다 새로
+ *   만들어지면 모든 행이 매번 다시 그려진다. 답글 상태(`답글` 버튼·답글 칸)는 컨텍스트로 읽어 `memo`를 지나 도착한다.
+ */
+const ThreadRow = memo(function ThreadRow({
   comment,
   replies,
   status,
   userId,
   nowMs,
-  actions,
-}: {
-  comment: Comment;
-  replies: Thread["replies"];
-  status: SessionStatus;
-  userId: string | undefined;
-  nowMs: number | null;
-  actions: (comment: Comment) => ReactNode;
-}) {
-  const { targetId } = useReplyTarget();
-  const replying = targetId === comment.id && status === "authenticated";
-  if (replies.length === 0 && !replying) return null;
+  deletingIds,
+  vote,
+  onSignInRequired,
+  onDelete,
+}: ThreadRowProps) {
+  const actionsFor = (c: Comment) => (
+    <CommentActions
+      comment={c}
+      status={status}
+      isMine={c.userId === userId}
+      deleting={deletingIds?.has(c.id) ?? false}
+      vote={vote}
+      onSignInRequired={onSignInRequired}
+      onDelete={onDelete}
+    />
+  );
 
   return (
-    <div className="mt-1 border-l border-hairline-cool pl-3">
-      {replies.length > 0 && (
-        <ul>
+    // 구분선은 항목 사이에만 — 정렬 바로 아래 첫 항목에는 없다
+    <li className="border-t border-hairline-cool first:border-t-0">
+      <CommentItem
+        comment={comment}
+        isMine={comment.userId === userId}
+        nowMs={nowMs}
+        actions={actionsFor(comment)}
+      >
+        <ReplyArea comment={comment} replies={replies} status={status}>
           {replies.map((r) => (
             <li key={r.id}>
               <CommentItem
@@ -318,12 +346,73 @@ function ReplyArea({
                 reply
                 isMine={r.userId === userId}
                 nowMs={nowMs}
-                actions={actions(r)}
+                actions={actionsFor(r)}
               />
             </li>
           ))}
-        </ul>
+        </ReplyArea>
+      </CommentItem>
+    </li>
+  );
+}, sameThreadRow);
+
+/** 표·답글·삭제 줄 — 답글에는 `답글` 버튼이 없다(깊이 1 — DB 트리거도 같은 제한) */
+function CommentActions({
+  comment,
+  status,
+  isMine,
+  deleting,
+  vote,
+  onSignInRequired,
+  onDelete,
+}: {
+  comment: Comment;
+  status: SessionStatus;
+  isMine: boolean;
+  deleting: boolean;
+  vote: CommentVoteFn;
+  onSignInRequired: (action: string) => void;
+  onDelete: (commentId: number) => void;
+}) {
+  return (
+    <>
+      <CommentVoteButtons comment={comment} vote={vote} />
+      {comment.parentId === null && (
+        <ReplyButton comment={comment} status={status} onSignInRequired={onSignInRequired} />
       )}
+      {isMine && (
+        <button
+          type="button"
+          disabled={deleting}
+          className={cn(ACTION_BUTTON, "ml-auto text-ink-mute-2")}
+          onClick={() => onDelete(comment.id)}
+        >
+          {deleting ? "삭제 중…" : "삭제"}
+        </button>
+      )}
+    </>
+  );
+}
+
+/** 답글 목록(`children`)과 답글 입력칸 — 본문 칸 안쪽 · 왼쪽 1px 레일. 둘 다 없으면 아무것도 그리지 않는다 */
+function ReplyArea({
+  comment,
+  replies,
+  status,
+  children,
+}: {
+  comment: Comment;
+  replies: Comment[];
+  status: SessionStatus;
+  children: ReactNode;
+}) {
+  const { targetId } = useReplyTarget();
+  const replying = targetId === comment.id && status === "authenticated";
+  if (replies.length === 0 && !replying) return null;
+
+  return (
+    <div className="mt-1 border-l border-hairline-cool pl-3">
+      {replies.length > 0 && <ul>{children}</ul>}
       {replying && <ReplyForm nickname={comment.authorNickname} />}
     </div>
   );

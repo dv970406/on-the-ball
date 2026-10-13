@@ -160,7 +160,7 @@
 ## `@/features/write-comment` · `delete-comment` · `vote-comment`
 - `useWriteComment(dealId)` / `validateComment` / `isReplyTargetMissing(error)` — 댓글·답글 작성과 검증(`hasVisibleChar` → `lengthOverflow`, 한도 `COMMENT_LIMIT` — 값은 `api-and-db.md`의 길이 한도 표). ⚠ 무효화 Promise를 반환해 리페치까지 `isPending`을 유지한다. `isReplyTargetMissing`은 실패 사유가 "답글 대상이 지워졌다"(트리거의 P0001 문구)인지 판정한다 — 답글 칸이 같은 안내를 겹쳐 내지 않는 데만 쓰고, 문구는 마이그레이션과 글자 하나까지 같아야 한다. ⚠ **가드는 여기 없다** — 실패 시 입력창·답글 대상을 되돌리는 것은 화면의 상태라 `views/transfer-detail/model/use-comment-composer`가 조립한다.
 - `useDeleteComment(dealId)` — 본인 댓글 hard delete. 0행이면 "이미 삭제된 댓글이에요."(실패해도 다시 받아 유령 행을 걷는다). 확인 다이얼로그·항목별 가드는 뷰 model(`use-comment-deletion`)이 갖는다. ⚠ 확인 문구의 답글 수는 **누르는 순간 목록을 다시 받아** 최신 캐시로 세고, 받는 동안에는 확인 버튼을 막는다(`Dialog`의 `confirmDisabled`) — 받기 전 문구로 확정하면 알리지 않은 남의 답글이 cascade로 지워진다.
-- `CommentVoteButtons({ dealId, comment, onSignInRequired })` — 좋아요·싫어요. ⚠ 훅(`useVoteComment`)은 배럴에 없다(버튼이 유일한 호출부). 낙관적 갱신 + 같은 딜의 표를 `scope`로 직렬화 + "목표 표로 수렴"하는 요청 + 실패·0행만 줄 끝에서 한 번 재동기화(그때는 진행 중인 조회가 있어도 새로 받는다 — 표 때문에 조회를 취소하지는 않는다)(`data-and-state.md` 낙관적 업데이트 절). 가드도 `disabled`도 없다.
+- `useCommentVote(dealId, onSignInRequired)` / `CommentVoteButtons({ comment, vote })` — 좋아요·싫어요. **목록이 `useCommentVote`로 표 보내기를 한 벌 만들어**(안정된 참조 — 세션 3분기와 비로그인 안내 호출을 누르는 순간에 한다) 행마다 버튼에 내려보낸다. ⚠ 버튼마다 뮤테이션·세션 구독을 두지 않는다 — 댓글 수만큼 옵저버가 생기고 행 `memo`가 깨진다. 같은 tick 연타를 막는 "마지막으로 요청한 표" ref는 버튼(행)이 갖는다. 뮤테이션 훅(`useVoteComment`)은 배럴에 없다(`useCommentVote`가 유일한 호출부). 낙관적 갱신 + 같은 딜의 표를 `scope`로 직렬화 + "목표 표로 수렴"하는 요청 + 실패·0행만 줄 끝에서 한 번 재동기화(그때는 진행 중인 조회가 있어도 새로 받는다 — 표 때문에 조회를 취소하지는 않는다)(`data-and-state.md` 낙관적 업데이트 절). 가드도 `disabled`도 없다.
 - ⚠ 세 슬라이스 모두 비로그인 안내를 직접 띄우지 않는다 — `onSignInRequired`로 올리고 **뷰가 `SignInDialog` 한 벌**을 문구만 바꿔 쓴다.
 
 ## `@/entities/prediction`

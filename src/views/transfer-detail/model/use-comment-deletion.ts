@@ -1,6 +1,6 @@
 "use client";
 
-import { type RefObject, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { type RefObject, useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useItemGuard, useToast } from "@/shared/lib";
 import type { CommentList } from "@/entities/comment";
 import { useDeleteComment } from "@/features/delete-comment";
@@ -150,6 +150,16 @@ export function useCommentDeletion({
     });
   };
 
+  /**
+   * 댓글 행에 내려보내는 `request` — **안정된 참조**다. 행이 `memo`라 렌더마다 새 함수를 주면 표 하나에
+   * 목록 전체가 다시 그려진다. 렌더마다 새로 만드는 `request`를 ref로 읽는다(`reply-composer.tsx`와 같은 형태).
+   */
+  const requestRef = useRef(request);
+  useEffect(() => {
+    requestRef.current = request;
+  });
+  const stableRequest = useCallback((commentId: number) => requestRef.current(commentId), []);
+
   const confirm = () => {
     if (pendingId === null || checking || pendingInvalid) return;
     const commentId = pendingId;
@@ -194,8 +204,8 @@ export function useCommentDeletion({
     },
     /** 댓글마다 붙는 `삭제` 버튼 */
     item: {
-      /** 확인부터 받는다(이미 지우는 중인 댓글은 무시한다) */
-      request,
+      /** 확인부터 받는다(이미 지우는 중인 댓글은 무시한다) — 안정된 참조 */
+      request: stableRequest,
       /** 그 댓글을 지우는 중인가 — 라벨(`삭제 중…`)과 `disabled`(렌더 중에 부른다) */
       isDeleting: guard.isBusy,
     },
