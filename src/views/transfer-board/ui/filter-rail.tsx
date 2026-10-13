@@ -1,7 +1,7 @@
 "use client";
 
 import { Bell, ChevronDown, ChevronLeft, ChevronRight, Heart, X } from "lucide-react";
-import type { MouseEvent } from "react";
+import { memo, type MouseEvent } from "react";
 import type { TransferLeague, TransferSort } from "@/entities/transfer";
 import { cn } from "@/shared/lib";
 import { chipClassName, Icon } from "@/shared/ui";
@@ -11,16 +11,9 @@ import type { ClubOption } from "../model/use-transfer-board";
 import { BoardLink } from "./board-link";
 import { useRailOverflow } from "./use-rail-overflow";
 
-/**
- * 레일에 늘어놓는 **그 밖의 구단** 수 — 그 뒤는 딜이 한두 건인 구단이라 칩으로 둘 가치가 작다. 선택된 구단은 순위와
- * 무관하게 남긴다. ⚠ 응원 구단은 이 상한에 들지 않는다 — 사용자가 고른 구단이 잘리면 "왜 내 구단이 없지"가 되고,
- * 응원 구단이 많다고 딜 수 상위 구단이 전부 밀려나도 안 된다.
- */
-const MAX_OTHER_CHIPS = 14;
-
 interface FilterRailProps {
-  /** 보드(리그 필터 안)에 등장하는 구단 — 내 응원 구단이 앞, 그 뒤는 딜 수 많은 순 */
-  options: readonly ClubOption[];
+  /** 칩으로 그릴 구단 — 내 응원 구단이 앞, 그 뒤는 딜 수 많은 순. 고르는 판정(상한·선택된 구단)은 `useTransferBoard`가 갖는다 */
+  clubs: readonly ClubOption[];
   /** 선택된 구단 코드 — URL이 소유한다(`?club=`). `null`은 전체 */
   club: string | null;
   league: TransferLeague | null;
@@ -73,6 +66,8 @@ const PAGER =
  * ⚠ 응원 구단 표시(하트)와 관심 칩의 종은 **잉크다(에메랄드 아님)** — 이 슬라이스는 에메랄드를 새로 쓰지 않는다. 아이콘이
  *   형태를 지고 sr-only 글자가 같은 뜻을 준다.
  * ⚠ 리그 버튼은 그냥 `button`이다 — `aria-haspopup`을 붙이지 않는다(과한 ARIA는 없느니만 못하다).
+ * ⚠ `memo`다 — 보드는 행을 고를 때마다(J/K·클릭) 다시 그려지는데 이 레일의 값은 그대로다. 그래서 넘기는 값은 원시값이거나
+ *   메모된 참조여야 한다(뷰가 지킨다).
  * ⚠ 고를 구단이 둘 미만이면 구단 칩을 그리지 않는다(리그 버튼과 관심 칩만 남는다). 단 선택된 구단이 있으면 풀 길이
  *   있어야 하므로 그린다.
  * ⚠ **`min-[90rem]`에서는 숨는다** — 그 폭에서는 왼쪽 레일(`BoardRail`)이 리그·관심·구단을 세로로 늘어놓는다(리그 시트도
@@ -85,8 +80,8 @@ const PAGER =
  *   줄바꿈(`flex-wrap`)은 택하지 않았다 — 구단 칩을 다 펼치면 1024px의 가운데 열에서 여러 줄이 되어 목록이 그만큼 밀린다.
  *   모바일은 그대로다(막대가 원래 숨어 있고 손가락으로 민다 — 버튼·흐림은 md+에만 있다).
  */
-export function FilterRail({
-  options,
+export const FilterRail = memo(function FilterRail({
+  clubs,
   club,
   league,
   sort,
@@ -95,12 +90,8 @@ export function FilterRail({
   onOpenLeague,
   onWatchSignInRequired,
 }: FilterRailProps) {
-  // `options`는 응원 구단이 앞이다(`useTransferBoard`) — 응원 구단 전부 + 그 밖의 구단 상위만 남긴다
-  const others = options.filter((o) => !o.followed);
-  const shown = [...options.filter((o) => o.followed), ...others.slice(0, MAX_OTHER_CHIPS)];
-  const selected = club === null ? null : options.find((o) => o.code === club);
-  if (selected && !shown.includes(selected)) shown.push(selected);
-  const showClubChips = options.length >= 2 || selected !== null;
+  // `club`은 보드에 실제로 있는 구단만 온다(`useTransferBoard`) — 그래서 선택이 있으면 칩 목록에도 있다
+  const showClubChips = clubs.length >= 2 || club !== null;
   const { ref: railRef, back, forward, page } = useRailOverflow<HTMLElement>();
   const fade = back && forward ? RAIL_FADE.both : back ? RAIL_FADE.back : forward ? RAIL_FADE.forward : null;
 
@@ -170,7 +161,7 @@ export function FilterRail({
           )}
 
           {showClubChips &&
-            shown.map((o) => {
+            clubs.map((o) => {
               const isSelected = club === o.code;
               return (
                 <BoardLink
@@ -209,4 +200,4 @@ export function FilterRail({
       </div>
     </div>
   );
-}
+});

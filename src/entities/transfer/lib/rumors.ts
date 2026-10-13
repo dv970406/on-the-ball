@@ -30,8 +30,10 @@ export function pickRecentRumors(
         new Date(report.publishedAt).getTime() >= since
       );
     })
-    .sort((a, b) =>
-      // 위 filter가 `latestReport !== null`을 보장한다 — 타입이 좁혀지지 않아 `?.`로 받는다
-      (b.latestReport?.publishedAt ?? "").localeCompare(a.latestReport?.publishedAt ?? ""),
+    .sort(
+      (a, b) =>
+        // 위 filter가 `latestReport !== null`을 보장한다 — 타입이 좁혀지지 않아 `?.`로 받는다.
+        // 시각으로 비교한다 — 문자열 비교는 소수 초를 생략한 표기를 뒤집는다(`sortReports`와 같은 이유)
+        Date.parse(b.latestReport?.publishedAt ?? "") - Date.parse(a.latestReport?.publishedAt ?? ""),
     );
 }

@@ -14,7 +14,6 @@ import {
   type TransferDealListItem,
   type TransferGroupKey,
   type TransferLeague,
-  type TransferReport,
   type TransferSort,
   useFollowedClubsQuery,
   useTransferDealListQuery,
@@ -48,10 +47,17 @@ export interface ClubOption {
   followed: boolean;
 }
 
+/**
+ * 칩으로 늘어놓는 **그 밖의 구단** 수 — 그 뒤는 딜이 한두 건인 구단이라 칩으로 둘 가치가 작다. 선택된 구단은 순위와
+ * 무관하게 남긴다. ⚠ 응원 구단은 이 상한에 들지 않는다 — 사용자가 고른 구단이 잘리면 "왜 내 구단이 없지"가 되고,
+ * 응원 구단이 많다고 딜 수 상위 구단이 전부 밀려나도 안 된다.
+ */
+const MAX_OTHER_CHIPS = 14;
+
 /** 캐러셀 한 장 — `pickRecentRumors`가 `latestReport !== null`을 보장하므로 여기서 좁혀 둔다 */
 export interface RumorEntry {
   deal: TransferDealListItem;
-  report: TransferReport;
+  report: NonNullable<TransferDealListItem["latestReport"]>;
 }
 
 /** 보드 구간 하나 — `groupDeals`의 반환 원소(배럴이 타입을 따로 내보내지 않아 여기서 뽑는다) */
@@ -162,6 +168,21 @@ export function useTransferBoard({
   }, [deals, league, followedClubs]);
   const effectiveClub = club !== null && clubOptions.some((o) => o.code === club) ? club : null;
 
+  /**
+   * 칩으로 그릴 구단 — 응원 구단 전부 + 그 밖의 구단 상위 `MAX_OTHER_CHIPS` + (밀려났으면) 선택된 구단.
+   * ⚠ 가로 필터 레일(`FilterRail`)과 왼쪽 레일(`BoardRail`)이 **이 결과를 함께** 그린다 — 두 자리가 각자 고르면 같은 보드에서
+   *   다른 구단 칩이 보인다. 행을 고를 때마다 보드가 다시 그려지므로 메모해 두 레일에 같은 참조로 넘긴다.
+   */
+  const clubChips = useMemo<ClubOption[]>(() => {
+    const shown = [
+      ...clubOptions.filter((o) => o.followed),
+      ...clubOptions.filter((o) => !o.followed).slice(0, MAX_OTHER_CHIPS),
+    ];
+    const selected = effectiveClub === null ? undefined : clubOptions.find((o) => o.code === effectiveClub);
+    if (selected && !shown.includes(selected)) shown.push(selected);
+    return shown;
+  }, [clubOptions, effectiveClub]);
+
   // 정렬 → 리그 필터 → 구단 필터 → 관심 필터 → 분류. 순서가 규약이다(`groupDeals`는 입력 순서를 그대로 둔다)
   const groups = useMemo<BoardGroup[]>(
     () =>
@@ -209,10 +230,10 @@ export function useTransferBoard({
     groups,
     counts,
     /**
-     * 필터 레일·왼쪽 레일이 읽는 값 — 구단 칩 목록과 URL의 구단 중 보드에 실제로 있는 것(칩·링크가 이 값을 선택
-     * 상태로 쓴다), 관심 필터의 빈 화면 문구·로그인 안내 판정
+     * 필터 레일·왼쪽 레일이 읽는 값 — 칩으로 그릴 구단(`clubChips`)과 URL의 구단 중 보드에 실제로 있는 것(칩·링크가 이 값을
+     * 선택 상태로 쓴다), 관심 필터의 빈 화면 문구·로그인 안내 판정
      */
-    filter: { clubOptions, club: effectiveClub, watchedCount, isGuest },
+    filter: { clubChips, club: effectiveClub, watchedCount, isGuest },
     /**
      * 이 보드의 쿼리 스코프(복원 전에는 서버가 본 사용자) — 같은 스코프의 쿼리를 갖는 하위(오른쪽 딜 판)까지 흘려보낸다.
      * 판이 다른 키로 같은 딜을 찾으면 첫 렌더에 같은 데이터를 한 번 더 받는다(`nextjs.md` 서버 프리페치 절).

@@ -2,7 +2,7 @@
 
 import { Heart, X } from "lucide-react";
 import Link from "next/link";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import {
   dealInLeague,
   FeeDelta,
@@ -21,9 +21,6 @@ import { LEAGUE_OPTIONS } from "../lib/league-options";
 import type { ClubOption } from "../model/use-transfer-board";
 import { BoardLink } from "./board-link";
 
-/** 레일에 늘어놓는 그 밖의 구단 수 — `FilterRail`과 같은 판단(응원 구단·선택된 구단은 상한 밖) */
-const MAX_OTHER_CHIPS = 14;
-
 /** 레일 항목의 선택 표시 — 잉크 왼쪽 막대 + 옅은 배경(표의 고른 행과 같은 말). 그림자가 아니라 `after:`로 그린다 */
 const RAIL_ON =
   "bg-canvas-soft after:absolute after:inset-y-0 after:left-0 after:w-[2px] after:bg-ink after:content-['']";
@@ -31,8 +28,8 @@ const RAIL_ON =
 interface BoardRailProps {
   /** 보드 전체(필터 무관) — 리그 건수·관심 딜이 이 목록에서 나온다 */
   deals: readonly TransferDealListItem[];
-  /** 리그 필터 안의 구단 — 응원 구단이 앞, 그 뒤는 딜 수 순(`useTransferBoard`) */
-  clubOptions: readonly ClubOption[];
+  /** 칩으로 그릴 구단 — 응원 구단이 앞, 그 뒤는 딜 수 순. 고르는 판정은 `useTransferBoard`가 갖는다(`FilterRail`과 같은 결과) */
+  clubs: readonly ClubOption[];
   league: TransferLeague | null;
   sort: TransferSort;
   club: string | null;
@@ -56,11 +53,13 @@ interface BoardRailProps {
  *   관심 칩과 같은 판정).
  * ⚠ 구단 칩에 **건수를 적는다**(`FilterRail`과 다르다) — 세로 레일은 리그 목록이 건수를 함께 말하고 칩이 여러 줄로
  *   감겨 순서만으로는 많고 적음이 읽히지 않는다. 한 줄 가로 레일은 순서가 곧 건수라 숫자를 뺀다.
+ * ⚠ `memo`다 — 사유는 `FilterRail`과 같다(행을 고를 때마다 보드가 다시 그려진다). 그래서 `selectedId`는 **관심 딜을 골랐을
+ *   때만** 값이다(보드 뷰가 거른다) — 관심 딜 밖의 선택까지 받으면 J/K마다 바뀌어 메모가 헛돈다.
  * ⚠ 이 레일은 에메랄드를 새로 쓰지 않는다 — 관심 딜의 변동폭 화살표(`FeeDelta`)·상태 뱃지가 갖는 자리뿐이다.
  */
-export function BoardRail({
+export const BoardRail = memo(function BoardRail({
   deals,
-  clubOptions,
+  clubs,
   league,
   sort,
   club,
@@ -78,10 +77,6 @@ export function BoardRail({
       ),
     [deals],
   );
-  const others = clubOptions.filter((o) => !o.followed);
-  const shownClubs = [...clubOptions.filter((o) => o.followed), ...others.slice(0, MAX_OTHER_CHIPS)];
-  const selectedClub = club === null ? null : clubOptions.find((o) => o.code === club);
-  if (selectedClub && !shownClubs.includes(selectedClub)) shownClubs.push(selectedClub);
 
   return (
     <aside aria-label="관심 딜·필터" className="py-4">
@@ -189,18 +184,18 @@ export function BoardRail({
         </ul>
       </section>
 
-      {(shownClubs.length >= 2 || selectedClub) && (
+      {(clubs.length >= 2 || club !== null) && (
         <section aria-labelledby="tm-rail-club">
           <div className="flex items-baseline justify-between px-4 pb-2">
             <h2 id="tm-rail-club" className="text-[12px] font-medium text-ink-mute">
               구단
             </h2>
-            {shownClubs.some((o) => o.followed) && (
+            {clubs.some((o) => o.followed) && (
               <span className="text-[11px] text-ink-mute-2">응원 구단이 앞</span>
             )}
           </div>
           <nav aria-label="구단 필터" className="flex flex-wrap gap-1.5 px-4">
-            {shownClubs.map((o) => {
+            {clubs.map((o) => {
               const on = club === o.code;
               return (
                 <BoardLink
@@ -233,4 +228,4 @@ export function BoardRail({
       )}
     </aside>
   );
-}
+});

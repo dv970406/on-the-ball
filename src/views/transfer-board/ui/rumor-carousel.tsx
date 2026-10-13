@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type UIEvent } from "react";
+import { memo, useState, type UIEvent } from "react";
 import { RumorCard } from "@/entities/transfer";
 import { cn } from "@/shared/lib";
 import type { RumorEntry } from "../model/use-transfer-board";
@@ -31,10 +31,11 @@ interface RumorCarouselProps {
  * ⚠ `확률 N%`는 없다(보류). 카드 자체는 `RumorCard`가 그린다.
  * ⚠ 인디케이터 인덱스는 `round(scrollLeft / (카드폭 + 간격))`. 스냅이
  *   `mandatory`라 멈춘 자리가 늘 카드 경계이고, 그래서 반올림이 곧 현재 카드다.
+ * ⚠ `memo`다 — 보드는 행을 고를 때마다 다시 그려지는데 소식(`rumors` — 메모된 배열)·기준 시각은 그대로다.
  * ⚠ 점은 `aria-hidden`이다 — 상태를 말하지 않는 순수 장식이라 `rounded-[2px]`(4×4)로 둔다
  *   (`rounded-full` 예외 목록을 늘리지 않는다).
  */
-export function RumorCarousel({ rumors, nowMs }: RumorCarouselProps) {
+export const RumorCarousel = memo(function RumorCarousel({ rumors, nowMs }: RumorCarouselProps) {
   const [index, setIndex] = useState(0);
 
   const handleScroll = (e: UIEvent<HTMLUListElement>) => {
@@ -83,4 +84,4 @@ export function RumorCarousel({ rumors, nowMs }: RumorCarouselProps) {
       </div>
     </section>
   );
-}
+});

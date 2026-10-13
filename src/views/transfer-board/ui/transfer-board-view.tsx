@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   TRANSFER_DEAL_LIMIT,
   type TransferClub,
@@ -120,7 +120,7 @@ export function TransferBoardView({
     nowMs,
     serverNowMs,
   });
-  const { clubOptions, club, watchedCount, isGuest } = filter;
+  const { clubChips, club, watchedCount, isGuest } = filter;
   const allDeals = deals.data;
 
   // 구간마다의 화면 배치(소구간·열기 순) — 그리는 쪽과 판의 기본 선택이 **같은 결과**를 본다(`groupLayout`)
@@ -147,10 +147,13 @@ export function TransferBoardView({
   // ⚠ 닫아도 내용은 남긴다 — 닫히는 애니메이션 동안 문구가 비면 글자가 깜빡인다
   const [signInPrompt, setSignInPrompt] = useState<SignInPrompt>({ action: "" });
   const [signInOpen, setSignInOpen] = useState(false);
-  const promptSignIn = (prompt: SignInPrompt) => {
+  // ⚠ 메모된 레일(`BoardRail`·`FilterRail`)에 내려가는 콜백은 `useCallback`으로 참조를 고정한다 — 행을 고를 때마다(J/K)
+  //   새 함수가 내려가면 `memo`가 헛돈다
+  const promptSignIn = useCallback((prompt: SignInPrompt) => {
     setSignInPrompt(prompt);
     setSignInOpen(true);
-  };
+  }, []);
+  const openLeagueSheet = useCallback(() => setLeagueSheetOpen(true), []);
   // 구간 점프·활성 칩 판정(DOM 메커니즘)은 `use-group-jump`가 소유한다
   const {
     panelRef,
@@ -179,17 +182,31 @@ export function TransferBoardView({
     if (next !== league) navigateBoard(boardHref(next, sort, null, watch), "replace");
   };
   /**
-   * 로그인 뒤 돌아올 보드 주소 — 지금 필터에 **판에 열린 딜**까지 싣는다(2분할일 때만 — 모바일에는 고른 딜이 없다).
-   * ⚠ 기본값(`/transfers`)으로 두면 로그인하고 돌아왔을 때 필터가 풀리고 판이 첫 딜을 연다 — 담으려던 딜이 아니다.
-   *   주소에 딜이 없던 기본 선택도 id를 싣는다(로그인 뒤 목록이 달라져도 같은 딜이 열리게).
+   * 판에 열린 딜(2분할일 때만) — 누르는 순간에 읽는다. 렌더 값을 콜백이 잡으면 행을 고를 때마다 콜백이 바뀌어 메모된 레일이
+   * 다시 그려진다 → 커밋 뒤에 ref로 옮겨 두고 클릭 핸들러에서만 읽는다(렌더 중에는 읽지 않는다).
    */
-  const returnHref = (nextWatch: boolean) =>
-    boardHref(league, sort, club, nextWatch, split ? (selectedDeal?.id ?? null) : null);
+  // 왼쪽 레일에는 **관심 딜을 골랐을 때만** 고른 id를 내린다 — 레일이 표시하는 것은 관심 딜 목록 안의 선택뿐이라, 그 밖의 딜을
+  // 고를 때마다 바뀌는 값을 넘기면 메모된 레일이 J/K마다 다시 그려진다
+  const railSelectedId =
+    selectedId !== null && allDeals?.some((d) => d.id === selectedId && d.isWatched) ? selectedId : null;
+  const selectedIdRef = useRef(selectedId);
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
   /**
    * 관심 딜 모아 보기의 로그인 안내.
    * ⚠ `next`를 준다 — 누른 것이 "관심 딜만 보기"라, 로그인하고 돌아오면 그 필터가 걸려 있어야 다시 누르지 않는다.
+   * ⚠ 돌아올 주소에는 **판에 열린 딜**까지 싣는다(모바일에는 고른 딜이 없다). 기본값(`/transfers`)으로 두면 로그인하고
+   *   돌아왔을 때 필터가 풀리고 판이 첫 딜을 연다 — 주소에 딜이 없던 기본 선택도 id를 싣는다(로그인 뒤 목록이 달라져도 같은 딜이 열리게).
    */
-  const promptWatchSignIn = () => promptSignIn({ action: "관심 딜을 모아 보려면", next: returnHref(true) });
+  const promptWatchSignIn = useCallback(
+    () =>
+      promptSignIn({
+        action: "관심 딜을 모아 보려면",
+        next: boardHref(league, sort, club, true, selectedIdRef.current),
+      }),
+    [promptSignIn, league, sort, club],
+  );
 
   // ⚠ `nowMs`가 `null`인 것은 서버 시각 없이 마운트된 하이드레이션 전 한 프레임뿐이다(이 앱의
   //   page는 늘 내려준다). 그 프레임은 첫 창 이름을 그리고 카운트다운을 미룬다.
@@ -255,13 +272,13 @@ export function TransferBoardView({
               <div className="hidden border-r border-hairline-cool min-[90rem]:sticky min-[90rem]:top-0 min-[90rem]:block min-[90rem]:h-[calc(100dvh-56px-env(safe-area-inset-top))] min-[90rem]:self-start min-[90rem]:overflow-y-auto">
                 <BoardRail
                   deals={allDeals}
-                  clubOptions={clubOptions}
+                  clubs={clubChips}
                   league={league}
                   sort={sort}
                   club={club}
                   watch={watch}
                   isGuest={isGuest}
-                  selectedId={selectedId}
+                  selectedId={railSelectedId}
                   onWatchSignInRequired={promptWatchSignIn}
                 />
               </div>
@@ -295,13 +312,13 @@ export function TransferBoardView({
                     trailing={<SortLinks league={league} sort={sort} club={club} watch={watch} />}
                   />
                   <FilterRail
-                    options={clubOptions}
+                    clubs={clubChips}
                     club={club}
                     league={league}
                     sort={sort}
                     watch={watch}
                     isGuest={isGuest}
-                    onOpenLeague={() => setLeagueSheetOpen(true)}
+                    onOpenLeague={openLeagueSheet}
                     onWatchSignInRequired={promptWatchSignIn}
                   />
 

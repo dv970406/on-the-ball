@@ -9,7 +9,7 @@ import { formatRelativeTime } from "@/shared/lib";
 import { Icon } from "@/shared/ui";
 import { reporterName } from "../lib/reporter";
 import { destinationClubs, routeLabels } from "../lib/route-label";
-import type { TransferDealListItem, TransferReport } from "../model/types";
+import type { TransferDealListItem, TransferLatestReport } from "../model/types";
 import { StatusBadge } from "./status-badge";
 import { FeeValue } from "./fee-value";
 import { CredibilityBadge } from "./credibility-badge";
@@ -20,7 +20,7 @@ import { playerName } from "../lib/player-name";
 interface RumorCardProps {
   deal: TransferDealListItem;
   /** 캐러셀에 실린 근거인 최신 1차 보도 — `pickRecentRumors`가 `null`이 아님을 보장한다 */
-  report: TransferReport;
+  report: TransferLatestReport;
   /** 기준 시각 — `serverNowMs ?? useNowMs()`는 뷰가 한다 */
   nowMs: number | null;
   /** 트랙의 첫 카드 — 첫 화면에 보이므로 엠블럼을 지연 로드하지 않는다 */

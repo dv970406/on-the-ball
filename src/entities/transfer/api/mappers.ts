@@ -6,8 +6,10 @@ import type {
   TransferDealRow,
   TransferDealWatchRow,
   TransferLeague,
+  TransferLatestReport,
   TransferNewsRow,
   TransferReport,
+  ReportGist,
 } from "../model/types";
 import { TRANSFER_LEAGUES } from "../model/types";
 
@@ -28,13 +30,20 @@ export const RUMOR_CAROUSEL_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
 const CLUB_COLUMNS = "code, name, short_name, league";
 const DEAL_COLUMNS =
-  "id, player, player_ko, position, birth_year, nationality, stage, fee_amount, fee_currency, fee_text, fee_kind, prev_fee_amount, fee_low_amount, fee_high_amount, add_on_amount, contract_text, wage_text, first_reported_at, latest_reported_at, report_count, is_free_agent";
+  "id, player, player_ko, position, birth_year, nationality, stage, fee_amount, fee_currency, fee_text, fee_kind, prev_fee_amount, fee_low_amount, fee_high_amount, add_on_amount, contract_text, wage_text, latest_reported_at, report_count, is_free_agent";
 /**
  * ⚠ **`body`가 없다.** anon·authenticated에는 `body`를 뺀 컬럼만 grant돼 있어 `select=*`도
  *   `body`도 42501이다(`api-and-db.md` 이적 소식 절) — 그래서 컬럼을 나열한다.
  */
 const REPORT_COLUMNS =
   "id, deal_id, source_id, attribution, attributed_to, tier, stage, fee_amount, fee_currency, fee_text, published_at, url, provenance_url, body_excerpt, summary_ko";
+/**
+ * 목록의 최신 보도 — 목록이 그리는 것(출처 표기·공신력 · 게시 시각 · 요지)만 받는다. 딜마다 한 건씩 상한만큼 실리므로
+ * 타임라인 컬럼을 통째로 실으면 그 무게가 목록 응답 전체에 곱해진다.
+ * ⚠ 컬럼을 더하면 `LatestReportSelectRow`·`TransferLatestReport`도 함께 넓힌다 — 좁은 타입이 목록에서 없는 필드를 읽는
+ *   코드를 컴파일 에러로 막는 장치다.
+ */
+const LATEST_REPORT_COLUMNS = "source_id, attribution, attributed_to, published_at, body_excerpt, summary_ko";
 
 /**
  * PostgREST select 문자열의 단일 소스 — 스키마가 바뀌면 여기 한 곳만 고친다.
@@ -44,14 +53,14 @@ const REPORT_COLUMNS =
  * ⚠ `transfer_deal_watch(user_id)` 임베딩은 SELECT 정책이 "내 행만"이라 **배열 길이가 곧
  *   "내가 관심 등록했는가"** 다. 목록에도 실려야 행이 관심 표시를 그릴 수 있다.
  * ⚠ `suitors:transfer_deal_suitor(...)`는 딜의 관심 구단 자식 행이다 — 화면이 전부 그리므로 코드가 아니라 구단 행을 임베딩한다.
- * ⚠ `latest:transfer_news!deal_id(...)`는 **최신 1건만** 받는다 — 정렬·상한은 select 문자열이
+ * ⚠ `latest:transfer_news!deal_id(...)`는 **최신 1건만**, 목록이 그리는 컬럼만(`LATEST_REPORT_COLUMNS`) 받는다 — 정렬·상한은 select 문자열이
  *   아니라 `list-query.ts`가 `.order(…, { referencedTable })`·`.limit(1, { referencedTable })`로
  *   건다(임베딩 정렬은 select 안에 적을 수 없다).
  * ⚠ **문자열을 `+`로 잇지 않는다** — 리터럴 타입이 `string`으로 넓어지면 추론이 통째로
  *   `GenericStringError`가 된다(실측). 한 템플릿 리터럴로 둔다.
  */
 export const DEAL_LIST_SELECT =
-  `${DEAL_COLUMNS}, from:transfer_club!from_club_code(${CLUB_COLUMNS}), to:transfer_club!to_club_code(${CLUB_COLUMNS}), suitors:transfer_deal_suitor(position, club:transfer_club(${CLUB_COLUMNS})), transfer_deal_watch(user_id), latest:transfer_news!deal_id(${REPORT_COLUMNS})` as const;
+  `${DEAL_COLUMNS}, from:transfer_club!from_club_code(${CLUB_COLUMNS}), to:transfer_club!to_club_code(${CLUB_COLUMNS}), suitors:transfer_deal_suitor(position, club:transfer_club(${CLUB_COLUMNS})), transfer_deal_watch(user_id), latest:transfer_news!deal_id(${LATEST_REPORT_COLUMNS})` as const;
 
 /**
  * 상세 select — 최신 보도 임베딩이 **없다.** 상세는 타임라인 전체를 따로 받으므로
@@ -142,6 +151,13 @@ export type ReportSelectRow = Pick<
   | "summary_ko"
 >;
 
+/** 한국어 요약 우선 — 요약 단계가 아직 돌지 않았거나 버린 행은 영문 발췌로 대신한다(타임라인·목록이 같은 판정) */
+function buildGist(row: Pick<TransferNewsRow, "summary_ko" | "body_excerpt">): ReportGist | null {
+  if (row.summary_ko) return { text: row.summary_ko, lang: "ko" };
+  if (row.body_excerpt) return { text: row.body_excerpt, lang: "en" };
+  return null;
+}
+
 export function buildReport(row: ReportSelectRow): TransferReport {
   return {
     id: row.id,
@@ -157,12 +173,23 @@ export function buildReport(row: ReportSelectRow): TransferReport {
     publishedAt: row.published_at,
     // 원저자 주소 우선 — 사유는 `TransferReport.originalUrl` 주석
     originalUrl: row.provenance_url ?? row.url,
-    // 한국어 요약 우선 — 요약 단계가 아직 돌지 않았거나 버린 행은 영문 발췌로 대신한다
-    gist: row.summary_ko
-      ? { text: row.summary_ko, lang: "ko" }
-      : row.body_excerpt
-        ? { text: row.body_excerpt, lang: "en" }
-        : null,
+    gist: buildGist(row),
+  };
+}
+
+/** `LATEST_REPORT_COLUMNS`가 돌려주는 행 */
+export type LatestReportSelectRow = Pick<
+  TransferNewsRow,
+  "source_id" | "attribution" | "attributed_to" | "published_at" | "body_excerpt" | "summary_ko"
+>;
+
+function buildLatestReport(row: LatestReportSelectRow): TransferLatestReport {
+  return {
+    sourceId: row.source_id,
+    attribution: row.attribution,
+    attributedTo: row.attributed_to,
+    publishedAt: row.published_at,
+    gist: buildGist(row),
   };
 }
 
@@ -207,7 +234,6 @@ export interface DealSelectRow {
   add_on_amount: TransferDealRow["add_on_amount"];
   contract_text: TransferDealRow["contract_text"];
   wage_text: TransferDealRow["wage_text"];
-  first_reported_at: TransferDealRow["first_reported_at"];
   latest_reported_at: TransferDealRow["latest_reported_at"];
   report_count: TransferDealRow["report_count"];
   is_free_agent: TransferDealRow["is_free_agent"];
@@ -240,7 +266,6 @@ export function buildDeal(row: DealSelectRow): TransferDeal {
     addOnAmount: row.add_on_amount,
     contractText: row.contract_text,
     wageText: row.wage_text,
-    firstReportedAt: row.first_reported_at,
     latestReportedAt: row.latest_reported_at,
     reportCount: row.report_count,
     isFreeAgent: row.is_free_agent,
@@ -252,14 +277,14 @@ export function buildDeal(row: DealSelectRow): TransferDeal {
 
 /** `DEAL_LIST_SELECT`가 돌려주는 행 — 상세 행 + 최신 보도 1건(배열이다: `limit 1`이라 0~1개) */
 export interface DealListSelectRow extends DealSelectRow {
-  latest: ReportSelectRow[] | null;
+  latest: LatestReportSelectRow[] | null;
 }
 
 export function buildDealListItem(row: DealListSelectRow): TransferDealListItem {
   const latest = row.latest?.[0];
   return {
     ...buildDeal(row),
-    latestReport: latest ? buildReport(latest) : null,
+    latestReport: latest ? buildLatestReport(latest) : null,
   };
 }
 

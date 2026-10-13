@@ -105,6 +105,7 @@
   ⚠ **목록·상세는 `userId`로 스코프된다**(관심 임베딩이 "내 행만"이라 응답 자체가 "나"에 종속된다). **타임라인은 스코프되지 않는다**("나"에 종속된 값이 없다).
   ⚠ **리그·정렬은 쿼리 키에 넣지 않는다** — 서버가 범위 안 딜 **전체**(≤`TRANSFER_DEAL_LIMIT`)를 내리고 뷰(`sortDeals`·`groupDeals`·`dealInLeague`)가 같은 데이터로 계산한다. 필터를 키에 넣으면 `initialData`가 캐시에 닿지 못하는 사고가 난다(`nextjs.md`의 실측 사고와 같은 함정).
   ⚠ `initialData`의 `undefined`(프리페치 안 함·실패)와 `[]`(받았는데 없다)는 다른 뜻이다.
+- ⚠ **목록 딜의 최신 보도(`latestReport`)는 좁은 타입이다**(`TransferLatestReport` — 출처 표기·공신력·게시 시각·요지만). 목록은 딜마다 한 건씩 상한만큼 실려 컬럼 하나가 응답 전체에 곱해지므로, select(`LATEST_REPORT_COLUMNS`)와 타입이 목록이 그리는 필드만 갖는다. 링크·단계·이적료가 필요한 자리는 타임라인(`useTransferReportsQuery`)을 쓴다 — 목록에서 넓혀야 하면 select·행 타입·도메인 타입을 함께 넓힌다.
 - `transferKeys` — 쿼리 키. `list`는 `userId`·`scopeStartIso`(범위 시작 ISO, **분 단위로 내린 값**)를 함께 받는다.
 - **`buildDealListQuery` / `buildDealQuery` / `buildReportsQuery`**(`api/list-query.ts` — 서버 안전) — 목록·단건·타임라인 조립의 단일 소스. 훅과 SSR 페이지가 **같은 함수**를 부른다 — 서버가 정렬·상한·select를 다시 짜면 하이드레이션 직후 목록이 재배열된다.
 - `TRANSFER_DEAL_LIMIT` — 목록 상한(`api/mappers.ts` — SSR과 공유해야 해서 `"use client"`가 아닌 파일에 있다). **화면이 잘림을 안내해야 한다** — 조용히 자르면 그 뒤 항목은 URL을 아는 사람 말고는 도달할 방법이 없다.

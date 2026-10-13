@@ -155,7 +155,6 @@ export interface TransferDeal {
   contractText: TransferDealRow["contract_text"];
   /** `'£250k'` — 원문 표기 그대로(원화 환산은 하지 않는다) */
   wageText: TransferDealRow["wage_text"];
-  firstReportedAt: TransferDealRow["first_reported_at"];
   /** 정렬·범위 기준 — "N분 전"도 이 값이다 */
   latestReportedAt: TransferDealRow["latest_reported_at"];
   reportCount: TransferDealRow["report_count"];
@@ -182,5 +181,12 @@ export interface TransferDeal {
  *   되돌린 뒤 딜 행이 남는 창이 있다(딜은 삭제하지 않고 다시 파생한다 — `api-and-db.md`).
  */
 export interface TransferDealListItem extends TransferDeal {
-  latestReport: TransferReport | null;
+  latestReport: TransferLatestReport | null;
 }
+
+/**
+ * 목록의 최신 보도 — 목록이 그리는 필드(출처 표기·공신력 · 게시 시각 · 요지)만 있다(`LATEST_REPORT_COLUMNS`).
+ * ⚠ 타임라인의 `TransferReport`보다 좁다 — 목록에서 링크·단계·이적료를 읽으려 하면 컴파일 에러가 난다. 필요해지면
+ *   select 컬럼과 함께 넓힌다(목록 응답의 무게가 딜 수만큼 곱해진다는 것을 먼저 따진다).
+ */
+export type TransferLatestReport = Pick<TransferReport, "sourceId" | "attribution" | "attributedTo" | "publishedAt" | "gist">;

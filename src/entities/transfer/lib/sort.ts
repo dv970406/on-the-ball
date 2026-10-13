@@ -5,7 +5,7 @@ import { GROUP_LABEL, GROUP_ORDER, STAGE_GROUP } from "./stage";
 /**
  * 보드 정렬 — **안정 정렬**이다(`Array.prototype.sort`는 ES2019부터 안정). 같은 값끼리는
  * 서버가 준 순서(최신 보도순)를 유지한다.
- * - `latest`: `latestReportedAt` 내림차순
+ * - `latest`: `latestReportedAt` 내림차순(시각 비교)
  * - `fee`: `feeAmount` 내림차순, 이적료 없는 딜은 **뒤**(값이 없는 것을 0으로 세지 않는다)
  * ⚠ 통화가 섞여도 금액만 비교한다 — 환율을 하드코딩하지 않는다("틀린 칸보다 빈 칸").
  *   같은 창의 딜은 대부분 €라 실사용에서 어긋나는 일이 드물고, 어긋나도 순서일 뿐이다.
@@ -23,7 +23,8 @@ export function sortDeals<T extends Pick<TransferDeal, "latestReportedAt" | "fee
       return b.feeAmount - a.feeAmount;
     });
   } else {
-    sorted.sort((a, b) => b.latestReportedAt.localeCompare(a.latestReportedAt));
+    // 시각으로 비교한다 — 문자열 비교는 소수 초를 생략한 표기를 뒤집는다(`sortReports`와 같은 이유). 같은 시각은 0이라 서버 순서가 남는다
+    sorted.sort((a, b) => Date.parse(b.latestReportedAt) - Date.parse(a.latestReportedAt));
   }
   return sorted;
 }
