@@ -13,7 +13,12 @@ import { useEffect, type RefObject } from "react";
  * 저장값을 덮어써 원래 위치를 잃는 문제 방지.
  *
  * ⚠ 재시도는 rAF **와 타이머 양쪽**에 건다. 이유는 아래 `schedule` 주석에.
+ * ⚠ 저장은 스크롤이 멎은 뒤 한 번이다(`SAVE_DEBOUNCE_MS`) — 프레임마다 쓰면 스크롤하는 동안 sessionStorage 쓰기(동기 I/O)가
+ *   초당 수십 번 나간다. 대신 아직 쓰지 않은 값은 화면을 떠날 때(cleanup)와 문서를 떠날 때(`pagehide`) 마저 쓴다.
  */
+/** 스크롤이 이만큼 멎으면 저장한다 */
+const SAVE_DEBOUNCE_MS = 150;
+
 /** 저장 키의 단일 소스 */
 function scrollKey(pathname: string) {
   return `otb-scroll:${pathname}`;
@@ -55,23 +60,31 @@ export function useScrollRestore(ref: RefObject<HTMLElement | null>) {
     let disposed = false;
     let raf = 0;
     let retryTimer = 0;
-    let saveRaf = 0;
-    let ticking = false;
+    let saveTimer = 0;
+    /** 아직 쓰지 않은 위치 — `null`이면 쓸 것이 없다 */
+    let pending: number | null = null;
     const startedAt = performance.now();
 
-    const onScroll = () => {
-      if (ticking) return;
-      ticking = true;
-      // ⚠ 이 핸들을 따로 들고 있어야 cleanup에서 취소된다. 전에는 복원용 raf 변수만
-      //   취소해서, 스크롤 직후 한 프레임 안에 화면을 떠나면 **detached 엘리먼트의
-      //   scrollTop(0)이 저장되어** 뒤로가기 시 맨 위로 튀었다.
-      saveRaf = requestAnimationFrame(() => {
-        writeSaved(el.scrollTop);
-        ticking = false;
-      });
+    const flush = () => {
+      clearTimeout(saveTimer);
+      if (pending === null) return;
+      writeSaved(pending);
+      pending = null;
     };
+    const onScroll = () => {
+      // ⚠ 위치는 **스크롤 이벤트 시점에** 읽어 둔다. 쓰는 시점(타이머·cleanup)에 읽으면 화면을 떠난 뒤
+      //   **detached 엘리먼트의 scrollTop(0)이 저장되어** 뒤로가기 시 맨 위로 튄다(실제로 그랬다).
+      pending = el.scrollTop;
+      clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(flush, SAVE_DEBOUNCE_MS);
+    };
+    let saverAttached = false;
     const attachSaver = () => {
-      if (!disposed) el.addEventListener("scroll", onScroll, { passive: true });
+      if (disposed) return;
+      el.addEventListener("scroll", onScroll, { passive: true });
+      // 새로고침·다른 사이트로 떠날 때는 cleanup이 돌지 않는다 — 문서를 떠나는 순간 남은 값을 쓴다
+      window.addEventListener("pagehide", flush);
+      saverAttached = true;
     };
 
     /**
@@ -117,8 +130,10 @@ export function useScrollRestore(ref: RefObject<HTMLElement | null>) {
     return () => {
       disposed = true;
       unschedule();
-      cancelAnimationFrame(saveRaf);
+      // 멎기 전에 화면을 떠났으면 마지막 위치를 지금 쓴다(이벤트 때 읽어 둔 값이다 — 엘리먼트를 다시 읽지 않는다)
+      if (saverAttached) flush();
       el.removeEventListener("scroll", onScroll);
+      window.removeEventListener("pagehide", flush);
     };
   }, [pathname, ref]);
 }
