@@ -15,6 +15,11 @@ interface RankingViewProps {
    * (안 내리면 복원 직후 내 줄에 표시가 붙으며 줄이 흔들린다).
    */
   initialUserId?: string;
+  /**
+   * 서버가 미리 조회한 `initialUserId`의 점수 — `null`은 "채점된 표가 없다", `undefined`는 "프리페치 안 함"이다.
+   * 상위 목록 밖일 때 "내 순위" 칸을 서버 HTML부터 채운다(안 그러면 하이드레이션 뒤 스켈레톤에서 바뀐다).
+   */
+  initialMyScore?: PredictionScore | null;
   /** 서버가 이 데이터를 읽은 시각 — 회차 안내(어느 창이 언제 채점되는가)와 신선도의 기준 */
   serverNowMs?: number;
 }
@@ -28,18 +33,27 @@ interface RankingViewProps {
  * ⚠ 랭킹은 "나"와 무관한 공개 데이터라 서버가 익명으로 받아 그린다. 로그인 사용자의 "나" 표시만 세션으로 가른다 —
  *   목록 밖(상위 `RANKING_LIMIT` 밖)이면 내 점수를 따로 받아 위에 적는다.
  */
-export function RankingView({ initialRanking, initialUserId, serverNowMs }: RankingViewProps) {
+export function RankingView({
+  initialRanking,
+  initialUserId,
+  initialMyScore,
+  serverNowMs,
+}: RankingViewProps) {
   const sessionStatus = useSessionStore((s) => s.status);
   const storeUserId = useSessionStore((s) => s.user?.id);
   const userId = sessionStatus === "loading" ? initialUserId : storeUserId;
 
-  const ranking = useRankingQuery({
-    initialData: initialRanking,
-    initialDataUpdatedAt: () => (serverNowMs === undefined ? undefined : serverToClientTime(serverNowMs)),
-  });
+  const initialDataUpdatedAt = () =>
+    serverNowMs === undefined ? undefined : serverToClientTime(serverNowMs);
+  const ranking = useRankingQuery({ initialData: initialRanking, initialDataUpdatedAt });
   const mineInList = userId ? ranking.data?.find((s) => s.userId === userId) : undefined;
   // 목록에 내가 없을 때만 따로 받는다 — 있으면 같은 줄을 두 번 받을 이유가 없다
-  const myScore = useMyScoreQuery(ranking.data && !mineInList ? userId : undefined);
+  const scoreUserId = ranking.data && !mineInList ? userId : undefined;
+  const myScore = useMyScoreQuery(scoreUserId, {
+    // 서버가 본 사용자의 키에만 시드한다 — 계정이 바뀌었으면 새로 받는다
+    initialData: scoreUserId !== undefined && scoreUserId === initialUserId ? initialMyScore : undefined,
+    initialDataUpdatedAt,
+  });
   const mine = mineInList ?? myScore.data ?? null;
 
   // ⚠ 서버 시각이 먼저다(`data-and-state.md`) — 훅은 무조건 먼저 부른다

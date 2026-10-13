@@ -165,7 +165,7 @@
 
 ## `@/entities/prediction`
 - `useDealPredictionQuery({ dealId, userId, enabled, initialData, initialDataUpdatedAt, placeholderData })` / `predictionKeys` — 한 딜의 성사 예측(회차별 집계 + 내 표). ⚠ **userId로 스코프된다**(내 표가 "내 행만"). 서버가 다른 사용자로 그린 예측은 `withoutMyPredictions` 사본을 `placeholderData`로 넘긴다(댓글과 같은 규약). 조립은 `buildTallyQuery`·`buildMyPredictionsQuery`·`buildDealPrediction`(서버 안전)이 갖는다. ⚠ **비로그인이면 내 표를 묻지 않는다** — `buildMyPredictionsQuery(…, signedIn)`이 요청 없이 빈 결과를 돌려준다(정책상 늘 빈 배열). 훅은 키의 `userId`로, SSR은 세션 쿠키 유무로 판정해 결과 모양이 갈리지 않는다.
-- `useRankingQuery({ initialData, initialDataUpdatedAt })` / `useMyScoreQuery(userId)` — 예측 랭킹 상위 `RANKING_LIMIT`줄과 한 사람의 점수(채점된 표가 없으면 `null`). 점수·순위는 파생 스크립트가 매시 쓴다 — 화면은 읽기만 한다.
+- `useRankingQuery({ initialData, initialDataUpdatedAt })` / `useMyScoreQuery(userId, { initialData, initialDataUpdatedAt })` — 예측 랭킹 상위 `RANKING_LIMIT`줄과 한 사람의 점수(채점된 표가 없으면 `null`). ⚠ 점수의 `initialData`는 `null`(표 없음)과 `undefined`(프리페치 안 함)가 다르고, 서버가 본 사용자와 `userId`가 같을 때만 넘긴다(`views/ranking`). 점수·순위는 파생 스크립트가 매시 쓴다 — 화면은 읽기만 한다.
 - **`tallyOf` / `myPickOf` / `latestVotedRound` / `yesShare` / `applyPick`** — 집계 읽기와 낙관적 갱신이 **같은 계산**을 쓴다. 비율은 표가 `MIN_VOTES_FOR_SHARE`(슬라이스 내부)보다 적으면 `null`이다 — 세 표 중 두 표를 "67%"로 그리면 팬 다수의 의견처럼 읽힌다.
 - ⚠ 랭킹 select가 profiles를 임베딩한다 → `invalidateProfileConsumers`가 `predictionKeys.ranking()`·`scores()`를 함께 무효화한다.
 - 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/list-query`를 직접 import.

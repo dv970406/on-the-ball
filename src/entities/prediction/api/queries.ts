@@ -81,12 +81,27 @@ export function useRankingQuery({ initialData, initialDataUpdatedAt }: UseRankin
   });
 }
 
+interface UseMyScoreQueryOptions {
+  /**
+   * 서버가 미리 조회한 **이 `userId`의** 점수 — `null`은 "채점된 표가 없다", `undefined`는 "프리페치 안 함(또는 실패)"이다.
+   * ⚠ 서버가 본 사용자와 `userId`가 같을 때만 넘긴다 — 키가 `userId`로 스코프돼 다른 사람의 키에 앉으면 남의 점수가 보인다.
+   */
+  initialData?: PredictionScore | null;
+  initialDataUpdatedAt?: number | (() => number | undefined);
+}
+
 /**
  * 한 사람의 점수 — 채점된 표가 없으면 `null`이다.
  * ⚠ `userId`를 인자로 받는다 — 세션을 아는 상위 레이어가 넘긴다(`useProfileQuery`와 같은 형태). 없으면 조회하지 않는다.
  */
-export function useMyScoreQuery(userId: string | undefined) {
+export function useMyScoreQuery(
+  userId: string | undefined,
+  { initialData, initialDataUpdatedAt }: UseMyScoreQueryOptions = {},
+) {
   return useQuery<PredictionScore | null, Error>({
+    // ⚠ `userId`가 없으면 키가 `score("")`라 거기에 시드하지 않는다
+    initialData: userId ? initialData : undefined,
+    initialDataUpdatedAt,
     queryKey: predictionKeys.score(userId ?? ""),
     queryFn: async () => {
       const supabase = requireBrowserSupabase();
