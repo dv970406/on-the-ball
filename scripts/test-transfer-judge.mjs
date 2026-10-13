@@ -334,6 +334,8 @@ const noLookup = async () => ({ wikidataId: null, nameKo: null });
       ["South American star", J({ move: true, player: null, evidence: "agreement to sign a South American star", summary_ko: "요약." })],
     ]),
   });
+  // 판정은 동시에 돌아 DB에 닿는 순서는 끝나는 순서다 — 보도 순서로 맞춰 본다(돌려주는 updates·경고는 이미 보도 순서다)
+  db.writes.sort((a, b) => a.id - b.id);
   check("집계 — 이동 3(요약 2 · 버림 1) · 아님 2(그중 선수 미특정 1) · 판정 불가 1 · 실패 1 · 모델이 읽은 선수 1", eq([r.move, r.summarized, r.summaryInvalid, r.notMove, r.unnamed, r.invalid, r.failed, r.extractedPlayers], [3, 2, 1, 2, 1, 1, 1, 1]), JSON.stringify(r));
   check("집계 — 캐시 읽은 토큰을 센다", r.cacheReadTokens === 42 && r.inputTokens === 60);
   check("저장 — 이동·아님·판정 불가는 쓰고, 일시 실패는 쓰지 않는다(다음 실행이 다시 묻는다)", eq(db.writes.map((w) => w.id), [1, 2, 3, 5, 6, 7]));
@@ -384,6 +386,7 @@ const noLookup = async () => ({ wikidataId: null, nameKo: null });
     { id: 2, playerKey: "vinicius jr", player: "Vinicius Jr", body: "Vinicius Jr to Arsenal truth emerges", source_id: "rss:fl-arsenal", url: "https://blocked.test/b" },
     { id: 3, playerKey: "david alaba", player: "David Alaba", body: "admits the Brazilian was a target in the summer", source_id: "tg:romano", url: "https://t.me/x" },
   ], { names, corrections: {}, lookup: noLookup, fetchImpl: fakeFetch, client: fakeClient([["Vinicius", J({ move: false, evidence: "admits the Brazilian was a target in the summer" })], ["Brazilian", J({ move: false, evidence: "" })]], sent) });
+  db.writes.sort((a, b) => a.id - b.id);
   check("흐름 — 받은 본문을 요청에 싣는다", sent[0].includes("[기사 본문]") && sent[0].includes("was a target in the summer"));
   check("흐름 — 본문에서 인용한 근거를 받는다", db.writes[0].verdict === "not_move" && db.writes[0].verdict_evidence === "admits the Brazilian was a target in the summer");
   check("흐름 — 못 받으면 저장된 글만으로 판정한다(근거가 없으면 근거만 비운다)", !sent[1].includes("[기사 본문]") && db.writes[1].verdict === "not_move" && db.writes[1].verdict_evidence === null);
@@ -607,7 +610,7 @@ const N = (o) => JSON.stringify({ evidence_ids: [], timing: "current", player: n
     const limit = () => new Anthropic.BadRequestError(400, { type: "error", error: { type: "invalid_request_error", message: "You have reached your specified API usage limits." } }, "You have reached your specified API usage limits.", new Headers());
     const db = fakeDb();
     const client = flaky({ 1: [timeout], 2: [limit] });
-    const r = await runJudgements(db, [needOf(1), needOf(2), needOf(3)], { names, corrections: {}, lookup: noLookup, client });
+    const r = await runJudgements(db, [needOf(1), needOf(2), needOf(3)], { names, corrections: {}, lookup: noLookup, client, concurrency: 1 });
     check("사용 한도 — 멈춘 뒤에는 일시 실패 행을 다시 보내지 않고 이월한다", client.calls.join(",") === "1,2" && r.transient.join(",") === "1" && db.writes.some((w) => w.id === 1 && w.verdict_attempts === 1));
     check("사용 한도 — 실행 화면 경고용 표지를 남긴다", r.usageLimited === true);
   }
@@ -615,14 +618,114 @@ const N = (o) => JSON.stringify({ evidence_ids: [], timing: "current", player: n
   {
     const db = fakeDb();
     const client = flaky({ 1: [timeout], 2: [timeout], 3: [timeout] });
-    const r = await runJudgements(db, [1, 2, 3, 4, 5].map((id) => needOf(id)), { names, corrections: {}, lookup: noLookup, client });
+    const r = await runJudgements(db, [1, 2, 3, 4, 5].map((id) => needOf(id)), { names, corrections: {}, lookup: noLookup, client, concurrency: 1 });
     check("차단기 — 일시 실패 3연속이면 멈추고 실패 행만 이월한다(4·5는 다음 실행이 묻는다)", client.calls.join(",") === "1,2,3" && r.transient.join(",") === "1,2,3" && !db.writes.some((w) => w.id >= 4) && r.warnings.some((w) => w.includes("연달아")), JSON.stringify({ calls: client.calls, t: r.transient }));
   }
   {
     const client = flaky({ 1: [bad], 2: [bad], 3: [bad], 4: [bad], 5: [bad] });
-    const r = await runJudgements(fakeDb(), [1, 2, 3, 4, 5, 6, 7].map((id) => needOf(id)), { names, corrections: {}, lookup: noLookup, client });
+    const r = await runJudgements(fakeDb(), [1, 2, 3, 4, 5, 6, 7].map((id) => needOf(id)), { names, corrections: {}, lookup: noLookup, client, concurrency: 1 });
     check("차단기 — 영구 실패 5연속이면 멈춘다(모델 id·요청 형식 오류)", client.calls.length === 5 && r.failStreakStopped === true);
   }
+  // ── 동시 판정 — 일꾼 수 상한 · 첫 건 홀로 · 차단기·예산·한도는 새로 보내기를 멈추고 보낸 것은 끝낸다 ─────────────
+  // failures: 보도 id → 실패 목록, delay: 보도 id → 응답까지 걸리는 ms(끝나는 순서를 뒤섞는다)
+  const slow = (failures = {}, delay = () => 3) => {
+    const calls = [];
+    const events = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    return { calls, events, max: () => maxInFlight, messages: { create: async (req) => {
+      const id = Number(/#id(\d+)/u.exec(req.messages[0].content)?.[1]);
+      calls.push(id);
+      events.push(`+${id}`);
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      try {
+        await new Promise((res) => setTimeout(res, delay(id)));
+        const queue = failures[id] ?? [];
+        if (queue.length) throw queue.shift()();
+        return { stop_reason: "end_turn", content: [{ type: "text", text: OK }], usage: { input_tokens: 1, output_tokens: 1 } };
+      } finally {
+        inFlight -= 1;
+        events.push(`-${id}`);
+      }
+    } } };
+  };
+  const ids = (n) => Array.from({ length: n }, (_, k) => k + 1);
+  const leftIn = (warnings, needle) => Number(/남은 (\d+)건/u.exec(warnings.find((w) => w.includes(needle)) ?? "")?.[1] ?? NaN);
+  {
+    const db = fakeDb();
+    // 뒤 보도일수록 빨리 끝난다 — 끝나는 순서가 보도 순서와 거꾸로다
+    const client = slow({ 4: [bad] }, (id) => 30 - id * 2);
+    const r = await runJudgements(db, ids(10).map((id) => needOf(id)), { names, corrections: {}, lookup: noLookup, client, concurrency: 3 });
+    check("동시 — 한 번에 묻는 수가 상한(3)을 넘지 않고, 실제로 겹쳐 묻는다", client.max() === 3 && client.calls.length === 10, JSON.stringify({ max: client.max() }));
+    check("동시 — 첫 건은 홀로 묻는다(지시문 캐시를 데운 뒤에 나머지를 보낸다)", client.events.slice(0, 3).join(",") === "+1,-1,+2", client.events.join(","));
+    check("동시 — 끝나는 순서가 뒤집혀도 updates·보도별 경고는 보도 순서다", eq(r.updates.map((u) => u.id), [1, 2, 3, 5, 6, 7, 8, 9, 10]) && r.warnings.findIndex((w) => w.startsWith("#4 판정 실패")) >= 0 && r.failed === 1, JSON.stringify(r.updates.map((u) => u.id)));
+  }
+  {
+    // 차단기 — 끝난 순서로 센다. 멈추면 새로 보내지 않고, 이미 보낸 것은 끝까지 기다려 이월한다. 남은 수는 보내지 않은 행의 수다
+    const db = fakeDb();
+    const all = Object.fromEntries(ids(10).map((id) => [id, [timeout, timeout]]));
+    const client = slow(all);
+    const r = await runJudgements(db, ids(10).map((id) => needOf(id)), { names, corrections: {}, lookup: noLookup, client, concurrency: 3 });
+    const sent = [...client.calls].sort((x, y) => x - y);
+    check("동시 차단기 — 일시 실패가 연달아 나면 새로 보내지 않는다", client.calls.length < 10 && new Set(client.calls).size === client.calls.length, client.calls.join(","));
+    check("동시 차단기 — 보낸 행은 전부 이월하고(다시 묻지 않는다) 보내지 않은 행은 건드리지 않는다", eq(r.transient, sent) && !db.writes.some((w) => !sent.includes(w.id)), JSON.stringify({ t: r.transient, sent }));
+    check("동시 차단기 — 경고의 남은 수 = 보내지 않은 행의 수", leftIn(r.warnings, "연달아") === 10 - sent.length, r.warnings.join(" | "));
+  }
+  {
+    // 차단기 — 동시에 나가 있던 보도가 한 번의 끊김에 함께 실패하면 한 번으로 센다(앞선 실패를 본 뒤에 보낸 보도만 연속이다)
+    const db = fakeDb();
+    // 첫 건(1) 뒤에 함께 나가는 2·3·4가 같은 순간 한 번씩 시간 초과 — 나머지는 성공
+    const client = slow({ 2: [timeout], 3: [timeout], 4: [timeout] }, () => 5);
+    const r = await runJudgements(db, ids(10).map((id) => needOf(id)), { names, corrections: {}, lookup: noLookup, client, concurrency: 3 });
+    check("동시 차단기 — 함께 나간 보도의 동시 실패는 한 번이다(멈추지 않고 끝까지 보낸다)", !r.warnings.some((w) => w.includes("연달아")) && ids(10).every((id) => client.calls.includes(id)), r.warnings.join(" | "));
+    check("동시 차단기 — 그 실패들은 실행 끝에 다시 물어 저장된다", r.transient.length === 0 && [2, 3, 4].every((id) => db.writes.some((w) => w.id === id && w.verdict)), JSON.stringify({ t: r.transient }));
+  }
+  {
+    // 시간 예산 — 새로 보내기 직전에만 본다. 남은 수는 보내지 않은 행의 수
+    let t = 0;
+    const client = slow();
+    const counted = { messages: { create: async (req) => { const res = await client.messages.create(req); t += 400; return res; } } };
+    const db = fakeDb();
+    const r = await runJudgements(db, ids(10).map((id) => needOf(id)), { names, corrections: {}, lookup: noLookup, client: counted, concurrency: 3, timeBudgetMs: 1000, now: () => t });
+    check("동시 예산 — 예산을 넘기면 새로 보내지 않고, 보낸 것은 저장까지 마친다", client.calls.length < 10 && db.writes.length === client.calls.length, JSON.stringify({ calls: client.calls, writes: db.writes.length }));
+    check("동시 예산 — 경고의 남은 수 = 보내지 않은 행의 수", leftIn(r.warnings, "시간 예산") === 10 - client.calls.length, r.warnings.join(" | "));
+  }
+  {
+    // 사용 한도 — 한 번 닿으면 새로 보내지 않는다. 이미 보낸 다른 보도는 끝내고 저장한다. 경고는 한 번
+    const limit = () => new Anthropic.BadRequestError(400, { type: "error", error: { type: "invalid_request_error", message: "You have reached your specified API usage limits." } }, "You have reached your specified API usage limits.", new Headers());
+    const db = fakeDb();
+    const client = slow({ 3: [limit], 4: [limit] }, (id) => (id === 3 ? 1 : 10));
+    const r = await runJudgements(db, ids(8).map((id) => needOf(id)), { names, corrections: {}, lookup: noLookup, client, concurrency: 3 });
+    const ok = client.calls.filter((id) => id !== 3 && id !== 4);
+    check("동시 사용 한도 — 새로 보내지 않는다(8건 중 일부만 묻는다)", client.calls.length < 8 && r.usageLimited === true, client.calls.join(","));
+    check("동시 사용 한도 — 이미 보낸 다른 보도는 끝까지 묻고 저장한다", ok.length > 0 && ok.every((id) => db.writes.some((w) => w.id === id && w.verdict === "move")), JSON.stringify({ calls: client.calls, w: db.writes.map((w) => w.id) }));
+    check("동시 사용 한도 — 경고는 한 번, 남은 수 = 보내지 않은 행의 수", r.warnings.filter((w) => w.includes("사용 한도")).length === 1 && leftIn(r.warnings, "사용 한도") === 8 - client.calls.length, r.warnings.join(" | "));
+  }
+  {
+    // 레이트 리밋도 같은 멈춤이다
+    const rate = () => new Anthropic.RateLimitError(429, { type: "error", error: { type: "rate_limit_error", message: "rate" } }, "rate", new Headers());
+    const client = slow({ 2: [rate] }, (id) => (id === 2 ? 1 : 10));
+    const r = await runJudgements(fakeDb(), ids(8).map((id) => needOf(id)), { names, corrections: {}, lookup: noLookup, client, concurrency: 3 });
+    check("동시 레이트 리밋 — 새로 보내지 않고 남은 수를 알린다", client.calls.length < 8 && leftIn(r.warnings, "한도 초과") === 8 - client.calls.length, r.warnings.join(" | "));
+  }
+  {
+    // 같은 사전 밖 구단을 두 보도가 동시에 확인해도 위키데이터는 한 번, 캐시 행도 하나
+    const body = "Arsenal, Brighton and Aston Villa are all monitoring Sturm Graz midfielder Luca Weinhandl, 17.";
+    const W = N({ evidence_ids: [1], player: "Luca Weinhandl", move: true, stage: "rumour", from: "Sturm Graz", suitors: ["Arsenal", "Brighton", "Aston Villa"], summary_ko: "아스날·브라이턴·애스턴 빌라가 슈투름 그라츠의 루카 바인한들을 지켜보고 있다. 아직 제안은 없다." });
+    let lookups = 0;
+    const lookup = async (name) => { if (name === "Sturm Graz") { lookups += 1; await new Promise((res) => setTimeout(res, 5)); return { wikidataId: "Q1", nameKo: "SK 슈투름 그라츠" }; } return { wikidataId: null, nameKo: null }; };
+    const client = { messages: { create: async (req) => {
+      const text = req.messages[0].content.includes("Weinhandl") ? W : OK;
+      return { stop_reason: "end_turn", content: [{ type: "text", text }], usage: { input_tokens: 1, output_tokens: 1 } };
+    } } };
+    const db = fakeDb();
+    const needs = [needOf(1), { id: 2, playerKey: "luca weinhandl", player: "Luca Weinhandl", body }, { id: 3, playerKey: "luca weinhandl", player: "Luca Weinhandl", body: `${body} Again.` }];
+    await runJudgements(db, needs, { names: createNameBook({}), corrections: {}, lookup, client, concurrency: 3 });
+    const rows = db.upserts.flatMap((u) => u.rows).filter((x) => x.kind === "club" && x.key === "Sturm Graz");
+    check("동시 구단 확인 — 같은 이름은 한 번만 찾고 한 행만 쌓는다", lookups === 1 && rows.length === 1, JSON.stringify({ lookups, rows: rows.length }));
+  }
+
   // 시간 예산 — 다 쓰면 남은 행을 묻지 않는다
   {
     let t = 0;

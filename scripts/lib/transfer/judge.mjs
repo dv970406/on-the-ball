@@ -57,6 +57,11 @@ export const JUDGE_TIME_BUDGET_MS = 5 * 60_000;
 export const JUDGE_TRANSIENT_STREAK_MAX = 3;
 /** 영구 실패(일시 실패가 아닌 API 오류·저장 실패)가 이만큼 연달아 나면 멈춘다 */
 export const JUDGE_FAIL_STREAK_MAX = 5;
+/**
+ * 동시에 묻는 보도 수 — 한 건이 본문 받기·호출·구단 확인·저장을 차례로 기다려 직렬이면 예산 안에 묻는 수가 호출 시간에 묶인다.
+ * 첫 건은 홀로 묻는다(지시문 캐시를 데운 뒤에 나머지가 그 캐시를 읽게). 레이트 리밋·사용 한도에 닿으면 새로 보내지 않는다.
+ */
+export const JUDGE_CONCURRENCY = 3;
 /** 연속 실패 수 상한 — DB CHECK(`transfer_news_verdict_attempts_range`, 0~100) 안에 묶는다 */
 const ATTEMPTS_MAX = 100;
 const nextAttempts = (prev) => Math.min((Number(prev) || 0) + 1, ATTEMPTS_MAX);
@@ -585,7 +590,8 @@ export async function resolveClubs(m, book, { lookup = lookupKo, cacheRows = [],
         try {
           if ([...raw].length > 120) throw new Error("키가 캐시 상한(120자)을 넘는다"); // 이름이 아니라 문장 조각이다
           const r = await lookup(raw, "club");
-          cacheRows.push({ kind: "club", key: raw, name_en: raw.slice(0, 120), name_ko: r.nameKo, wikidata_id: r.wikidataId, source: "wikidata", checked_at: new Date().toISOString() });
+          // 판정을 동시에 돌리면 다른 보도가 같은 이름을 기다리는 사이에 먼저 쌓았을 수 있다 — 한 키는 한 행만
+          if (!cacheRows.some((c) => c.kind === "club" && c.key === raw)) cacheRows.push({ kind: "club", key: raw, name_en: raw.slice(0, 120), name_ko: r.nameKo, wikidata_id: r.wikidataId, source: "wikidata", checked_at: new Date().toISOString() });
           out = r.wikidataId ? raw : null;
         } catch {
           out = null; // 네트워크 오류 — 캐시에 남기지 않는다(다음에 다시 찾는다)
@@ -676,6 +682,8 @@ const newNameRun = () => ({ koEntries: [], summaries: [] });
  */
 async function settleJudgement(n, judged, rawText, ctx) {
   const { out, book, nameRun, clubCache, lookup, nowMs, provenance } = ctx;
+  // 경고를 받을 자리 — 판정 실행은 보도마다 따로 모았다가 보도 순서대로 옮긴다(동시에 돌아 끝나는 순서가 갈린다)
+  const warnings = ctx.warnings ?? out.warnings;
   const at = ctx.verdictAt ?? new Date().toISOString();
   const label = n.player ?? judged.player ?? "?";
   const attempts = nextAttempts(n.prev?.verdict_attempts);
@@ -709,7 +717,7 @@ async function settleJudgement(n, judged, rawText, ctx) {
     }
     out.summaryInvalid += 1;
     const why = judged.kind === "move" ? (judged.summary ? "다른 선수로 읽었다" : judged.summaryIssue) : judged.kind === "invalid" ? judged.reason : "이번에는 이동 아님으로 읽었다";
-    out.warnings.push(`#${n.id} 요약 재시도 실패(${label}): ${why} — 판정과 옛 요약은 그대로 둔다`);
+    warnings.push(`#${n.id} 요약 재시도 실패(${label}): ${why} — 판정과 옛 요약은 그대로 둔다`);
     return { verdict_at: at, verdict_attempts: attempts };
   }
 
@@ -718,7 +726,7 @@ async function settleJudgement(n, judged, rawText, ctx) {
     out.invalid += 1;
     out.kept += 1;
     if (judged.truncated) out.truncated += 1;
-    out.warnings.push(`#${n.id} 판정 불가(${label}): ${judged.reason}${judged.quote ? ` — "${judged.quote}"` : ""} — 옛 판정(${standing.verdict})을 그대로 둔다(${attempts}회째)`);
+    warnings.push(`#${n.id} 판정 불가(${label}): ${judged.reason}${judged.quote ? ` — "${judged.quote}"` : ""} — 옛 판정(${standing.verdict})을 그대로 둔다(${attempts}회째)`);
     return { verdict_at: at, verdict_attempts: attempts };
   }
 
@@ -749,7 +757,7 @@ async function settleJudgement(n, judged, rawText, ctx) {
       if (s.pending) nameRun.summaries.push({ id: n.id, ...s.pending, update });
     } else {
       out.summaryInvalid += 1;
-      out.warnings.push(`#${n.id} 요약 버림(${label}): ${judged.summaryIssue} — 다음 실행이 다시 묻는다`);
+      warnings.push(`#${n.id} 요약 버림(${label}): ${judged.summaryIssue} — 다음 실행이 다시 묻는다`);
       // 통용 표기는 요약이 없어도 후보다
       if (judged.playerKo && !trusted(key)) nameRun.koEntries.push({ id: n.id, key, name: judged.player, ko: judged.playerKo });
       // 옛 요약이 있으면 둔다(다시 물은 경우) — 영문으로 되돌릴 이유가 없다
@@ -759,7 +767,7 @@ async function settleJudgement(n, judged, rawText, ctx) {
     out.notMove += 1;
     if (judged.unnamed) out.unnamed += 1; // 이적 글이지만 선수를 특정할 수 없다 — 딜 후보가 아니라 not_move로 접는다(다시 묻지 않는다)
     // 한 토큰 이름이라 접은 글은 사람이 봐야 한다 — 진짜 한 이름 선수(Patric·Dodo)는 사람 사전에 넣어야 열린다
-    if (judged.unnamed && judged.mention) out.warnings.push(`#${n.id} 한 토큰 이름이라 선수를 특정하지 못했다: "${judged.mention}" — 선수가 맞으면 players-ko.json에 넣는다`);
+    if (judged.unnamed && judged.mention) warnings.push(`#${n.id} 한 토큰 이름이라 선수를 특정하지 못했다: "${judged.mention}" — 선수가 맞으면 players-ko.json에 넣는다`);
     if (judged.retrospective) out.retrospective += 1;
     if (judged.titleOnly) out.titleOnly += 1;
     Object.assign(update, { verdict: "not_move", verdict_evidence: judged.evidence, summary_ko: null });
@@ -768,7 +776,7 @@ async function settleJudgement(n, judged, rawText, ctx) {
     if (judged.truncated) out.truncated += 1;
     // 판정이 없는 행에 요약이 남으면 재계약·회고의 요약이 화면에 나간다(운영) — 판정과 함께 비운다
     update.summary_ko = null;
-    out.warnings.push(`#${n.id} 판정 불가(${label}): ${judged.reason}${judged.quote ? ` — "${judged.quote}"` : ""} — 다음 재시도에서 다시 묻는다${provenance ? `(${attempts}회째)` : ""}`);
+    warnings.push(`#${n.id} 판정 불가(${label}): ${judged.reason}${judged.quote ? ` — "${judged.quote}"` : ""} — 다음 재시도에서 다시 묻는다${provenance ? `(${attempts}회째)` : ""}`);
   }
   return update;
 }
@@ -803,6 +811,7 @@ async function flushNames(supabase, out, clubCache, nameRun, names) {
   out.namesWritten += res.written;
   for (const a of res.added) out.warnings.push(formatNewNameLog(a));
   for (const s of res.split) out.warnings.push(`표기가 갈려 쓰지 않음: ${s.key} (${[...new Set(s.candidates)].join(" / ")})`);
+  out.warnings.push(...(res.warnings ?? []));
   // 확정 표기와 다른 표기로 쓴 이번 실행의 요약 — DB와 파생이 메모리에 입힐 값(`updates`)을 함께 고친다
   const finalKo = new Map(res.added.map((a) => [a.key, a.ko]));
   for (const s of nameRun.summaries) {
@@ -883,7 +892,7 @@ export async function replayJudgements(supabase, rows, { names, fetchImpl = fetc
  *   `corrections`가 없으면 `glossary-ko.json`의 교정표를 쓴다. `log`(Console)를 주면 20건마다 진행을 찍는다.
  * @returns 저장한 값(`updates` — 파생이 메모리의 행에 곧바로 입혀 다시 파생한다)과 집계. `namesWritten`이 0보다 크면 이름 사전을 다시 읽는다
  */
-export async function runJudgements(supabase, needs, { apiKey, names, limit = JUDGE_MAX_PER_RUN, client, fetchImpl = fetch, lookup = lookupKo, corrections, nowMs = Date.now(), log = null, system = buildSystem(), config = JUDGE_CONFIG, articleRetry, timeBudgetMs = JUDGE_TIME_BUDGET_MS, now = Date.now } = {}) {
+export async function runJudgements(supabase, needs, { apiKey, names, limit = JUDGE_MAX_PER_RUN, client, fetchImpl = fetch, lookup = lookupKo, corrections, nowMs = Date.now(), log = null, system = buildSystem(), config = JUDGE_CONFIG, articleRetry, timeBudgetMs = JUDGE_TIME_BUDGET_MS, now = Date.now, concurrency = JUDGE_CONCURRENCY } = {}) {
   const api = client ?? new Anthropic({ apiKey, timeout: JUDGE_TIMEOUT_MS, maxRetries: JUDGE_SDK_RETRIES });
   const fixes = corrections ?? loadGlossary().corrections;
   const out = newStats(needs.length);
@@ -891,14 +900,26 @@ export async function runJudgements(supabase, needs, { apiKey, names, limit = JU
   const promptPrint = judgeFingerprint(system, config);
   const nameRun = newNameRun();
   const clubCache = [];
+  // 같은 구단을 두 보도가 동시에 확인하면 한 번만 찾는다(실패는 기억하지 않는다 — 다음 확인이 다시 찾는다)
+  const lookups = new Map();
+  const sharedLookup = (name, kind) => {
+    const k = `${kind}:${name}`;
+    if (!lookups.has(k)) lookups.set(k, Promise.resolve().then(() => lookup(name, kind)).catch((e) => { lookups.delete(k); throw e; }));
+    return lookups.get(k);
+  };
 
   const batch = needs.slice(0, limit);
   const started = Date.now();
   /**
    * 보도 한 건을 묻고 저장한다. 돌려주는 값: "done"(판정·판정 불가·영구 실패 — 다음 행으로) · "transient"(일시 실패 — 다시 물을 수 있다)
-   * · "stop"(한도·사용 한도 — 남은 행을 보내지 않는다).
+   * · "fail"(영구 실패·저장 실패 — 연속 실패를 센다) · "stop"(한도·사용 한도 — 남은 행을 보내지 않는다).
+   * 경고·저장한 값은 보도마다 따로 모아 돌려준다 — 동시에 돌아 끝나는 순서가 갈려도 호출부가 보도 순서대로 옮긴다.
+   * "stop"은 남은 수를 받아 경고 문구를 만드는 함수(`stopWarning`)를 함께 준다 — 남은 수는 멈추는 순간 호출부만 안다.
    */
-  const judgeOne = async (n, remaining) => {
+  const judgeOne = async (n) => {
+    const warnings = [];
+    const updates = [];
+    const done = (status, extra = {}) => ({ status, warnings, updates, ...extra });
     // 기사 본문 — 받지 못하면 저장된 글만으로 판정한다(실패가 아니다). 받았는지는 `verdict_article_chars`로 남는다(0 = 못 받음)
     let article = "";
     const articleSource = wantsArticle(n);
@@ -912,9 +933,9 @@ export async function runJudgements(supabase, needs, { apiKey, names, limit = JU
       out.articleSkipped = (out.articleSkipped ?? 0) + 1;
       const update = { verdict_at: new Date().toISOString(), verdict_attempts: nextAttempts(n.prev?.verdict_attempts) };
       const { error } = await supabase.from("transfer_news").update(update).eq("id", n.id);
-      if (error) out.warnings.push(`#${n.id} 본문 재시도 표지 저장 실패: ${error.message}`);
-      else out.updates.push(Object.assign(update, { id: n.id }));
-      return "done";
+      if (error) warnings.push(`#${n.id} 본문 재시도 표지 저장 실패: ${error.message}`);
+      else updates.push(Object.assign(update, { id: n.id }));
+      return done("done");
     }
     const input = prepareJudgeInput(n, article);
     const request = buildJudgeRequest(n, names, system, article, config);
@@ -945,77 +966,147 @@ export async function runJudgements(supabase, needs, { apiKey, names, limit = JU
         throw new Error(`판정 API 인증 실패(${e.status}) — ANTHROPIC_API_KEY를 확인하세요`);
       }
       if (e instanceof Anthropic.RateLimitError) {
-        out.warnings.push("판정 API 한도 초과 — 남은 행은 다음 실행으로 넘긴다");
-        return "stop";
+        return done("stop", { stopWarning: (left) => `판정 API 한도 초과 — 남은 ${left}건은 다음 실행으로 넘긴다` });
       }
       // 계정 사용 한도(400 "usage limits")·크레딧 소진(400 "credit balance is too low")도 남은 행이 전부 같은 결과다 —
       // 곧바로 거부될 호출을 이어 보내지 않는다. 크레딧 소진을 빠뜨렸더니 한 실행이 546건을 전부 부르고 전부 거부당했다.
       if (e instanceof Anthropic.APIError && e.status === 400 && /usage limit|credit balance/iu.test(e.message)) {
         out.failed += 1;
         out.usageLimited = true;
-        out.warnings.push(`판정 API 계정 사용 한도에 닿았다 — 남은 ${remaining}건은 다음 실행으로 넘긴다: ${e.message.slice(0, 160)}`);
-        return "stop";
+        const message = e.message.slice(0, 160);
+        return done("stop", { stopWarning: (left) => `판정 API 계정 사용 한도에 닿았다 — 남은 ${left}건은 다음 실행으로 넘긴다: ${message}` });
       }
       // 아무것도 쓰지 않는다 — 판정 결과가 아니라 호출의 실패다(옛 판정도 그대로 남는다)
-      if (isTransientApiError(e)) return "transient";
+      if (isTransientApiError(e)) return done("transient");
       out.failed += 1;
-      out.warnings.push(`#${n.id} 판정 실패: ${e instanceof Anthropic.APIError ? e.status : ""} ${e instanceof Error ? e.message : String(e)}`);
-      return "fail";
+      warnings.push(`#${n.id} 판정 실패: ${e instanceof Anthropic.APIError ? e.status : ""} ${e instanceof Error ? e.message : String(e)}`);
+      return done("fail");
     }
 
-    const update = await settleJudgement(n, judged, rawText, { out, book: names, nameRun, clubCache, lookup, nowMs, provenance });
+    const update = await settleJudgement(n, judged, rawText, { out, warnings, book: names, nameRun, clubCache, lookup: sharedLookup, nowMs, provenance });
     const { error } = await supabase.from("transfer_news").update(update).eq("id", n.id);
     if (error) {
       out.failed += 1;
-      out.warnings.push(`#${n.id} 판정 저장 실패: ${error.message}`);
+      warnings.push(`#${n.id} 판정 저장 실패: ${error.message}`);
       // 저장되지 않은 판정의 통용 표기 후보·요약 맞추기는 버린다(실행 끝에 저장되지 않은 행의 요약만 쓰게 된다)
       nameRun.koEntries = nameRun.koEntries.filter((e) => e.id !== n.id);
       nameRun.summaries = nameRun.summaries.filter((s) => s.id !== n.id);
       // 시각·실패 횟수만이라도 남긴다 — 판정 시각이 없으면 같은 행이 매시 다시 물린다(비용 반복). 옛 판정은 건드리지 않는다
       const fallback = { verdict_at: update.verdict_at ?? new Date().toISOString(), verdict_attempts: nextAttempts(n.prev?.verdict_attempts) };
       const res = await supabase.from("transfer_news").update(fallback).eq("id", n.id);
-      if (!res.error) out.updates.push(Object.assign(fallback, { id: n.id }));
-      return "fail";
+      if (!res.error) updates.push(Object.assign(fallback, { id: n.id }));
+      return done("fail");
     }
     // 같은 객체를 넘긴다 — 실행 끝의 표기 맞추기(`flushNames`)가 고친 요약이 파생의 메모리에도 입혀지게
-    out.updates.push(Object.assign(update, { id: n.id }));
-    return "done";
+    updates.push(Object.assign(update, { id: n.id }));
+    return done("done");
+  };
+
+  /*
+   * 일꾼 `concurrency`개가 앞에서부터 하나씩 가져가 묻는다. 새 보도를 가져가기 직전에 `canStart`가 멈출지 정하고(예산·차단기·한도),
+   * 이미 보낸 보도는 끝까지 기다린다(저장까지 마친다). 결과는 끝나는 순서대로 `settle`이 받는다 — 연속 실패도 끝난 순서로 센다.
+   * 인증 실패(throw)는 새로 보내지 않고 나머지가 끝나기를 기다린 뒤 던진다.
+   */
+  const drain = async (items, { firstAlone = false, canStart, settle }) => {
+    const results = new Array(items.length);
+    let next = 0;
+    let thrown = null;
+    const left = () => items.length - next;
+    const take = () => (thrown == null && next < items.length && canStart(left) ? next++ : -1);
+    const step = async (i) => {
+      try {
+        results[i] = await judgeOne(items[i]);
+      } catch (e) {
+        thrown ??= e;
+        return;
+      }
+      settle(i, results[i].status, results[i], left);
+    };
+    const worker = async () => { for (let i = take(); i >= 0; i = take()) await step(i); };
+    // 첫 건은 홀로 — 지시문(prompt cache)을 데운 뒤에 나머지가 동시에 그 캐시를 읽는다
+    if (firstAlone) { const i = take(); if (i >= 0) await step(i); }
+    await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
+    if (thrown) throw thrown;
+    return { results, dispatched: next };
+  };
+  // 보도마다 모은 경고·저장한 값을 보도 순서대로 옮긴다 — 끝나는 순서가 실행마다 갈려도 결과가 같은 순서로 남게
+  const emit = (results, passWarnings) => {
+    for (const r of results) {
+      if (!r) continue;
+      out.warnings.push(...r.warnings);
+      out.updates.push(...r.updates);
+    }
+    out.warnings.push(...passWarnings);
   };
 
   // 일시 실패한 행은 모았다가 실행 끝에 한 번 더 묻는다(그 사이 연결이 회복된다) — 시간 초과 하나로 그 보도가 이번 실행에서 빠지지 않게
-  const transient = [];
+  const transientIdx = [];
   let stopped = false;
   let streak = 0;
+  // 마지막으로 센 일시 실패를 본 순간까지 보낸 보도의 마지막 순번 — 그 뒤에 보낸 보도의 실패만 연속으로 센다
+  let streakMark = -1;
   let failStreak = 0;
+  let finished = 0;
   const begun = now();
-  // 예산·장애로 멈추면 아직 묻지 않은 행은 그대로 다음 실행이 묻는다(상한에 걸린 행과 같다 — 표지를 남기지 않는다)
-  const halt = (i, total, why) => { stopped = true; out.warnings.push(`${why} — 남은 ${total - i}건은 다음 실행이 묻는다`); };
   const overBudget = () => now() - begun >= timeBudgetMs;
-  for (const [i, n] of batch.entries()) {
-    // 호출이 한 건에 3초 안팎이라 수십 건이면 몇 분 동안 아무 출력이 없다 — 20건마다 진행을 찍는다(호출부가 log를 줄 때만)
-    if (log && i > 0 && i % 20 === 0) log.log(`  LLM 판정 진행 ${i}/${batch.length} · ${((Date.now() - started) / 1000).toFixed(0)}초`);
-    if (overBudget()) { halt(i, batch.length, `판정 시간 예산(${Math.round(timeBudgetMs / 1000)}초)을 다 썼다`); break; }
-    const r = await judgeOne(n, batch.length - i - 1);
-    if (r === "transient") {
-      transient.push(n);
-      streak += 1;
-      if (streak >= JUDGE_TRANSIENT_STREAK_MAX) { halt(i + 1, batch.length, `일시 실패가 ${streak}번 연달아 났다(API 장애로 본다)`); break; }
-    } else streak = 0;
-    if (r === "fail") {
-      failStreak += 1;
-      // 같은 실패(모델 id 접근 불가·요청 형식 오류)는 남은 행도 전부 같다 — 상한까지 다 부르지 않는다
-      if (failStreak >= JUDGE_FAIL_STREAK_MAX) { out.failStreakStopped = true; halt(i + 1, batch.length, `판정이 ${failStreak}번 연달아 실패했다(설정·요청 오류로 본다)`); break; }
-    } else failStreak = 0;
-    if (r === "stop") { stopped = true; break; }
-  }
-  const carried = [];
-  for (const [i, n] of transient.entries()) {
-    if (stopped || overBudget()) { carried.push(n); continue; }
-    if (log && i === 0) log.log(`  일시 실패 ${transient.length}건을 다시 묻는다`);
-    const r = await judgeOne(n, transient.length - i - 1);
-    if (r === "transient") carried.push(n);
-    if (r === "stop") stopped = true;
-  }
+  // 예산·장애로 멈추면 아직 보내지 않은 행은 그대로 다음 실행이 묻는다(상한에 걸린 행과 같다 — 표지를 남기지 않는다).
+  // 남은 수는 아직 보내지 않은 행이다 — 이미 보낸 행은 끝까지 묻고 저장한다
+  const passWarnings = [];
+  const halt = (why, left) => {
+    if (stopped) return;
+    stopped = true;
+    passWarnings.push(`${why} — 남은 ${left}건은 다음 실행이 묻는다`);
+  };
+  const onStop = (r, left) => {
+    if (stopped) return;
+    stopped = true;
+    passWarnings.push(r.stopWarning(left));
+  };
+  const first = await drain(batch, {
+    firstAlone: true,
+    canStart: (left) => {
+      if (stopped) return false;
+      if (overBudget()) { halt(`판정 시간 예산(${Math.round(timeBudgetMs / 1000)}초)을 다 썼다`, left()); return false; }
+      return true;
+    },
+    settle: (i, status, r, left) => {
+      finished += 1;
+      // 호출이 한 건에 3초 안팎이라 수십 건이면 몇 분 동안 아무 출력이 없다 — 20건마다 진행을 찍는다(호출부가 log를 줄 때만)
+      if (log && finished % 20 === 0) log.log(`  LLM 판정 진행 ${finished}/${batch.length} · ${((Date.now() - started) / 1000).toFixed(0)}초`);
+      if (status === "transient") {
+        transientIdx.push(i);
+        // ⚠ 연속은 **앞선 실패를 본 뒤에 보낸** 보도만 센다(i는 보낸 순서다) — 동시에 나가 있던 보도들이 한 번의 끊김에 함께
+        //   실패하면 그것은 한 번이다. 다 세면 몇 초짜리 끊김 하나가 차단기를 내려 그 실행의 판정이 통째로 멈춘다
+        if (i > streakMark) {
+          streak += 1;
+          streakMark = batch.length - left() - 1;
+          if (streak >= JUDGE_TRANSIENT_STREAK_MAX) halt(`일시 실패가 ${streak}번 연달아 났다(API 장애로 본다)`, left());
+        }
+      } else streak = 0;
+      if (status === "fail") {
+        failStreak += 1;
+        // 같은 실패(모델 id 접근 불가·요청 형식 오류)는 남은 행도 전부 같다 — 상한까지 다 부르지 않는다
+        if (failStreak >= JUDGE_FAIL_STREAK_MAX && !stopped) { out.failStreakStopped = true; halt(`판정이 ${failStreak}번 연달아 실패했다(설정·요청 오류로 본다)`, left()); }
+      } else failStreak = 0;
+      if (status === "stop") onStop(r, left());
+    },
+  });
+  emit(first.results, passWarnings.splice(0));
+
+  const transient = transientIdx.sort((x, y) => x - y).map((i) => batch[i]);
+  const carriedIdx = [];
+  if (transient.length && !stopped && !overBudget() && log) log.log(`  일시 실패 ${transient.length}건을 다시 묻는다`);
+  const retry = await drain(transient, {
+    canStart: () => !stopped && !overBudget(),
+    settle: (i, status, r, left) => {
+      if (status === "transient") carriedIdx.push(i);
+      if (status === "stop") onStop(r, left());
+    },
+  });
+  emit(retry.results, passWarnings.splice(0));
+  // 보내지 못한 행(멈춤·예산)과 두 번째에도 일시 실패한 행
+  for (let i = retry.dispatched; i < transient.length; i += 1) carriedIdx.push(i);
+  const carried = carriedIdx.sort((x, y) => x - y).map((i) => transient[i]);
   /*
    * 두 번 다 일시 실패한 행은 다음 실행으로 이월한다. 판정한 적이 없는 행에는 `verdict_attempts`만 올려 표지를 남긴다 — 판정 시각을
    * 쓰지 않으므로 다음 실행이 곧바로 다시 묻고, 파생이 그 표지를 보고 같은 층의 다른 보도보다 먼저 세운다(대기열이 길어도 밀리지 않게).
@@ -1031,6 +1122,11 @@ export async function runJudgements(supabase, needs, { apiKey, names, limit = JU
   }
   if (carried.length) out.warnings.push(`일시 실패(시간 초과·연결·서버 오류) ${carried.length}건 — 실행 안에서 한 번 더 물었지만 실패했다. 다음 실행이 먼저 다시 묻는다: ${carried.map((n) => `#${n.id}`).join(" ")}`);
 
+  // 통용 표기 후보·요약 맞추기도 보도 순서로 — 다수결(`pickConsensusKo`)과 새 표기 로그가 끝나는 순서에 흔들리지 않게
+  const order = new Map(batch.map((n, k) => [n.id, k]));
+  const byOrder = (x, y) => (order.get(x.id) ?? 0) - (order.get(y.id) ?? 0);
+  nameRun.koEntries.sort(byOrder);
+  nameRun.summaries.sort(byOrder);
   await flushNames(supabase, out, clubCache, nameRun, names);
   return out;
 }
