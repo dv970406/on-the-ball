@@ -6,8 +6,12 @@ import type { TransferClub, TransferDeal } from "../model/types";
  */
 export const ROUTE_CLUB_LIMIT = 3;
 
-/** 행선지 자리에 놓을 구단들 — 확실한 행선지가 있으면 그것을 앞에, 그 밖의 관심 구단을 뒤에. 관심 구단만 있는 루머는 그 전부 */
-export function destinationClubs(deal: Pick<TransferDeal, "toClub" | "suitors">): TransferClub[] {
+/**
+ * 행선지 자리에 놓을 구단들 — 확실한 행선지가 있으면 그것을 앞에, 그 밖의 관심 구단을 뒤에. 관심 구단만 있는 루머는 그 전부.
+ * ⚠ 오피셜은 행선지가 확정이다 — 옛 루머의 관심 구단을 함께 놓으면 어느 쪽으로 갔는지 헷갈리므로 행선지 하나만 둔다.
+ */
+export function destinationClubs(deal: Pick<TransferDeal, "toClub" | "suitors" | "stage">): TransferClub[] {
+  if (deal.toClub && deal.stage === "official") return [deal.toClub];
   return deal.toClub ? [deal.toClub, ...deal.suitors] : deal.suitors;
 }
 
@@ -26,7 +30,7 @@ export function destinationClubs(deal: Pick<TransferDeal, "toClub" | "suitors">)
  * `full`이면 정식명(상세 경로 카드), 아니면 약칭이다.
  */
 export function routeLabels(
-  deal: Pick<TransferDeal, "fromClub" | "toClub" | "isFreeAgent" | "suitors">,
+  deal: Pick<TransferDeal, "fromClub" | "toClub" | "isFreeAgent" | "suitors" | "stage">,
   { full = false }: { full?: boolean } = {},
 ): { from: string; to: string } {
   const name = (club: TransferClub) => (full ? club.name : club.shortName);

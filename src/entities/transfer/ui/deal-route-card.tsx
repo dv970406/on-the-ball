@@ -61,7 +61,7 @@ function RouteCell({
 }
 
 interface DealRouteCardProps {
-  deal: Pick<TransferDeal, "fromClub" | "toClub" | "isFreeAgent" | "suitors">;
+  deal: Pick<TransferDeal, "fromClub" | "toClub" | "isFreeAgent" | "suitors" | "stage">;
   className?: string;
 }
 

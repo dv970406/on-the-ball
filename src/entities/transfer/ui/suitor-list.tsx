@@ -5,7 +5,7 @@ import type { TransferDeal } from "../model/types";
 import { TransferCrest } from "./transfer-crest";
 
 interface SuitorListProps {
-  deal: Pick<TransferDeal, "toClub" | "suitors">;
+  deal: Pick<TransferDeal, "toClub" | "suitors" | "stage">;
   className?: string;
 }
 
