@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { TransferWindow } from "@/shared/config";
 import { formatCount } from "@/shared/lib";
 import { DeadlineCountdown } from "./deadline-countdown";
@@ -10,6 +11,8 @@ interface BoardHeaderProps {
   /** 필터 무관 전체 딜 수 — 필터를 걸어도 이 수는 바뀌지 않는다 */
   totalCount: number;
   serverNowMs: number | null;
+  /** "읽는 법" 진입점 — 제목 아래 줄 끝에 놓인다(lg+에서는 지수 띠가 같은 버튼을 그린다) */
+  guide?: ReactNode;
 }
 
 /**
@@ -25,14 +28,17 @@ interface BoardHeaderProps {
  *   닫는 리그가 닫히는 순간까지(`openTransferWindow`). 화면을 연 채 마감을 넘기면 카운트다운이
  *   스스로 사라진다(`DeadlineCountdown`).
  */
-export function BoardHeader({ label, openWindow, totalCount, serverNowMs }: BoardHeaderProps) {
+export function BoardHeader({ label, openWindow, totalCount, serverNowMs, guide }: BoardHeaderProps) {
   return (
     <div className="flex items-end justify-between gap-3 border-t border-hairline-cool px-5 pb-3.5 pt-[22px] lg:block lg:border-0 lg:p-0">
       <div className="min-w-0">
         <h1 className="text-[26px] font-medium leading-none tracking-[-0.9px] text-ink lg:sr-only">이적시장</h1>
-        <p className="mt-[5px] text-[12px] text-ink-mute lg:hidden">
-          {label} · 추적 중 <span className="font-mono tabular-nums">{formatCount(totalCount)}</span>건
-        </p>
+        <div className="mt-[5px] flex items-center gap-2.5 lg:hidden">
+          <p className="text-[12px] text-ink-mute">
+            {label} · 추적 중 <span className="font-mono tabular-nums">{formatCount(totalCount)}</span>건
+          </p>
+          {guide}
+        </div>
       </div>
       {openWindow && (
         <div className="lg:hidden">

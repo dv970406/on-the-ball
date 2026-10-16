@@ -4,3 +4,4 @@ export { usePushToggle } from "./model/use-push-toggle";
 // 관심 목록에 담은 직후의 알림 안내 — 딜 상세와 보드의 오른쪽 판(`widgets/deal-panel`)이 같은 판정·같은 한 줄을 쓴다
 export { PushNudge } from "./ui/push-nudge";
 export { usePushNudge } from "./model/use-push-nudge";
+export type { PushNudgeBlock } from "./model/use-push-nudge";

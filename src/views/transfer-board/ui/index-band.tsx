@@ -1,7 +1,7 @@
 "use client";
 
 import type { TransferWindow } from "@/shared/config";
-import { memo, useMemo } from "react";
+import { memo, useMemo, type ReactNode } from "react";
 import {
   GROUP_LABEL,
   STAGE_STATUS,
@@ -33,6 +33,8 @@ interface IndexBandProps {
   /** 지금 열려 있는 창 — 없으면 카운트다운을 그리지 않는다 */
   openWindow: TransferWindow | null;
   serverNowMs: number | null;
+  /** "읽는 법" 진입점 — 창 정보 줄 끝에 놓인다 */
+  guide?: ReactNode;
 }
 
 /**
@@ -46,7 +48,7 @@ interface IndexBandProps {
  * ⚠ 마감 카운트다운은 `BoardHeader`(lg 미만)와 이 띠(lg+)에 한 벌씩 있고 한쪽은 CSS로 가려진다 — 폭으로 갈라 하나만 그리면
  *   서버 HTML이 한 폭의 것이 되어 다른 폭의 첫 화면이 하이드레이션 뒤에 바뀐다. 1초 시계는 둘이 하나를 나눠 쓴다(`useDeadline`).
  */
-export const IndexBand = memo(function IndexBand({ deals, windowLabel, openWindow, serverNowMs }: IndexBandProps) {
+export const IndexBand = memo(function IndexBand({ deals, windowLabel, openWindow, serverNowMs, guide }: IndexBandProps) {
   // 행을 고를 때마다 뷰가 다시 그려진다 — 건수는 보드가 바뀔 때만 센다
   const cellCounts = useMemo(() => {
     const counts = new Map<TransferStatus, number>();
@@ -74,10 +76,13 @@ export const IndexBand = memo(function IndexBand({ deals, windowLabel, openWindo
       </dl>
       {/* 가운데 열의 머리라 폭이 좁다(1024에서 약 640px) — 창 정보는 두 줄로 세워 칸을 덜 먹는다 */}
       <div className="ml-auto flex shrink-0 flex-col items-end justify-center gap-1 border-l border-hairline-cool pl-4 pr-3">
-        <p className="text-[12px] text-ink-mute">
-          <span className="font-medium text-ink">{windowLabel}</span> · 추적 중{" "}
-          <span className="font-mono tabular-nums">{formatCount(deals.length)}</span>건
-        </p>
+        <div className="flex items-center gap-2.5">
+          <p className="text-[12px] text-ink-mute">
+            <span className="font-medium text-ink">{windowLabel}</span> · 추적 중{" "}
+            <span className="font-mono tabular-nums">{formatCount(deals.length)}</span>건
+          </p>
+          {guide}
+        </div>
         {openWindow && <DeadlineCountdown closesAt={openWindow.closesAt} serverNowMs={serverNowMs} />}
       </div>
     </section>

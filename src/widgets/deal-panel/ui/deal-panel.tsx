@@ -190,7 +190,7 @@ export function DealPanel({ deal, userId, nowMs, active, onSignInRequired }: Dea
 
       {/* 하단 고정 줄 — 판의 유일한 에메랄드 CTA는 관심 토글이다(활성 시 `primary` — `buttonClassName`이 갖는다) */}
       <footer className="border-t border-hairline-cool bg-canvas px-6 py-3">
-        {nudge.show && <PushNudge />}
+        {nudge.show && <PushNudge blocked={nudge.blocked} />}
         <div className="flex gap-2">
           <Link
             href={ROUTES.transfer(deal.id)}

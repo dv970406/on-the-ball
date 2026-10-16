@@ -428,7 +428,7 @@ export function TransferDetailView({
                       낼 때만 연다(`usePushNudge`)
                     */}
                     {nudge.show ? (
-                      <PushNudge className="mt-3 border-t border-hairline-cool pt-3" />
+                      <PushNudge className="mt-3 border-t border-hairline-cool pt-3" blocked={nudge.blocked} />
                     ) : (
                       <p className="mt-2.5 text-center text-[12px] text-ink-mute">
                         {deal.isWatched
@@ -470,8 +470,8 @@ export function TransferDetailView({
       {deal && (
         <footer className="absolute inset-x-0 bottom-0 z-[60] border-t border-hairline-cool bg-canvas px-4 pb-[max(30px,env(safe-area-inset-bottom))] pt-2.5 lg:hidden">
           <div className="md:mx-auto md:max-w-[720px]">
-            {/* 방금 담은 사람에게만 — 알림이 꺼져 있고 이 기기에서 켤 수 있을 때(`usePushNudge` 주석) */}
-            {nudge.show && <PushNudge />}
+            {/* 방금 담은 사람에게만 — 알림이 꺼져 있거나 켤 수 없는 이유를 알려야 할 때(`usePushNudge` 주석) */}
+            {nudge.show && <PushNudge blocked={nudge.blocked} />}
             {watchToggle}
           </div>
         </footer>

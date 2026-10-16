@@ -4,6 +4,14 @@ import { useState } from "react";
 import { usePushStatusQuery } from "@/entities/push";
 import { useToastStore } from "@/shared/lib";
 
+/**
+ * 이 기기에서 알림을 켤 수 없는 이유 중 **사용자가 풀 수 있는 것** — 안내 한 줄이 방법을 말한다.
+ * `unsupported`(구형 브라우저)는 풀 방법이 없고 `unconfigured`(알림 키 없음)는 기능이 꺼진 배포라 안내하지 않는다.
+ */
+export type PushNudgeBlock = "needs-install" | "in-app-browser" | "denied";
+
+const NUDGE_BLOCKS: readonly string[] = ["needs-install", "in-app-browser", "denied"] satisfies PushNudgeBlock[];
+
 interface UsePushNudgeArgs {
   /** 지금 보고 있는 딜 — 안내는 **그 딜을 방금 담았을 때만** 뜬다. 같은 자리에서 딜이 바뀌면(보드의 오른쪽 판) 안내도 걷힌다 */
   dealId: number;
@@ -18,6 +26,8 @@ interface UsePushNudgeArgs {
  * `show`가 참일 때 `PushNudge`를 그린다.
  *
  * - 들어올 때 이미 담겨 있던 딜에는 내지 않는다(열 때마다 같은 물음이 뜨면 안내가 아니라 조르기다).
+ * - 켤 수 없는 기기(홈 화면 추가 전 iOS · 앱 안 브라우저 · 차단)에는 물음 대신 **방법**을 낸다 — 버튼만 보여 주고 누르면 실패하는
+ *   것보다, 담은 그 순간에 왜 알림이 안 오는지 알려 주는 편이 낫다.
  * - 알림 상태는 안내를 낼 때만 조회한다 — 담기 전에는 브라우저 API와 서버 왕복을 붙이지 않는다.
  * - ⚠ **"담았어요" 토스트가 걷힌 뒤에 처음 낸다.** 토스트는 하단 바 바로 위에 뜨는데 안내가 뜨면 바가 그만큼 높아져,
  *   토스트가 방금 나타난 안내 문구를 정확히 덮는다(실측). 담았다는 확인이 먼저, 그다음이 물음이다.
@@ -35,8 +45,14 @@ export function usePushNudge({ dealId, watched, userId }: UsePushNudgeArgs) {
   const toastShowing = useToastStore((s) => s.message !== null);
   if (justWatched && !toastShowing && revealedId !== dealId) setRevealedId(dealId);
 
+  const blocked =
+    status.data !== undefined && NUDGE_BLOCKS.includes(status.data) ? (status.data as PushNudgeBlock) : null;
+
   return {
-    show: revealedId === dealId && watched && status.data === "off",
+    // 켤 수 있으면 물음을, 사용자가 풀 수 있는 이유로 못 켜면 방법을 말한다(그 밖에는 아무것도 그리지 않는다)
+    show: revealedId === dealId && watched && (status.data === "off" || blocked !== null),
+    /** 켤 수 없는 이유 — `null`이면 켤 수 있는 상태다. `PushNudge`에 그대로 넘긴다 */
+    blocked,
     /** 방금 담았다 — 다시 담을 때마다 "토스트 → 안내" 순서를 처음부터 밟는다 */
     onWatched: () => {
       setRevealedId(null);

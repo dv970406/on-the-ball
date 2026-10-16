@@ -25,6 +25,7 @@ import { BoardRail } from "./board-rail";
 import { BoardSections } from "./board-sections";
 import { FilterRail } from "./filter-rail";
 import { GroupTabs } from "./group-tabs";
+import { GuideButton, GuideSheet } from "./guide-sheet";
 import { IndexBand } from "./index-band";
 import { LeagueSheet } from "./league-sheet";
 import { RumorCarousel } from "./rumor-carousel";
@@ -144,6 +145,7 @@ export function TransferBoardView({
   const selectedId = split ? (selectedDeal?.id ?? null) : null;
 
   const [leagueSheetOpen, setLeagueSheetOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   // ⚠ 닫아도 내용은 남긴다 — 닫히는 애니메이션 동안 문구가 비면 글자가 깜빡인다
   const [signInPrompt, setSignInPrompt] = useState<SignInPrompt>({ action: "" });
   const [signInOpen, setSignInOpen] = useState(false);
@@ -154,6 +156,7 @@ export function TransferBoardView({
     setSignInOpen(true);
   }, []);
   const openLeagueSheet = useCallback(() => setLeagueSheetOpen(true), []);
+  const openGuide = useCallback(() => setGuideOpen(true), []);
   // 구간 점프·활성 칩 판정(DOM 메커니즘)은 `use-group-jump`가 소유한다
   const {
     panelRef,
@@ -265,6 +268,7 @@ export function TransferBoardView({
               openWindow={openWindow}
               totalCount={allDeals.length}
               serverNowMs={serverNowMs ?? null}
+              guide={<GuideButton onClick={openGuide} />}
             />
 
             <div className="contents lg:grid lg:grid-cols-[minmax(0,1fr)_384px] min-[90rem]:grid-cols-[232px_minmax(0,1fr)_384px]">
@@ -294,6 +298,7 @@ export function TransferBoardView({
                   windowLabel={trackedWindow.label}
                   openWindow={openWindow}
                   serverNowMs={serverNowMs ?? null}
+                  guide={<GuideButton onClick={openGuide} />}
                 />
 
                 {/* 카드 0장이면 섹션 자체를 그리지 않는다 — 빈 캡션이 첫 화면 세로 공간을 먹지 않게 */}
@@ -411,6 +416,8 @@ export function TransferBoardView({
         onSelect={handleLeagueSelect}
         onClose={() => setLeagueSheetOpen(false)}
       />
+
+      <GuideSheet open={guideOpen} onClose={() => setGuideOpen(false)} />
 
       {/* 로그인 안내 — 프레임 직속 자리에 한 벌(`Dialog`가 `absolute`다). 문구·돌아올 곳만 자리마다 다르다 */}
       <SignInDialog

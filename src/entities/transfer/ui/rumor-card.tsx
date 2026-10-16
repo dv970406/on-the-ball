@@ -36,6 +36,7 @@ interface RumorCardProps {
  * ⚠ md+에서는 가로 트랙이 아니라 그리드의 칸이다 — 폭·높이를 칸에 맡기는 규칙과 넘친 카드 가리기는 카드마다 싣지 않고
  *   캐러셀 목록(`views/transfer-board`의 `RumorCarousel`)이 범위에 한 번 건다(`styling.md`). 이 카드는 그 목록 안에서만 그린다.
  * ⚠ 링크의 `data-deal-id`는 lg+에서 보드가 클릭을 가로채 오른쪽 판에 여는 표지다(`DealRow`와 같다).
+ * ⚠ 경로는 폭에 따라 두 모양이다 — md+는 로고 40의 박스, 모바일은 로고 16의 한 줄(카드 높이를 줄여 첫 화면에 딜 행이 보이게).
  * ⚠ 요지는 2줄 클램프 + `min-h-10`으로 카드 높이를 맞춘다 — 요지가 없는 보도가 섞여도 트랙이
  *   들쭉날쭉하지 않게.
  * ⚠ `memo`·`prefetch={false}` — 사유는 `DealRow`와 같다(행을 고를 때마다 보드가 다시 그려진다 · 동적 상세의 뷰포트 프리페치는
@@ -65,8 +66,8 @@ export const RumorCard = memo(function RumorCard({ deal, report, nowMs, priority
           </time>
         </div>
 
-        {/* 경로 블록 — 3열 `1fr 40px 1fr`, 로고 40 + 약칭. 행선지만 500 ink */}
-        <div className="mt-4 mb-3.5 grid grid-cols-[1fr_40px_1fr] items-center rounded-md border border-hairline-cool bg-canvas-soft py-3.5">
+        {/* 경로 블록 — 3열 `1fr 40px 1fr`, 로고 40 + 약칭. 행선지만 500 ink. 모바일(<md)에서는 아래 한 줄이 대신한다 */}
+        <div className="mt-4 mb-3.5 grid max-md:hidden grid-cols-[1fr_40px_1fr] items-center rounded-md border border-hairline-cool bg-canvas-soft py-3.5">
           <span className="flex flex-col items-center gap-[7px] whitespace-nowrap text-[12px] text-ink-mute">
             <TransferCrest club={deal.fromClub} size={40} priority={priority} />
             <span className="max-w-full truncate px-1">
@@ -90,9 +91,27 @@ export const RumorCard = memo(function RumorCard({ deal, report, nowMs, priority
           </span>
         </div>
 
-        <h3 className="truncate text-[20px] font-medium leading-[1.2] tracking-[-0.6px] text-ink">
+        <h3 className="truncate text-[20px] font-medium leading-[1.2] tracking-[-0.6px] text-ink max-md:mt-3">
           {name}
         </h3>
+        {/*
+          모바일 경로 한 줄 — 로고 16 + 약칭. 이름은 말줄임이지만 이 줄은 하이라이트 카드의 요약이고, 전체 경로는 아래 목록
+          행과 상세 카드가 적는다. 큰 경로 블록(로고 40 + 박스)이 카드 높이의 4분의 1을 먹어 첫 화면에 딜 행이 거의 안 보였다.
+          ⚠ `md:hidden` ↔ 위 블록의 `max-md:hidden`은 한 쌍이다 — 하나만 바꾸면 두 경로가 함께 보이거나 둘 다 사라진다.
+          ⚠ 숨겨진 쪽은 접근성 트리에서도 빠진다(`display: none`) — 스크린리더에는 경로가 한 번만 읽힌다.
+        */}
+        <p className="mt-1.5 flex items-center gap-1.5 text-[12px] text-ink-mute md:hidden">
+          <TransferCrest club={deal.fromClub} size={16} priority={priority} />
+          <span className="min-w-0 truncate">{route.from}</span>
+          <Icon as={ArrowRight} size={12} className="shrink-0 text-ink" />
+          <span className="sr-only">, 행선지 </span>
+          {destinations.length > 1 ? (
+            <CrestStack clubs={destinations} size={16} />
+          ) : (
+            <TransferCrest club={destinations[0] ?? null} size={16} priority={priority} />
+          )}
+          <span className="min-w-0 truncate font-medium text-ink">{route.to}</span>
+        </p>
         <p
           lang={report.gist?.lang}
           className="mt-1.5 line-clamp-2 min-h-10 text-[13px] leading-[1.55] text-ink-secondary text-pretty"

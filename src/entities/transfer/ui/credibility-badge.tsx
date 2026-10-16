@@ -1,6 +1,6 @@
 // ⚠ 배럴이 아니라 직접 경로다 — `"use client"`가 없어 서버 렌더 여지를 남긴다(`pill.tsx`와 같은 이유)
 import { cn } from "@/shared/lib/cn";
-import { credibilityOf } from "../lib/credibility";
+import { credibilityOf, type Credibility } from "../lib/credibility";
 import type { TransferReport } from "../model/types";
 
 /**
@@ -28,18 +28,15 @@ interface CredibilityBadgeProps {
 }
 
 /**
- * 출처 공신력 뱃지 — 🎖️(오피셜에 육박하는 매체) 또는 🌑~🌕(그 밖의 매체·기자 5단계). 등재되지 않은 출처면 그리지 않는다.
- *
+ * 공신력 표시 하나 — 이모지는 `aria-hidden`, 뜻은 `sr-only` 글자가 진다(마우스 사용자에게는 `title`).
+ * 뱃지(보도 한 건의 출처)와 보드의 읽는 법 시트(등급 범례)가 같은 모양을 그린다.
  * ⚠ **이모지만 두지 않는다** — 스크린리더는 이모지를 "보름달"처럼 모양 이름으로 읽어 뜻이 전해지지 않는다.
- *   이모지는 `aria-hidden`, 뜻은 `sr-only` 글자가 진다(마우스 사용자에게는 `title`).
  * ⚠ 이모지 폰트를 명시한다 — 본문 폰트(Pretendard)에 이모지가 없어, 대체 폰트를 브라우저에 맡기면
  *   OS마다 흑백 기호가 잡히기도 한다(국기와 같은 폰트 스택).
  */
-export function CredibilityBadge({ report, className }: CredibilityBadgeProps) {
-  const c = credibilityOf(report);
-  if (c === null) return null;
-  const emoji = c.kind === "medal" ? MEDAL : MOON[c.level];
-  const label = c.kind === "medal" ? MEDAL_LABEL : MOON_LABEL[c.level];
+export function CredibilityMark({ value, className }: { value: Credibility; className?: string }) {
+  const emoji = value.kind === "medal" ? MEDAL : MOON[value.level];
+  const label = value.kind === "medal" ? MEDAL_LABEL : MOON_LABEL[value.level];
   return (
     <span title={label} className={cn("inline-flex shrink-0 items-center", className)}>
       <span
@@ -51,4 +48,11 @@ export function CredibilityBadge({ report, className }: CredibilityBadgeProps) {
       <span className="sr-only">{label}</span>
     </span>
   );
+}
+
+/** 출처 공신력 뱃지 — 🎖️(오피셜에 육박하는 매체) 또는 🌑~🌕(그 밖의 매체·기자 5단계). 등재되지 않은 출처면 그리지 않는다. */
+export function CredibilityBadge({ report, className }: CredibilityBadgeProps) {
+  const c = credibilityOf(report);
+  if (c === null) return null;
+  return <CredibilityMark value={c} className={className} />;
 }

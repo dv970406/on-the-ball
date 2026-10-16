@@ -74,6 +74,8 @@ export { DealMiniCard } from "./ui/deal-mini-card";
 export { RumorCard } from "./ui/rumor-card";
 // 상세 화면(`views/transfer-detail`)이 그리는 조각들 — 목록 UI는 같은 슬라이스라 상대 경로로 가져간다
 export { StatusBadge } from "./ui/status-badge";
+// 공신력 표시 하나 — 보드의 읽는 법 시트(`views/transfer-board`)가 등급 범례를 뱃지와 같은 모양으로 그린다
+export { CredibilityMark } from "./ui/credibility-badge";
 export { FeeDelta } from "./ui/fee-delta";
 export { TransferCrest } from "./ui/transfer-crest";
 // 딜 상세(`views/transfer-detail`)와 보드의 오른쪽 판(`widgets/deal-panel`)이 **함께** 그리는 조각들 —
