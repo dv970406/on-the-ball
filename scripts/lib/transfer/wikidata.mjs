@@ -254,13 +254,6 @@ export async function currentClubsOf(playerIds, fetchImpl = fetch, { known = {} 
   return out;
 }
 
-/** 선수 항목 id → 현 소속 구단(`pickCurrentClub`). 네트워크·HTTP 오류는 던진다(호출부가 캐시하지 않는다) */
-export async function currentClubOf(playerId, fetchImpl = fetch) {
-  const r = (await currentClubsOf([playerId], fetchImpl)).get(playerId);
-  if (!r.ok) throw r.error;
-  return r.club;
-}
-
 async function getJson(params, fetchImpl, timeoutMs = TIMEOUT_MS) {
   const url = `${API}?${new URLSearchParams({ format: "json", ...params })}`;
   const res = await fetchImpl(url, { headers: { "User-Agent": USER_AGENT }, signal: AbortSignal.timeout(timeoutMs) });

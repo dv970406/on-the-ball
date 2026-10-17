@@ -24,7 +24,6 @@
  *   - 5대 리그 구단이 하나도 걸리지 않은 후보는 파생이 여기까지 보내지 않는다(`derive-deals.mjs`).
  *   - 글자만 보낸다 — 이미지 블록도 도구(웹 검색·열기)도 없고 링크 주소는 걷는다.
  */
-import { createHash } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import * as cheerio from "cheerio";
 import { detectClubs, isClubName } from "./clubs.mjs";
@@ -36,6 +35,7 @@ import { DEAD, RENEWAL, isRoundupItem } from "./story.mjs";
 import { lookupKo } from "./wikidata.mjs";
 import { clampCp } from "../sync-db.mjs";
 import { normalizePlayer } from "./player-key.mjs";
+import { escapeRe, sha1Hex } from "./util.mjs";
 import { ARTICLE_MAX_CHARS, FEE_CURRENCIES, FEE_KINDS, JUDGE_CONFIG, JUDGE_STAGES, SUITORS_MAX, buildJudgeRequest, buildSystem, ellipsize, judgeFingerprint, prepareJudgeInput } from "./judge-prompt.mjs";
 
 // 요청 쪽(지시문·출력 형식·사용자 메시지)은 judge-prompt.mjs에 있다 — 기존 소비자가 이 파일에서 가져가던 이름을 그대로 내보낸다
@@ -45,23 +45,23 @@ export * from "./judge-prompt.mjs";
  * 호출 한 건의 시간 상한 — SDK 기본값(10분)이면 응답 없이 붙들린 연결 하나가 재시도까지 30분 동안 실행을 묶는다(실측: 끊긴
  * 연결 셋이 30분 넘게 진행이 없었다). 판정 한 건은 생각을 켜도 수십 초 안에 끝난다 — 시간이 다 되면 일시 실패로 쳐 다음 실행이 다시 묻는다.
  */
-export const JUDGE_TIMEOUT_MS = 60_000;
+const JUDGE_TIMEOUT_MS = 60_000;
 /** SDK 재시도 횟수 — 시간 초과·5xx를 SDK가 다시 보내는 횟수. 호출 한 건이 묶이는 최대 시간은 상한 × (재시도 + 1)이다 */
-export const JUDGE_SDK_RETRIES = 1;
+const JUDGE_SDK_RETRIES = 1;
 /**
  * 판정 단계 전체의 시간 예산 — 정기 실행은 작업 시간 상한(워크플로 `timeout-minutes: 10`) 안에서 수집·파생·저장·알림까지 끝내야 한다.
  * 판정이 예산을 넘기면 남은 행은 묻지 않고 다음 실행으로 넘긴다(강제 종료되면 딜 저장까지 통째로 잃는다).
  */
-export const JUDGE_TIME_BUDGET_MS = 5 * 60_000;
+const JUDGE_TIME_BUDGET_MS = 5 * 60_000;
 /** 일시 실패가 이만큼 연달아 나면 장애로 보고 이번 실행의 판정을 멈춘다 — 장애 중에 호출마다 시간 상한을 다 쓰지 않게 */
-export const JUDGE_TRANSIENT_STREAK_MAX = 3;
+const JUDGE_TRANSIENT_STREAK_MAX = 3;
 /** 영구 실패(일시 실패가 아닌 API 오류·저장 실패)가 이만큼 연달아 나면 멈춘다 */
-export const JUDGE_FAIL_STREAK_MAX = 5;
+const JUDGE_FAIL_STREAK_MAX = 5;
 /**
  * 동시에 묻는 보도 수 — 한 건이 본문 받기·호출·구단 확인·저장을 차례로 기다려 직렬이면 예산 안에 묻는 수가 호출 시간에 묶인다.
  * 첫 건은 홀로 묻는다(지시문 캐시를 데운 뒤에 나머지가 그 캐시를 읽게). 레이트 리밋·사용 한도에 닿으면 새로 보내지 않는다.
  */
-export const JUDGE_CONCURRENCY = 3;
+const JUDGE_CONCURRENCY = 3;
 /** 연속 실패 수 상한 — DB CHECK(`transfer_news_verdict_attempts_range`, 0~100) 안에 묶는다 */
 const ATTEMPTS_MAX = 100;
 const nextAttempts = (prev) => Math.min((Number(prev) || 0) + 1, ATTEMPTS_MAX);
@@ -85,7 +85,7 @@ export const EVIDENCE_MAX_CHARS = 300;
 /** 요약 상한 — DB CHECK(`transfer_news_summary_ko_len`)와 같은 값. 지시문은 120자 안팎을 요구한다 */
 export const SUMMARY_MAX_CHARS = 160;
 /** 원출력 상한 — DB CHECK(`transfer_news_verdict_raw_len`)와 같은 값 */
-export const RAW_MAX_CHARS = 2_000;
+const RAW_MAX_CHARS = 2_000;
 /** 단일 이적의 금액 상한(백만) — DB CHECK(`transfer_news_verdict_fee_amount_range`)와 같은 값 */
 const FEE_MAX_M = 350;
 const ARTICLE_TIMEOUT_MS = 10_000;
@@ -231,7 +231,7 @@ export function mentionIn(mention, sentText) {
  * 모델이 "Stuttgart's Finn Jeltsch"의 출발을 "VfB Stuttgart"로 다듬어 적어 원문 대조에 걸려 출발이 비었다(회귀 실측 — 운영에서
  * 출발이 빈 판정의 원인이다). 원문에 없는 구단은 여전히 받지 않는다.
  */
-export function clubMentionIn(mention, sentText) {
+function clubMentionIn(mention, sentText) {
   const verbatim = mentionIn(mention, sentText);
   if (verbatim || typeof mention !== "string") return verbatim;
   const canonical = detectClubs(mention)[0];
@@ -500,7 +500,6 @@ export function parseJudgement(raw, sentText, { corrections, player = null, name
 
 /** 나열의 이음말 — "A, B and C"·"A as well as B"·"A, alongside B". 쉼표나 접속사 중 하나는 있어야 나열이다(공백만으로는 아니다) */
 const LIST_JOIN = String.raw`(?:,\s*(?:(?:and|or|&|as well as|alongside|plus|along with)\s+)?|\s+(?:and|or|&|as well as|alongside|plus|along with)\s+)(?:the\s+)?`;
-const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** to가 원문에서 suitors 중 하나와 같은 나열에 묶여 있는가 — "Tottenham, Newcastle and Chelsea are interested"의 Tottenham */
 export function isEnumeratedWith(text, to, suitors) {
@@ -545,7 +544,7 @@ export function loneOtherClub(text, from) {
  * "Besiktas were among the sides interested"·"who is also attracting interest from Barcelona"가 행선지로 확정됐다(재측정).
  * 그 구단이 나오는 문장만 본다.
  */
-export function hintsOtherSuitors(text, suitor) {
+function hintsOtherSuitors(text, suitor) {
   const name = normalizeQuote(suitor);
   return String(text).split(/(?<=[.!?])\s+|\n+/u).some((s) => normalizeQuote(s).includes(name) && PLURAL_CUE.test(s));
 }
@@ -657,7 +656,7 @@ export function localizeSummary(summary, { player, playerKoByModel, ko, rawClubs
  * 재생이 그 행을 건드리지 않는다. 요청 전체(`inputFingerprint`)가 아니라 원문만 보는 이유: 요청의 <표기>는 이름 사전을 따라
  * 판정 뒤에도 바뀐다(판정이 쌓은 통용 표기·구단 표기가 다음 요청의 <표기>에 실린다) — 요청 전체로 대조하면 재생이 늘 막힌다.
  */
-export const sourceFingerprint = (numberedText) => createHash("sha1").update(String(numberedText)).digest("hex").slice(0, 16);
+export const sourceFingerprint = (numberedText) => sha1Hex(String(numberedText), 16);
 
 /** 그 행에 이미 있는 판정 중 **지금 묻는 선수의 것**(이동·이동 아님) — 없으면 null */
 function standingVerdict(n) {

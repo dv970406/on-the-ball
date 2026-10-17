@@ -26,8 +26,7 @@
  * ⚠ **삭제하지 않는다** — 범위 밖으로 나간 딜은 화면의 범위 필터가 가린다. 지우는 것은 **어떤 보도 행도
  *   더는 가리키지 않는 딜**뿐이다.
  */
-import { createHash } from "node:crypto";
-import { clampCp, slugify, upsertRows } from "../sync-db.mjs";
+import { clampCp, readAll, slugify, upsertRows } from "../sync-db.mjs";
 import { clubCode, clubDisplay, presetClubs } from "./club-display.mjs";
 import { canonicalClubName } from "./clubs.mjs";
 import { contractText, parseContract } from "./contract.mjs";
@@ -39,12 +38,12 @@ import { RANK, RENEWAL, cleanBody, isDead, isRoundup, isRoundupItem, mentionRe, 
 import { normalizePlayer } from "./player-key.mjs";
 
 /** 이적 관련성 하한 — 그 아래는 경기 리뷰·부상 소식이 단계 규칙에 스친 것이다 */
-export const MIN_RELEVANCE = 0.3;
+const MIN_RELEVANCE = 0.3;
 /** 보드 범위 시작보다 이만큼 앞선 보도까지 본다 — 창 직전의 "합의" 보도가 창 안의 오피셜과 한 이야기다 */
-export const SCOPE_SLACK_MS = 14 * 86_400_000;
+const SCOPE_SLACK_MS = 14 * 86_400_000;
 
 // 창 일정 읽기는 windows.mjs가 갖는다(판정 요청도 쓴다) — 기존 소비자를 위해 다시 내보낸다
-import { chunks } from "./util.mjs";
+import { chunks, sha1Hex } from "./util.mjs";
 import { loadWindows, windowSpan } from "./windows.mjs";
 export { loadWindows, windowSpan };
 
@@ -62,7 +61,7 @@ export const derivationStartMs = (nowMs, windows) => boardScopeStartMs(nowMs, wi
 // 선수 키의 정규형 — `player-key.mjs`가 단독으로 갖는다(judge와 공유). 여기서 다시 내보내 호출부의 경로를 유지한다
 export { normalizePlayer };
 /** ⚠ 16자리 소문자 hex — `transfer_deal.deal_key`의 CHECK와 한 쌍이다. 영구 계약(관심이 이 딜의 id를 본다) */
-export const dealKey = (normalized) => createHash("sha1").update(normalized).digest("hex").slice(0, 16);
+export const dealKey = (normalized) => sha1Hex(normalized, 16);
 
 const ts = (r) => Date.parse(r.published_at);
 const tokens = (normalized) => normalized.split(" ");
@@ -135,11 +134,11 @@ export function dedupeRows(rows) {
 /** 그 선수에 대한 LLM 판정 — 다른 선수로 판정했으면(추출이 바뀌어 딜이 옮겨 감) 판정이 없는 것이다 */
 const verdictOf = (r, key) => (r.verdict_player === key ? (r.verdict ?? null) : null);
 /** 판정 불가·실패 재시도 간격의 상한 — 같은 이유로 실패하는 행을 하루마다 끝없이 묻지 않는다(한 행 9회가 있었다) */
-export const JUDGE_BACKOFF_MAX_MS = 7 * 86_400_000;
+const JUDGE_BACKOFF_MAX_MS = 7 * 86_400_000;
 /** 매체 RSS인데 기사 본문 없이 난 판정을, 본문을 받으러 다시 묻는 횟수 상한 */
-export const ARTICLE_RETRY_MAX = 2;
+const ARTICLE_RETRY_MAX = 2;
 /** 본문 재시도를 하는 기간 — 게시 뒤 이만큼 지나면 발췌로 난 판정을 그대로 둔다(시도 횟수가 쌓이지 않아도 끝이 있게) */
-export const ARTICLE_RETRY_WINDOW_MS = 4 * 86_400_000;
+const ARTICLE_RETRY_WINDOW_MS = 4 * 86_400_000;
 /** 연달아 실패한 행을 "반복 실패"로 세는 기준(실행 요약·Actions 경고) */
 export const REPEATED_FAILURE_ATTEMPTS = 3;
 
@@ -888,7 +887,7 @@ export function dealFee(it, ctx, memo) {
  * ⚠ 위험 — 서로 다른 매체가 **따로** 같은 사실을 보도해도 요약이 같으면 접힌다(보도 수가 하나 준다). 짧은 요약("X가 Y의 관심을 받고
  *   있다")일수록 그렇다 — 그래서 48시간으로 묶는다. 출처 수를 세는 관문(`canOpenUnverified`)도 접힌 뒤의 행으로 센다.
  */
-export const ECHO_WINDOW_MS = 48 * 3_600_000;
+const ECHO_WINDOW_MS = 48 * 3_600_000;
 const ECHO_EVIDENCE_MIN = 40;
 /** 요약 대조의 하한(코드포인트) — 아주 짧은 요약("X가 이적한다")은 다른 보도끼리도 같다. 운영 요약은 1~2문장(수십 자)이다 */
 const ECHO_SUMMARY_MIN = 20;
@@ -897,7 +896,7 @@ const judgedFields = (r) => JSON.stringify([r.verdict_stage ?? null, r.verdict_f
 const citedOutlet = (r) => (r.attribution === "cited" && r.attributed_to ? normalizeQuote(r.attributed_to) : null);
 
 /** 두 판정 행이 같은 보도를 옮긴 것인가(위 a~c). 같은 선수의 "이동" 판정끼리만 부른다 */
-export function isEcho(a, b) {
+function isEcho(a, b) {
   if (Math.abs(ts(a) - ts(b)) > ECHO_WINDOW_MS) return false;
   // 단계가 다르면 같은 보도가 아니다 — 요약·근거가 같아도 한쪽이 더 진전된 판정이면 접는 순간 그 판정이 사라진다
   if ((a.verdict_stage ?? null) !== (b.verdict_stage ?? null)) return false;
@@ -1384,7 +1383,6 @@ const DEAL_COLUMNS = [
 const CLUB_COLUMNS = ["code", "canonical", "name", "short_name", "league"];
 const TIME_COLUMNS = new Set(["first_reported_at", "latest_reported_at", "settled_at"]);
 const NUMERIC_COLUMNS = new Set(["fee_amount", "prev_fee_amount", "fee_low_amount", "fee_high_amount", "add_on_amount"]);
-const PAGE = 500;
 
 /**
  * 저장된 값과 새로 파생한 값이 **같은가** — 같으면 그 행은 쓰지 않는다.
@@ -1405,21 +1403,6 @@ function sameValue(column, stored, next) {
 }
 const sameRow = (columns, stored, next) => columns.every((c) => sameValue(c, stored[c], next[c]));
 
-/** 한 테이블을 `order` 키셋으로 끝까지 읽는다(`max_rows`에 기대지 않는다) */
-async function readAll(supabase, table, columns, key, build = (q) => q) {
-  const out = [];
-  let last = null;
-  for (;;) {
-    let q = build(supabase.from(table).select(columns)).order(key).limit(PAGE);
-    if (last !== null) q = q.gt(key, last);
-    const { data, error } = await q;
-    if (error) throw new Error(`${table} 조회 실패: ${error.message}`);
-    out.push(...data);
-    if (data.length < PAGE) break;
-    last = data.at(-1)[key];
-  }
-  return out;
-}
 
 /**
  * 어떤 보도 행도 가리키지 않는 딜 — 이번에 파생되지 않은 딜 중에서 찾는다.
@@ -1460,7 +1443,7 @@ async function findOrphanDeals(supabase, keep) {
  *   어긋난다. `writeDeals`는 쓰기 직전에 다시 읽는다.
  * @returns {Promise<Map<string, object>>} deal_key → 저장된 행
  */
-export async function loadStoredDeals(supabase) {
+async function loadStoredDeals(supabase) {
   return new Map((await readAll(supabase, DEALS, `id, ${DEAL_COLUMNS.join(", ")}`, "deal_key")).map((d) => [d.deal_key, d]));
 }
 

@@ -1,9 +1,9 @@
 /**
  * 항목 단위 귀속 판정 + 여러 소스에 걸친 묶음 키.
  */
-import { createHash } from "node:crypto";
 import { citedOutlet } from "./roundup.mjs";
 import { ITEM_MARK } from "./story.mjs";
+import { sha1Hex } from "./util.mjs";
 
 /**
  * 이 항목의 저자를 어디까지 믿을 수 있는가.
@@ -119,5 +119,5 @@ function significantWords(text, n = 4) {
 
 function hash(s) {
   // ⚠ 16자리 소문자 hex — `transfer_news.cluster_key`의 CHECK와 한 쌍이다
-  return createHash("sha1").update(s).digest("hex").slice(0, 16);
+  return sha1Hex(s, 16);
 }

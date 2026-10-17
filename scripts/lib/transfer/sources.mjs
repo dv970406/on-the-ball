@@ -9,8 +9,8 @@
  */
 import * as cheerio from "cheerio";
 import { XMLParser } from "fast-xml-parser";
-import { createHash } from "node:crypto";
 import { clampCp } from "../sync-db.mjs";
+import { sha1Hex } from "./util.mjs";
 
 /** 수집기의 User-Agent — LLM 판정이 기사 본문을 받을 때도 같은 값을 쓴다(`judge.mjs`). 브라우저로 위장하지 않는다 */
 export const COLLECTOR_UA = "Mozilla/5.0 (compatible; on-the-ball-transfer-sync/0.1)";
@@ -422,7 +422,7 @@ async function fetchRss(def, since) {
 
     items.push({
       // guid가 URL이든 임의 문자열이든 길이가 들쭉날쭉해 해시로 고정한다
-      externalId: createHash("sha1").update(guid).digest("hex").slice(0, 20),
+      externalId: sha1Hex(guid, 20),
       url: link,
       // Google News는 <source>에 원 매체명이 온다("The Times &amp; The Sunday Times"처럼 인코딩돼서).
       // 그 밖의 매체는 기사 byline(기자 이름)이 온다 — 없으면 매체 단위 귀속으로 남는다

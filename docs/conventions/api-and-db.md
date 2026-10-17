@@ -766,8 +766,8 @@ writer는 `scripts/lib/transfer/derive-deals.mjs`(`scripts/sync-transfer-news.mj
   여는 리그**, 마감은 **가장 늦게 닫는 리그**다(`windowSpan` · 화면의 `transfer-window.ts`가 같은 규칙).
   보드 범위의 시작과 헤더의 창 이름·마감 카운트다운, 판정 요청의 `<기준>` 블록이 이 기간을 본다. 스크립트 쪽 읽기는
   `scripts/lib/transfer/windows.mjs`(`loadWindows`)가 단독으로 갖는다 — 파생과 판정 요청이 함께 쓰므로 다른 파이프라인 모듈을
-  import하지 않는 순수 모듈로 둔다(둘 사이의 순환 import를 막는다). 쓰는 것은 잎 모듈 `util.mjs`(JSON 읽기·조각내기 — `node:fs`
-  말고는 import하지 않는다)뿐이다. 리그 키는 구단 프리셋의 리그 이름과
+  import하지 않는 순수 모듈로 둔다(둘 사이의 순환 import를 막는다). 쓰는 것은 잎 모듈 `util.mjs`(JSON 읽기·조각내기 — Node 내장
+  모듈 말고는 import하지 않는다)뿐이다. 리그 키는 구단 프리셋의 리그 이름과
   같아야 하고 5개가 전부 있어야 한다(`test-transfer-extract.mjs`가 검사한다). 시각은 전부 UTC로 옮겨 적는다.
 - **자유계약(`transfer_deal.is_free_agent`)은 보도 문장에서 확인한 것만이다** — 그 선수가 나오는 문장에
   "free agent · free transfer · on a free"가 있을 때. ⚠ **빈 이적료를 FA로 추정하지 않는다** — 금액이 비는 것은

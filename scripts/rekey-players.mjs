@@ -22,7 +22,7 @@
  * ⚠ 계획 계산(`planRekey` 이하)은 DB와 분리된 순수 함수다 — `scripts/test-transfer-rekey.mjs`가 가짜 행으로 검사한다.
  */
 import { pathToFileURL } from "node:url";
-import { createSyncClient, guardTarget, loadEnv } from "./lib/sync-db.mjs";
+import { connectFromEnv, readRange } from "./lib/sync-db.mjs";
 import { dealKey } from "./lib/transfer/derive-deals.mjs";
 import { loadPlayerDictionary } from "./lib/transfer/names-ko.mjs";
 import { normalizePlayer } from "./lib/transfer/player-key.mjs";
@@ -188,17 +188,6 @@ export function renderPlan(p) {
 
 // ── DB ────────────────────────────────────────────────────────────────────
 
-async function readPaged(query, label) {
-  const out = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await query().range(from, from + 999);
-    if (error) throw new Error(`${label} 조회 실패: ${error.message}`);
-    out.push(...data);
-    if (data.length < 1000) break;
-  }
-  return out;
-}
-
 /** 딜 하나에 걸린 사용자 데이터 수(관심·댓글·예측) */
 async function userDataOf(supabase, dealId) {
   const count = async (table) => {
@@ -234,20 +223,13 @@ export async function applyPlan(supabase, plan, log = console) {
 }
 
 async function main(argv) {
-  const env = loadEnv();
-  const url = env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!url || !env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.error("NEXT_PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY가 없습니다");
-    process.exit(1);
-  }
-  guardTarget(url, argv.includes("--remote"));
+  const { url, supabase } = connectFromEnv(argv);
   const apply = argv.includes("--apply");
-  const supabase = createSyncClient(url, env.SUPABASE_SERVICE_ROLE_KEY);
 
   const [deals, news, nameRows] = await Promise.all([
-    readPaged(() => supabase.from("transfer_deal").select("id, deal_key, player").order("id"), "딜"),
-    readPaged(() => supabase.from("transfer_news").select("id, players, verdict_player_name, verdict_player").order("id"), "보도"),
-    readPaged(() => supabase.from("transfer_name_ko").select("kind, key, name_en").in("kind", ["player", "player_club"]).order("kind").order("key"), "이름 캐시"),
+    readRange(() => supabase.from("transfer_deal").select("id, deal_key, player").order("id"), "딜"),
+    readRange(() => supabase.from("transfer_news").select("id, players, verdict_player_name, verdict_player").order("id"), "보도"),
+    readRange(() => supabase.from("transfer_name_ko").select("kind, key, name_en").in("kind", ["player", "player_club"]).order("kind").order("key"), "이름 캐시"),
   ]);
   const dictKeys = Object.keys(loadPlayerDictionary());
 

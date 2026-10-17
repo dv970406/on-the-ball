@@ -14,7 +14,7 @@ const NAME = String.raw`((?:[A-Z][\p{L}\p{N}'.-]*)(?:\s(?:[A-Z][\p{L}\p{N}'.-]*|
 /** 이름 앞에 붙는 속보 표식 — 구단명의 일부가 아니다 */
 const TAG = String.raw`(?:(?:EXCL|EXCLUSIVE|BREAKING|OFFICIAL|Official|Understand|RT)\b[:,]?\s+)*`;
 /** 사전 밖 이름은 **구단처럼 생겼을 때만** 받는다 — 규칙 판정과 LLM 구단명 검증(`judge.mjs`)이 같은 기준을 쓴다 */
-export const CLUB_LIKE = /\b(?:FC|CF|SC|AC|AFC|CD|SV|FK|SK|IF|BK|SL|United|City|Town|Rovers|Athletic|Sporting|Club|Olympique|Dynamo|Dinamo)\b|\s\d{2,4}$/;
+const CLUB_LIKE = /\b(?:FC|CF|SC|AC|AFC|CD|SV|FK|SK|IF|BK|SL|United|City|Town|Rovers|Athletic|Sporting|Club|Olympique|Dynamo|Dinamo)\b|\s\d{2,4}$/;
 
 function resolveClub(phrase, strong, player) {
   const raw = phrase.trim();

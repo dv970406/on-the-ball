@@ -376,7 +376,7 @@ export async function reprocessAll(supabase, opts = {}) {
 /** 가십 칼럼을 싣는 소스 — 이 소스의 칼럼만 항목으로 나눈다(`story.mjs`의 `isRoundup`과 같은 소스) */
 const ROUNDUP_SOURCES = ["rss:bbc-gossip", "rss:bbc-football", "rss:sky-transfers"];
 /** 실행당 받는 칼럼 상한 — 첫 실행(최근 14일 백필)이나 페이지 구조가 바뀐 날에도 요청이 몰리지 않게 */
-export const ROUNDUP_MAX_PER_RUN = 20;
+const ROUNDUP_MAX_PER_RUN = 20;
 const ROUNDUP_TIMEOUT_MS = 10_000;
 
 /** 칼럼 HTML 받기 — 실패하면 null(다음 실행이 다시 받는다). 던지지 않는다 */

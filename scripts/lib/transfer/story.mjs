@@ -4,6 +4,7 @@
  * 순수 함수뿐이다. 둘이 각자 문장을 나누면 같은 원문에서 다른 문장 집합을 보게 되어
  * 글의 소속팀과 보드의 출발 구단이 갈린다.
  */
+import { escapeRe } from "./util.mjs";
 
 /** 진전 순서 — 죽은 단계(결렬·부인)는 여기 없다(따로 다룬다) */
 export const RANK = ["rumour", "talks", "offer", "agreement", "personal_terms", "medical", "here_we_go", "official"];
@@ -53,7 +54,6 @@ export function cleanBody(r) {
 
 export const sentencesOf = (text) => text.split(/(?<=[.!?])\s+|\n+/).map((x) => x.trim()).filter(Boolean);
 
-export const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** 키워드가 **단어로** 나오는가 — 부분 일치("Read" ↔ "already")는 다른 이야기를 섞는다 */
 export const mentionRe = (keyword) => new RegExp(`(?<![\\p{L}])${escapeRe(keyword)}(?![\\p{L}])`, "iu");

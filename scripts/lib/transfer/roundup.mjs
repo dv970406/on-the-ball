@@ -18,11 +18,11 @@
  *   이적설이 BBC 🎖️로 그려진다(운영에서 실제로 그랬다).
  */
 import * as cheerio from "cheerio";
-import { createHash } from "node:crypto";
 import { ITEM_MARK } from "./story.mjs";
+import { escapeRe, sha1Hex } from "./util.mjs";
 
 /** 항목 행의 external_id — 본문으로 만든다(칼럼이 문단 순서를 바꿔도 같은 항목은 같은 키다) */
-export const itemExternalId = (parentId, text) => `${parentId}${ITEM_MARK}${createHash("sha1").update(text).digest("hex").slice(0, 12)}`;
+export const itemExternalId = (parentId, text) => `${parentId}${ITEM_MARK}${sha1Hex(text, 12)}`;
 
 /**
  * 항목 본문 끝의 인용 매체 — `parseRoundupItems`가 `"문단 (신문)"`으로 남긴 괄호를 되읽는다(원문 표기 그대로).
@@ -60,7 +60,6 @@ function bbcItem(text) {
  * 스카이: `<p>… - <em>Daily Mirror</em></p>` — 문단 끝의 기울임이 신문 이름이다.
  * 언어 표기가 뒤따르는 형태(`- <em>Sport </em>(Spanish).`)도 있다.
  */
-const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 function skyItem($, p) {
   // 기울임 안에 언어 표기가 든 것("Marca (Spanish)")은 신문 이름만 남긴다 — 그대로 두면 항목 끝의 괄호가 겹친다

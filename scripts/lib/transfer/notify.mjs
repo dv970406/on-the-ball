@@ -23,6 +23,7 @@
  */
 import { parse as legacyParse } from "node:url";
 import webpush from "web-push";
+import { readRange } from "../sync-db.mjs";
 import { chunks } from "./util.mjs";
 
 /** 단계 → 상태 톤. ⚠ `stage.ts`의 `STAGE_STATUS`와 같아야 한다(테스트가 대조한다) */
@@ -221,20 +222,14 @@ export function payloadsFor(notices) {
 /**
  * `column in (values)`인 행을 **끝까지** 읽는다 — 키 하나에 행이 여럿 딸리는 조회라(딜 하나에 관심 여럿, 사용자 하나에 구독
  * 여럿) 한 번의 응답이 `max_rows`에서 **조용히 잘릴 수 있다**(`api-and-db.md`의 PostgREST 절). 잘리면 그 뒤의 사람들에게
- * 알림이 가지 않는데 에러도 로그도 없다. 그래서 정렬을 고정하고 페이지를 넘긴다(`derive-deals.mjs`의 `readAll`과 같은 이유).
+ * 알림이 가지 않는데 에러도 로그도 없다. 그래서 정렬을 고정하고 페이지를 넘긴다(`sync-db.mjs`의 `readRange`).
  * @param {string[]} orderBy 페이지 사이에 순서가 흔들리지 않게 하는 정렬 — 그 표의 기본키 컬럼들
  */
 async function selectIn(supabase, table, columns, column, values, orderBy) {
   const out = [];
   for (const part of chunks([...new Set(values)])) {
-    for (let from = 0; ; from += PAGE) {
-      let query = supabase.from(table).select(columns).in(column, part);
-      for (const key of orderBy) query = query.order(key);
-      const { data, error } = await query.range(from, from + PAGE - 1);
-      if (error) throw new Error(`${table} 조회 실패: ${error.message}`);
-      out.push(...data);
-      if (data.length < PAGE) break;
-    }
+    const query = () => orderBy.reduce((q, key) => q.order(key), supabase.from(table).select(columns).in(column, part));
+    out.push(...(await readRange(query, table, PAGE)));
   }
   return out;
 }

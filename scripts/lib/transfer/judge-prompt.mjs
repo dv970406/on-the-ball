@@ -8,12 +8,12 @@
  * 지시문 고정 장치: `scripts/fixtures/judge-prompt.sha1`에 운영 설정(`JUDGE_CONFIG`)의 지문을 적어 두고 테스트가 대조한다 — 지시문·스키마·
  * 설정을 바꾸면 그 파일도 의도적으로 갱신해야 한다(`node scripts/test-transfer-judge-prompt.mjs --update-fingerprint`).
  */
-import { createHash } from "node:crypto";
 import { DEAD, RANK } from "./story.mjs";
 import { loadGlossary } from "./names-ko.mjs";
 import { clubDisplay, presetClubs } from "./club-display.mjs";
 import { loadWindows } from "./windows.mjs";
 import { clampCp } from "../sync-db.mjs";
+import { sha1Hex } from "./util.mjs";
 
 /** 관심 구단 상한 — DB CHECK(`transfer_news_verdict_suitors_size`)와 같은 값 */
 export const SUITORS_MAX = 10;
@@ -424,7 +424,7 @@ export function buildBasis(publishedAt, windows = (windowsCache ??= loadWindows(
 }
 
 /** 사용자 메시지 — 기준 · 선수 · 표기 · 번호 붙은 원문. 시각·난수 같은 변동값을 싣지 않는다(같은 행이면 같은 요청) */
-export function buildUserContent(player, glossaryLines, numberedText, basisLines = null) {
+function buildUserContent(player, glossaryLines, numberedText, basisLines = null) {
   const basis = basisLines ? `<기준>\n${basisLines.join("\n")}\n</기준>\n` : "";
   return `${basis}<선수>${player ?? ""}</선수>\n<표기>\n${glossaryLines.join("\n") || "(없음)"}\n</표기>\n<원문>\n${numberedText}\n</원문>`;
 }
@@ -446,11 +446,10 @@ export function buildJudgeRequest(need, names, system, article = "", config = JU
   };
 }
 
-const sha1 = (s) => createHash("sha1").update(s).digest("hex");
 
 /** 지시문 지문(12자) — 지시문·출력 형식·모델·생각 설정·effort 중 하나라도 바뀌면 바뀐다(`transfer_news.verdict_prompt`) */
 export function judgeFingerprint(system, config = JUDGE_CONFIG) {
-  return sha1(withoutDictionaries(system) + JSON.stringify(JUDGE_SCHEMA) + config.model + JSON.stringify(config.thinking) + config.effort).slice(0, 12);
+  return sha1Hex(withoutDictionaries(system) + JSON.stringify(JUDGE_SCHEMA) + config.model + JSON.stringify(config.thinking) + config.effort, 12);
 }
 
 /**
@@ -465,5 +464,5 @@ function withoutDictionaries(system) {
 
 /** 입력 지문(16자) — 사용자 메시지가 같으면 같다(`transfer_news.verdict_input`). 재생이 "입력이 바뀐 행"을 가르는 데 쓴다 */
 export function inputFingerprint(request) {
-  return sha1(String(request.messages?.[0]?.content ?? "")).slice(0, 16);
+  return sha1Hex(String(request.messages?.[0]?.content ?? ""), 16);
 }

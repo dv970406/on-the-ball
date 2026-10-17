@@ -56,6 +56,58 @@ export function createSyncClient(url, key) {
 }
 
 /**
+ * 사람이 돌리는 운영 명령의 연결 — 자격 증명 확인 → 원격 가드(`--remote`) → service_role 클라이언트.
+ * 없으면 이유를 찍고 종료 코드 1로 끝낸다. 정기 실행(`sync-transfer-news.mjs`)은 추가 키·도움말이 달라 쓰지 않는다.
+ * @returns {{ env: Record<string, string | undefined>, url: string, supabase: import("@supabase/supabase-js").SupabaseClient }}
+ */
+export function connectFromEnv(argv, extraKeys = []) {
+  const env = loadEnv(extraKeys);
+  const url = env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("NEXT_PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY가 없습니다");
+    process.exit(1);
+  }
+  guardTarget(url, argv.includes("--remote"));
+  return { env, url, supabase: createSyncClient(url, env.SUPABASE_SERVICE_ROLE_KEY) };
+}
+
+/**
+ * 한 테이블을 `key` 키셋으로 끝까지 읽는다 — PostgREST `max_rows`에서 조용히 잘리지 않게(`api-and-db.md` PostgREST 절).
+ * offset보다 이쪽이 먼저다 — 읽는 동안 행이 늘거나 줄어도 건너뛰거나 겹치지 않는다. 키는 유일해야 한다.
+ * @param {(q: any) => any} build select 뒤에 거는 필터(정렬·limit은 여기서 건다)
+ */
+export async function readAll(supabase, table, columns, key, build = (q) => q, page = 500) {
+  const out = [];
+  let last = null;
+  for (;;) {
+    let q = build(supabase.from(table).select(columns)).order(key).limit(page);
+    if (last !== null) q = q.gt(key, last);
+    const { data, error } = await q;
+    if (error) throw new Error(`${table} 조회 실패: ${error.message}`);
+    out.push(...data);
+    if (data.length < page) break;
+    last = data.at(-1)[key];
+  }
+  return out;
+}
+
+/**
+ * 범위(offset)로 끝까지 읽는다 — 키가 여러 컬럼이라 키셋으로 넘길 수 없는 조회용.
+ * ⚠ `makeQuery`는 **정렬을 고정한** 새 쿼리를 매번 만들어야 한다 — 정렬이 없으면 페이지 사이에 순서가 흔들려 행이 빠지거나 겹친다.
+ * @param {() => any} makeQuery
+ */
+export async function readRange(makeQuery, label, page = 1000) {
+  const out = [];
+  for (let from = 0; ; from += page) {
+    const { data, error } = await makeQuery().range(from, from + page - 1);
+    if (error) throw new Error(`${label} 조회 실패: ${error.message}`);
+    out.push(...data);
+    if (data.length < page) break;
+  }
+  return out;
+}
+
+/**
  * 계통적 장애로 볼 SQLSTATE — 데이터가 아니라 **환경**이 문제라 남은 행도 전부 실패한다.
  * ⚠ 반대로 `23xxx`(제약)·`22xxx`(형식)·`P0001`은 **그 행의 데이터** 문제라 계속 간다.
  */
@@ -71,7 +123,7 @@ const SYSTEMIC = /^(42|53|57|58|08|PGRST)/;
  *   아무것도 쓰지 못한 실행이 초록으로 지나간다.
  * ⚠ `status`는 네트워크 실패에서 0, 게이트웨이 오류에서 5xx다 — 그 둘을 함께 본다.
  */
-export function isSystemic(error, status) {
+function isSystemic(error, status) {
   if (status === 0 || status >= 500) return true;
   return SYSTEMIC.test(error?.code ?? "");
 }

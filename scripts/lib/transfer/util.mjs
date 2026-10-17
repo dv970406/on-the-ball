@@ -1,9 +1,10 @@
 /**
- * 파이프라인 모듈이 함께 쓰는 작은 도구 — 운영 JSON 읽기와 배열 조각내기.
+ * 파이프라인 모듈이 함께 쓰는 작은 도구 — 운영 JSON 읽기 · 배열 조각내기 · 정규식 이스케이프 · 해시.
  *
- * ⚠ **잎 모듈이다** — `node:fs` 말고는 아무것도 import하지 않는다. 판정·파생이 함께 쓰는 순수 모듈(`windows.mjs`)도 이것을 쓰므로,
+ * ⚠ **잎 모듈이다** — Node 내장 모듈(`node:fs`·`node:crypto`) 말고는 아무것도 import하지 않는다. 판정·파생이 함께 쓰는 순수 모듈(`windows.mjs`)도 이것을 쓰므로,
  *   여기서 다른 파이프라인 모듈을 import하면 그 모듈이 피하려는 순환 import가 생긴다.
  */
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 /** 읽은 JSON — 경로마다 한 번만 읽는다(한 실행에서 이름 사전·용어 사전을 여러 번 부른다) */
@@ -42,3 +43,12 @@ export const CHUNK = 100;
 
 /** 배열을 `size`개씩 자른다 */
 export const chunks = (arr, size = CHUNK) => Array.from({ length: Math.ceil(arr.length / size) }, (_, i) => arr.slice(i * size, (i + 1) * size));
+
+/** 정규식 리터럴로 그대로 넣을 수 있게 특수문자를 이스케이프한다 */
+export const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * sha1 16진 문자열(앞 `length`자). ⚠ 딜 키·external_id·지문처럼 **저장되는 값**을 만드는 자리가 쓴다 —
+ * 자리마다 정한 길이를 바꾸면 그 값이 영구 키라 다른 행이 된다.
+ */
+export const sha1Hex = (s, length = 40) => createHash("sha1").update(s).digest("hex").slice(0, length);

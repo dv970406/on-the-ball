@@ -21,10 +21,10 @@
  */
 import fs from "node:fs";
 import { pathToFileURL } from "node:url";
-import { createSyncClient, guardTarget, loadEnv } from "./lib/sync-db.mjs";
+import { connectFromEnv, loadEnv, readAll } from "./lib/sync-db.mjs";
 import { extractTransfer } from "./lib/transfer/extract.mjs";
 import { deriveDeals, normalizePlayer } from "./lib/transfer/derive-deals.mjs";
-import { createNameBook, loadGlossary, loadPlayerDictionary, missingNames } from "./lib/transfer/names-ko.mjs";
+import { createNameBook, loadGlossary, loadNameCache, loadPlayerDictionary, missingNames } from "./lib/transfer/names-ko.mjs";
 import { lookupKo } from "./lib/transfer/wikidata.mjs";
 import { runJudgements } from "./lib/transfer/judge.mjs";
 import * as judgePrompt from "./lib/transfer/judge-prompt.mjs";
@@ -344,32 +344,14 @@ async function main(argv) {
 }
 
 async function exportSnapshot(argv) {
-  const env = loadEnv();
-  const url = env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error("NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY가 필요합니다");
-  // 읽기만 하지만 대상을 명시하게 한다(다른 운영 명령과 같은 규칙)
-  guardTarget(url, argv.includes("--remote"));
-  const supabase = createSyncClient(url, key);
+  // 읽기만 하지만 대상을 명시하게 한다(다른 운영 명령과 같은 규칙 — `--remote`)
+  const { url, supabase } = connectFromEnv(argv);
   const ids = JSON.parse(fs.readFileSync(GOLDEN, "utf8")).items.map((g) => g.id);
   const minId = Math.min(...ids);
-  const read = async (table, cols, build = (q) => q) => {
-    const out = [];
-    let last = 0;
-    for (;;) {
-      const { data, error } = await build(supabase.from(table).select(cols)).gt("id", last).order("id").limit(1000);
-      if (error) throw new Error(`${table} 조회 실패: ${error.message}`);
-      out.push(...data);
-      if (data.length < 1000) break;
-      last = data.at(-1).id;
-    }
-    return out;
-  };
   // 정답 세트가 가리키는 보도가 속한 기간 전체(파생 범위 계산에 필요한 이웃 보도까지)
   // 운영에 저장된 판정(verdict*)까지 받는다 — 이미 치른 호출이라 채점이 토큰 없이 돈다
-  const rows = await read("transfer_news", "*", (q) => q.gte("id", minId - 2000));
-  const { data: names, error } = await supabase.from("transfer_name_ko").select("kind, key, name_en, name_ko, wikidata_id, source, checked_at");
-  if (error) throw new Error(`이름 캐시 조회 실패: ${error.message}`);
+  const rows = await readAll(supabase, "transfer_news", "*", "id", (q) => q.gte("id", minId - 2000), 1000);
+  const names = await loadNameCache(supabase);
   fs.mkdirSync(DIR, { recursive: true });
   fs.writeFileSync(SNAPSHOT, JSON.stringify({ exportedAt: new Date().toISOString(), nowIso: new Date().toISOString(), source: url, rows, names }));
   console.log(`스냅샷 ${rows.length}행 · 이름 캐시 ${names.length}행 → ${SNAPSHOT}`);

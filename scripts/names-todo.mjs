@@ -19,9 +19,9 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
-import { createSyncClient, flag, guardTarget, loadEnv } from "./lib/sync-db.mjs";
+import { connectFromEnv, flag, readAll } from "./lib/sync-db.mjs";
 import { boardScopeStartMs, dealKey, deriveDeals, derivationStartMs, loadWindows, normalizePlayer } from "./lib/transfer/derive-deals.mjs";
-import { NAME_TABLE, canonicalClubName, createNameBook, loadGlossary, loadPlayerDictionary } from "./lib/transfer/names-ko.mjs";
+import { canonicalClubName, createNameBook, loadGlossary, loadNameCache, loadPlayerDictionary } from "./lib/transfer/names-ko.mjs";
 import { clubDisplay } from "./lib/transfer/club-display.mjs";
 
 const HANGUL = /[가-힣]/u;
@@ -476,39 +476,8 @@ export function renderMarkdown(todo, meta = {}) {
 const NEWS_COLUMNS =
   "id, source_id, external_id, url, stage, players, clubs, body, published_at, relevance, deal_id, verdict, verdict_player, verdict_player_name, verdict_evidence, verdict_at, verdict_from, verdict_to, verdict_suitors, verdict_stage, verdict_fee_amount, verdict_fee_currency, verdict_fee_kind, verdict_raw, verdict_model, verdict_prompt, verdict_input, verdict_article_chars, verdict_attempts, summary_ko, attribution, attributed_to";
 
-async function readPaged(build, label) {
-  const out = [];
-  let lastId = 0;
-  for (;;) {
-    const { data, error } = await build().gt("id", lastId).order("id").limit(500);
-    if (error) throw new Error(`${label} 조회 실패: ${error.message}`);
-    if (!data.length) break;
-    out.push(...data);
-    lastId = data.at(-1).id;
-  }
-  return out;
-}
-
-async function readCache(supabase) {
-  const out = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await supabase.from(NAME_TABLE).select("kind, key, name_en, name_ko, wikidata_id, source, checked_at").order("kind").order("key").range(from, from + 999);
-    if (error) throw new Error(`이름 캐시 조회 실패: ${error.message}`);
-    out.push(...data);
-    if (data.length < 1000) break;
-  }
-  return out;
-}
-
 async function main(argv) {
-  const env = loadEnv();
-  const url = env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!url || !env.SUPABASE_SERVICE_ROLE_KEY) {
-    console.error("NEXT_PUBLIC_SUPABASE_URL · SUPABASE_SERVICE_ROLE_KEY가 없습니다");
-    process.exit(1);
-  }
-  guardTarget(url, argv.includes("--remote"));
-  const supabase = createSyncClient(url, env.SUPABASE_SERVICE_ROLE_KEY);
+  const { supabase } = connectFromEnv(argv);
 
   const nowMs = Date.now();
   const windows = loadWindows();
@@ -518,9 +487,9 @@ async function main(argv) {
   const boardStartIso = new Date(boardStartMs).toISOString();
 
   const [rows, cache, storedDeals] = await Promise.all([
-    readPaged(() => supabase.from("transfer_news").select(NEWS_COLUMNS).gte("published_at", rowStartIso), "보도"),
-    readCache(supabase),
-    readPaged(() => supabase.from("transfer_deal").select("id, deal_key, player, stage, settled_at, latest_reported_at"), "딜"),
+    readAll(supabase, "transfer_news", NEWS_COLUMNS, "id", (q) => q.gte("published_at", rowStartIso)),
+    loadNameCache(supabase),
+    readAll(supabase, "transfer_deal", "id, deal_key, player, stage, settled_at, latest_reported_at", "id"),
   ]);
   const players = loadPlayerDictionary();
   const glossaryClubs = loadGlossary().clubs;

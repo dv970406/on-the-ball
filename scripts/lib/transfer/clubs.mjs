@@ -3,6 +3,8 @@
  * 완전할 필요는 없다 — 못 찾으면 clubs 가 비는 것뿐이고, 원문은 그대로 보존된다.
  * 표기 흔들림(Man Utd / Manchester United / #MUFC)을 정규 명칭으로 모으는 게 목적이다.
  */
+import { escapeRe } from "./util.mjs";
+
 const CLUB_ALIASES = {
   "Arsenal": ["Arsenal", "#AFC", "Gunners"],
   "Aston Villa": ["Aston Villa", "Villa", "#AVFC"],
@@ -244,7 +246,6 @@ function sameRule(aliases, re) {
  */
 const NOT_FIRST_TEAM = /^[\s-]*(?:Women|Ladies|Femenino|Feminino|Féminines|Frauen|WFC|II\b|B\b|U-?\d{2}\b|Castilla|Atl[eè]tic|Futures|Academy|Youth|Reserves)/;
 
-const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
  * 낱말 경계 — 유니코드 글자·숫자·결합 문자가 이어지지 않는 자리.

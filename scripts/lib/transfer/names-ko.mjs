@@ -15,6 +15,7 @@
  * ⚠ **찾는 대상은 딜에 오른 이름뿐이다**(`missingNames`). 보도에 스친 모든 이름을 찾지 않는다 — 화면과 요약에
  *   나오는 것은 딜의 선수·구단뿐이다.
  */
+import { readRange } from "../sync-db.mjs";
 import { clubDisplay } from "./club-display.mjs";
 export { shortKoClubName } from "./club-display.mjs";
 import { detectClubs, isKnownClub } from "./clubs.mjs";
@@ -28,11 +29,11 @@ export const RECHECK_MS = 30 * 86_400_000;
  * 한 번 실행의 조회 상한 — 백필이 한 시간에 몰리지 않게 한다(이름 하나에 검색 한 번 + 후보 항목은 실행의 이름 전부를 묶어 받는다 —
  * `lookupKoMany`). 남은 이름은 다음 실행이 찾는다
  */
-export const LOOKUP_MAX_PER_RUN = 60;
+const LOOKUP_MAX_PER_RUN = 60;
 /** 현 소속(P54) 재확인 주기 — 창이 열리면 소속이 바뀌므로 이름 표기(30일)보다 짧다 */
 export const CLUB_RECHECK_MS = 14 * 86_400_000;
 /** 실행당 현 소속 조회 상한 — 출발 구단이 빈 딜의 선수만 대상이라 많지 않다 */
-export const CLUB_LOOKUP_MAX_PER_RUN = 20;
+const CLUB_LOOKUP_MAX_PER_RUN = 20;
 
 /** 사람 JSON — 프로세스 안에서 한 번만 읽는다(`util.mjs`). 한 실행이 사전을 여러 번 다시 만들어도 파일은 다시 읽지 않는다 */
 const readJson = (rel) => readJsonFile(new URL(rel, import.meta.url));
@@ -56,7 +57,7 @@ export function shortClubName(name) {
 }
 
 /** 통용 표기(판정자)를 캐시에 쓸 때의 `checked_at` — 위키데이터 확인 전이라는 뜻(다음 실행이 곧 찾는다) */
-export const NEVER_CHECKED = "1970-01-01T00:00:00.000Z";
+const NEVER_CHECKED = "1970-01-01T00:00:00.000Z";
 
 /**
  * 이름 사전 — 순수한 조회기. 캐시 행을 받아 만든다(DB 없이 테스트가 돈다).
@@ -136,18 +137,15 @@ export function createNameBook({ players = {}, clubs = {}, cache = [] } = {}) {
   };
 }
 
-/** 이름 캐시(`transfer_name_ko`) 전체 — 키셋 없이 범위로 끝까지 읽는다 */
-export async function loadNameCache(supabase) {
-  const cache = [];
-  let from = 0;
-  for (;;) {
-    const { data, error } = await supabase.from(NAME_TABLE).select("kind, key, name_en, name_ko, wikidata_id, source, checked_at").range(from, from + 999);
-    if (error) throw new Error(`이름 사전 조회 실패: ${error.message}`);
-    cache.push(...data);
-    if (data.length < 1000) break;
-    from += 1000;
-  }
-  return cache;
+/**
+ * 이름 캐시(`transfer_name_ko`) 전체 — 키가 두 컬럼(`kind`·`key`)이라 키셋 대신 범위로 끝까지 읽는다.
+ * ⚠ 정렬을 고정한다 — 정렬 없는 범위 읽기는 페이지 사이에 순서가 흔들려 행이 빠지거나 겹친다.
+ */
+export function loadNameCache(supabase) {
+  return readRange(
+    () => supabase.from(NAME_TABLE).select("kind, key, name_en, name_ko, wikidata_id, source, checked_at").order("kind").order("key"),
+    "이름 사전",
+  );
 }
 
 /** 캐시 행 → 사전(사람 JSON과 합친다 — JSON은 프로세스 안에서 한 번만 읽는다) */
@@ -167,11 +165,6 @@ export function overlayNameRows(cache, rows) {
     byKey.set(k, { ...(byKey.get(k) ?? {}), ...r });
   }
   return [...byKey.values()];
-}
-
-/** 사전 전체 — 사람 JSON + DB 캐시 */
-export async function loadNameBook(supabase) {
-  return buildNameBook(await loadNameCache(supabase));
 }
 
 /** 표기 비교용 — 공백 차이("에마누엘마누"·"에마누엘 마누")는 같은 표기다 */
@@ -491,7 +484,7 @@ async function fixSummaries(supabase, renamed) {
  * @param {string[] | null} [warnings]
  * @returns {Promise<number>} 고친 요약 수
  */
-export async function fixSummaryNames(supabase, renamed, warnings = null) {
+async function fixSummaryNames(supabase, renamed, warnings = null) {
   const { fixed, failures } = await fixSummaries(supabase, renamed);
   if (warnings) warnings.push(...failures);
   return fixed;
