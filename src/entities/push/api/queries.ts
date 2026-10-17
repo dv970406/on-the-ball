@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
+import { SIGN_IN_REQUIRED_MESSAGE, requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
 import { env } from "@/shared/config";
 import { detectPushSupport, getPushSubscription, pushSubscriptionUsesKey } from "@/shared/lib";
 import type { PushStatus } from "../model/types";
@@ -24,7 +24,7 @@ export function usePushStatusQuery(userId: string | undefined) {
     queryKey: pushKeys.status(userId ?? ""),
     queryFn: async () => {
       // ⚠ `!`를 쓰지 않는다 — 아래 `enabled`와 떨어져 있어 한쪽만 고치면 조용히 깨진다
-      if (!userId) throw new Error("로그인이 필요해요.");
+      if (!userId) throw new Error(SIGN_IN_REQUIRED_MESSAGE);
 
       // ⚠ 키 판정이 **맨 앞**이다 — 켤 수 없는 배포에서 "사파리로 열어 주세요" 같은 안내를 내면 따라 해도 켜지지 않는다
       if (!env.vapidPublicKey) return "unconfigured";

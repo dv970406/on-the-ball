@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { preferredScrollBehavior } from "@/shared/lib";
 
 /** 한 번 누를 때 넘기는 양 — 보이는 폭의 이만큼(나머지는 앞 화면과 겹쳐 어디서 이어지는지 보이게) */
 const PAGE_RATIO = 0.8;
@@ -52,8 +53,7 @@ export function useRailOverflow<T extends HTMLElement>() {
   const page = (dir: 1 | -1) => {
     const el = ref.current;
     if (!el) return;
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    el.scrollBy({ left: dir * el.clientWidth * PAGE_RATIO, behavior: reduceMotion ? "auto" : "smooth" });
+    el.scrollBy({ left: dir * el.clientWidth * PAGE_RATIO, behavior: preferredScrollBehavior() });
   };
 
   return { ref, back: overflow.back, forward: overflow.forward, page };

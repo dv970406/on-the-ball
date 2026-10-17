@@ -11,6 +11,7 @@ import {
   SuitorList,
   type TransferDeal,
   type TransferReport,
+  isSettledStage,
   playerName,
 } from "@/entities/transfer";
 import { PredictionCard } from "@/features/predict-deal";
@@ -171,7 +172,7 @@ export function TransferDetailView({
       <PredictionCard
         className={className}
         dealId={deal.id}
-        settled={deal.stage === "here_we_go" || deal.stage === "official"}
+        settled={isSettledStage(deal.stage)}
         prediction={prediction.data}
         error={prediction.error}
         onRetry={() => prediction.refetch()}

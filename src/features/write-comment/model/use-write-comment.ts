@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
+import { SIGN_IN_REQUIRED_MESSAGE, requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
 import { hasVisibleChar, lengthOverflow, track, useToast, type TextLimit } from "@/shared/lib";
 import { commentKeys, refreshCommentLists } from "@/entities/comment";
 import { useSessionStore } from "@/entities/session";
@@ -73,7 +73,7 @@ export function useWriteComment(dealId: number) {
   return useMutation<void, Error, WriteCommentInput>({
     mutationFn: async ({ content, parentId }) => {
       const supabase = requireBrowserSupabase();
-      if (!user) throw new Error("로그인이 필요해요.");
+      if (!user) throw new Error(SIGN_IN_REQUIRED_MESSAGE);
 
       const { error } = await supabase
         .from("transfer_deal_comment")

@@ -11,7 +11,7 @@ import {
   type KeyboardEvent,
   type RefObject,
 } from "react";
-import { hasVisibleChar, useDuplicateGuard, useToast } from "@/shared/lib";
+import { hasVisibleChar, preferredScrollBehavior, useDuplicateGuard, useToast } from "@/shared/lib";
 import type { Comment } from "@/entities/comment";
 import { isReplyTargetMissing, useWriteComment, validateComment } from "@/features/write-comment";
 
@@ -67,9 +67,7 @@ function revealInScroller(el: HTMLElement) {
   if (!scroller) return;
   const box = el.getBoundingClientRect();
   const view = scroller.getBoundingClientRect();
-  const behavior: ScrollBehavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ? "auto"
-    : "smooth";
+  const behavior = preferredScrollBehavior();
   const overflowBottom = box.bottom - (view.bottom - REVEAL_BOTTOM_CLEARANCE);
   const overflowTop = view.top + REVEAL_TOP_CLEARANCE - box.top;
   if (overflowBottom > 0) scroller.scrollBy({ top: overflowBottom, behavior });

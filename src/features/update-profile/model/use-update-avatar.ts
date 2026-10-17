@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
+import { SIGN_IN_REQUIRED_MESSAGE, requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
 import { AVATAR_BUCKET } from "@/shared/config";
 import { useToast } from "@/shared/lib";
 import {
@@ -38,7 +38,7 @@ export function useUpdateAvatar(userId: string | undefined) {
   return useMutation({
     mutationFn: async (file: File) => {
       const supabase = requireBrowserSupabase();
-      if (!userId) throw new Error("로그인이 필요해요.");
+      if (!userId) throw new Error(SIGN_IN_REQUIRED_MESSAGE);
 
       if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
         throw new Error("JPG·PNG·WebP 이미지만 올릴 수 있어요.");

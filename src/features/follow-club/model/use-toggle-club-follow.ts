@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
+import { SIGN_IN_REQUIRED_MESSAGE, requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
 import { track, useToast } from "@/shared/lib";
 import { useSessionStore } from "@/entities/session";
 import { compareClubs, transferKeys, type TransferClub } from "@/entities/transfer";
@@ -62,7 +62,7 @@ export function useToggleClubFollow() {
       // ⚠ 세션은 **실행하는 순간에** 읽는다(렌더 때 구독한 값이 아니다) — 줄 서 있는 동안 로그아웃·계정 전환이
       //   일어났으면 옛 사용자의 요청을 새 세션으로 보내지 않는다. RLS도 그 요청을 거부하지만 문구가 "권한 없음"이 된다.
       const current = useSessionStore.getState().user;
-      if (!current || current.id !== userId) throw new Error("로그인이 필요해요.");
+      if (!current || current.id !== userId) throw new Error(SIGN_IN_REQUIRED_MESSAGE);
 
       if (following) {
         const { data, error } = await supabase

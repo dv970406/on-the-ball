@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient, type QueryKey } from "@tanstack/react-query";
-import { requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
+import { SIGN_IN_REQUIRED_MESSAGE, requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
 import { track, useToast } from "@/shared/lib";
 import { useSessionStore } from "@/entities/session";
 import { transferKeys, type TransferDeal, type TransferDealListItem } from "@/entities/transfer";
@@ -55,7 +55,7 @@ export function useToggleTransferWatch() {
   return useMutation<boolean, Error, ToggleWatchVariables, WatchSnapshot>({
     mutationFn: async ({ dealId, watched }) => {
       const supabase = requireBrowserSupabase();
-      if (!user) throw new Error("로그인이 필요해요.");
+      if (!user) throw new Error(SIGN_IN_REQUIRED_MESSAGE);
 
       if (watched) {
         const { error } = await supabase

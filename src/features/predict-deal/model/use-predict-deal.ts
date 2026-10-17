@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
+import { SIGN_IN_REQUIRED_MESSAGE, requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
 import { track, useToast } from "@/shared/lib";
 import { applyPick, myPickOf, predictionKeys, type DealPrediction } from "@/entities/prediction";
 import { useSessionStore } from "@/entities/session";
@@ -61,7 +61,7 @@ export function usePredictDeal(dealId: number) {
       const supabase = requireBrowserSupabase();
       // ⚠ 세션은 **실행하는 순간에** 읽는다 — 줄 서 있는 동안 로그아웃·계정 전환이 끼면 다른 명의로 보내지 않는다
       const user = useSessionStore.getState().user;
-      if (!user || user.id !== userId) throw new Error("로그인이 필요해요.");
+      if (!user || user.id !== userId) throw new Error(SIGN_IN_REQUIRED_MESSAGE);
       const fail = async (error: unknown, what: string) => {
         console.error(`[predict-deal] ${what} 실패:`, error);
         return new Error(await toWriteErrorMessage(supabase, error));

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
+import { SIGN_IN_REQUIRED_MESSAGE, requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
 import { env } from "@/shared/config";
 import {
   getPushSubscription,
@@ -65,7 +65,7 @@ export function usePushToggle(source: PushSource) {
   const enableMutation = useMutation<void, Error, EnableVariables>({
     mutationFn: async ({ permission }) => {
       const user = useSessionStore.getState().user;
-      if (!user) throw new Error("로그인이 필요해요.");
+      if (!user) throw new Error(SIGN_IN_REQUIRED_MESSAGE);
       if (!env.vapidPublicKey) throw new Error("지금은 알림을 켤 수 없어요.");
 
       /*

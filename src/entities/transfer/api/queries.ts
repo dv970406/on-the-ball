@@ -1,7 +1,7 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
+import { SIGN_IN_REQUIRED_MESSAGE, requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
 import type {
   TransferClub,
   TransferDeal,
@@ -209,7 +209,7 @@ export function useFollowedClubsQuery({
     queryKey: transferKeys.follows(userId ?? ""),
     queryFn: async () => {
       // ⚠ `!`를 쓰지 않는다 — 아래 `enabled`와 떨어져 있어 한쪽만 고치면 조용히 깨진다
-      if (!userId) throw new Error("로그인이 필요해요.");
+      if (!userId) throw new Error(SIGN_IN_REQUIRED_MESSAGE);
       const supabase = requireBrowserSupabase();
       const { data, error } = await buildFollowedClubsQuery(supabase);
       if (error) {

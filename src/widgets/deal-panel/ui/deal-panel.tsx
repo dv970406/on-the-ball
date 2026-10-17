@@ -14,6 +14,7 @@ import {
   SuitorList,
   type TransferDealListItem,
   headlineReports,
+  isSettledStage,
   playerName,
   sortReports,
   useTransferReportsQuery,
@@ -146,7 +147,7 @@ export function DealPanel({ deal, userId, nowMs, active, onSignInRequired }: Dea
           className="mt-6"
           headingLevel="h3"
           dealId={deal.id}
-          settled={deal.stage === "here_we_go" || deal.stage === "official"}
+          settled={isSettledStage(deal.stage)}
           prediction={prediction.data}
           error={prediction.error}
           onRetry={() => prediction.refetch()}

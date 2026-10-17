@@ -7,6 +7,8 @@ export { useNowMs } from "./use-now";
 // 서버 시각 → 기기 시계 기준(쿼리의 initialDataUpdatedAt 등 기기 시계와 빼는 자리) — 사유는 그 파일 주석
 export { serverToClientTime } from "./server-clock";
 export { useFocusTrap } from "./use-focus-trap";
+// 코드로 굴리는 스크롤의 behavior(동작 줄이기면 즉시) — 브라우저에서만 부른다
+export { preferredScrollBehavior } from "./scroll-behavior";
 export { useToast, useToastStore } from "./toast-store";
 // 브라우저 푸시 구독의 순수 메커니즘(지원 판정 · 구독 · 해지) — 누구의 구독인지는 모른다(그 파일 주석).
 // ⚠ 전부 브라우저에서만 부른다(이벤트 핸들러 · effect · queryFn)

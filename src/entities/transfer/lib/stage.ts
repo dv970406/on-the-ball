@@ -79,6 +79,14 @@ export function isDeadStage(stage: TransferStage): boolean {
   return STAGE_GROUP[stage] === "dead";
 }
 
+/**
+ * 결과가 나온 딜인가(합의 완료·오피셜) — 성사 예측 카드가 이때 투표를 닫는다.
+ * ⚠ DB의 `settled_at` CHECK(`transfer_deal_settled_stage`)·예측 트리거가 투표를 막는 단계와 같은 판정이다 — 단계를 더하면 함께 고친다.
+ */
+export function isSettledStage(stage: TransferStage): boolean {
+  return stage === "here_we_go" || stage === "official";
+}
+
 /** 진행 중 구간의 소구간 — 뱃지 톤과 같은 갈림(합의 임박 · 협상 중). 라벨은 `STATUS_LABEL`을 그대로 쓴다 */
 export type ProgressSubgroupKey = Extract<TransferStatus, "imminent" | "talks">;
 export const PROGRESS_SUBGROUPS = ["imminent", "talks"] as const satisfies readonly ProgressSubgroupKey[];

@@ -5,3 +5,5 @@ export { getBrowserSupabase, requireBrowserSupabase } from "./supabase-browser";
 export { toDbErrorMessage } from "./db-error-message";
 // 쓰기 실패 문구 — 42501의 원인이 "세션이 사라짐"이면 그렇게 말한다(그 파일 주석)
 export { toWriteErrorMessage } from "./write-error-message";
+// 로그인이 필요한 조회·쓰기를 세션 없이 부르려 할 때의 문구(훅의 이중 방어) — 그 파일 주석
+export { SIGN_IN_REQUIRED_MESSAGE } from "./sign-in-required";

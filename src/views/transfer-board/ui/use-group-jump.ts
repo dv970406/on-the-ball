@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { TransferGroupKey } from "@/entities/transfer";
+import { preferredScrollBehavior } from "@/shared/lib";
 
 /**
  * 구간 섹션의 id 규칙(`section#tm-g-{key}`) — `BoardSections`가 붙이고 여기가 찾는다.
@@ -164,8 +165,7 @@ export function useGroupJump(groupKeys: readonly TransferGroupKey[]) {
       recomputeRef.current();
     }, JUMP_TIMEOUT_MS);
 
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    main.scrollTo({ top, behavior: reduceMotion ? "auto" : "smooth" });
+    main.scrollTo({ top, behavior: preferredScrollBehavior() });
   };
 
   return {

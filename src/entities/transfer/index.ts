@@ -59,7 +59,7 @@ export {
 // ⚠ 루머 구간의 접기 — 식은 루머·열기 상위 판정을 뷰가 다시 짜지 않는다
 export { splitHotRumors } from "./lib/rumor-heat";
 // ⚠ 진행 중 구간의 소구간(합의 임박·협상 중) — 뱃지 톤과 같은 갈림
-export { splitProgress } from "./lib/stage";
+export { isSettledStage, splitProgress } from "./lib/stage";
 // ⚠ 이적료 표기·범위 — 상세의 이적료 카드가 쓴다(목록 UI는 같은 슬라이스라 상대 경로)
 export { feeKindLabel, formatFee, formatFeeRange } from "./lib/fee";
 // ⚠ 경로 두 칸의 문구(FA·미확인·미정·외 N)의 단일 소스 — 상세 경로 카드와 목록 UI가 같은 말을 한다

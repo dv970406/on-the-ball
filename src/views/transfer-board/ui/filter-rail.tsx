@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, ChevronDown, ChevronLeft, ChevronRight, Heart, X } from "lucide-react";
+import { Bell, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { memo, type MouseEvent } from "react";
 import type { TransferLeague, TransferSort } from "@/entities/transfer";
 import { cn } from "@/shared/lib";
@@ -9,6 +9,7 @@ import { boardHref } from "../lib/board-href";
 import { leagueLabel } from "../lib/league-options";
 import type { ClubOption } from "../model/use-transfer-board";
 import { BoardLink } from "./board-link";
+import { ClearFilterMark, FollowedClubMark } from "./chip-marks";
 import { useRailOverflow } from "./use-rail-overflow";
 
 interface FilterRailProps {
@@ -99,12 +100,7 @@ export const FilterRail = memo(function FilterRail({
     <>
       <Icon as={Bell} size={12} className={watch ? "fill-current" : undefined} />
       관심
-      {watch && (
-        <>
-          <Icon as={X} size={12} className="-mr-0.5" />
-          <span className="sr-only">필터 해제</span>
-        </>
-      )}
+      {watch && <ClearFilterMark />}
     </>
   );
 
@@ -170,19 +166,9 @@ export const FilterRail = memo(function FilterRail({
                   aria-current={isSelected ? "page" : undefined}
                   className={chipClassName(isSelected, CHIP_LAYOUT)}
                 >
-                  {o.followed && (
-                    <>
-                      <Icon as={Heart} size={11} className="fill-current" />
-                      <span className="sr-only">응원 구단</span>
-                    </>
-                  )}
+                  {o.followed && <FollowedClubMark />}
                   {o.label}
-                  {isSelected && (
-                    <>
-                      <Icon as={X} size={12} className="-mr-0.5" />
-                      <span className="sr-only">필터 해제</span>
-                    </>
-                  )}
+                  {isSelected && <ClearFilterMark />}
                 </BoardLink>
               );
             })}
