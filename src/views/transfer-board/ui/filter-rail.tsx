@@ -9,7 +9,7 @@ import { boardHref } from "../lib/board-href";
 import { leagueLabel } from "../lib/league-options";
 import type { ClubOption } from "../model/use-transfer-board";
 import { BoardLink } from "./board-link";
-import { ClearFilterMark, FollowedClubMark } from "./chip-marks";
+import { ClearFilterMark, ClubChip } from "./chip-marks";
 import { useRailOverflow } from "./use-rail-overflow";
 
 interface FilterRailProps {
@@ -157,21 +157,7 @@ export const FilterRail = memo(function FilterRail({
           )}
 
           {showClubChips &&
-            clubs.map((o) => {
-              const isSelected = club === o.code;
-              return (
-                <BoardLink
-                  key={o.code}
-                  href={boardHref(league, sort, isSelected ? null : o.code, watch)}
-                  aria-current={isSelected ? "page" : undefined}
-                  className={chipClassName(isSelected, CHIP_LAYOUT)}
-                >
-                  {o.followed && <FollowedClubMark />}
-                  {o.label}
-                  {isSelected && <ClearFilterMark />}
-                </BoardLink>
-              );
-            })}
+            clubs.map((o) => <ClubChip key={o.code} option={o} club={club} league={league} sort={sort} watch={watch} />)}
         </nav>
         {back && (
           <button type="button" tabIndex={-1} aria-hidden onMouseDown={keepFocus} onClick={() => page(-1)} className={cn(PAGER, "left-0")}>

@@ -14,12 +14,11 @@ import {
 } from "@/entities/transfer";
 import { ROUTES } from "@/shared/config";
 import { cn, formatCount } from "@/shared/lib";
-import { chipClassName } from "@/shared/ui";
 import { boardHref } from "../lib/board-href";
 import { LEAGUE_OPTIONS } from "../lib/league-options";
 import type { ClubOption } from "../model/use-transfer-board";
 import { BoardLink } from "./board-link";
-import { ClearFilterMark, FollowedClubMark } from "./chip-marks";
+import { ClearFilterMark, ClubChip } from "./chip-marks";
 
 /** 레일 항목의 선택 표시 — 잉크 왼쪽 막대 + 옅은 배경(표의 고른 행과 같은 말). 그림자가 아니라 `after:`로 그린다 */
 const RAIL_ON =
@@ -190,24 +189,18 @@ export const BoardRail = memo(function BoardRail({
             )}
           </div>
           <nav aria-label="구단 필터" className="flex flex-wrap gap-1.5 px-4">
-            {clubs.map((o) => {
-              const on = club === o.code;
-              return (
-                <BoardLink
-                  key={o.code}
-                  href={boardHref(league, sort, on ? null : o.code, watch)}
-                  aria-current={on ? "page" : undefined}
-                  className={chipClassName(on, "inline-flex items-center gap-1 whitespace-nowrap px-[9px] py-[7px] text-[12.5px]")}
-                >
-                  {o.followed && <FollowedClubMark />}
-                  {o.label}
-                  <span className={cn("font-mono text-[11px] tabular-nums", on ? "text-ink-faint" : "text-ink-mute-2")}>
-                    {o.count}
-                  </span>
-                  {on && <ClearFilterMark />}
-                </BoardLink>
-              );
-            })}
+            {clubs.map((o) => (
+              <ClubChip
+                key={o.code}
+                option={o}
+                club={club}
+                league={league}
+                sort={sort}
+                watch={watch}
+                className="px-[9px] py-[7px] text-[12.5px]"
+                showCount
+              />
+            ))}
           </nav>
         </section>
       )}
