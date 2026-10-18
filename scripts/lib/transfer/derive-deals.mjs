@@ -40,10 +40,10 @@ import { normalizePlayer } from "./player-key.mjs";
 /** 이적 관련성 하한 — 그 아래는 경기 리뷰·부상 소식이 단계 규칙에 스친 것이다 */
 const MIN_RELEVANCE = 0.3;
 /** 보드 범위 시작보다 이만큼 앞선 보도까지 본다 — 창 직전의 "합의" 보도가 창 안의 오피셜과 한 이야기다 */
-const SCOPE_SLACK_MS = 14 * 86_400_000;
+const SCOPE_SLACK_MS = 14 * DAY_MS;
 
 // 창 일정 읽기는 windows.mjs가 갖는다(판정 요청도 쓴다) — 기존 소비자를 위해 다시 내보낸다
-import { chunks, sha1Hex } from "./util.mjs";
+import { chunks, DAY_MS, HOUR_MS, sha1Hex } from "./util.mjs";
 import { loadWindows, windowSpan } from "./windows.mjs";
 export { loadWindows, windowSpan };
 
@@ -134,11 +134,11 @@ export function dedupeRows(rows) {
 /** 그 선수에 대한 LLM 판정 — 다른 선수로 판정했으면(추출이 바뀌어 딜이 옮겨 감) 판정이 없는 것이다 */
 const verdictOf = (r, key) => (r.verdict_player === key ? (r.verdict ?? null) : null);
 /** 판정 불가·실패 재시도 간격의 상한 — 같은 이유로 실패하는 행을 하루마다 끝없이 묻지 않는다(한 행 9회가 있었다) */
-const JUDGE_BACKOFF_MAX_MS = 7 * 86_400_000;
+const JUDGE_BACKOFF_MAX_MS = 7 * DAY_MS;
 /** 매체 RSS인데 기사 본문 없이 난 판정을, 본문을 받으러 다시 묻는 횟수 상한 */
 const ARTICLE_RETRY_MAX = 2;
 /** 본문 재시도를 하는 기간 — 게시 뒤 이만큼 지나면 발췌로 난 판정을 그대로 둔다(시도 횟수가 쌓이지 않아도 끝이 있게) */
-const ARTICLE_RETRY_WINDOW_MS = 4 * 86_400_000;
+const ARTICLE_RETRY_WINDOW_MS = 4 * DAY_MS;
 /** 연달아 실패한 행을 "반복 실패"로 세는 기준(실행 요약·Actions 경고) */
 export const REPEATED_FAILURE_ATTEMPTS = 3;
 
@@ -201,7 +201,7 @@ export const CARRIED_DAILY_ATTEMPTS = 6;
  * 실행이 그 시간을 건너뛰면(Actions 지연) 다음 날로 밀린다 — 간격이 하루 더 늘 뿐 행을 잃지는 않는다.
  */
 function carriedSlotDue(r, nowMs) {
-  const hour = Math.floor(nowMs / 3_600_000) % 24;
+  const hour = Math.floor(nowMs / HOUR_MS) % 24;
   return hour === (((Number(r.id) || 0) % 24) + 24) % 24;
 }
 
@@ -887,7 +887,7 @@ export function dealFee(it, ctx, memo) {
  * ⚠ 위험 — 서로 다른 매체가 **따로** 같은 사실을 보도해도 요약이 같으면 접힌다(보도 수가 하나 준다). 짧은 요약("X가 Y의 관심을 받고
  *   있다")일수록 그렇다 — 그래서 48시간으로 묶는다. 출처 수를 세는 관문(`canOpenUnverified`)도 접힌 뒤의 행으로 센다.
  */
-const ECHO_WINDOW_MS = 48 * 3_600_000;
+const ECHO_WINDOW_MS = 48 * HOUR_MS;
 const ECHO_EVIDENCE_MIN = 40;
 /** 요약 대조의 하한(코드포인트) — 아주 짧은 요약("X가 이적한다")은 다른 보도끼리도 같다. 운영 요약은 1~2문장(수십 자)이다 */
 const ECHO_SUMMARY_MIN = 20;

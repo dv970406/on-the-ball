@@ -35,7 +35,7 @@ import { DEAD, RENEWAL, isRoundupItem } from "./story.mjs";
 import { lookupKo } from "./wikidata.mjs";
 import { clampCp } from "../sync-db.mjs";
 import { normalizePlayer } from "./player-key.mjs";
-import { escapeRe, sha1Hex } from "./util.mjs";
+import { DAY_MS, escapeRe, HOUR_MS, sha1Hex } from "./util.mjs";
 import { ARTICLE_MAX_CHARS, FEE_CURRENCIES, FEE_KINDS, JUDGE_CONFIG, JUDGE_STAGES, SUITORS_MAX, buildJudgeRequest, buildSystem, ellipsize, judgeFingerprint, prepareJudgeInput } from "./judge-prompt.mjs";
 
 // 요청 쪽(지시문·출력 형식·사용자 메시지)은 judge-prompt.mjs에 있다 — 기존 소비자가 이 파일에서 가져가던 이름을 그대로 내보낸다
@@ -77,9 +77,9 @@ export function isTransientApiError(e) {
 /** 한 번 실행의 호출 상한 — 백필·버그가 한 시간에 비용을 태우지 않게 한다. 남은 행은 다음 실행이 잇는다 */
 export const JUDGE_MAX_PER_RUN = 60;
 /** 판정 불가·요약 실패로 끝난 행을 다시 묻기까지의 간격 */
-export const JUDGE_RETRY_MS = 24 * 3_600_000;
+export const JUDGE_RETRY_MS = 24 * HOUR_MS;
 /** 요약 실패를 다시 시도하는 기간 — 이보다 오래된 보도는 영문 발췌로 둔다 */
-export const SUMMARY_RETRY_WINDOW_MS = 14 * 86_400_000;
+export const SUMMARY_RETRY_WINDOW_MS = 14 * DAY_MS;
 /** 근거 인용 상한 — DB CHECK(`transfer_news_verdict_evidence_len`)와 같은 값 */
 export const EVIDENCE_MAX_CHARS = 300;
 /** 요약 상한 — DB CHECK(`transfer_news_summary_ko_len`)와 같은 값. 지시문은 120자 안팎을 요구한다 */

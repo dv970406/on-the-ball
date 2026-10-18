@@ -19,19 +19,19 @@ import { readRange } from "../sync-db.mjs";
 import { clubDisplay } from "./club-display.mjs";
 export { shortKoClubName } from "./club-display.mjs";
 import { detectClubs, isKnownClub } from "./clubs.mjs";
-import { readJson as readJsonFile } from "./util.mjs";
+import { DAY_MS, readJson as readJsonFile } from "./util.mjs";
 import { currentClubsOf, lookupKoMany } from "./wikidata.mjs";
 
 export const NAME_TABLE = "transfer_name_ko";
 /** 찾지 못한 이름을 다시 찾기까지 — 위키데이터에 표기가 새로 생긴다 */
-export const RECHECK_MS = 30 * 86_400_000;
+export const RECHECK_MS = 30 * DAY_MS;
 /**
  * 한 번 실행의 조회 상한 — 백필이 한 시간에 몰리지 않게 한다(이름 하나에 검색 한 번 + 후보 항목은 실행의 이름 전부를 묶어 받는다 —
  * `lookupKoMany`). 남은 이름은 다음 실행이 찾는다
  */
 const LOOKUP_MAX_PER_RUN = 60;
 /** 현 소속(P54) 재확인 주기 — 창이 열리면 소속이 바뀌므로 이름 표기(30일)보다 짧다 */
-export const CLUB_RECHECK_MS = 14 * 86_400_000;
+export const CLUB_RECHECK_MS = 14 * DAY_MS;
 /** 실행당 현 소속 조회 상한 — 출발 구단이 빈 딜의 선수만 대상이라 많지 않다 */
 const CLUB_LOOKUP_MAX_PER_RUN = 20;
 

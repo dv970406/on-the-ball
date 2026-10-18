@@ -12,6 +12,7 @@ import { MAX_ITEM_AGE_DAYS, findSource } from "./registry.mjs";
 import { itemExternalId, parseRoundupItems } from "./roundup.mjs";
 import { COLLECTOR_UA, createAdapter } from "./sources.mjs";
 import { ITEM_MARK, isRoundup } from "./story.mjs";
+import { DAY_MS } from "./util.mjs";
 
 const TABLE = "transfer_news";
 const CONFLICT = "source_id,external_id";
@@ -193,7 +194,7 @@ function toRow(def, raw, { floorMs, nowMs }) {
 async function syncSource(supabase, def, opts = {}) {
   const log = opts.log ?? console;
   const nowMs = opts.nowMs ?? Date.now();
-  const floorMs = nowMs - MAX_ITEM_AGE_DAYS * 86_400_000;
+  const floorMs = nowMs - MAX_ITEM_AGE_DAYS * DAY_MS;
   const started = Date.now();
   const result = { sourceId: def.id, ok: false, fetched: 0, rows: 0, inserted: 0, skipped: {}, warnings: [], error: null, ms: 0 };
 
@@ -405,7 +406,7 @@ export async function expandRoundups(supabase, opts = {}) {
   const nowMs = opts.nowMs ?? Date.now();
   const fetchImpl = opts.fetchImpl ?? fetch;
   const limit = opts.limit ?? ROUNDUP_MAX_PER_RUN;
-  const floorMs = nowMs - MAX_ITEM_AGE_DAYS * 86_400_000;
+  const floorMs = nowMs - MAX_ITEM_AGE_DAYS * DAY_MS;
   const floorIso = new Date(floorMs).toISOString();
   const stats = { columns: 0, fetched: 0, items: 0, inserted: 0, failed: [], deferred: 0, preview: [] };
 

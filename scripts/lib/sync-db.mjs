@@ -41,12 +41,20 @@ export function loadEnv(extraKeys = []) {
  * ⚠ **원격 쓰기는 명시적으로만.** `.env.local`에는 원격 프로젝트의 자격증명이 함께 들어 있어
  *   URL 한 줄만 바뀌어도 확인 프롬프트 없이 프로덕션을 덮어쓴다. 다만 이 스크립트들은
  *   **원격 정기 실행이 본래 용도**라 금지가 아니라 플래그로 연다.
+ * ⚠ 반대로 `--remote`인데 대상이 로컬이면 멈춘다 — `--remote`는 원격 URL을 허용할 뿐 대상을 바꾸지 않는다(대상은 환경변수,
+ *   없으면 `.env.local`). 원격 자격 증명을 싣지 않은 채 붙인 것이라, 조용히 로컬에 쓰면 원격에 돌렸다고 믿게 된다
+ *   (로컬에 `--rejudge`를 돌린 적이 있다).
  */
-export function guardTarget(url, allowRemote) {
+function guardTarget(url, allowRemote) {
   const isLocal = /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(url);
   if (!isLocal && !allowRemote) {
     console.error(`원격으로 보입니다 — ${url}`);
     console.error("의도한 것이라면 --remote 를 붙이세요.");
+    process.exit(1);
+  }
+  if (isLocal && allowRemote) {
+    console.error(`--remote인데 대상이 로컬입니다(${url}) — 원격 자격 증명을 환경에 실으세요.`);
+    console.error("예: set -a; source .env.prod; set +a; node scripts/<명령>.mjs --remote …");
     process.exit(1);
   }
 }
@@ -56,8 +64,8 @@ export function createSyncClient(url, key) {
 }
 
 /**
- * 사람이 돌리는 운영 명령의 연결 — 자격 증명 확인 → 원격 가드(`--remote`) → service_role 클라이언트.
- * 없으면 이유를 찍고 종료 코드 1로 끝낸다. 정기 실행(`sync-transfer-news.mjs`)은 추가 키·도움말이 달라 쓰지 않는다.
+ * 운영 스크립트의 DB 연결 — 자격 증명 확인 → 원격 가드(`--remote`) → service_role 클라이언트. 정기 실행과 사람이 돌리는 명령이
+ * 함께 쓴다. 없으면 이유를 찍고 종료 코드 1로 끝낸다. `extraKeys`는 함께 읽을 환경변수다(LLM·푸시 키 등).
  * @returns {{ env: Record<string, string | undefined>, url: string, supabase: import("@supabase/supabase-js").SupabaseClient }}
  */
 export function connectFromEnv(argv, extraKeys = []) {

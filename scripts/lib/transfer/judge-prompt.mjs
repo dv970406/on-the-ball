@@ -13,7 +13,7 @@ import { loadGlossary } from "./names-ko.mjs";
 import { clubDisplay, presetClubs } from "./club-display.mjs";
 import { loadWindows } from "./windows.mjs";
 import { clampCp } from "../sync-db.mjs";
-import { sha1Hex } from "./util.mjs";
+import { HOUR_MS, sha1Hex } from "./util.mjs";
 
 /** 관심 구단 상한 — DB CHECK(`transfer_news_verdict_suitors_size`)와 같은 값 */
 export const SUITORS_MAX = 10;
@@ -398,7 +398,7 @@ export function buildGlossary(need, names) {
 }
 
 let windowsCache = null;
-const KST_MS = 9 * 3_600_000;
+const KST_MS = 9 * HOUR_MS;
 const kstDate = (ms) => new Date(ms + KST_MS).toISOString().slice(0, 10);
 
 /**

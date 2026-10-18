@@ -29,7 +29,7 @@
  *   항목이 밀려나 유실된다. 스케줄은 `.github/workflows/sync-transfer-news.yml`(매시, `--remote`)이다.
  * ⚠ 소스 하나라도 실패하거나 행 단위 저장이 실패하면 종료 코드 1이다 — 읽는 화면이 없어 종료 코드가 유일한 신호다.
  */
-import { clampCp, createSyncClient, flag, guardTarget, loadEnv } from "./lib/sync-db.mjs";
+import { clampCp, connectFromEnv, flag } from "./lib/sync-db.mjs";
 import { REPEATED_FAILURE_ATTEMPTS, runDerivation } from "./lib/transfer/derive-deals.mjs";
 import * as judgeLib from "./lib/transfer/judge.mjs";
 import { runNotifications } from "./lib/transfer/notify.mjs";
@@ -95,17 +95,7 @@ if (dryRun && !deriveOnly) {
 }
 
 // ── DB ────────────────────────────────────────────────────────────────
-const env = loadEnv(["ANTHROPIC_API_KEY", "NEXT_PUBLIC_VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT"]);
-const url = env.NEXT_PUBLIC_SUPABASE_URL;
-const key = env.SUPABASE_SERVICE_ROLE_KEY;
-if (!url || !key) usage("NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY가 필요합니다");
-guardTarget(url, allowRemote);
-// --remote는 원격 URL을 허용할 뿐 대상을 바꾸지 않는다 — 대상은 환경변수(없으면 .env.local)다. 로컬 값인데 --remote를 붙였다면
-// 원격 자격 증명을 싣지 않은 것이다(로컬에 --rejudge를 돌린 적이 있다) → 조용히 로컬에 쓰지 않고 멈춘다
-if (allowRemote && /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(url)) {
-  usage(`--remote인데 대상이 로컬입니다(${url}) — 원격 자격 증명을 환경에 실으세요. 예: set -a; source .env.prod; set +a; node scripts/sync-transfer-news.mjs --remote …`);
-}
-const supabase = createSyncClient(url, key);
+const { env, url, supabase } = connectFromEnv(argv, ["ANTHROPIC_API_KEY", "NEXT_PUBLIC_VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT"]);
 
 if (deriveOnly) {
   await derive({ dryRun, rejudge, replay, rejudgeStale });

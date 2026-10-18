@@ -24,7 +24,7 @@
 import { parse as legacyParse } from "node:url";
 import webpush from "web-push";
 import { readRange } from "../sync-db.mjs";
-import { chunks } from "./util.mjs";
+import { chunks, HOUR_MS } from "./util.mjs";
 
 /** 단계 → 상태 톤. ⚠ `stage.ts`의 `STAGE_STATUS`와 같아야 한다(테스트가 대조한다) */
 export const STATUS_OF_STAGE = {
@@ -56,7 +56,7 @@ export const STATUS_LABEL = {
 const FOLLOWER_STATUSES = new Set(["imminent", "hwg", "official"]);
 
 /** 이보다 오래된 보도로 생긴 변화는 알리지 않는다 — 수집이 며칠 멎었다 돌아온 뒤의 밀린 소식은 "지금"이 아니다 */
-export const NOTICE_MAX_AGE_MS = 48 * 3_600_000;
+export const NOTICE_MAX_AGE_MS = 48 * HOUR_MS;
 /**
  * 한 실행에 보내는 알림 수의 상한. 넘치면 **확정된 소식(오피셜·합의 완료)부터** 이 수만큼만 보내고 나머지는 기록만 한다.
  * 규칙·사전 변경으로 딜이 한꺼번에 움직였을 때의 폭주를 막는 장치인데, 이적 마감일처럼 진짜 소식이 몰리는 시간에도

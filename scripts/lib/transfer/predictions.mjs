@@ -18,10 +18,10 @@
  */
 import { upsertRows } from "../sync-db.mjs";
 import { loadWindows } from "./derive-deals.mjs";
-import { chunks } from "./util.mjs";
+import { chunks, DAY_MS } from "./util.mjs";
 
 /** 창 마감 뒤 결과를 기다리는 유예 — 마감일에 등록된 이적은 발표가 하루 이틀 늦게 나온다 */
-export const SETTLE_GRACE_MS = 2 * 86_400_000;
+export const SETTLE_GRACE_MS = 2 * DAY_MS;
 
 const WINDOWS = "transfer_window";
 const PREDICTIONS = "transfer_deal_prediction";
