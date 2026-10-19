@@ -199,6 +199,8 @@ enum이면 양쪽에 라벨 → 부호 변환이 한 벌씩 생긴다. 라벨이
 - ⚠ **"원문" 링크는 `provenance_url ?? url`이다(원저자 주소 우선)** — 미러 채널(`tg:romano`)의
   `url`은 미러 게시물이고 `provenance_url`이 기자의 원글이다. 판정은 매퍼(`entities/transfer/api/mappers.ts`의
   `buildReport`) 한 곳이 하고, 화면이 두 컬럼을 각자 고르지 않는다.
+  ⚠ 같은 자리에서 `&amp;`를 푼다 — 수집기가 RSS 링크의 엔티티를 풀지 않던 때의 행이 남아 있다(수집 컬럼이라 고칠 수 없다).
+  그대로 그리면 원문 링크가 `&amp;amp;` 주소가 된다. 수집기는 이제 링크를 풀어 저장하고, 개정판 URL 대조(`existingUrls`)는 두 표기를 함께 본다.
 - **추출 규칙을 고치면** `node scripts/test-transfer-extract.mjs` → `sync-transfer-news.mjs --reprocess` 순서로 돈다.
   ⚠ 추출 결과(`players`·`stage`)는 **행에 저장되고 딜 파생은 그 저장값을 읽는다** — 규칙을 배포해도 이미 저장된 행은
   재처리 전까지 옛 판정 그대로다. 운영에 반영하려면 **배포 뒤 원격 재처리**까지가 한 작업이다.

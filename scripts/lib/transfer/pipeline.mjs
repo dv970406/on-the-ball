@@ -71,10 +71,12 @@ async function existingIds(supabase, sourceId, ids) {
  * ⚠ 개정 번호를 걷기 전(`canonicalGuid`)에 저장된 행은 키가 옛 해시라 키만으로는 걸러지지 않는다 — 규칙을 바꾼 첫
  *   수집에서 피드에 남아 있던 기사가 전부 한 번 더 들어온다. URL로 한 번 더 거른다.
  * ⚠ 같은 URL을 계속 고쳐 쓰는 라이브 블로그는 첫 판만 남는다 — 여러 선수가 섞인 글이라 딜의 근거로 쓰지 않는다.
+ * ⚠ 링크의 엔티티를 풀기 전(`&amp;`)에 저장된 행도 같은 기사다 — 두 표기로 함께 묻고 푼 표기로 돌려준다
+ *   (수집 컬럼은 트리거가 고정해 옛 행을 고칠 수 없다).
  */
 async function existingUrls(supabase, sourceId, urls) {
   const found = new Set();
-  const list = [...new Set(urls.filter(Boolean))];
+  const list = [...new Set(urls.filter(Boolean).flatMap((u) => [u, u.replaceAll("&", "&amp;")]))];
   for (let i = 0; i < list.length; i += 50) {
     const { data, error } = await supabase
       .from(TABLE)
@@ -82,7 +84,7 @@ async function existingUrls(supabase, sourceId, urls) {
       .eq("source_id", sourceId)
       .in("url", list.slice(i, i + 50));
     if (error) throw new Error(`기존 URL 조회 실패: ${error.message}`);
-    for (const r of data) found.add(r.url);
+    for (const r of data) found.add(r.url.replaceAll("&amp;", "&"));
   }
   return found;
 }

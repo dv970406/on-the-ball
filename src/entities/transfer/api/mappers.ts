@@ -172,7 +172,9 @@ export function buildReport(row: ReportSelectRow): TransferReport {
     feeText: row.fee_text,
     publishedAt: row.published_at,
     // 원저자 주소 우선 — 사유는 `TransferReport.originalUrl` 주석
-    originalUrl: row.provenance_url ?? row.url,
+    // ⚠ `&amp;`를 푼다 — 수집기가 RSS 링크의 엔티티를 풀지 않던 때의 행이 남아 있고(수집 컬럼은 트리거가 고정해 고칠 수
+    //   없다), 그대로 그리면 React가 다시 이스케이프해 `&amp;amp;` 주소가 된다. URL에 `&amp;`가 글자 그대로 있을 일은 없다
+    originalUrl: (row.provenance_url ?? row.url)?.replaceAll("&amp;", "&") ?? null,
     gist: buildGist(row),
   };
 }

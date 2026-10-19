@@ -11,7 +11,11 @@ export const env = {
    *
    * ⚠ 비워 두면 localhost로 폴백해 **공유 프리뷰 이미지가 열리지 않는다**.
    *   배포 도메인이 정해지면 `NEXT_PUBLIC_SITE_URL`을 채운다.
-   *   Vercel은 프리뷰 배포마다 도메인이 달라지므로 `VERCEL_URL`을 그다음으로 본다.
+   *   비어 있으면 Vercel 운영 배포는 프로젝트의 운영 도메인(`VERCEL_PROJECT_PRODUCTION_URL`)을,
+   *   프리뷰 배포는 그 배포의 주소(`VERCEL_URL`)를 쓴다.
+   * ⚠ **운영에서 `VERCEL_URL`을 쓰지 않는다** — 배포마다 바뀌는 주소(`…-hash.vercel.app`)라 canonical·og:url·
+   *   사이트맵이 배포마다 다른 URL을 가리키고, 배포 보호가 켜져 있으면 크롤러가 그 주소에서 401을 받는다.
+   * ⚠ 이 값은 서버(메타데이터·사이트맵·robots)에서만 쓴다 — `VERCEL_*`는 `NEXT_PUBLIC_`이 아니라 클라이언트 번들에는 없다.
    * ⚠ `NEXT_PUBLIC_*`는 **빌드 시점에 인라인된다.** 런타임에만 주입하는 배포(도커 등)에서는
    *   값이 잡히지 않고 조용히 localhost가 나가므로, 반드시 빌드 환경에 넣어야 한다.
    */
@@ -77,9 +81,11 @@ function withScheme(value: string): string {
  */
 function resolveSiteUrl(): string {
   const fallback = "http://localhost:3000";
-  const raw =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
+  const vercelHost =
+    process.env.VERCEL_ENV === "production"
+      ? process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL
+      : process.env.VERCEL_URL;
+  const raw = process.env.NEXT_PUBLIC_SITE_URL || (vercelHost ? `https://${vercelHost}` : "");
   if (!raw) return fallback;
 
   try {

@@ -109,7 +109,7 @@
   ⚠ `initialData`의 `undefined`(프리페치 안 함·실패)와 `[]`(받았는데 없다)는 다른 뜻이다.
 - ⚠ **목록 딜의 최신 보도(`latestReport`)는 좁은 타입이다**(`TransferLatestReport` — 출처 표기·공신력·게시 시각·요지만). 목록은 딜마다 한 건씩 상한만큼 실려 컬럼 하나가 응답 전체에 곱해지므로, select(`LATEST_REPORT_COLUMNS`)와 타입이 목록이 그리는 필드만 갖는다. 링크·단계·이적료가 필요한 자리는 타임라인(`useTransferReportsQuery`)을 쓴다 — 목록에서 넓혀야 하면 select·행 타입·도메인 타입을 함께 넓힌다.
 - `transferKeys` — 쿼리 키. `list`는 `userId`·`scopeStartIso`(범위 시작 ISO, **분 단위로 내린 값**)를 함께 받는다.
-- **`buildDealListQuery` / `buildDealQuery` / `buildReportsQuery`**(`api/list-query.ts` — 서버 안전) — 목록·단건·타임라인 조립의 단일 소스. 훅과 SSR 페이지가 **같은 함수**를 부른다 — 서버가 정렬·상한·select를 다시 짜면 하이드레이션 직후 목록이 재배열된다.
+- **`buildDealListQuery` / `buildDealQuery` / `buildReportsQuery` / `buildRelatedDealsQuery`**(`api/list-query.ts` — 서버 안전) — 목록·단건·타임라인·같은 구단의 다른 딜(상한 `RELATED_DEAL_LIMIT`) 조립의 단일 소스. 훅과 SSR 페이지가 **같은 함수**를 부른다 — 서버가 정렬·상한·select를 다시 짜면 하이드레이션 직후 목록이 재배열된다.
 - `TRANSFER_DEAL_LIMIT` — 목록 상한(`api/mappers.ts` — SSR과 공유해야 해서 `"use client"`가 아닌 파일에 있다). **화면이 잘림을 안내해야 한다** — 조용히 자르면 그 뒤 항목은 URL을 아는 사람 말고는 도달할 방법이 없다.
 - **`headlineReports(reports, count)`** — 딜을 대표하는 보도(한국어 요약 있는 보도 중 최신 `count`건, 없으면 최신 `count`건). 상세 og description과 보드 판의 "최신 보도"가 함께 쓰고, 서버는 `api/mappers` 직접 경로로 가져간다. ⚠ 대표 문구를 고를 때 `reports[0]`을 직접 쓰지 말 것. ⚠ 목록(최신 보도 1건 임베딩)은 이 판정을 쓰지 않는다 — 캐러셀 카드의 기자·등급과 요지가 같은 보도여야 한다.
 - **`pickRecentRumors(deals, nowMs)`** — "최근 3일 소식" 캐러셀 대상(믿을 만한 출처 · 3일 이내). 믿을 만한 출처는 🎖️ 매체와 🌕·🌖 기자다(`isTopCredibility` — 화면 뱃지와 같은 등급이라 표시와 채택 기준이 갈리지 않는다). ⚠ **최신 보도의 출처로 판정한다** — 목록 select의 최신 보도 임베딩(`limit 1`)만 보므로, 최신 보도의 등급이 낮으면 그 앞의 믿을 만한 보도가 있어도 그 딜은 빠진다(딜마다 보도 전체를 싣는 비용을 들이지 않기로 한 트레이드오프). 결렬 딜도 포함한다. ⚠ `nowMs`를 인자로 받는다(`formatRelativeTime`과 같은 이유) — 매퍼에 넣으면 순수·서버 안전이 깨지고 같은 행이 호출 시점마다 달라진다. 서버 시각이 있으면 그 값을 넘긴다.
@@ -225,7 +225,7 @@
 - **`publicStorageUrl(bucket, path)`**(`shared/config/storage.ts` — 배럴에 없다) — 공개 버킷 경로 → URL 조립의 **단일 소스**. 새 공개 버킷이 생기면 이 함수를 감싸는 버킷별 함수를 `shared/config`에 두고 그것을 배럴로 노출한다(`avatarUrl`이 선례). 호출부가 버킷 URL을 직접 조립하지 않는다.
 - **`OG_IMAGE` / `OG_SITE` / `NOT_FOUND_TITLE` / `absoluteUrl(path)`** — 세그먼트가 `openGraph`를 채울 때 함께 싣는 이미지·사이트 공통 값(`siteName`·`locale`), 없는 리소스의 메타데이터 제목(404 화면과 같아야 한다), 그리고 앱 경로 → 절대 URL. ⚠ `new URL(path, env.siteUrl)`을 호출부가 각자 짜지 말 것 — 사이트맵·`robots.txt`·`og:url` 셋이 **같은 URL**을 가리켜야 검색엔진·공유 플랫폼이 한 주소를 대표로 본다(canonical과도 같은 경로여야 한다).
 - **`env`** — `NEXT_PUBLIC_*` 환경변수의 단일 소스(`supabaseUrl`·`supabaseAnonKey`·`siteUrl`·`googleSiteVerification`·`naverSiteVerification`·`gaId`·`vapidPublicKey`). **`process.env`를 호출부에서 다시 읽지 말 것** — `proxy.ts`가 화면·훅과 같은 supabase 인스턴스를 봐야 세션 쿠키가 어긋나지 않는다.
-  - `siteUrl`은 `og:image`를 절대 URL로 만드는 `metadataBase`(루트 layout)용이다. `NEXT_PUBLIC_SITE_URL` → `VERCEL_URL` → `localhost:3000` 순으로 폴백한다.
+  - `siteUrl`은 `og:image`를 절대 URL로 만드는 `metadataBase`(루트 layout)용이다. `NEXT_PUBLIC_SITE_URL` → Vercel 주소(운영 배포는 `VERCEL_PROJECT_PRODUCTION_URL`, 프리뷰는 `VERCEL_URL`) → `localhost:3000` 순으로 폴백한다. ⚠ 운영에서 `VERCEL_URL`로 떨어뜨리지 않는다 — 배포마다 바뀌는 주소라 canonical·사이트맵이 배포마다 다른 URL을 가리킨다.
   - `gaId`는 GA4 측정 ID다 — 형식(`G-…`)이 아니면 빈 값으로 접힌다(깨진 스크립트를 싣느니 측정을 끈다).
   - `vapidPublicKey`는 웹 푸시의 **공개키**다 — 비어 있으면 화면이 알림 자리를 그리지 않는다. ⚠ 짝이 되는 비밀키를 여기 두지 않는다(이 모듈은 클라이언트 번들에 실린다 — 발송 스크립트의 환경에만 있다).
 - **`TOKEN_COLORS`** — 디자인 토큰과 같은 값의 JS 색 상수. **CSS를 읽지 못하는 자리 전용**이다(딜 공유 카드 이미지 · 웹 앱 매니페스트). 화면 컴포넌트의 `style`에 쓰지 않는다. 단일 소스는 `globals.css`의 `@theme`이고 이건 그 사본이다 — 토큰 값을 바꾸면 함께 고친다.

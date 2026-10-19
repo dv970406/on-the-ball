@@ -167,7 +167,7 @@ Router Cache는 **URL로만 키가 잡히고 세션은 키에 들어가지 않�
 | 화면 | 서버가 조립하는 것 |
 |---|---|
 | `app/transfers/page.tsx` | 이적 딜 목록(범위 안 전부 — 필터와 무관하다. 리그·정렬·구단·관심은 뷰가 주소에서 읽어 계산한다) + 내 응원 구단(로그인 사용자만 — 구단 칩의 순서가 이 값을 본다) (+ `userId` · **서버 시각** · `scopeStartIso`) |
-| `app/transfers/[id]/page.tsx` | 딜 + 보도 타임라인 전체 + 댓글(최신 `COMMENT_LIST_LIMIT`건 — 탭 두 개를 모두 그린다) + 성사 예측(회차별 집계 + 내 표 — 내 표는 세션 쿠키가 있을 때만 묻는다. 서버가 다른 사용자로 그렸으면 내 표를 지운 사본을 `placeholderData`로) (+ `userId` · **서버 시각** — 예측 카드의 회차도 이 시각으로 고른다) |
+| `app/transfers/[id]/page.tsx` | 딜 + 보도 타임라인 전체 + 댓글(최신 `COMMENT_LIST_LIMIT`건 — 탭 두 개를 모두 그린다) + 성사 예측(회차별 집계 + 내 표 — 내 표는 세션 쿠키가 있을 때만 묻는다. 서버가 다른 사용자로 그렸으면 내 표를 지운 사본을 `placeholderData`로) + 같은 구단의 다른 딜(`buildRelatedDealsQuery` — 딜의 구단을 알아야 물을 수 있어 **딜 조회 뒤에 직렬로** 간다. 상세가 다른 딜로 가는 크롤 경로라 서버 HTML에만 싣고 클라이언트에서 다시 받지 않는다) (+ `userId` · **서버 시각** — 예측 카드의 회차도 이 시각으로 고른다) |
 | `app/ranking/page.tsx` | 랭킹 상위 `RANKING_LIMIT`줄 + 내 점수(로그인 사용자만 — 상위 목록 밖이면 "내 순위" 칸이 이것으로 그려진다. `null`은 채점된 표 없음, `undefined`는 프리페치 안 함. 서버가 본 사용자의 키에만 `initialData`로 넣는다) (+ `userId` · 서버 시각) |
 
 - ⚠ **`initialData`에는 서버가 읽은 시각을 함께 준다**(`initialDataUpdatedAt: () => serverToClientTime(serverNowMs)` —
@@ -424,6 +424,7 @@ path로 둘 수 있는 것은 **닫힌 유한 분류**(DB enum 같은)뿐이다 
 - 접미사는 루트 layout의 **`title.template`** 이 단일 소스다(`"%s | 온더볼"`). 각 page는 자기 제목만 적는다. 유일한 예외가 `global-error.tsx`인데, 루트 layout이 대체된 상태라 템플릿이 닿지 않아 접미사를 직접 적는다 — 구분자를 바꾸면 **여기도 함께** 고친다.
 - ⚠ **`title`만 채우면 링크 프리뷰는 달라지지 않는다.** 카카오톡·슬랙 등은 `og:title`/`og:description`을 먼저 읽으므로, 상세에 og를 안 넣었더니 **모든 상세의 공유 프리뷰가 루트 설명 하나로 똑같았다**(공유 버튼이 있는 화면이라 실사용 경로다).
 - 제목·본문 요약은 **길이를 클램프**해서 넣는다(긴 제목이 `<title>`에 그대로 들어갔다).
+- 색인 대상 상세의 제목은 **사람들이 함께 검색하는 말**을 담는다 — 딜 상세는 `선수 이적 · 출발 → 행선지 (상태)`다(`titleOf`). 선수 이름만 두면 "선수 + 구단" 검색어와 맞는 말이 없다. 경로·상태 문구는 화면과 같은 함수(`routeLabels`·`STATUS_LABEL`)로 만들되, 행선지 자리에 구단이 여럿이면 가장 유력한 하나 + `등`이다(화면의 나열을 그대로 실으면 제목이 잘려 상태까지 사라진다).
 - 없는 리소스의 `generateMetadata`는 **404 화면과 같은 제목**(`NOT_FOUND_TITLE`)을 낸다 — `Page`가 `notFound()`를 부르므로 제목만 달라지면 안 된다.
 - 로그인 필수 화면(`/profile`)은 `robots: { index: false }`. 본문이 스켈레톤뿐인 페이지가 정적 프리렌더되어 색인될 수 있다.
 - `global-error.tsx`에서는 `metadata`가 동작하지 않는다 — React `<title>`을 직접 쓴다(Next 16 문서 명시).
@@ -460,7 +461,7 @@ path로 둘 수 있는 것은 **닫힌 유한 분류**(DB enum 같은)뿐이다 
 
 - ⚠ **`opengraph-image.alt.txt`는 파일 내용이 그대로 들어간다.** 끝에 개행을 남기면 `og:image:alt` 값에 `\n`이 붙는다(실측). 개행 없이 저장한다.
 - ⚠ **`apple-icon`은 SVG를 지원하지 않는다**(`.jpg|.jpeg|.png`만). 그리고 iOS가 자체 마스크를 씌우므로 **모서리를 둥글리지 않은 전면 채움**으로 만든다 — 라운드된 타일을 넣으면 모서리가 두 번 깎인다. 투명 영역은 검게 칠해지므로 알파도 없앤다.
-- ⚠ **`metadataBase`가 없으면 `og:image`가 localhost 절대 URL로 나간다.** `env.siteUrl`(`NEXT_PUBLIC_SITE_URL` → `VERCEL_URL` → localhost)을 루트 layout에서 쓴다.
+- ⚠ **`metadataBase`가 없으면 `og:image`가 localhost 절대 URL로 나간다.** `env.siteUrl`(`NEXT_PUBLIC_SITE_URL` → Vercel 운영 도메인(운영 배포)·배포 주소(프리뷰) → localhost)을 루트 layout에서 쓴다.
 
 #### ⚠ 세그먼트가 `openGraph`를 채우면 루트의 이미지가 사라진다
 

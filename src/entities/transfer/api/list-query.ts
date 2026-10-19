@@ -40,6 +40,35 @@ export function buildDealListQuery(supabase: SupabaseClient<Database>, scopeStar
     .limit(TRANSFER_DEAL_LIMIT);
 }
 
+/** 상세의 "같은 구단의 다른 딜" 상한 */
+export const RELATED_DEAL_LIMIT = 6;
+
+/**
+ * 같은 구단(출발·행선지)이 걸린 다른 딜 — 최신 보도순. 상세가 다른 딜로 가는 크롤 경로가 된다.
+ *
+ * ⚠ 구단 코드를 `.or()` 문자열에 싣는다 — 코드는 파생이 slugify로 만든 값(영소문자·숫자·하이픈)이지만,
+ *   필터 문법을 깨는 글자(`,`·`(`·`)`)가 섞이면 조건이 바뀌므로 그 형식만 통과시킨다.
+ * ⚠ 관심 구단 자리(`transfer_deal_suitor`)로는 찾지 않는다 — 임베딩 필터는 부모 행을 거르지 않아(`!inner` 없이) 조건이 되지 않는다.
+ *   출발·행선지만으로 같은 구단 딜이 충분히 잡힌다.
+ * ⚠ 최신 보도 임베딩의 정렬·상한은 목록과 같다(`buildDealListQuery` 주석) — 같은 select·매퍼를 쓴다.
+ */
+export function buildRelatedDealsQuery(
+  supabase: SupabaseClient<Database>,
+  dealId: number,
+  clubCodes: string[],
+) {
+  const codes = [...new Set(clubCodes)].filter((c) => /^[a-z0-9-]+$/.test(c)).join(",");
+  return supabase
+    .from("transfer_deal")
+    .select(DEAL_LIST_SELECT)
+    .neq("id", dealId)
+    .or(`from_club_code.in.(${codes}),to_club_code.in.(${codes})`)
+    .order("latest_reported_at", { ascending: false })
+    .order("published_at", { ascending: false, referencedTable: "latest" })
+    .limit(1, { referencedTable: "latest" })
+    .limit(RELATED_DEAL_LIMIT);
+}
+
 /** 딜 하나 — 0행이 에러가 아니다(`maybeSingle`) */
 export function buildDealQuery(supabase: SupabaseClient<Database>, dealId: number) {
   return supabase.from("transfer_deal").select(DEAL_DETAIL_SELECT).eq("id", dealId).maybeSingle();

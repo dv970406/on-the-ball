@@ -5,7 +5,7 @@
  *   node scripts/test-transfer-sources.mjs
  */
 import { cleanByline, resolveAttribution } from "./lib/transfer/attribution.mjs";
-import { bylineOf, canonicalGuid, parseTelegram, stripHtml } from "./lib/transfer/sources.mjs";
+import { bylineOf, canonicalGuid, createAdapter, parseTelegram, stripHtml } from "./lib/transfer/sources.mjs";
 import { citedOutlet, itemExternalId, parseRoundupItems } from "./lib/transfer/roundup.mjs";
 import { sourceHost, syncSources } from "./lib/transfer/pipeline.mjs";
 
@@ -21,6 +21,24 @@ function check(name, ok, detail = "") {
 check("guid — 끝의 #숫자(개정 번호)를 걷는다", canonicalGuid("https://www.bbc.co.uk/sport/football/articles/c6r7dy2yyx2xo#3") === "https://www.bbc.co.uk/sport/football/articles/c6r7dy2yyx2xo");
 check("guid — 숫자가 아닌 조각은 그대로 둔다", canonicalGuid("https://a.test/x#comments") === "https://a.test/x#comments");
 check("guid — URL이 아닌 guid도 그대로 둔다", canonicalGuid("tag:site,2026:123") === "tag:site,2026:123");
+
+// ── RSS 링크 — 엔티티를 풀어 저장한다(BBC 링크의 `&amp;`가 그대로 저장돼 화면에서 `&amp;amp;`가 됐다) ──
+{
+  const feed = `<?xml version="1.0"?><rss><channel><item><title>Alaba joins Udinese</title>
+    <link>https://www.bbc.co.uk/sport/football/articles/abc?at_medium=RSS&amp;at_campaign=rss</link>
+    <guid>https://www.bbc.co.uk/sport/football/articles/abc#2</guid>
+    <pubDate>Mon, 19 Oct 2026 09:00:00 GMT</pubDate></item></channel></rss>`;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(feed, { status: 200 });
+  try {
+    const { items } = await createAdapter({ id: "rss:test", kind: "rss", config: { url: "https://feed.test/rss" } })(null);
+    const url = items[0]?.url;
+    check("RSS 링크 — `&amp;`를 풀어 저장한다", url === "https://www.bbc.co.uk/sport/football/articles/abc?at_medium=RSS&at_campaign=rss", url);
+    check("RSS 링크 — 원저자 주소도 같은 값이다", items[0]?.provenanceUrl === url, items[0]?.provenanceUrl);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
 
 // ── RSS 설명 — 태그째 걷는다 ──────────────────────────────────────────────
 const rss = stripHtml('<p>Alaba joins Udinese.</p><img src="https://cdn.example.com/alaba.jpg" alt="Alaba signs"><figure><img src="x.png"></figure>');

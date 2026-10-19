@@ -4,12 +4,14 @@ import { useRef, useState } from "react";
 import {
   ContractTerms,
   DealInfoLine,
+  DealMiniCard,
   DealRouteCard,
   FeeHighlight,
   ReportFlowChart,
   StatusBadge,
   SuitorList,
   type TransferDeal,
+  type TransferDealListItem,
   type TransferReport,
   isSettledStage,
   playerName,
@@ -63,6 +65,11 @@ interface TransferDetailViewProps {
    *   달라진다(시프트). 서버 시각으로 첫 렌더부터 상대시각을 그린다.
    */
   serverNowMs?: number;
+  /**
+   * 서버가 조회한 같은 구단의 다른 딜. `undefined`(조회 실패·프리페치 없음)나 빈 목록이면 섹션을 그리지 않는다.
+   * ⚠ `initial*`이 아니다 — 쿼리 캐시에 넣지 않고 그대로 그린다(클라이언트 조회가 없다).
+   */
+  relatedDeals?: TransferDealListItem[];
 }
 
 /** 넓은 화면의 카드 — 1px 헤어라인 + 16px 라운드. 좁은 화면에서는 아무것도 입히지 않는다(카드가 아니라 흐름이다) */
@@ -105,6 +112,7 @@ export function TransferDetailView({
   initialPrediction,
   initialUserId,
   serverNowMs,
+  relatedDeals,
 }: TransferDetailViewProps) {
   // 조회·대기 판정은 `model/use-transfer-detail`이 소유한다
   const {
@@ -397,6 +405,24 @@ export function TransferDetailView({
                     />
                   </div>
                 </div>
+
+                {/*
+                  같은 구단의 다른 딜 — 상세가 다른 딜로 가는 **크롤 경로**다(없으면 크롤러가 딜을 찾는 길이 사이트맵뿐이다).
+                  서버가 그린 목록만 쓴다 — 클라이언트에서 다시 받지 않는다(이동 링크라 몇 분 낡아도 거짓이 되지 않는다).
+                  좁은 화면은 보드의 미니 카드 트랙처럼 가로로 흐르고(화면 끝까지), md+는 줄을 바꿔 다 보인다(스크롤바 한 줄을 두지 않는다).
+                */}
+                {relatedDeals && relatedDeals.length > 0 && (
+                  <section aria-labelledby="detail-related-heading" className={cn("mt-8 lg:mt-6", wideCard)}>
+                    <h2 id="detail-related-heading" className="text-[17px] font-semibold tracking-[-0.4px] text-ink">
+                      같은 구단의 다른 딜
+                    </h2>
+                    <ul className="no-scrollbar -mx-5 mt-3 flex snap-x snap-mandatory gap-2.5 overflow-x-auto overflow-y-hidden scroll-px-5 px-5 pb-1 md:mx-0 md:grid md:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] md:overflow-visible md:px-0 md:[&>li]:w-auto">
+                      {relatedDeals.map((related) => (
+                        <DealMiniCard key={related.id} deal={related} nowMs={nowMs} />
+                      ))}
+                    </ul>
+                  </section>
+                )}
               </div>
 
               {/*

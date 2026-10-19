@@ -9,12 +9,14 @@ import { NOT_FOUND_TITLE, OG_SITE, ROUTES, absoluteUrl } from "@/shared/config";
 import { clamp } from "@/shared/lib/text";
 import { createSupabaseServerClient, hasSessionCookie } from "@/shared/api/supabase-server";
 // ⚠ 배럴이 아니라 직접 경로 — 조립·매퍼·단계 라벨은 "use client"가 없어 서버에서 쓸 수 있다.
-import { buildDealQuery, buildReportsQuery } from "@/entities/transfer/api/list-query";
-import { buildDeal, buildReport, headlineReports } from "@/entities/transfer/api/mappers";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database.types";
+import { buildDealQuery, buildRelatedDealsQuery, buildReportsQuery } from "@/entities/transfer/api/list-query";
+import { buildDeal, buildDealListItem, buildReport, headlineReports } from "@/entities/transfer/api/mappers";
 import { STAGE_STATUS, STATUS_LABEL } from "@/entities/transfer/lib/stage";
-import { routeLabels } from "@/entities/transfer/lib/route-label";
+import { destinationClubs, routeLabels } from "@/entities/transfer/lib/route-label";
 import { playerName } from "@/entities/transfer/lib/player-name";
-import type { TransferDeal, TransferReport } from "@/entities/transfer/model/types";
+import type { TransferDeal, TransferDealListItem, TransferReport } from "@/entities/transfer/model/types";
 import { buildCommentListQuery } from "@/entities/comment/api/list-query";
 import { buildCommentList } from "@/entities/comment/api/mappers";
 import type { CommentList } from "@/entities/comment/model/types";
@@ -23,7 +25,14 @@ import { buildDealPrediction } from "@/entities/prediction/api/mappers";
 import type { DealPrediction } from "@/entities/prediction/model/types";
 import { TransferDetailView } from "@/views/transfer-detail";
 
-const FALLBACK_METADATA: Metadata = { title: "딜 상세" };
+/**
+ * 조회가 실패했을 때(`unknown`) — 화면은 200으로 뜨고 클라이언트 조회로 폴백한다.
+ * ⚠ canonical은 id만으로 만들 수 있으니 이때도 싣는다 — 일시 장애 중에 크롤러가 오면 추적 파라미터가 붙은 주소가
+ *   별개 페이지로 색인되지 않게.
+ */
+function fallbackMetadata(dealId: number): Metadata {
+  return { title: "딜 상세", alternates: { canonical: ROUTES.transfer(dealId) } };
+}
 /** 없는 딜·형식이 틀린 id — `Page`가 `notFound()`를 부르므로 **404 화면과 같은 제목**이어야 한다. */
 const NOT_FOUND_METADATA: Metadata = { title: NOT_FOUND_TITLE };
 const META_TITLE_MAX = 60;
@@ -49,6 +58,11 @@ type DealHead =
        * ⚠ 내 표가 "내 행만"이라 키가 userId로 스코프된다 — 아래 `userId`와 한 쌍이다.
        */
       prediction: DealPrediction | undefined;
+      /**
+       * 같은 구단의 다른 딜 — 곁다리다. 실패하면 `undefined`(섹션을 그리지 않는다 — 클라이언트 조회로 미루지 않는다).
+       * 상세가 다른 딜로 가는 **크롤 경로**라 서버 HTML에 실려야 뜻이 있다.
+       */
+      related: TransferDealListItem[] | undefined;
       /** ⚠ 쿼리 키가 userId로 스코프된다 — 그 값도 함께 내려야 캐시에 닿는다 */
       userId: string | undefined;
       /**
@@ -60,6 +74,28 @@ type DealHead =
   | { state: "missing" }
   /** 조회 자체가 실패 — 일시 장애로 멀쩡한 딜을 없다고 단정하면 안 되므로 구분한다 */
   | { state: "unknown" };
+
+/**
+ * 같은 구단의 다른 딜. 구단은 출발과 행선지(없으면 가장 유력한 관심 구단)다.
+ *
+ * ⚠ **딜 조회 뒤에 직렬로 간다** — 딜의 구단을 알아야 물을 수 있다. 같은 리전의 DB 왕복 하나라 첫 바이트에 더해지는 것은 작다.
+ * ⚠ 딜과 **같은 쿠키 클라이언트**다 — 카드가 관심 표시(`isWatched`, "내 행만" 임베딩)를 그리므로 로그인 사용자에게 익명 응답을
+ *   주면 담은 딜의 표시가 빠진다.
+ * ⚠ 실패해도 본문은 그대로 내보낸다(곁다리) — `undefined`로 접는다.
+ */
+async function fetchRelatedDeals(
+  supabase: SupabaseClient<Database>,
+  deal: TransferDeal,
+): Promise<TransferDealListItem[] | undefined> {
+  const codes = [deal.fromClub?.code, (deal.toClub ?? deal.suitors[0])?.code].filter((c): c is string => !!c);
+  if (codes.length === 0) return [];
+  const { data, error } = await buildRelatedDealsQuery(supabase, deal.id, codes);
+  if (error) {
+    console.error("[transfers/[id]] 관련 딜 조회 실패:", error);
+    return undefined;
+  }
+  return data.map(buildDealListItem);
+}
 
 /**
  * ⚠ `cache()`로 감싼다 — `generateMetadata`와 `Page`가 같은 데이터를 쓰므로 감싸지 않으면
@@ -101,6 +137,9 @@ const fetchDealHead = cache(async (dealId: number): Promise<DealHead> => {
     if (error) return { state: "unknown" };
     if (!data) return { state: "missing" };
 
+    const deal = buildDeal(data);
+    const related = await fetchRelatedDeals(supabase, deal);
+
     // ⚠ 곁다리 조회가 실패해도 **본문은 그대로 내보낸다** — 타임라인만 접는다(`undefined`).
     //   `[]`로 접으면 "보도가 없다"는 다른 뜻이 되어 화면이 거짓말한다.
     const reports = reportsError ? undefined : (reportRows ?? []).map(buildReport);
@@ -112,8 +151,9 @@ const fetchDealHead = cache(async (dealId: number): Promise<DealHead> => {
 
     return {
       state: "found",
-      deal: buildDeal(data),
+      deal,
       reports,
+      related,
       comments,
       prediction,
       userId: auth?.claims.sub,
@@ -151,6 +191,25 @@ function describe(head: Extract<DealHead, { state: "found" }>): string {
   return clamp(status === null ? route : `${route} · ${STATUS_LABEL[status]}`, META_DESCRIPTION_MAX);
 }
 
+/**
+ * 검색 결과·공유 카드의 제목 — `선수 이적 · 출발 → 행선지 (상태)`.
+ *
+ * 사람들은 선수 이름과 구단 이름을 함께 검색한다("케인 바이에른") — 제목이 선수 이름뿐이면 그 검색어와 맞는 말이 없다.
+ * 선수 이름을 맨 앞에 둔다(잘려도 남는다). 경로는 약칭이다(제목이 길면 검색 결과에서 잘린다).
+ * ⚠ 행선지 자리에 구단이 여럿이면 가장 유력한 하나 + `등`이다 — 화면 문구(`리버풀 · 노팅엄 · 뉴캐슬 외 3`)를 그대로 실으면
+ *   제목이 그 나열로 채워져 검색 결과에서 상태까지 잘린다(실측). 순서는 화면과 같은 `destinationClubs`다.
+ * ⚠ 그 밖의 경로·상태 문구는 화면과 **같은 함수**다(`routeLabels`·`STATUS_LABEL` — `describe`와 같은 이유).
+ * ⚠ 클램프한다 — `player`는 DB가 길이를 넓게 허용한다. 접미사(`| 온더볼`)는 루트의 `title.template`이 붙인다.
+ */
+function titleOf(deal: TransferDeal): string {
+  const labels = routeLabels(deal);
+  const clubs = destinationClubs(deal);
+  const to = clubs.length > 1 ? `${clubs[0].shortName} 등` : labels.to;
+  const status = STAGE_STATUS[deal.stage];
+  const suffix = status === null ? "" : ` (${STATUS_LABEL[status]})`;
+  return clamp(`${playerName(deal)} 이적 · ${labels.from} → ${to}${suffix}`, META_TITLE_MAX);
+}
+
 export async function generateMetadata(props: PageProps<"/transfers/[id]">): Promise<Metadata> {
   const { id } = await props.params;
   const dealId = parsePostId(id);
@@ -159,11 +218,10 @@ export async function generateMetadata(props: PageProps<"/transfers/[id]">): Pro
 
   const head = await fetchDealHead(dealId);
   if (head.state === "missing") return NOT_FOUND_METADATA;
-  if (head.state !== "found") return FALLBACK_METADATA;
+  if (head.state !== "found") return fallbackMetadata(dealId);
 
   const { deal } = head;
-  // ⚠ 클램프한다 — `player`는 DB가 길이를 넓게 허용하고, 화면 제목(`h1`)과 같은 값이다
-  const title = clamp(`${playerName(deal)} 이적`, META_TITLE_MAX);
+  const title = titleOf(deal);
   const description = describe(head);
 
   return {
@@ -207,6 +265,7 @@ export default async function Page(props: PageProps<"/transfers/[id]">) {
       initialPrediction={head.state === "found" ? head.prediction : undefined}
       initialUserId={head.state === "found" ? head.userId : undefined}
       serverNowMs={head.state === "found" ? head.nowMs : undefined}
+      relatedDeals={head.state === "found" ? head.related : undefined}
     />
   );
 }

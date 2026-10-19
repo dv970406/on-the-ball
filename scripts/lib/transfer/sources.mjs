@@ -407,6 +407,10 @@ async function fetchRss(def, since) {
     const rawGuid = textOf(e.guid) || textOf(e.id) || link;
     if (!rawGuid) continue;
     const guid = canonicalGuid(rawGuid);
+    // ⚠ 링크도 엔티티를 푼다 — 파서의 processEntities를 꺼 두어 BBC 링크의 `&amp;`가 그대로 저장됐고, 화면이 그 값을
+    //   다시 이스케이프해 원문 링크가 `&amp;amp;`로 나갔다. ⚠ guid 폴백(`rawGuid`)은 푼 값이 아니라 원래 값을 쓴다 —
+    //   guid 없는 피드의 키가 바뀌면 같은 기사가 새 행으로 다시 저장된다.
+    const url = link && decodeEntities(link);
 
     const published = parseFeedDate(textOf(e.pubDate)) ?? parseFeedDate(textOf(e.published)) ?? parseFeedDate(textOf(e.updated));
     if (!published) {
@@ -423,13 +427,13 @@ async function fetchRss(def, since) {
     items.push({
       // guid가 URL이든 임의 문자열이든 길이가 들쭉날쭉해 해시로 고정한다
       externalId: sha1Hex(guid, 20),
-      url: link,
+      url,
       // Google News는 <source>에 원 매체명이 온다("The Times &amp; The Sunday Times"처럼 인코딩돼서).
       // 그 밖의 매체는 기사 byline(기자 이름)이 온다 — 없으면 매체 단위 귀속으로 남는다
       authorHandle: stripHtml(textOf(e.source)) || bylineOf(e) || null,
       text,
       publishedAt: published.toISOString(),
-      provenanceUrl: link,
+      provenanceUrl: url,
     });
   }
   return { items, warnings };
