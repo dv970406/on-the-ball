@@ -93,7 +93,7 @@ function cardClassName(peek: boolean) {
 `code-quality.md`의 "성급한 추상화보다 중복"을 그대로 적용한다.
 
 1. **`@theme` 토큰 추가 — 하지 않는다**(동결). 여러 슬라이스가 공유하는 디자인 결정이 새로 생겼을 때만 별도 논의.
-   선례: 이적시장 결렬 행의 회색 배경은 `bg-[#f3f3f3]`(arbitrary value)다 — 토큰에 없는 값이라 토큰을
+   선례: 이적시장 결렬 행의 회색 배경은 `bg-[#f5f5f5]`(arbitrary value)다 — 토큰에 없는 값이라 토큰을
    늘리지 않고 인라인으로 둔다(`entities/transfer/ui/deal-row.tsx`).
 2. **슬라이스 내부 `Record<K, string>` 클래스 맵** — 판별자(tone·side·상태)가 **이미 있고** 값들이 반드시 함께 바뀔 때만. 새 추상화를 만드는 게 아니라 기존 맵의 값 타입을 바꾸는 수준이어야 한다.
 3. **`@utility`(`globals.css`의 "커스텀 유틸리티" 절)** — 클래스 **조합 전체**가 여러 레이어에서 **같은 뜻으로** 되풀이될 때만

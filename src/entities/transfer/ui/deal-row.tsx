@@ -54,10 +54,13 @@ interface DealRowProps {
  *   `contents`로 풀어 자식이 곧장 열에 놓인다 — 같은 요소를 두 벌 그리지 않으려는 배치다. 범위는 묶음 안의 **순서**로 이적료·변동폭·상태 뱃지를 찾는다
  *   (그 컴포넌트들에 표지 prop을 열지 않으려고) → 묶음 안 순서를 바꾸면 `DealTable`도 함께 고친다. 묶음에 건 `opacity`는
  *   md+에서 효과가 없어(상자가 없다) 범위가 칸마다 다시 건다(`data-dead`).
- * ⚠ 결렬 변형: 행 `bg-[#f3f3f3] grayscale`(`@theme` 동결이라 arbitrary hex),
- *   이름·경로·이적료 `opacity-60`, meta `opacity-85`, 변동폭 생략(상태는 뱃지가 말한다), 출처 대신 최신
+ * ⚠ 결렬 변형: 행 `bg-[#f5f5f5] grayscale`(`@theme` 동결이라 arbitrary hex — 흐림은 `opacity`가 아니라 `text-ink-mute` 토큰으로 낸다:
+ *   `opacity`는 안쪽 `ink-mute-2` 글자까지 곱해 1.3~1.7:1까지 떨어졌다. `ink-mute`(#707070)는 이 배경에서 4.5:1을 넘는다),
+ *   변동폭 생략(상태는 뱃지가 말한다), 출처 대신 최신
  *   보도 요지 1줄. **이름에는 취소선이 없다** — 행선지 약칭·이적료에만(`ClubRoute`가 진다). 고른 결렬 행도 회색 배경을
  *   유지하고 막대만 더한다.
+ * ⚠ 모바일 메타 줄(상태·출처·시각)은 **맨 위**에 선다(`order-first`) — 이 화면에서 가장 먼저 읽혀야 할 것이 상태(오피셜인가 루머인가)라
+ *   이름·이적료 아래 셋째 줄에 두면 훑을 때 마지막에 읽힌다. DOM 순서는 그대로라 표(md+)·스크린리더 순서는 바뀌지 않는다.
  * ⚠ 이 행의 에메랄드는 `WatchMark`(관심)와 변동폭의 상승 화살표뿐이다.
  * ⚠ 렌더 중에 시계를 읽지 않는다 — 상대시각은 `nowMs`를 받아 계산한다.
  * ⚠ 링크에 `data-deal-id`를 단다 — lg+에서 보드가 일반 클릭을 가로채 오른쪽 판에 연다(이벤트 위임이라 이 행은
@@ -84,7 +87,7 @@ export const DealRow = memo(function DealRow({ deal, nowMs, hidden, reportScale,
       data-dead={dead ? "" : undefined}
       className={cn(
         "relative mx-2 rounded-md",
-        dead && "bg-[#f3f3f3] grayscale",
+        dead && "bg-[#f5f5f5] grayscale",
         // 고른 행 — 잉크 왼쪽 막대. 죽은 딜은 회색 배경을 그대로 두고 막대만 더한다(옅은 배경이 회색을 덮으면 결렬 행이 아니게 보인다)
         selected && "lg:after:absolute lg:after:inset-y-0 lg:after:left-0 lg:after:w-[3px] lg:after:bg-ink lg:after:content-['']",
         selected && !dead && "lg:bg-canvas-soft",
@@ -98,18 +101,18 @@ export const DealRow = memo(function DealRow({ deal, nowMs, hidden, reportScale,
         aria-current={selected ? "true" : undefined}
         className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-[9px] rounded-md px-3 py-3 transition-colors duration-150 ease-otb active:bg-canvas-soft"
       >
-        <div className={cn("min-w-0", dead && "opacity-60")}>
+        <div className="min-w-0">
           {/* 화면의 계층이 h1(`BoardHeader`의 이적시장) → h2(구간) → h3(선수) */}
           <h3
             data-col="name"
-            className="flex items-center gap-[5px] text-[15px] font-medium leading-[1.3] tracking-[-0.3px] text-ink"
+            className={cn("flex items-center gap-[5px] text-[15px] font-medium leading-[1.3] tracking-[-0.3px] text-ink", dead && "text-ink-mute")}
           >
             {deal.isWatched && <WatchMark />}
             <span data-name="" className="truncate">
               {name}
             </span>
             {deal.position && (
-              <span data-pos="" className="hidden shrink-0 text-[11px] font-normal text-ink-mute-2">
+              <span data-pos="" className="hidden shrink-0 text-[12px] font-normal text-ink-mute">
                 {deal.position}
               </span>
             )}
@@ -118,15 +121,12 @@ export const DealRow = memo(function DealRow({ deal, nowMs, hidden, reportScale,
         </div>
 
         {/* ⚠ 묶음 안의 순서(이적료 → 변동폭)를 표의 범위(`DealTable`)가 칸 자리로 쓴다 */}
-        <div
-          data-g="money"
-          className={cn("flex flex-col items-end gap-[3px] text-right", dead && "opacity-60")}
-        >
+        <div data-g="money" className="flex flex-col items-end gap-[3px] text-right">
           <FeeValue
             deal={deal}
             className={cn(
               "text-[16px] leading-none tracking-[-0.5px]",
-              dead ? "text-ink-mute-2 line-through decoration-hairline-strong" : "text-ink",
+              dead ? "text-ink-mute line-through decoration-hairline-strong" : "text-ink",
             )}
           />
           {/* 죽은 딜은 변동폭을 그리지 않는다 — 결렬·부인은 같은 행의 상태 뱃지가 말한다 */}
@@ -136,10 +136,7 @@ export const DealRow = memo(function DealRow({ deal, nowMs, hidden, reportScale,
         {/* ⚠ 묶음의 첫째(상태 뱃지)를 표의 범위가 첫 칸으로 쓴다 */}
         <div
           data-g="meta"
-          className={cn(
-            "col-span-full flex min-w-0 items-center gap-2 text-[11px] text-ink-mute-2",
-            dead && "opacity-85",
-          )}
+          className="order-first col-span-full flex min-w-0 items-center gap-2 text-[12px] text-ink-mute"
         >
           <StatusBadge stage={deal.stage} inline />
           {dead ? (
@@ -157,7 +154,7 @@ export const DealRow = memo(function DealRow({ deal, nowMs, hidden, reportScale,
                   {reporterName(report)}
                 </>
               )}
-              <time dateTime={deal.latestReportedAt} className="font-mono text-[10px] tabular-nums text-ink-mute-2">
+              <time dateTime={deal.latestReportedAt} className="font-mono text-[11px] tabular-nums text-ink-mute">
                 · {updated}
               </time>
             </span>
@@ -180,7 +177,7 @@ export const DealRow = memo(function DealRow({ deal, nowMs, hidden, reportScale,
         <time
           data-col="updated"
           dateTime={deal.latestReportedAt}
-          className="hidden justify-self-end whitespace-nowrap font-mono text-[11px] tabular-nums text-ink-mute-2"
+          className="hidden justify-self-end whitespace-nowrap font-mono text-[12px] tabular-nums text-ink-mute"
         >
           {updated}
         </time>

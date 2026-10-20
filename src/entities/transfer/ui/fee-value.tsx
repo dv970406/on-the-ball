@@ -35,12 +35,12 @@ export function FeeValue({ deal, className, labelClassName = "text-[13px]", capt
         "whitespace-nowrap",
         className,
         label.kind === "fee" ? "font-mono tabular-nums" : cn("font-sans tracking-normal", labelClassName),
-        label.kind === "unknown" && "text-ink-mute-2",
+        label.kind === "unknown" && "text-ink-mute",
       )}
     >
       {label.text}
       {kind !== null && (
-        <span className="ml-1 font-sans text-[10px] font-normal tracking-normal text-ink-mute-2">{kind}</span>
+        <span className="ml-1 font-sans text-[11px] font-normal tracking-normal text-ink-mute">{kind}</span>
       )}
     </span>
   );

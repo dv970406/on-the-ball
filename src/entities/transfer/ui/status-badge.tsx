@@ -47,6 +47,7 @@ export function StatusBadge({ stage, inline, className }: StatusBadgeProps) {
     <span
       className={cn(
         "inline-flex h-5 shrink-0 items-center gap-[3px] whitespace-nowrap rounded-full px-2 text-[11px] font-medium leading-none",
+        inline && "h-[22px] text-[12px]",
         deadInline ? DEAD_INLINE_CLASS : STATUS_CLASS[status],
         className,
       )}

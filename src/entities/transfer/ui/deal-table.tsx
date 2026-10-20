@@ -26,6 +26,7 @@ import type { TransferSort } from "../model/types";
  *   다 쓴다). 이름 글자는 낱말 단위로 꺾인다(`break-keep` — 한 낱말이 칸보다 길 때만 그 안에서 꺾는다). 열 폭도 경로에 더
  *   준다 — 이름 칸은 줄을 바꿀 수 있어 좁아도 되고, 상태·이적료 칸은 가장 긴 값(`합의 임박`·`FA(자유 계약)`)에 맞춘다.
  *   모바일은 그대로 한 줄 + 말줄임이다(행 폭이 화면 폭이라 약칭이 들어간다 — 모바일 결과를 바꾸지 않는다).
+ * ⚠ 죽은 딜의 흐림은 `opacity`가 아니라 글자색 토큰(`text-ink-mute`)이다 — 행이 칸마다 자기 색을 갖고 있어 범위가 따로 흐리게 할 일이 없다.
  * ⚠ 죽은 딜의 취소선은 md+에서 굵고 진하게 그린다(1.5px · `ink-mute-2`) — 행 전체가 흐린(`opacity`) 회색 배경이라 1px
  *   헤어라인 색이면 1배율 화면에서 거의 보이지 않는다(Firefox 실측). 모바일은 그대로다.
  * ⚠ 행 링크의 포커스 링은 잉크 `outline`이다(입력칸의 `focus:border-ink`와 같은 래더) — J/K로 옮긴 행이 어디인지 보여야 한다.
@@ -75,8 +76,6 @@ const TABLE_SCOPE = [
   // 칸 — 보도·업데이트(표 전용 — 행 요소는 모바일에서 `hidden`이다)
   "min-[90rem]:[&_[data-col=reports]]:col-start-6 min-[90rem]:[&_[data-col=reports]]:row-start-1 min-[90rem]:[&_[data-col=reports]]:flex",
   "md:[&_[data-col=updated]]:col-start-5 md:[&_[data-col=updated]]:row-start-1 md:[&_[data-col=updated]]:block min-[90rem]:[&_[data-col=updated]]:col-start-7",
-  // 죽은 딜 — md+에서는 모바일 묶음이 상자가 없어(`md:contents`) 묶음의 흐림이 효과가 없다 → 칸이 직접 흐려진다
-  "md:[&_[data-dead]_[data-col=name]]:opacity-60 md:[&_[data-dead]_[data-col=route]]:opacity-60 md:[&_[data-dead]_[data-col=updated]]:opacity-60 md:[&_[data-dead]_[data-g=money]>:first-child]:opacity-60 md:[&_[data-dead]_[data-g=meta]>:first-child]:opacity-85",
 ].join(" ");
 
 interface DealTableProps {
@@ -99,7 +98,7 @@ export function DealTableHead({ sort }: { sort: TransferSort }) {
     <div
       aria-hidden
       data-deal-cols=""
-      className="hidden h-[34px] items-center gap-x-3 border-b border-hairline-cool px-5 text-[11.5px] text-ink-mute-2 md:grid"
+      className="hidden h-[34px] items-center gap-x-3 border-b border-hairline-cool px-5 text-[12px] text-ink-mute md:grid"
     >
       <span>상태</span>
       <span>선수</span>

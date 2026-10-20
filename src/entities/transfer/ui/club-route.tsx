@@ -65,7 +65,7 @@ export function ClubRoute({ deal, size, className, "data-col": dataCol }: ClubRo
       <span className="sr-only">, 행선지 </span>
       <span
         data-route-to={stacked ? "stacked" : ""}
-        className={cn("inline-flex min-w-0 items-center gap-[5px]", dead ? "font-normal text-ink-mute-2" : "font-medium text-ink")}
+        className={cn("inline-flex min-w-0 items-center gap-[5px]", dead ? "font-normal text-ink-mute" : "font-medium text-ink")}
       >
         {stacked ? (
           <CrestStack clubs={destinations} size={size} className={dead ? "opacity-50" : undefined} />

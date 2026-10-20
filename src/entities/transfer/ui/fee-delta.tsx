@@ -17,6 +17,7 @@ interface FeeDeltaProps {
  * 직전 보도 대비 변동폭 — `ArrowUp`/`ArrowDown` 11 + **한 텍스트 노드**(`€10M`).
  * 금액을 한 노드로 두는 이유는 flex gap이 문자 사이에 끼지 않게 하기 위해서다.
  *
+ * ⚠ 상승의 **글자는 잉크**(`text-ink-secondary`)이고 에메랄드는 화살표 아이콘만이다 — `primary-deep`은 흰 배경에서 2.6:1이라 글자에는 못 쓴다(아이콘은 형태가 뜻을 져 비텍스트 기준을 받는다).
  * ⚠ **색이 정보를 혼자 지지 않는다** — 방향은 아이콘이 함께 진다. 상승은 `text-primary-deep`
  *   (에메랄드 계열이지만 CTA가 아니라 콘텐츠 값의 방향 표시), 하락은 `text-crimson`.
  *   `check:conventions`의 `text-primary` 대조에 이 파일이 걸리는 것은 `text-primary-deep`이
@@ -31,15 +32,19 @@ export function FeeDelta({ deal, lead, className }: FeeDeltaProps) {
   const delta = feeDelta(deal);
   const value =
     delta === null ? (
-      <span className="font-mono tabular-nums text-ink-faint">—</span>
+      <span className="font-mono tabular-nums text-ink-mute">—</span>
     ) : (
       <span
         className={cn(
           "inline-flex items-center gap-0.5 whitespace-nowrap font-mono tabular-nums",
-          delta.direction === "up" ? "text-primary-deep" : "text-crimson",
+          delta.direction === "up" ? "text-ink-secondary" : "text-crimson",
         )}
       >
-        <Icon as={delta.direction === "up" ? ArrowUp : ArrowDown} size={11} />
+        <Icon
+          as={delta.direction === "up" ? ArrowUp : ArrowDown}
+          size={11}
+          className={delta.direction === "up" ? "text-primary-deep" : undefined}
+        />
         {delta.text}
       </span>
     );
@@ -55,7 +60,7 @@ export function FeeDelta({ deal, lead, className }: FeeDeltaProps) {
     <span
       className={cn("inline-flex items-center gap-[5px] whitespace-nowrap text-[11px]", className)}
     >
-      <span className="font-sans text-[10px] text-ink-mute">직전 보도 대비</span>
+      <span className="font-sans text-[11px] text-ink-mute">직전 보도 대비</span>
       {value}
     </span>
   );
