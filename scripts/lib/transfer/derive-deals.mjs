@@ -1474,14 +1474,12 @@ export async function writeDeals(supabase, derived, rows, opts = {}) {
   if (clubUp.aborted) throw new Error("계통적 실패로 구단 저장을 중단했다");
 
   // 저장된 딜(파생이 쓰는 컬럼 + id) — 바뀌었는지 대조하고, 바뀌지 않은 딜의 id도 여기서 얻는다.
-  // 호출부가 이미 읽어 두었으면(`opts.stored` — `loadStoredDeals`) 다시 읽지 않는다
-  const stored = opts.stored ?? new Map();
-  if (!opts.stored) {
-    for (const keys of chunks(derived.deals.map((d) => d.deal_key))) {
-      const { data, error } = await supabase.from(DEALS).select(`id, ${DEAL_COLUMNS.join(", ")}`).in("deal_key", keys);
-      if (error) throw new Error(`딜 조회 실패: ${error.message}`);
-      for (const d of data) stored.set(d.deal_key, d);
-    }
+  // ⚠ 쓰기 직전에 늘 다시 읽는다 — 실행 초반에 읽은 값(`loadStoredDeals`)은 판정 단계 동안 낡는다(그 함수 주석)
+  const stored = new Map();
+  for (const keys of chunks(derived.deals.map((d) => d.deal_key))) {
+    const { data, error } = await supabase.from(DEALS).select(`id, ${DEAL_COLUMNS.join(", ")}`).in("deal_key", keys);
+    if (error) throw new Error(`딜 조회 실패: ${error.message}`);
+    for (const d of data) stored.set(d.deal_key, d);
   }
   const dealRows = derived.deals.map(({ rowIds: _rowIds, suitorCodes: _suitorCodes, ...d }) => d);
   const changedDeals = dealRows.filter((d) => !stored.has(d.deal_key) || !sameRow(DEAL_COLUMNS, stored.get(d.deal_key), d));
