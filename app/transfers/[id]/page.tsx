@@ -98,6 +98,22 @@ async function fetchRelatedDeals(
 }
 
 /**
+ * 딜 단건 + 같은 구단의 다른 딜. 관련 딜은 딜의 구단을 알아야 물을 수 있어 **딜 조회에만** 직렬로 붙인다 — 곁다리 조회
+ * (타임라인·댓글·예측)를 기다리지 않게 이 Promise째 `Promise.all`에 넣는다.
+ * ⚠ 쿼리 빌더는 `await`할 때마다 요청을 새로 보낸다 — 빌더는 여기서 한 번만 기다리고 바깥에는 이 Promise만 넘긴다.
+ */
+async function fetchDealWithRelated(
+  supabase: SupabaseClient<Database>,
+  dealId: number,
+): Promise<{ state: "unknown" | "missing" } | { state: "found"; deal: TransferDeal; related: TransferDealListItem[] | undefined }> {
+  const { data, error } = await buildDealQuery(supabase, dealId);
+  if (error) return { state: "unknown" };
+  if (!data) return { state: "missing" };
+  const deal = buildDeal(data);
+  return { state: "found", deal, related: await fetchRelatedDeals(supabase, deal) };
+}
+
+/**
  * ⚠ `cache()`로 감싼다 — `generateMetadata`와 `Page`가 같은 데이터를 쓰므로 감싸지 않으면
  *   조회가 **요청당 2번** 나간다.
  *
@@ -112,11 +128,12 @@ const fetchDealHead = cache(async (dealId: number): Promise<DealHead> => {
     if (!supabase) return { state: "unknown" };
 
     // 서로의 결과를 쓰는 조회가 없다 → **전부 병렬로** 보낸다. 직렬이면 왕복이 쌓인다.
+    //   유일한 예외인 관련 딜은 딜 조회 뒤에만 붙는다(`fetchDealWithRelated`).
     // ⚠ 조립은 `buildDealQuery`·`buildReportsQuery`가 단독으로 소유한다 — 클라이언트 훅과 같은
     //   select·정렬이어야 하이드레이션 직후 타임라인이 재배열되지 않는다.
     const [
       { data: auth },
-      { data, error },
+      head,
       { data: reportRows, error: reportsError },
       { data: commentRows, error: commentsError },
       { data: tallyRows, error: tallyError },
@@ -124,7 +141,7 @@ const fetchDealHead = cache(async (dealId: number): Promise<DealHead> => {
     ] = await Promise.all([
       // `getClaims()` — 서명 키로 토큰을 로컬 검증한다(GoTrue 왕복 없음 — `proxy.ts` 주석)
       supabase.auth.getClaims(),
-      buildDealQuery(supabase, dealId),
+      fetchDealWithRelated(supabase, dealId),
       buildReportsQuery(supabase, dealId),
       // ⚠ 조립·자르기·뒤집기는 클라이언트 훅과 같은 함수다 — 갈리면 하이드레이션 직후 목록이 흔들린다
       buildCommentListQuery(supabase, dealId),
@@ -134,11 +151,8 @@ const fetchDealHead = cache(async (dealId: number): Promise<DealHead> => {
       buildMyPredictionsQuery(supabase, dealId, signedIn),
     ]);
 
-    if (error) return { state: "unknown" };
-    if (!data) return { state: "missing" };
-
-    const deal = buildDeal(data);
-    const related = await fetchRelatedDeals(supabase, deal);
+    if (head.state !== "found") return { state: head.state };
+    const { deal, related } = head;
 
     // ⚠ 곁다리 조회가 실패해도 **본문은 그대로 내보낸다** — 타임라인만 접는다(`undefined`).
     //   `[]`로 접으면 "보도가 없다"는 다른 뜻이 되어 화면이 거짓말한다.
