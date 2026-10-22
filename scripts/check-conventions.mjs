@@ -51,6 +51,8 @@ const DEEP_IMPORT_ALLOWED = new Set([
   "@/entities/transfer/lib/player-name",
   // 이적료 표기·성격 라벨 — 딜 공유 카드(opengraph-image)가 상세의 이적료 카드와 같은 판정으로 그린다
   "@/entities/transfer/lib/fee",
+  // 딜의 공유 제목·설명·카드 이미지 — 상세와 보드의 `?deal=` 공유가 같은 카드를 낸다
+  "@/entities/transfer/lib/deal-meta",
   "@/entities/session/lib/auth-error-message",
   "@/features/sign-in/lib/pkce-verifier",
 ]);

@@ -24,7 +24,7 @@ interface UseDealSelectArgs {
    * 키도 **포커스가 이 안에 있을 때만** 듣는다(아래).
    */
   listRef: RefObject<HTMLElement | null>;
-  /** 주소의 `?deal=`(해석된 값) — 첫 로드에 그 행을 화면에 들일지 정한다 */
+  /** 주소의 고른 딜(해석된 값) — 첫 로드에 그 행을 화면에 들일지 정한다 */
   requestedId: number | null;
   onSelect: (id: number) => void;
 }
@@ -149,7 +149,7 @@ export function useDealSelect({ enabled, selectedId, listRef, requestedId, onSel
   }, [enabled, selectedId, listRef, onSelect]);
 
   /**
-   * 첫 로드에 주소의 딜(`?deal=`) 행이 화면 밖이면 그 행을 화면 가운데로 들인다 — 공유 링크로 들어온 사람이 판에 열린 딜이
+   * 첫 로드에 주소의 딜 행이 화면 밖이면 그 행을 화면 가운데로 들인다 — 공유 링크로 들어온 사람이 판에 열린 딜이
    * 목록의 어디인지 찾지 않게. 2분할이 처음 선 순간 한 번만 본다(그 뒤 고르는 것은 사용자가 화면에서 하는 일이다).
    * ⚠ 건드리지 않는 때: 문서의 뒤로가기·앞으로가기(`back_forward` — 복원된 자리가 있다) · 이미 스크롤된 화면(스크롤 복원·
    *   사용자) · 그 사이 사용자가 휠·터치·키로 움직였다 · 행이 접혀 있거나 이미 보인다.

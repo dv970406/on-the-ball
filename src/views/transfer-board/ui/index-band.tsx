@@ -63,9 +63,11 @@ export const IndexBand = memo(function IndexBand({ deals, windowLabel, openWindo
     <section aria-label="구간별 건수" className="hidden h-[62px] border-b border-hairline-cool px-2 lg:flex">
       <dl className="flex min-w-0 flex-1">
         {CELLS.map((cell, i) => (
+          // ⚠ 칸 좌우 여백은 10px이다 — 12px이면 1024px(목록 640px)에서 "합의 완료"(43px)가 칸(42px)을 1px 넘어 말줄임됐고, 세로
+          //   스크롤바가 폭을 먹는 환경에서는 1040px까지 그랬다. 라벨은 칸에 다 들어가야 한다 — 잘린 단계 이름은 읽을 수 없다
           <div
             key={cell.key}
-            className="flex min-w-0 max-w-[150px] flex-1 flex-col justify-center gap-[3px] border-r border-hairline-cool px-3 last:border-r-0"
+            className="flex min-w-0 max-w-[150px] flex-1 flex-col justify-center gap-[3px] border-r border-hairline-cool px-2.5 last:border-r-0"
           >
             <dt className="truncate text-[11.5px] text-ink-mute">{cell.label}</dt>
             <dd className="font-mono text-[20px] font-medium leading-none tracking-[-0.8px] tabular-nums text-ink">

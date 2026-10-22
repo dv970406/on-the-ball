@@ -13,6 +13,7 @@ import { feeKindLabel, feeLabel } from "@/entities/transfer/lib/fee";
 import { playerName } from "@/entities/transfer/lib/player-name";
 import { destinationClubs, routeLabels, ROUTE_CLUB_LIMIT } from "@/entities/transfer/lib/route-label";
 import { STAGE_STATUS, STATUS_LABEL } from "@/entities/transfer/lib/stage";
+import { DEAL_CARD_ALT, DEAL_CARD_SIZE } from "@/entities/transfer/lib/deal-meta";
 import type { TransferClub, TransferDeal, TransferStatus } from "@/entities/transfer/model/types";
 
 /**
@@ -35,8 +36,9 @@ import type { TransferClub, TransferDeal, TransferStatus } from "@/entities/tran
  * ⚠ 없는 딜은 404, 조회 실패는 사이트 공통 이미지로 답한다 — 일시 장애로 카드가 깨진 그림이 되지 않게.
  */
 
-export const alt = "온더볼 — 이적 딜 카드(선수 · 이적 경로 · 이적료)";
-export const size = { width: 1200, height: 630 };
+// 치수·대체 문구는 보드의 `?deal=` 공유가 이 그림을 가리킬 때도 쓴다(`dealCardImage`) — 한 곳에서 가져온다
+export const alt = DEAL_CARD_ALT;
+export const size = DEAL_CARD_SIZE;
 export const contentType = "image/png";
 
 const FONT_FAMILY = "Pretendard";
@@ -103,8 +105,10 @@ function crestUri(club: TransferClub): Promise<string | null> {
  */
 async function fallbackImage(): Promise<Response> {
   const png = await readFile(join(ROOT, "app/opengraph-image.png"));
+  // ⚠ 길이를 붙인다(아래 카드와 같은 이유). 본문은 Buffer가 아니라 `Uint8Array` 복사본이다 — Vercel 함수가 `Buffer` 본문을
+  //   UTF-8로 다시 인코딩해 PNG를 깨뜨린다는 보고가 이 Next 버전에 있다.
   return new Response(new Uint8Array(png), {
-    headers: { "Content-Type": contentType, "Cache-Control": "no-store" },
+    headers: { "Content-Type": contentType, "Content-Length": String(png.byteLength), "Cache-Control": "no-store" },
   });
 }
 
@@ -191,7 +195,7 @@ export default async function Image({ params }: { params: Promise<{ id: string }
     ...destinations.map(crestUri),
   ]);
 
-  return new ImageResponse(
+  const image = new ImageResponse(
     (
       <div
         style={{
@@ -324,7 +328,19 @@ export default async function Image({ params }: { params: Promise<{ id: string }
     {
       ...size,
       fonts: [{ name: FONT_FAMILY, data: font, style: "normal", weight: 600 }],
-      headers: { "Cache-Control": CARD_CACHE_CONTROL },
     },
   );
+
+  // ⚠ **길이를 붙여 보낸다.** `ImageResponse`를 그대로 돌려주면 길이 없이 `Transfer-Encoding: chunked`로 나간다(길이를
+  //   명시하지 않은 응답은 전부 그렇다 — 운영은 CDN 적중 응답도 그랬다). 카카오톡이 이 카드를 그리지 못했는데, 잘 그리는
+  //   사이트 공통 이미지(정적 파일, 길이 있음)와 응답이 다른 점이 그것뿐이었다. ⚠ 카카오가 길이 없는 이미지를 거부한다는
+  //   공식 근거는 없다 — 가장 유력한 차이를 없앤 것이다. 버퍼링 비용은 없다(그리기가 끝난 PNG를 한 번에 내보내는 구현이다).
+  const png = await image.arrayBuffer();
+  return new Response(png, {
+    headers: {
+      "Content-Type": contentType,
+      "Content-Length": String(png.byteLength),
+      "Cache-Control": CARD_CACHE_CONTROL,
+    },
+  });
 }

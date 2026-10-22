@@ -14,7 +14,8 @@ import { env } from "./env";
  *   `generateMetadata`가 `openGraph`를 직접 반환하는 순간 **통째로 대체되어 이미지가 빠진다**
  *   (실측 — 상세만 이미지 없는 카드로 나갔다). `twitter`도 마찬가지다.
  * ⚠ **딜 상세만 예외다** — 그 세그먼트는 `opengraph-image.tsx`가 딜마다 카드를 그리므로 이 상수를 쓰지 않는다
- *   (메타데이터에 `images`를 적으면 그 값이 파일 컨벤션을 이긴다 — `nextjs.md`). 그 밖의 세그먼트는 이 공통 이미지다.
+ *   (메타데이터에 `images`를 적으면 그 값이 파일 컨벤션을 이긴다 — `nextjs.md`). 보드도 주소에 딜이 실리면(`?deal=`)
+ *   그 딜의 카드를 가리킨다(`dealCardImage`). 그 밖의 세그먼트는 이 공통 이미지다.
  * ⚠ `width`·`height`·`alt`는 **실제 파일과 갈릴 수 있는 값**이다 —
  *   `app/opengraph-image.png`의 치수와 `app/opengraph-image.alt.txt`의 문구를 바꾸면 여기도 함께 고친다.
  *   (그 파일은 내용이 그대로 `og:image:alt`에 들어가므로 끝에 개행을 남기지 않는다.)

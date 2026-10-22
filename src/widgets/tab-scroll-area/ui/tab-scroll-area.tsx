@@ -10,9 +10,16 @@ import { useScrollRestore } from "@/shared/lib";
  *   ⚠ 마지막 행이 탭바에 가리면 안 된다.
  *   `lg`부터는 탭바가 없으므로(상단 바가 대신한다) 이 여백을 걷는다 — 바닥 여백은 그 화면이 정한다.
  */
-export function TabScrollArea({ children }: { children: ReactNode }) {
+export function TabScrollArea({
+  children,
+  screen,
+}: {
+  children: ReactNode;
+  /** 스크롤 위치를 저장할 자리의 이름 — 화면이 그대로인데 경로가 바뀌는 화면만 준다(`useScrollRestore`) */
+  screen?: string;
+}) {
   const scrollRef = useRef<HTMLElement>(null);
-  useScrollRestore(scrollRef);
+  useScrollRestore(scrollRef, screen);
 
   return (
     <main

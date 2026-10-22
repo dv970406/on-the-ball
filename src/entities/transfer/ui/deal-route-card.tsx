@@ -47,10 +47,11 @@ function RouteCell({
         </ul>
       ) : (
         <>
-          <div className="mt-2 flex items-center gap-2 text-[14px] font-medium leading-[1.3] tracking-[-0.3px] text-ink">
+          <div className="mt-2 flex min-w-0 items-center gap-2 text-[14px] font-medium leading-[1.3] tracking-[-0.3px] text-ink">
             <TransferCrest club={club} size={24} priority className="shrink-0" />
-            {/* 경로 카드는 정식명이다 — 목록 행·칩은 약칭(`TransferClub` 주석) */}
-            <span className="truncate">{text}</span>
+            {/* 경로 카드는 정식명이다 — 목록 행·칩은 약칭(`TransferClub` 주석). 위 목록과 같이 자르지 않고 두 줄로 흘린다
+                (판이 좁은 폭에서 "맨체스터 유나이…"로 잘렸다 — 잘린 구단 이름은 어느 구단인지 알 수 없다) */}
+            <span className="line-clamp-2 break-keep">{text}</span>
           </div>
           {/* 5대 리그 밖은 `null`이라 줄을 비운다 — 모르는 리그명을 지어내지 않는다 */}
           {club?.league && <div className="mt-1 text-[11px] text-ink-mute">{club.league}</div>}

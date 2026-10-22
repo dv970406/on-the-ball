@@ -24,6 +24,8 @@ export {
 // 분석 이벤트 — 이름·파라미터의 단일 소스(`AnalyticsEvents`)와 보내는 함수. 측정 ID가 없으면 아무것도 하지 않는다
 export { track } from "./analytics";
 export { parsePostId } from "./post-id";
+// 로그인 뒤 돌아올 주소 — 화면이 직접 정한 값(속성)이 있으면 그것, 없으면 지금 주소(사유는 그 파일 주석)
+export { RETURN_PATH_ATTR, currentReturnPath } from "./return-path";
 export {
   hasVisibleChar,
   lengthOverflow,

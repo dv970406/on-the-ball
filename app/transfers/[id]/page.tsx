@@ -5,17 +5,14 @@ import { notFound, unstable_rethrow } from "next/navigation";
 //   아니고, 이름은 첫 호출자를 기록할 뿐이다.
 import { parsePostId } from "@/shared/lib/post-id";
 import { NOT_FOUND_TITLE, OG_SITE, ROUTES, absoluteUrl } from "@/shared/config";
-// ⚠ 배럴(@/shared/lib)이 아니라 직접 경로 — 배럴은 "use client" 훅을 포함한다.
-import { clamp } from "@/shared/lib/text";
 import { createSupabaseServerClient, hasSessionCookie } from "@/shared/api/supabase-server";
 // ⚠ 배럴이 아니라 직접 경로 — 조립·매퍼·단계 라벨은 "use client"가 없어 서버에서 쓸 수 있다.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 import { buildDealQuery, buildRelatedDealsQuery, buildReportsQuery } from "@/entities/transfer/api/list-query";
-import { buildDeal, buildDealListItem, buildReport, headlineReports } from "@/entities/transfer/api/mappers";
-import { STAGE_STATUS, STATUS_LABEL } from "@/entities/transfer/lib/stage";
-import { destinationClubs, routeLabels } from "@/entities/transfer/lib/route-label";
-import { playerName } from "@/entities/transfer/lib/player-name";
+import { buildDeal, buildDealListItem, buildReport } from "@/entities/transfer/api/mappers";
+// 제목·설명은 보드의 `?deal=` 공유와 같은 함수다 — 같은 딜이 어느 주소로 공유되든 같은 말을 한다
+import { dealMetaDescription, dealMetaTitle } from "@/entities/transfer/lib/deal-meta";
 import type { TransferDeal, TransferDealListItem, TransferReport } from "@/entities/transfer/model/types";
 import { buildCommentListQuery } from "@/entities/comment/api/list-query";
 import { buildCommentList } from "@/entities/comment/api/mappers";
@@ -35,8 +32,6 @@ function fallbackMetadata(dealId: number): Metadata {
 }
 /** 없는 딜·형식이 틀린 id — `Page`가 `notFound()`를 부르므로 **404 화면과 같은 제목**이어야 한다. */
 const NOT_FOUND_METADATA: Metadata = { title: NOT_FOUND_TITLE };
-const META_TITLE_MAX = 60;
-const META_DESCRIPTION_MAX = 120;
 
 type DealHead =
   | {
@@ -183,47 +178,6 @@ const fetchDealHead = cache(async (dealId: number): Promise<DealHead> => {
   }
 });
 
-/**
- * 공유 카드·검색 결과의 한 줄.
- *
- * 대표 보도의 요지를 쓴다 — 한국어 요약이 있는 가장 최근 보도, 그런 보도가 없으면 최신 보도의 영문 발췌(`headlineReports` —
- * 보드 오른쪽 판의 "최신 보도"와 같은 판정). 최신 보도를 그대로 쓰면 판정 전·이적과 무관한 영문 기사가 공유 카드 설명이 된다.
- * 없으면 화면이 그리는 값(경로 + 상태 뱃지)으로 만든다(`nextjs.md` "색인 대상 상세는 description을
- * 채운다"). 어느 쪽이든 120자에서 클램프한다.
- * ⚠ 발췌는 줄바꿈을 담고 있을 수 있다(텔레그램 원문) — 메타 태그에 실릴 문장이라 공백 하나로 접는다.
- */
-function describe(head: Extract<DealHead, { state: "found" }>): string {
-  const gist = headlineReports(head.reports ?? [], 1)[0]?.gist?.text.replace(/\s+/g, " ").trim();
-  if (gist) return clamp(gist, META_DESCRIPTION_MAX);
-
-  const { deal } = head;
-  const status = STAGE_STATUS[deal.stage];
-  // 화면(경로 카드·`ClubRoute`)과 **같은 문구**다 — 빈 칸의 말(`FA`·`미확인`·`미정`·`외 N`)까지 `routeLabels`가 정한다.
-  // 전에는 여기서 `미확인`을 따로 들어 자유계약·행선지 미정·관심 구단 여럿이 화면과 다르게 나갔다.
-  const labels = routeLabels(deal, { full: true });
-  const route = `${labels.from} → ${labels.to}`;
-  return clamp(status === null ? route : `${route} · ${STATUS_LABEL[status]}`, META_DESCRIPTION_MAX);
-}
-
-/**
- * 검색 결과·공유 카드의 제목 — `선수 이적 · 출발 → 행선지 (상태)`.
- *
- * 사람들은 선수 이름과 구단 이름을 함께 검색한다("케인 바이에른") — 제목이 선수 이름뿐이면 그 검색어와 맞는 말이 없다.
- * 선수 이름을 맨 앞에 둔다(잘려도 남는다). 경로는 약칭이다(제목이 길면 검색 결과에서 잘린다).
- * ⚠ 행선지 자리에 구단이 여럿이면 가장 유력한 하나 + `등`이다 — 화면 문구(`리버풀 · 노팅엄 · 뉴캐슬 외 3`)를 그대로 실으면
- *   제목이 그 나열로 채워져 검색 결과에서 상태까지 잘린다(실측). 순서는 화면과 같은 `destinationClubs`다.
- * ⚠ 그 밖의 경로·상태 문구는 화면과 **같은 함수**다(`routeLabels`·`STATUS_LABEL` — `describe`와 같은 이유).
- * ⚠ 클램프한다 — `player`는 DB가 길이를 넓게 허용한다. 접미사(`| 온더볼`)는 루트의 `title.template`이 붙인다.
- */
-function titleOf(deal: TransferDeal): string {
-  const labels = routeLabels(deal);
-  const clubs = destinationClubs(deal);
-  const to = clubs.length > 1 ? `${clubs[0].shortName} 등` : labels.to;
-  const status = STAGE_STATUS[deal.stage];
-  const suffix = status === null ? "" : ` (${STATUS_LABEL[status]})`;
-  return clamp(`${playerName(deal)} 이적 · ${labels.from} → ${to}${suffix}`, META_TITLE_MAX);
-}
-
 export async function generateMetadata(props: PageProps<"/transfers/[id]">): Promise<Metadata> {
   const { id } = await props.params;
   const dealId = parsePostId(id);
@@ -235,8 +189,8 @@ export async function generateMetadata(props: PageProps<"/transfers/[id]">): Pro
   if (head.state !== "found") return fallbackMetadata(dealId);
 
   const { deal } = head;
-  const title = titleOf(deal);
-  const description = describe(head);
+  const title = dealMetaTitle(deal);
+  const description = dealMetaDescription(deal, head.reports);
 
   return {
     title,

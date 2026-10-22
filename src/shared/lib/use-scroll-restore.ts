@@ -24,8 +24,14 @@ function scrollKey(pathname: string) {
   return `otb-scroll:${pathname}`;
 }
 
-export function useScrollRestore(ref: RefObject<HTMLElement | null>) {
+/**
+ * @param screen 저장 자리의 이름 — 기본은 지금 경로다. **화면이 그대로인데 경로가 바뀌는 화면**은 고정된 이름을 준다
+ *   (이적 보드는 딜을 고르면 주소가 그 딜의 상세 경로가 된다 — 경로를 키로 두면 고를 때마다 이 effect가 다시 돌아
+ *   새 키의 저장값(없으면 0)으로 목록을 맨 위로 올린다).
+ */
+export function useScrollRestore(ref: RefObject<HTMLElement | null>, screen?: string) {
   const pathname = usePathname();
+  const place = screen ?? pathname;
 
   useEffect(() => {
     const el = ref.current;
@@ -33,7 +39,7 @@ export function useScrollRestore(ref: RefObject<HTMLElement | null>) {
     // 아래 함수 선언들은 호이스팅되어 TS가 el의 null 좁힘을 잃는다 — 좁혀진 값을 따로 잡는다
     const node = el;
 
-    const key = scrollKey(pathname);
+    const key = scrollKey(place);
     /**
      * ⚠ sessionStorage 접근은 실패할 수 있다 — 사파리의 쿠키·사이트 데이터 차단이나
      *   일부 임베드 환경에서 접근 자체가 throw한다. effect에서 터지면 목록 화면이
@@ -135,5 +141,5 @@ export function useScrollRestore(ref: RefObject<HTMLElement | null>) {
       el.removeEventListener("scroll", onScroll);
       window.removeEventListener("pagehide", flush);
     };
-  }, [pathname, ref]);
+  }, [place, ref]);
 }

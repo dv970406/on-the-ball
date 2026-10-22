@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { MouseEvent, SyntheticEvent } from "react";
 import { signInWithNext } from "@/shared/config";
+import { currentReturnPath } from "@/shared/lib";
 import { buttonClassName } from "./button-class";
 
 /**
@@ -24,15 +25,17 @@ import { buttonClassName } from "./button-class";
  * ⚠ **보정은 쿼리 유무와 무관하게 늘 한다.** React는 prop이 같으면 속성을 다시 쓰지 않으므로, 쿼리가 있던
  *   때 고쳐 둔 `href`가 필터를 푼 뒤에도 남아 다음 새 탭·복사가 낡은 주소를 연다.
  * ⚠ 가운데 클릭은 `click`이 아니라 `auxclick`이다 — `onClick`만 걸면 그 길이 통째로 빠진다.
+ * ⚠ 돌아올 주소는 `currentReturnPath`가 정한다 — 화면이 단 값(`RETURN_PATH_ATTR`)이 지금 주소보다 먼저다. 이적 보드는 딜을
+ *   고르면 주소가 그 딜의 상세 경로라, 지금 주소로 돌아오면 보드가 아니라 상세가 뜬다.
  * 목적지의 OAuth 복귀 파라미터(`?code=` 등)는 `signInWithNext`가 걷고, 검증은 `safeNextPath`가 한다.
  */
 export function SignInLink() {
   const pathname = usePathname();
   const router = useRouter();
 
-  // 지금 주소(쿼리 포함)로 앵커의 href를 맞추고 그 목적지를 돌려준다
+  // 돌아올 주소(지금 주소 — 쿼리 포함, 화면이 정했으면 그 값)로 앵커의 href를 맞추고 그 목적지를 돌려준다
   const syncHref = (anchor: HTMLAnchorElement) => {
-    const target = signInWithNext(`${window.location.pathname}${window.location.search}`);
+    const target = signInWithNext(currentReturnPath());
     anchor.href = target;
     return target;
   };

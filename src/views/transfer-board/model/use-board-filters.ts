@@ -1,7 +1,7 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
-import { useMemo } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useMemo, type MouseEvent } from "react";
 import { parsePostId } from "@/shared/lib";
 import {
   parseTransferClub,
@@ -11,6 +11,7 @@ import {
   type TransferLeague,
   type TransferSort,
 } from "@/entities/transfer";
+import { dealIdOfBoardPath } from "../lib/board-href";
 
 /** 보드 필터 — 리그·정렬·구단·관심. **URL이 소유한다**(공유 링크·뒤로가기가 필터를 잃지 않게) */
 export interface BoardFilters {
@@ -22,7 +23,9 @@ export interface BoardFilters {
   /** 관심 딜만 보는가(`?watch=1`) — 비로그인이면 담은 딜이 없어 빈 목록이 된다 */
   watch: boolean;
   /**
-   * 목록·상세 2분할(lg+)에서 오른쪽 판에 연 딜(`?deal=<id>`) — `null`이면 화면 순서상 첫 딜이다.
+   * 목록·상세 2분할(lg+)에서 오른쪽 판에 연 딜 — `null`이면 화면 순서상 첫 딜이다.
+   * 고르면 주소가 그 딜의 상세 경로(`/transfers/<id>` — `boardDealHref`)가 된다. 로그인 복귀 주소(`next`)와 옛 공유 링크는
+   * `?deal=<id>`로 온다 — 경로가 먼저이고, 둘 다 같은 값으로 읽는다.
    * ⚠ **필터가 아니다** — `boardHref`의 필터 링크는 이 값을 싣지 않는다(필터를 바꾸면 선택이 풀리고 기본값으로 간다).
    * ⚠ 해석은 `parsePostId`다 — 상세 라우트(`/transfers/[id]`)와 같은 파서여야 같은 딜이 두 주소 표기로 갈리지 않는다.
    */
@@ -44,6 +47,29 @@ export function navigateBoard(href: string, mode: "push" | "replace" = "push") {
 }
 
 /**
+ * 판의 상세 링크("전체 화면"·"전체 보기")를 누르기 직전, **그 링크가 지금 주소와 같으면** 지금 기록을 하나 복제해 둔다.
+ *
+ * 딜을 고르면 보드의 주소가 그 딜의 상세 경로가 되므로(`boardDealHref`), 필터가 없으면 판의 상세 링크가 지금 주소와 **같다**.
+ * Next는 지금 주소와 같은 곳으로 가는 이동에서 기록을 쌓지 않고 바꿔 끼운다(`app-router.js` — `canonicalUrl`이 지금 주소와
+ * 같으면 `replaceState`) — 그대로 두면 보드 기록이 상세로 덮여, 상세에서 뒤로가기를 누르면 보드가 아니라 그 앞 페이지로 간다
+ * (실측: 새 탭에서 연 보드였다면 빈 탭으로 갔다). 복제해 두면 Next가 그 복제본을 상세로 바꿔 끼우고 보드 기록은 남는다.
+ * ⚠ Next가 감싼 `pushState`는 지금 기록의 라우터 트리를 새 기록에 옮겨 적는다 — 뒤로가기가 보드 화면으로 돌아오는 근거다.
+ * ⚠ 일반 클릭만 본다 — 수정 키·가운데 버튼(새 탭)은 이 탭의 기록과 무관하다. 주소가 다르면(필터가 걸렸다) Next가 스스로 쌓는다.
+ */
+export function keepBoardEntryOnSameUrlLink(e: MouseEvent<HTMLElement>) {
+  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  // 더블클릭의 두 번째 클릭은 첫 클릭이 시작한 이동이 끝나기 전이라 주소가 아직 같다 — 복제가 두 번 되면 뒤로가기가 한 번 헛돈다
+  if (e.detail > 1) return;
+  if (!(e.target instanceof Element)) return;
+  const link = e.target.closest<HTMLAnchorElement>("a[href]");
+  if (!link || link.target !== "") return;
+  const to = new URL(link.href);
+  const here = window.location;
+  if (to.origin !== here.origin || to.pathname !== here.pathname || to.search !== here.search || to.hash !== "") return;
+  window.history.pushState(null, "", here.href);
+}
+
+/**
  * 보드 필터 — **Next 라우터의 주소**에서 읽는다. 첫 렌더(SSR)부터 그 뒤의 모든 이동까지 소스가 하나다.
  *
  * ⚠ `useSearchParams`가 이 슬라이스의 유일한 예외다(`check:conventions`의 `SEARCH_PARAMS_ALLOWED`에 사유가 있다).
@@ -57,14 +83,16 @@ export function navigateBoard(href: string, mode: "push" | "replace" = "push") {
  */
 export function useBoardFilters(): BoardFilters {
   const searchParams = useSearchParams();
-  return useMemo(
-    () => ({
+  // ⚠ 고른 딜은 경로(`/transfers/<id>`)에도 실린다 — `usePathname`도 Next 라우터의 주소라 `useSearchParams`와 같은 이유로 쓴다
+  const pathname = usePathname();
+  return useMemo(() => {
+    const pathDeal = dealIdOfBoardPath(pathname);
+    return {
       league: parseTransferLeague(searchParams.get("league") ?? undefined),
       sort: parseTransferSort(searchParams.get("sort") ?? undefined),
       club: parseTransferClub(searchParams.get("club") ?? undefined),
       watch: parseTransferWatch(searchParams.get("watch") ?? undefined),
-      deal: parsePostId(searchParams.get("deal") ?? ""),
-    }),
-    [searchParams],
-  );
+      deal: pathDeal ?? parsePostId(searchParams.get("deal") ?? ""),
+    };
+  }, [pathname, searchParams]);
 }

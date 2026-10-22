@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { signInWithNext } from "@/shared/config";
+import { currentReturnPath } from "@/shared/lib";
 import { Dialog } from "./dialog";
 
 interface SignInDialogProps {
@@ -50,7 +51,7 @@ export function SignInDialog({ open, onClose, action, next }: SignInDialogProps)
       // ⚠ 쿼리까지 싣는다 — 이적 보드의 필터(`?league=`)·딜 패널(`?deal=`)은 주소에만 있어서,
       //   경로만 실으면 로그인하고 돌아왔을 때 보던 딜·필터가 사라진다(`safeNextPath`가 쿼리를 통과시킨다).
       onConfirm={() =>
-        router.push(signInWithNext(next ?? `${window.location.pathname}${window.location.search}`))
+        router.push(signInWithNext(next ?? currentReturnPath()))
       }
       title="로그인이 필요해요"
       description={`${action} 먼저 로그인해 주세요. ${

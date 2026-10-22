@@ -7,8 +7,8 @@ import {
   type TransferDealListItem,
   type TransferLeague,
 } from "@/entities/transfer";
-import { openTransferWindow, trackedTransferWindow } from "@/shared/config";
-import { cn, formatCount, useNowMs } from "@/shared/lib";
+import { ROUTES, openTransferWindow, trackedTransferWindow } from "@/shared/config";
+import { RETURN_PATH_ATTR, cn, formatCount, useNowMs } from "@/shared/lib";
 import { EmptyState, SignInDialog, StaleBanner } from "@/shared/ui";
 import { AppBar } from "@/widgets/app-bar";
 import { AuthStatus } from "@/widgets/auth-status";
@@ -17,7 +17,7 @@ import { DealPanel } from "@/widgets/deal-panel";
 import { TabScrollArea } from "@/widgets/tab-scroll-area";
 import { boardHref } from "../lib/board-href";
 import { groupLayout } from "../lib/screen-order";
-import { navigateBoard, useBoardFilters } from "../model/use-board-filters";
+import { keepBoardEntryOnSameUrlLink, navigateBoard, useBoardFilters } from "../model/use-board-filters";
 import { useDealSelection } from "../model/use-deal-selection";
 import { useTransferBoard } from "../model/use-transfer-board";
 import { BoardHeader } from "./board-header";
@@ -70,8 +70,8 @@ interface SignInPrompt {
  *
  * 폭이 늘면 **판을 늘린다 — 화면을 바꾸지 않는다**(같은 라우트·같은 데이터·같은 컴포넌트):
  * - md(768+): 목록 행이 표의 열로 펼쳐지고(`DealRow`), 소식이 한 줄 그리드가 된다.
- * - lg(1024+): 머리에 지수 띠(`IndexBand`), 오른쪽에 고른 딜의 판(`DealPanel`) — 목록·상세 2분할. 고른 딜은 주소의
- *   `?deal=`이 소유한다(`useDealSelection`). 딜 링크는 상세 주소를 가진 앵커로 남고 이 폭의 일반 클릭만 선택으로
+ * - lg(1024+): 머리에 지수 띠(`IndexBand`), 오른쪽에 고른 딜의 판(`DealPanel`) — 목록·상세 2분할. 고른 딜은 주소가
+ *   소유한다 — 고르면 주소가 그 딜의 상세 경로(`/transfers/<id>`)가 된다(`useDealSelection`). 딜 링크는 상세 주소를 가진 앵커로 남고 이 폭의 일반 클릭만 선택으로
  *   가로챈다(`useDealSelect`).
  * - `min-[90rem]`(1440px): 왼쪽 레일(`BoardRail` — 관심 딜·리그·구단)이 `FilterRail`을 대신한다(3분할).
  *   ⚠ `min-[1440px]`로 쓰지 않는다 — 단위가 다른 임의 브레이크포인트는 `md:`·`lg:`(rem)보다 **앞에** 정렬돼 같은 속성의
@@ -99,7 +99,7 @@ export function TransferBoardView({
   serverNowMs,
   scopeStartIso,
 }: TransferBoardViewProps) {
-  // 필터(`?league=`·`?sort=`·`?club=`·`?watch=`)와 고른 딜(`?deal=`)은 **주소가 소유한다** — SSR 첫 렌더부터 화면 안 이동까지 소스가 하나다
+  // 필터(`?league=`·`?sort=`·`?club=`·`?watch=`)와 고른 딜(상세 경로 또는 `?deal=`)은 **주소가 소유한다** — SSR 첫 렌더부터 화면 안 이동까지 소스가 하나다
   const { league, sort, club: requestedClub, watch, deal: requestedDeal } = useBoardFilters();
 
   // ⚠ **서버 시각이 우선이다** — `useNowMs()`는 세션당 한 번 고정되므로 클라 값을 앞에 두면
@@ -219,7 +219,8 @@ export function TransferBoardView({
 
   return (
     <>
-      <TabScrollArea>
+      {/* 딜을 고르면 주소가 그 딜의 상세 경로가 된다 — 스크롤 자리는 보드 하나로 둔다(`useScrollRestore`) */}
+      <TabScrollArea screen={ROUTES.transferList}>
         <AppBar leading={<AuthStatus />} />
 
         {/* ⚠ 화면 제목(h1)은 sr-only가 아니라 `BoardHeader`의 보이는 "이적시장"이다(lg+에서는 그 요소가 sr-only로 남는다) —
@@ -271,7 +272,13 @@ export function TransferBoardView({
               guide={<GuideButton onClick={openGuide} />}
             />
 
-            <div className="contents lg:grid lg:grid-cols-[minmax(0,1fr)_384px] min-[90rem]:grid-cols-[232px_minmax(0,1fr)_384px]">
+            {/*
+              오른쪽 판은 폭에 비례해 넓힌다(상·하한 사이) — 판이 딜 상세를 대신하는 자리라 경로 카드·이적료·보도가 좁은 고정 폭에
+              눌리지 않게, 가운데 목록이 그만큼 내준다. 비율의 기준은 이 격자(내용 폭 — 1920px에서 멈춘다)다.
+              ⚠ 하한은 가운데가 무너지지 않는 선이다 — 1024px에서 목록이 640px 아래로 줄면 머리의 지수 띠(`IndexBand`)가 칸에 라벨을
+                다 담지 못한다(판 하한 400px에서 "합의 …"로 잘렸다). 판 하한을 올리려면 지수 띠부터 다시 잰다.
+            */}
+            <div className="contents lg:grid lg:grid-cols-[minmax(0,1fr)_clamp(384px,37%,520px)] min-[90rem]:grid-cols-[232px_minmax(0,1fr)_clamp(460px,32%,620px)]">
               {/* 왼쪽 레일 — 1440 미만에서는 상자째 없다(display:none). 높이는 상단 바(safe-area 포함)를 뺀 화면 높이 */}
               <div className="hidden border-r border-hairline-cool min-[90rem]:sticky min-[90rem]:top-0 min-[90rem]:block min-[90rem]:h-[calc(100dvh-56px-env(safe-area-inset-top))] min-[90rem]:self-start min-[90rem]:overflow-y-auto">
                 <BoardRail
@@ -378,7 +385,16 @@ export function TransferBoardView({
                   막대가 없으면 마우스 사용자가 더 내려갈 내용이 있다는 신호를 받지 못한다. 페이지(`main`) 막대와 오른쪽 끝에
                   나란히 서지만 판의 왼쪽 경계선이 두 스크롤 영역을 가른다.
               */}
-              <div className="hidden border-l border-hairline-cool lg:sticky lg:top-0 lg:block lg:h-[calc(100dvh-56px-env(safe-area-inset-top))] lg:self-start">
+              {/*
+                판의 상세 링크가 지금 주소와 같을 때 보드 기록을 남긴다(`keepBoardEntryOnSameUrlLink`) — 링크의 이동보다 먼저(캡처).
+                판에 딜이 열려 있는 동안 **로그인 뒤 돌아올 주소**를 단다(`RETURN_PATH_ATTR`) — 주소가 그 딜의 상세 경로라, 상단 바
+                "로그인"이 지금 주소로 돌아오면 보드가 아니라 상세가 뜬다. 판의 로그인 안내와 같은 보드 주소(`?deal=`)다.
+              */}
+              <div
+                {...{ [RETURN_PATH_ATTR]: selectedId === null ? undefined : boardHref(league, sort, club, watch, selectedId) }}
+                onClickCapture={keepBoardEntryOnSameUrlLink}
+                className="hidden border-l border-hairline-cool lg:sticky lg:top-0 lg:block lg:h-[calc(100dvh-56px-env(safe-area-inset-top))] lg:self-start"
+              >
                 {selectedDeal ? (
                   <DealPanel
                     key={selectedDeal.id}

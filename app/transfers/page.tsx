@@ -4,17 +4,25 @@ import { unstable_rethrow } from "next/navigation";
 import { OG_IMAGE, OG_SITE, ROUTES, absoluteUrl, boardScopeStartMs } from "@/shared/config";
 import { createSupabaseServerClient, hasSessionCookie } from "@/shared/api/supabase-server";
 import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
+import { parsePostId } from "@/shared/lib/post-id";
+import { firstParam } from "@/shared/lib/search-params";
 // ⚠ 배럴이 아니라 직접 경로 — 매퍼·빌더·파서는 "use client"가 없어 서버에서 쓸 수 있다.
 //   select 문자열·정렬·상한을 클라이언트 훅과 **공유해야** 같은 목록이 나온다.
-import { buildDealListQuery, buildFollowedClubsQuery } from "@/entities/transfer/api/list-query";
-import { buildDealListItem, buildFollowedClubs } from "@/entities/transfer/api/mappers";
-import type { TransferClub, TransferDealListItem } from "@/entities/transfer/model/types";
+import {
+  buildDealListQuery,
+  buildDealQuery,
+  buildFollowedClubsQuery,
+  buildReportsQuery,
+} from "@/entities/transfer/api/list-query";
+import { buildDeal, buildDealListItem, buildFollowedClubs, buildReport } from "@/entities/transfer/api/mappers";
+import { dealCardImage, dealMetaDescription, dealMetaTitle } from "@/entities/transfer/lib/deal-meta";
+import type { TransferClub, TransferDeal, TransferDealListItem, TransferReport } from "@/entities/transfer/model/types";
 import { TransferBoardView } from "@/views/transfer-board";
 
 const TITLE = "이적시장";
 const DESCRIPTION = "프리미어리그·유럽 5대 리그 이적 소식을 단계별로 모아 봅니다.";
 
-export const metadata: Metadata = {
+const BOARD_METADATA: Metadata = {
   title: TITLE,
   // ⚠ 색인 대상 목록이라 description을 채운다 — 비우면 루트의 사이트 소개 한 줄이 이 화면의
   //   검색 결과 설명이 된다.
@@ -33,6 +41,76 @@ export const metadata: Metadata = {
   },
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: OG_IMAGE },
 };
+
+/**
+ * 공유 카드에 그릴 딜 — 보드 주소에 딜이 실려(`?deal=<id>`) 들어왔을 때만 읽는다. 없거나 읽지 못하면 `null`.
+ *
+ * ⚠ **익명 클라이언트다**(세션 갈림이 없다). 카드는 누가 열든 같아야 하고 개인화 값(`isWatched`)을 쓰지 않는다 — 딜 공유
+ *   카드 이미지(`opengraph-image.tsx`)와 같은 판단이다. 조회가 Data Cache를 탄다.
+ * ⚠ 보드 본문(`fetchTransferBoard`)과 따로 묻는다 — 목록 행에는 설명에 쓰는 보도 요지(`headlineReports`)가 없고, 상세와
+ *   **같은 조립**(`buildDealQuery`·`buildReportsQuery`)이어야 두 주소의 카드가 같은 말을 한다.
+ * ⚠ 보도가 실패해도 딜만으로 답한다 — 설명이 경로 + 상태 문구로 내려갈 뿐이다.
+ */
+async function fetchSharedDeal(
+  dealId: number,
+): Promise<{ deal: TransferDeal; reports: TransferReport[] | undefined } | null> {
+  try {
+    const supabase = createSupabaseAnonClient();
+    if (!supabase) return null;
+    const [dealResult, reportsResult] = await Promise.all([
+      buildDealQuery(supabase, dealId),
+      buildReportsQuery(supabase, dealId),
+    ]);
+    if (dealResult.error || !dealResult.data) return null;
+    return {
+      deal: buildDeal(dealResult.data),
+      reports: reportsResult.error ? undefined : (reportsResult.data ?? []).map(buildReport),
+    };
+  } catch (e) {
+    unstable_rethrow(e);
+    console.error("[transfers] 공유 딜 조회 실패:", e);
+    return null;
+  }
+}
+
+/**
+ * 보드의 메타데이터 — 평소엔 목록의 것이고, **주소에 딜이 실리면(`?deal=<id>`) 공유 카드만 그 딜의 것**이다.
+ *
+ * 넓은 화면에서 고른 딜은 상세 경로로 실리지만(`nextjs.md` 2분할 절), `?deal=` 형태가 로그인 복귀 주소이고 그 전에 공유된
+ * 링크가 남아 있다 — 목록의 공통 카드가 나가면 받는 사람은 무슨 딜인지 알 수 없다. 그래서 상세와 같은 제목·설명·카드 이미지를 싣는다.
+ * ⚠ **`<title>`·`description`·canonical은 목록의 것 그대로다.** 화면 안에서 다른 딜을 고르면 주소만 바뀌고 메타데이터는
+ *   다시 만들어지지 않아 탭 제목이 처음 딜에 굳는다. 검색에는 canonical(`/transfers`)이 대표다.
+ * ⚠ **`og:url`은 그 딜의 상세 주소다** — "og:url = canonical"의 예외다. 카드가 말하는 대상이 그 딜이고, 공유 플랫폼이
+ *   og:url을 따라가 다시 읽으면(페이스북) 상세가 같은 카드를 낸다. 좁은 화면에는 판이 없어 이 주소를 연 사람이 그 딜을
+ *   볼 수 없다는 점도 상세를 가리킬 이유다.
+ * ⚠ 판정은 화면과 같다 — `?deal=`이 여럿이면 첫 값(`useSearchParams().get`과 같다), 형식은 `parsePostId`.
+ *   못 읽으면(형식이 틀림·없는 딜·조회 실패) 목록의 메타데이터로 답한다.
+ */
+export async function generateMetadata(props: PageProps<"/transfers">): Promise<Metadata> {
+  const dealId = parsePostId(firstParam((await props.searchParams).deal) ?? "");
+  if (dealId === null) return BOARD_METADATA;
+
+  const shared = await fetchSharedDeal(dealId);
+  if (!shared) return BOARD_METADATA;
+
+  const { deal, reports } = shared;
+  const title = dealMetaTitle(deal);
+  const description = dealMetaDescription(deal, reports);
+  const image = dealCardImage(dealId);
+  return {
+    ...BOARD_METADATA,
+    openGraph: {
+      ...OG_SITE,
+      type: "article",
+      title,
+      description,
+      url: absoluteUrl(ROUTES.transfer(dealId)),
+      modifiedTime: deal.latestReportedAt,
+      images: image,
+    },
+    twitter: { card: "summary_large_image", title, description, images: image },
+  };
+}
 
 interface TransferBoard {
   /** 프리페치 결과 — 실패하면 undefined를 넘겨 클라이언트 조회로 폴백한다(nextjs.md) */
@@ -63,8 +141,8 @@ function toMinuteIso(ms: number): string {
 }
 
 /**
- * ⚠ `cache()`로 감싼다 — 지금은 소비자가 `Page` 하나라 필수는 아니지만, **메타데이터를
- *   동적으로 바꾸는 순간 요청당 2회가 된다.** 그때 잊지 않도록 미리 감싼다(다른 목록과 같다).
+ * ⚠ `cache()`로 감싼다 — 지금은 소비자가 `Page` 하나라 필수는 아니지만(`generateMetadata`는 공유 딜만 따로 읽는다),
+ *   **메타데이터가 이 조회를 쓰게 되는 순간 요청당 2회가 된다.** 그때 잊지 않도록 미리 감싼다(다른 목록과 같다).
  *   인자가 없는 이유: 범위 시작이 `nowMs`에서 파생되는데 그 값을 렌더 본문에서 찍을 수 없어
  *   (`react-hooks/purity`) 둘 다 안에서 만든다 — 인자를 받게 되면 **원시값**으로 받는다.
  */
