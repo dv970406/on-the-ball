@@ -140,5 +140,16 @@ check("가십 — 괄호를 되읽지 못한 항목만 칼럼 매체로 남는�
   check("동시성 — 모든 소스를 한 번씩 돌리고, 전체·호스트별 상한을 넘지 않는다", results.length === defs.length && new Set(results.map((r) => r.sourceId)).size === defs.length && peak <= 4 && peak >= 3 && peakHost === 2, JSON.stringify({ peak, peakHost, n: results.length }));
 }
 
+// ── 정기 수집 스크립트 — 최상위 실행 줄보다 아래에 상수를 선언하지 않는다 ──
+{
+  // 스크립트가 최상위에서 곧바로 실행을 기다린다(`await derive(…)`). 그 실행이 부르는 함수가 쓰는 상수를 그 줄보다 아래에 두면
+  // 초기화 전 접근(TDZ)으로 파생이 죽는다 — 판정이 있는 실행에만 걸려 로컬 테스트를 통과한 채 운영이 이틀간 멈췄다
+  const { readFileSync } = await import("node:fs");
+  const lines = readFileSync(new URL("./sync-transfer-news.mjs", import.meta.url), "utf8").split("\n");
+  const firstRun = lines.findIndex((l) => /^(?:await |if \(deriveOnly\))/.test(l));
+  const late = lines.flatMap((l, i) => (i > firstRun && /^(?:const|let) [A-Z][A-Z0-9_]*\b/.test(l) ? [`${i + 1}: ${l}`] : []));
+  check("정기 수집 — 최상위 실행보다 아래에 대문자 상수를 선언하지 않는다(TDZ)", firstRun > 0 && late.length === 0, late.join(" | "));
+}
+
 console.log(`\n수집 어댑터 ${pass}/${pass + fail} 통과`);
 if (fail) process.exit(1);

@@ -50,6 +50,11 @@ const replay = argv.includes("--replay");
 const rejudgeStale = argv.includes("--rejudge-stale");
 const loanOnly = argv.includes("--loan-only");
 const onlyArg = flag(argv, "only");
+/**
+ * 판정 불가 비율의 경고 문턱(`reportJudgeMetrics`). ⚠ 이 파일은 최상위에서 곧바로 실행을 기다린다(`await derive(…)`) — 그 실행이 부르는 함수가
+ * 쓰는 상수는 **그 줄보다 위에** 선언한다. 아래에 두면 판정이 한 건이라도 있는 실행마다 초기화 전 접근(TDZ)으로 파생이 죽는다(운영에서 이틀간 그랬다).
+ */
+const INVALID_WARN_RATIO = 0.2;
 
 // 모르는 플래그와 뜻이 겹치는 조합은 거부한다 — 조용히 무시하면 의도와 다른 일이 원격에 일어난다
 const KNOWN = new Set(["--remote", "--dry-run", "--reprocess", "--derive-only", "--rejudge", "--rejudge-stale", "--loan-only", "--replay", "--verify", "--only"]);
@@ -239,7 +244,6 @@ async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: rer
  * GitHub Actions에서는 판정 불가 비율이 `INVALID_WARN_RATIO`를 넘거나 반복 실패 행이 있으면 `::warning::` 줄을 낸다(실행 화면에 뜬다) —
  * 실패해도 종료 코드는 그대로다(판정이 흔들려도 보드는 저장된 판정으로 그려진다). 원인은 사람이 본다.
  */
-const INVALID_WARN_RATIO = 0.2;
 function reportJudgeMetrics(r) {
   const n = r.needStats;
   const j = r.judged && "read" in r.judged ? r.judged : null;
