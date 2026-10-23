@@ -911,6 +911,33 @@ values ('61f61e3fdb8eed92', 'Same Club', 'rlstest-a', 'rlstest-a', 'talks', now(
 rollback to s;
 
 savepoint s;
+\echo '[❌차단] 딜의 형태가 진행 중 임대(loan_standing) — 보도의 형태이지 딜의 형태가 아니다(20261023000001)'
+insert into public.transfer_deal (deal_key, player, stage, form, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Standing Loan', 'official', 'loan_standing', now(), now(), 1);
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 완전 이적 딜에 임대 조항'
+insert into public.transfer_deal (deal_key, player, stage, form, loan_clause, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Clause Permanent', 'official', 'permanent', 'option', now(), now(), 1);
+rollback to s;
+
+savepoint s;
+\echo '[t 기대] 임대 딜 — 형태 · 임대 구단(FK) · 의무 조항 · 조항 금액(buy_clause) · 임대료 표기'
+insert into public.transfer_deal (deal_key, player, from_club_code, to_club_code, loan_club_code, stage, form, loan_clause, loan_fee_text,
+                                  fee_amount, fee_currency, fee_text, fee_kind, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Loan Deal', 'rlstest-a', 'rlstest-b', 'rlstest-b', 'official', 'loan', 'obligation', '£5m',
+        42.5, 'GBP', '£42.5m', 'buy_clause', now(), now(), 1);
+select form = 'loan' and loan_clause = 'obligation' and fee_kind = 'buy_clause' from public.transfer_deal where deal_key = '61f61e3fdb8eed92';
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 없는 구단을 임대 구단으로 — FK(transfer_club)'
+insert into public.transfer_deal (deal_key, player, loan_club_code, stage, first_reported_at, latest_reported_at, report_count)
+values ('61f61e3fdb8eed92', 'Ghost Loan Club', 'rlstest-none', 'official', now(), now(), 1);
+rollback to s;
+
+savepoint s;
 insert into public.transfer_deal (deal_key, player, stage, first_reported_at, latest_reported_at, report_count)
 values ('61f61e3fdb8eed92', 'No Clubs', 'rumour', now(), now(), 1);
 \echo '[t 기대] 구단을 하나도 못 읽은 딜은 정상이다 — from<>to CHECK가 둘 다 null을 거부하면 안 된다'
@@ -1441,6 +1468,40 @@ update public.transfer_news set verdict_at = now(), verdict_model = 'claude-sonn
 select verdict_model = 'claude-sonnet-5' and verdict_article_chars = 0 and verdict_attempts = 2 from public.transfer_news where id = :tv1;
 rollback to s;
 
+\echo ''
+\echo '-- 37-5. 판정의 임대 필드 — 형태·보유 구단·임대 구단·조항 (20261023000001) --'
+savepoint s;
+select set_config('request.jwt.claims', '{}', true);
+:login_anon
+\echo '[❌차단] 비로그인이 판정의 임대 필드를 읽는다 — 비공개 추출 컬럼'
+select verdict_form, verdict_loan_owner, verdict_loan_club, verdict_loan_clause from public.transfer_news where id = :tv1;
+rollback to s;
+
+savepoint s;
+:login_alice
+\echo '[❌차단] 로그인 유저가 판정의 형태를 쓴다 — 쓰기 grant가 없다'
+update public.transfer_news set verdict_form = 'loan' where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] "이동" 판정이 아닌 행의 형태 — 임대 필드는 이동 판정에 딸린다'
+update public.transfer_news set verdict = 'not_move', verdict_player = 'barcola', verdict_at = now(), verdict_form = 'loan' where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 모르는 형태 — enum(transfer_move_form)'
+update public.transfer_news set verdict = 'move', verdict_player = 'barcola', verdict_at = now(), verdict_form = 'swap' where id = :tv1;
+rollback to s;
+
+savepoint s;
+\echo '[t 기대] "이동" 판정과 함께 진행 중 임대 · 보유 구단 · 임대 구단 · 의무 조항을 쓴다'
+update public.transfer_news set verdict = 'move', verdict_player = 'barcola', verdict_at = now(),
+       verdict_form = 'loan_standing', verdict_loan_owner = 'Chelsea', verdict_loan_club = 'Aston Villa', verdict_loan_clause = 'obligation',
+       verdict_fee_amount = 42.5, verdict_fee_currency = 'GBP', verdict_fee_kind = 'buy_clause'
+ where id = :tv1;
+select verdict_form = 'loan_standing' and verdict_loan_club = 'Aston Villa' and verdict_fee_kind = 'buy_clause' from public.transfer_news where id = :tv1;
+rollback to s;
+
 rollback to s37v;
 
 \echo ''
@@ -1473,6 +1534,12 @@ savepoint s;
 \echo '[t 기대] 현 소속 캐시(player_club — 20260930000002): key는 선수 키, name_en은 구단 정규명, wikidata_id는 구단 항목'
 insert into public.transfer_name_ko (kind, key, name_en, wikidata_id) values ('player_club', 'rlstest player', 'Rlstest Club', 'Q2');
 select count(*) = 1 from public.transfer_name_ko where kind = 'player_club' and key = 'rlstest player' and name_ko is null;
+rollback to s;
+
+savepoint s;
+\echo '[t 기대] 보유 구단 캐시(player_owner_club — 20261023000003): 임대 중인 선수를 보유한 구단'
+insert into public.transfer_name_ko (kind, key, name_en, wikidata_id) values ('player_owner_club', 'rlstest player', 'Rlstest Owner', 'Q3');
+select count(*) = 1 from public.transfer_name_ko where kind = 'player_owner_club' and key = 'rlstest player';
 rollback to s;
 
 savepoint s;
@@ -2073,6 +2140,24 @@ rollback to s;
 savepoint s;
 \echo '[❌차단] 상태 톤이 아닌 값(단계 이름 here_we_go)을 기록한다 — enum(transfer_status_tone)'
 insert into public.transfer_deal_push_log (deal_id, status) values (:tdp, 'here_we_go');
+rollback to s;
+
+savepoint s;
+\echo '    (20261023000002) 딜 id는 선수당 영구다 — 다음 창의 같은 상태(임대 오피셜 다음 해의 완전 이적 오피셜)는 다시 알린다'
+\echo '[t 기대] 같은 (딜, 상태)도 창이 다르면 기록된다 — 기본키가 (딜, 창, 상태)'
+insert into public.transfer_deal_push_log (deal_id, round_key, status) values (:tdp, '2027-summer', 'talks');
+select count(*) = 2 from public.transfer_deal_push_log where deal_id = :tdp;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 같은 창의 같은 (딜, 상태)를 두 번 기록한다'
+insert into public.transfer_deal_push_log (deal_id, round_key, status) values (:tdp, '2027-summer', 'talks');
+insert into public.transfer_deal_push_log (deal_id, round_key, status) values (:tdp, '2027-summer', 'talks');
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 창 키의 모양이 아니다'
+insert into public.transfer_deal_push_log (deal_id, round_key, status) values (:tdp, 'next-year', 'official');
 rollback to s;
 
 savepoint s; :login_anon

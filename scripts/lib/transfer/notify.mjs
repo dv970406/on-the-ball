@@ -13,8 +13,11 @@
  *
  * ⚠ **알리는 것은 "이번 실행의 변화"뿐이다.** 저장된 값과 새로 파생한 값의 차이(`writeDeals`의 `changes`)에서만 만든다 —
  *   기록(`transfer_deal_push_log`)만 보고 만들면 처음 켠 날 보드의 모든 딜이 "아직 안 알린 딜"이 된다.
- * ⚠ **기록을 먼저 넣고 보낸다.** 같은 (딜, 상태)는 한 번만 알린다 — 보내다 죽어도 다음 실행이 다시 보내지 않는다
+ * ⚠ **기록을 먼저 넣고 보낸다.** 같은 창 안에서 같은 (딜, 상태)는 한 번만 알린다 — 보내다 죽어도 다음 실행이 다시 보내지 않는다
  *   (알림은 한 번 덜 가는 편이 두 번 가는 것보다 낫다). 루머 ↔ 협상을 오가는 딜도 상태마다 한 번이다.
+ *   기록의 키에 창(`round_key` — `trackedWindowKey`)이 든다 — 딜 id는 선수당 영구라, 창이 없으면 여름 임대 오피셜을 알린 선수의
+ *   다음 해 완전 이적 오피셜이 영영 가지 않는다.
+ * ⚠ **진행 중인 임대의 설명만으로 바뀐 변화(`contextOnly`)는 알리지 않는다** — 새 움직임이 아니다(`derive-deals.mjs`의 문맥 보도).
  * ⚠ **상태는 단계가 아니라 화면의 톤이다**(`STATUS_OF_STAGE`). 메디컬 → 개인 합의처럼 같은 톤 안의 이동은 화면에서
  *   달라지는 것이 없어 알리지 않는다. 이 표는 `src/entities/transfer/lib/stage.ts`의 `STAGE_STATUS`·`STATUS_LABEL`과
  *   **글자 하나까지 같아야 한다** — 스크립트는 TS를 import할 수 없어 사본을 두고, 테스트가 두 파일을 대조한다.
@@ -25,6 +28,7 @@ import { parse as legacyParse } from "node:url";
 import webpush from "web-push";
 import { readRange } from "../sync-db.mjs";
 import { chunks, HOUR_MS } from "./util.mjs";
+import { trackedWindowKey } from "./windows.mjs";
 
 /** 단계 → 상태 톤. ⚠ `stage.ts`의 `STAGE_STATUS`와 같아야 한다(테스트가 대조한다) */
 export const STATUS_OF_STAGE = {
@@ -50,6 +54,19 @@ export const STATUS_LABEL = {
   rumor: "루머",
   dead: "결렬",
   denied: "부인",
+};
+
+/**
+ * 딜 형태가 알림 제목에 붙이는 말 — "오피셜 · 가르나초 임대". ⚠ 화면(`src/entities/transfer/lib/deal-form.ts`의 `DEAL_FORM`의 noun)과
+ * 같아야 한다(테스트가 대조한다). 완전 이적·모름은 붙이지 않는다.
+ */
+export const FORM_NOUN = {
+  permanent: null,
+  loan: "임대",
+  loan_convert: "완전 영입",
+  loan_standing: "임대",
+  loan_recall: "조기 복귀",
+  loan_extend: "임대 연장",
 };
 
 /** 응원 구단 팬에게도 알리는 **상태 변화** — 새 딜은 상태와 무관하게 알린다 */
@@ -142,21 +159,24 @@ function destinationLabel(shorts) {
  * 변화 → 알림 계획. 같은 톤 안의 이동 · 오래된 보도 · 톤이 없는 단계는 뺀다.
  *
  * @param {object[]} changes `writeDeals`가 돌려준 변화 — `{ dealId, prevStage, stage, player, playerKo, fromShort, toShorts,
- *   isFreeAgent, clubCodes, latestReportedAt, summary }`. `prevStage`가 null이면 새 딜이다.
+ *   isFreeAgent, form, formChanged, contextOnly, clubCodes, latestReportedAt, summary }`. `prevStage`가 null이면 새 딜이다.
  * @returns {{ dealId: number, status: string, isNew: boolean, toWatchers: boolean, toFollowers: boolean, clubCodes: string[],
  *   title: string, body: string, url: string, tag: string }[]}
  */
 export function planNotices(changes, { nowMs }) {
   const notices = [];
   for (const c of changes) {
+    if (c.contextOnly) continue;
     const status = STATUS_OF_STAGE[c.stage] ?? null;
     if (status === null) continue;
     const isNew = c.prevStage == null;
-    if (!isNew && STATUS_OF_STAGE[c.prevStage] === status) continue;
+    // 같은 톤 안의 이동은 알리지 않는다 — 단 결과가 난 딜의 형태가 바뀐 것(임대 → 완전 영입 전환)은 새 소식이다(`writeDeals`의 `formChanged`)
+    if (!isNew && STATUS_OF_STAGE[c.prevStage] === status && !c.formChanged) continue;
     const reportedMs = Date.parse(c.latestReportedAt);
     if (!Number.isFinite(reportedMs) || reportedMs < nowMs - NOTICE_MAX_AGE_MS) continue;
 
-    const name = c.playerKo ?? c.player;
+    const noun = c.form ? (FORM_NOUN[c.form] ?? null) : null;
+    const name = `${c.playerKo ?? c.player}${noun ? ` ${noun}` : ""}`;
     const from = c.fromShort ?? (c.isFreeAgent ? "FA" : "미확인");
     const route = `${from} → ${destinationLabel(c.toShorts)}`;
     // 새 루머는 "루머"보다 "새 이적설"이 사건을 말한다 — 그 밖에는 화면의 뱃지와 같은 글자다
@@ -270,7 +290,7 @@ export function assertVapid(vapid) {
  * 기록 → 받는 사람 조회 → 발송 → 죽은 구독 정리.
  *
  * @param {object[]} changes `writeDeals`의 `changes`
- * @param {{ vapid: { subject: string, publicKey: string, privateKey: string }, nowMs?: number, log?: Console,
+ * @param {{ vapid: { subject: string, publicKey: string, privateKey: string }, nowMs?: number, log?: Console, roundKey?: string,
  *   send?: (subscription: object, payload: object) => Promise<unknown> }} opts
  * @returns {{ planned: number, fresh: number, users: number, sent: number, gone: number, failed: number, rejected: number,
  *   unknownHosts: number, suppressed: number }} `fresh`는 이번에 처음 기록된 알림 수, `suppressed`는 상한에 걸려 기록만 한 수,
@@ -288,10 +308,11 @@ export async function runNotifications(supabase, changes, opts) {
   // 실제 발송 경로에서만 검증한다(발송을 바꿔 끼운 테스트·점검은 web-push를 타지 않는다)
   if (!opts.send) assertVapid(opts.vapid);
 
-  // 기록을 먼저 넣는다 — 이미 있는 (딜, 상태)는 무시되고, **새로 들어간 것만** 돌아온다
+  // 기록을 먼저 넣는다 — 이미 있는 (딜, 창, 상태)는 무시되고, **새로 들어간 것만** 돌아온다
+  const roundKey = opts.roundKey ?? trackedWindowKey(opts.nowMs ?? Date.now());
   const { data: logged, error: logError } = await supabase
     .from("transfer_deal_push_log")
-    .upsert(planned.map((n) => ({ deal_id: n.dealId, status: n.status })), { onConflict: "deal_id,status", ignoreDuplicates: true })
+    .upsert(planned.map((n) => ({ deal_id: n.dealId, round_key: roundKey, status: n.status })), { onConflict: "deal_id,round_key,status", ignoreDuplicates: true })
     .select("deal_id, status");
   if (logError) throw new Error(`알림 기록 실패: ${logError.message}`);
   const freshKeys = new Set(logged.map((r) => `${r.deal_id}:${r.status}`));

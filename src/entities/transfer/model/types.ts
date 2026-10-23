@@ -28,6 +28,16 @@ export type TransferGroupKey = "official" | "hwg" | "prog" | "rumor" | "dead";
  */
 export type TransferStatus = Database["public"]["Enums"]["transfer_status_tone"];
 
+/**
+ * 딜의 형태 — 완전 이적 · 임대 · 완전 영입 전환 · 진행 중 임대 · 조기 복귀 · 임대 연장. DB enum(`transfer_move_form`)에서 생성된 타입이다.
+ * ⚠ 진행 중 임대(`loan_standing`)는 보도의 형태이고 딜에는 오지 않는다(DB CHECK) — 그래도 타입은 enum 그대로라 `Record<TransferDealForm, …>`
+ *   맵이 그 키를 채운다(`TransferStage`의 `unknown`과 같은 판단 — 값이 늘면 맵이 컴파일 에러로 누락을 드러낸다).
+ * 단계(`TransferStage`)와 직교한다 — 단계는 진전, 형태는 거래의 모양이다. 라벨·표지는 `lib/deal-form.ts`가 갖는다.
+ */
+export type TransferDealForm = Database["public"]["Enums"]["transfer_move_form"];
+/** 임대에 붙은 완전 이적 조항 — 옵션 · 의무. DB enum(`transfer_loan_clause`)에서 생성된 타입이다 */
+export type TransferLoanClause = Database["public"]["Enums"]["transfer_loan_clause"];
+
 /** 보드 정렬 — URL `?sort=`가 소유한다. 해석은 `lib/league.ts`의 `parseTransferSort` */
 export type TransferSort = "latest" | "fee";
 
@@ -127,9 +137,26 @@ export interface TransferDeal {
   birthYear: TransferDealRow["birth_year"];
   /** `^[A-Z]{3}$` */
   nationality: TransferDealRow["nationality"];
-  /** 출발·행선지 — 빈 칸의 문구(`FA`·`미확인`·`미정`·`외 N`)는 `lib/route-label.ts`가 단독으로 정한다 */
+  /**
+   * 출발·행선지 — 빈 칸의 문구(`FA`·`미확인`·`미정`·`외 N`)는 `lib/route-label.ts`가 단독으로 정한다.
+   * ⚠ 출발은 **선수를 보유한 구단**이다(파는 쪽·빌려주는 쪽) — 임대 중인 선수도 임대 구단이 아니다. 조기 복귀만 임대 구단이 출발이다.
+   */
   fromClub: TransferClub | null;
   toClub: TransferClub | null;
+  /**
+   * 딜의 형태 — `null`은 모른다(형태를 묻기 전의 판정만 있다). 화면은 그때 형태 표지를 그리지 않는다 — 완전 이적으로 짐작하지 않는다
+   * (빈 이적료를 FA로 짐작하지 않는 것과 같은 원칙). 라벨·표지는 `lib/deal-form.ts`.
+   */
+  form: TransferDealRow["form"];
+  /**
+   * 선수가 **지금 임대로 뛰는 구단** — 임대 중인 선수의 제3구단 이적설에서 출발(보유 구단) 아래 "○○ 임대 중"을 그린다
+   * (`lib/deal-form.ts`의 `loanNote`). 출발·행선지와 같은 구단이면 경로가 이미 말하므로 그 줄을 그리지 않는다.
+   */
+  loanClub: TransferClub | null;
+  /** 임대에 붙은 완전 이적 조항 — 옵션·의무. 임대 형태(임대·전환·연장)에만 있다(DB CHECK) */
+  loanClause: TransferDealRow["loan_clause"];
+  /** 임대료의 원문 표기("£5m") — 대표 금액(`fee*`)이 조항 금액일 때 계약 조건 줄에 따로 그린다 */
+  loanFeeText: TransferDealRow["loan_fee_text"];
   /**
    * 행선지 밖의 관심 구단(유력한 순 — 파생의 `rankSuitors`, `transfer_deal_suitor.position`) — 여러 구단이 노리는 루머에서 화면이 전부 엠블럼·이름으로 그린다.
    * `toClub`이 있으면 확실한 행선지 하나 + 그 밖의 관심 구단, 없으면 관심 구단들뿐인 루머(행선지 미정)다.
@@ -141,7 +168,7 @@ export interface TransferDeal {
   feeCurrency: TransferDealRow["fee_currency"];
   feeText: TransferDealRow["fee_text"];
   /**
-   * 그 금액의 성격 — 이적료 · 제안액 · 요구액 · 바이아웃 · 평가액. 보도가 말하는 금액의 대부분은 실제 이적료가 아니라서
+   * 그 금액의 성격 — 이적료 · 제안액 · 요구액 · 바이아웃 · 평가액 · 임대료 · 완전 이적 조항 금액. 보도가 말하는 금액의 대부분은 실제 이적료가 아니라서
    * 화면이 성격을 함께 그린다(`feeKindLabel`). 판정자가 읽지 못한 금액은 `null`("추정 이적료").
    */
   feeKind: TransferDealRow["fee_kind"];

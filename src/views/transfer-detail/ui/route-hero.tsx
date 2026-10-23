@@ -5,6 +5,7 @@ import {
   type TransferDeal,
   TransferCrest,
   destinationClubs,
+  loanNote,
   routeLabels,
 } from "@/entities/transfer";
 import { cn } from "@/shared/lib/cn";
@@ -32,6 +33,8 @@ function HeroClub({ label, club, text, note }: { label: string; club: TransferCl
  * - 두 칸은 **행을 함께 쓴다**(3열 그리드 + 칸마다 `subgrid`) — 한쪽 정식명만 두 줄로 꺾이면 그 칸의 리그 줄이 한 줄 내려가
  *   FROM과 TO의 높이가 어긋났다. 행을 공유하면 이름 줄의 높이가 긴 쪽에 맞고 리그 줄이 같은 높이에 선다(둘 다 한 줄이면 빈 줄이
  *   생기지 않는다). 화살표는 엠블럼 줄 가운데에 선다.
+ * - FROM은 늘 보유 구단이다 — 선수가 다른 구단에 임대 중이면 리그 줄 자리에 "○○ 임대 중"을 적는다(`loanNote` — 세 번째 칸을
+ *   만들지 않는다. 경로 밖의 상태다).
  */
 export function RouteHero({ deal, className }: { deal: TransferDeal; className?: string }) {
   const labels = routeLabels(deal, { full: true });
@@ -43,7 +46,7 @@ export function RouteHero({ deal, className }: { deal: TransferDeal; className?:
       aria-label="이적 경로"
       className={cn("grid-cols-[124px_auto_124px] grid-rows-[repeat(4,auto)] gap-x-3", className)}
     >
-      <HeroClub label="FROM" club={deal.fromClub} text={labels.from} note={deal.fromClub?.league ?? undefined} />
+      <HeroClub label="FROM" club={deal.fromClub} text={labels.from} note={loanNote(deal, { full: true }) ?? deal.fromClub?.league ?? undefined} />
       {/* 엠블럼 줄(둘째 행) 가운데 — 엠블럼과 같은 위 여백(`mt-2`)을 두어 엠블럼 자체의 가운데에 맞춘다 */}
       <span aria-hidden className="col-start-2 row-start-2 mt-2 self-center text-ink-mute-2">
         <Icon as={ArrowRight} size={20} />

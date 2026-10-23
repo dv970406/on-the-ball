@@ -1,5 +1,5 @@
 import type { Database } from "@/types/database.types";
-import type { TransferDeal } from "../model/types";
+import type { TransferDeal, TransferLoanClause } from "../model/types";
 
 type TransferFeeKind = Database["public"]["Enums"]["transfer_fee_kind"];
 
@@ -13,22 +13,40 @@ const FEE_KIND_LABEL: Record<TransferFeeKind, string> = {
   asking_price: "요구액",
   release_clause: "바이아웃",
   valuation: "평가액",
+  loan_fee: "임대료",
+  buy_clause: "완전 이적 조항 금액",
+};
+
+/**
+ * 완전 이적 조항 금액의 라벨·짧은 표시를 조항으로 가른다 — 옵션은 임대 구단이 고르는 값이고 의무는 조건이 맞으면 내야 하는 값이다.
+ * 조항을 모르면(`null`) 위 표의 일반 라벨이다. `Record`라 조항 값이 늘면 컴파일이 누락을 잡는다.
+ */
+const CLAUSE_FEE_LABEL: Record<TransferLoanClause, { label: string; caption: string }> = {
+  option: { label: "완전 이적 옵션 금액", caption: "옵션" },
+  obligation: { label: "완전 이적 의무 금액", caption: "의무" },
 };
 
 /** 성격을 모르는 금액(규칙이 읽은 것)의 라벨 */
 export const UNKNOWN_FEE_KIND_LABEL = "추정 이적료";
 
-/** 금액 칸의 제목 — 성격을 알면 그 라벨, 모르면 "추정 이적료" */
-export function feeKindLabel(kind: TransferDeal["feeKind"]): string {
-  return kind === null ? UNKNOWN_FEE_KIND_LABEL : FEE_KIND_LABEL[kind];
+/**
+ * 금액 칸의 제목 — 성격을 알면 그 라벨, 모르면 "추정 이적료". 조항 금액은 딜의 조항(`loanClause`)으로 옵션·의무를 가른다.
+ */
+export function feeKindLabel(kind: TransferDeal["feeKind"], clause: TransferDeal["loanClause"] = null): string {
+  if (kind === null) return UNKNOWN_FEE_KIND_LABEL;
+  if (kind === "buy_clause" && clause !== null) return CLAUSE_FEE_LABEL[clause].label;
+  return FEE_KIND_LABEL[kind];
 }
 
 /**
- * 금액 옆에 붙이는 짧은 표시 — **실제 이적료가 아닐 때만**(제안액·요구액·바이아웃·평가액). 이적료와 성격 미상은 금액만 그린다
- * (목록의 모든 금액에 "이적료"를 붙이면 소음이다).
+ * 금액 옆에 붙이는 짧은 표시 — **실제 이적료가 아닐 때만**(제안액·요구액·바이아웃·평가액·임대료·조항 금액). 이적료와 성격 미상은
+ * 금액만 그린다(목록의 모든 금액에 "이적료"를 붙이면 소음이다). 조항 금액은 좁은 칸에 들어가게 "옵션"·"의무"(모르면 "조항")로 줄인다
+ * — 그 딜이 임대라는 것은 형태 표지(`DealFormMark`)가 말한다.
  */
-export function feeKindCaption(kind: TransferDeal["feeKind"]): string | null {
-  return kind === null || kind === "fee" ? null : FEE_KIND_LABEL[kind];
+export function feeKindCaption(kind: TransferDeal["feeKind"], clause: TransferDeal["loanClause"] = null): string | null {
+  if (kind === null || kind === "fee") return null;
+  if (kind === "buy_clause") return clause !== null ? CLAUSE_FEE_LABEL[clause].caption : "조항";
+  return FEE_KIND_LABEL[kind];
 }
 
 /**

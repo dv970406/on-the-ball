@@ -24,3 +24,13 @@ export function loadWindows() {
     throw new Error(`${url.pathname}를 읽지 못했습니다 — ${e instanceof Error ? e.message : String(e)}`);
   }
 }
+
+/**
+ * 지금 추적하는 창의 키 — `opensAt <= now`인 마지막 창(창 사이에는 방금 닫힌 창). 아직 아무 창도 열리지 않았거나 일정이 없으면 ''.
+ * 알림 기록(`transfer_deal_push_log.round_key`)이 쓴다 — 같은 딜의 같은 상태도 창이 바뀌면 다시 알린다(같은 선수의 다음 창 이적).
+ * ⚠ 보드 범위의 시작(`derive-deals.mjs`의 `boardScopeStartMs`)과 같은 "열린 마지막 창" 판정이다.
+ */
+export function trackedWindowKey(nowMs, windows = loadWindows()) {
+  const opened = [...windows].filter((w) => Date.parse(w.opensAt) <= nowMs).sort((a, b) => Date.parse(a.opensAt) - Date.parse(b.opensAt));
+  return opened.at(-1)?.key ?? "";
+}

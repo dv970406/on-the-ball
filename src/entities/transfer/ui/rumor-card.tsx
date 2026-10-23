@@ -8,12 +8,14 @@ import { ROUTES } from "@/shared/config";
 import { formatRelativeTime } from "@/shared/lib";
 import { Icon } from "@/shared/ui";
 import { reporterName } from "../lib/reporter";
+import { loanNote } from "../lib/deal-form";
 import { destinationClubs, routeLabels } from "../lib/route-label";
 import type { TransferDealListItem, TransferLatestReport } from "../model/types";
 import { StatusBadge } from "./status-badge";
 import { FeeValue } from "./fee-value";
 import { CredibilityBadge } from "./credibility-badge";
 import { CrestStack } from "./crest-stack";
+import { DealFormMark } from "./deal-form-mark";
 import { TransferCrest } from "./transfer-crest";
 import { playerName } from "../lib/player-name";
 
@@ -46,6 +48,8 @@ export const RumorCard = memo(function RumorCard({ deal, report, nowMs, priority
   const name = playerName(deal);
   const route = routeLabels(deal);
   const destinations = destinationClubs(deal);
+  // 임대 중인 선수 — 경로 밖의 상태라 이름 아래 한 줄로(`ClubRoute`와 같은 판단. 이 카드는 경로를 직접 그린다)
+  const note = loanNote(deal);
 
   return (
     <li className="w-[300px] shrink-0 snap-start">
@@ -112,6 +116,7 @@ export const RumorCard = memo(function RumorCard({ deal, report, nowMs, priority
           )}
           <span className="min-w-0 truncate font-medium text-ink">{route.to}</span>
         </p>
+        {note && <p className="mt-1 truncate text-[11px] text-ink-mute">{note}</p>}
         <p
           lang={report.gist?.lang}
           className="mt-1.5 line-clamp-2 min-h-10 text-[13px] leading-[1.55] text-ink-secondary text-pretty"
@@ -121,6 +126,8 @@ export const RumorCard = memo(function RumorCard({ deal, report, nowMs, priority
 
         <div className="mt-3 flex items-center gap-2 border-t border-hairline-cool pt-3">
           <StatusBadge stage={deal.stage} />
+          {/* 형태 표지(임대) — 진전과 다른 축이라 뱃지 옆에 따로 선다 */}
+          <DealFormMark deal={deal} />
           <FeeValue deal={deal} className="ml-auto shrink-0 text-[15px] text-ink" />
         </div>
       </Link>

@@ -1,6 +1,6 @@
 // ⚠ `"use client"`가 없다 — 상호작용이 없는 렌더러라 서버 렌더 여지를 남긴다(`architecture.md`).
 //    그래서 순수 함수는 배럴이 아니라 직접 경로로 가져온다(`credibility-badge.tsx`와 같은 이유).
-import { FeeDelta, FeeValue, type TransferDeal, feeKindLabel, formatFee, formatFeeRange } from "@/entities/transfer";
+import { FeeDelta, FeeValue, type TransferDeal, clauseNote, feeKindLabel, formatFee, formatFeeRange, isLoanForm } from "@/entities/transfer";
 import { cn } from "@/shared/lib/cn";
 
 /** 값이 없는 칸 — 전부 같은 글자(`—`)로 말한다 */
@@ -18,6 +18,8 @@ interface FeeCardProps {
  * - 결렬 딜도 값은 그대로 그린다 — 뱃지만 결렬이다.
  * - 제목은 금액의 성격이다 — 실제 이적료가 아닌 금액(거절된 제안액·구단의 요구액)을 "이적료"로 부르지 않는다.
  * - 이적료 자체가 없으면 부제를 그리지 않는다 — "옵션 없음"은 이적료가 있을 때만 뜻이 있다.
+ * - 대표 금액이 임대의 **완전 이적 조항 금액**이면 부제가 그 조건이다("조건이 맞으면 완전 이적" — `clauseNote`) — 지금 오간 금액이
+ *   아니라는 것을 금액 바로 아래에서 말한다. 임대료가 따로 있으면 함께 적는다.
  *
  * ⚠ 이 KV의 모든 칸은 **라벨 위 · 값 아래**다. 칸 구분은 헤어라인이고 그림자는 없다.
  * ⚠ 숫자는 전부 `font-mono tabular-nums` — `FeeDelta`는 안에서 그 클래스를 갖는다.
@@ -33,6 +35,7 @@ export function FeeCard({ deal, className }: FeeCardProps) {
       : null;
 
   const hasFee = fee !== null;
+  const condition = hasFee ? clauseNote(deal) : null;
   // 금액 칸 둘이 빠지면 계약·주급이 첫 줄이 된다 — 선 규칙이 칸 번호로 정해지므로 번호를 당긴다
   const offset = hasFee ? 2 : 0;
 
@@ -51,14 +54,26 @@ export function FeeCard({ deal, className }: FeeCardProps) {
     >
       <div className="p-3.5">
         {/* 제목이 금액의 성격을 말한다(제안액·요구액…) — 금액이 없으면(FA·미공개) 성격도 없다 */}
-        <span className="label-mono">{feeKindLabel(hasFee ? deal.feeKind : null)}</span>
+        <span className="label-mono">{feeKindLabel(hasFee ? deal.feeKind : null, deal.loanClause)}</span>
         <FeeValue
           deal={deal}
           caption={false}
           className="mt-2 block text-[36px] leading-none tracking-[-1.5px] text-ink"
           labelClassName="text-[20px] font-medium"
         />
-        {fee !== null && (
+        {condition !== null && (
+          <p className="mt-1.5 text-[12px] text-ink-mute">
+            {condition}
+            {deal.loanFeeText !== null && (
+              <>
+                {" · 임대료 "}
+                <span className="font-mono tabular-nums">{deal.loanFeeText}</span>
+              </>
+            )}
+          </p>
+        )}
+        {/* 임대 계열 딜에는 "옵션 없음"을 그리지 않는다 — "완전 이적 옵션이 없다"로 읽힌다(조항은 조건 문구가 말한다) */}
+        {fee !== null && condition === null && !isLoanForm(deal.form) && (
           <p className="mt-1.5 text-[12px] text-ink-mute">
             {addOn !== null && addOn.add !== null && addOn.max !== null ? (
               <>

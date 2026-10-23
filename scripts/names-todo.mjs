@@ -474,7 +474,7 @@ export function renderMarkdown(todo, meta = {}) {
  * ⚠ `loadRows`의 select 열이 늘면 여기도 더한다 — 빠지면 메모리 파생이 운영과 다른 답을 낸다.
  */
 const NEWS_COLUMNS =
-  "id, source_id, external_id, url, stage, players, clubs, body, published_at, relevance, deal_id, verdict, verdict_player, verdict_player_name, verdict_evidence, verdict_at, verdict_from, verdict_to, verdict_suitors, verdict_stage, verdict_fee_amount, verdict_fee_currency, verdict_fee_kind, verdict_raw, verdict_model, verdict_prompt, verdict_input, verdict_article_chars, verdict_attempts, summary_ko, attribution, attributed_to";
+  "id, source_id, external_id, url, stage, players, clubs, body, published_at, relevance, deal_id, verdict, verdict_player, verdict_player_name, verdict_evidence, verdict_at, verdict_from, verdict_to, verdict_suitors, verdict_stage, verdict_fee_amount, verdict_fee_currency, verdict_fee_kind, verdict_form, verdict_loan_owner, verdict_loan_club, verdict_loan_clause, verdict_raw, verdict_model, verdict_prompt, verdict_input, verdict_article_chars, verdict_attempts, summary_ko, attribution, attributed_to";
 
 async function main(argv) {
   const { supabase } = connectFromEnv(argv);

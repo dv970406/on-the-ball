@@ -7,13 +7,15 @@ import {
   parseTransferClub,
   parseTransferLeague,
   parseTransferSort,
+  parseTransferType,
   parseTransferWatch,
   type TransferLeague,
   type TransferSort,
+  type TransferTypeFilter,
 } from "@/entities/transfer";
 import { dealIdOfBoardPath } from "../lib/board-href";
 
-/** 보드 필터 — 리그·정렬·구단·관심. **URL이 소유한다**(공유 링크·뒤로가기가 필터를 잃지 않게) */
+/** 보드 필터 — 리그·정렬·구단·관심·형태. **URL이 소유한다**(공유 링크·뒤로가기가 필터를 잃지 않게) */
 export interface BoardFilters {
   /** `null` = 전체 리그 */
   league: TransferLeague | null;
@@ -22,6 +24,8 @@ export interface BoardFilters {
   club: string | null;
   /** 관심 딜만 보는가(`?watch=1`) — 비로그인이면 담은 딜이 없어 빈 목록이 된다 */
   watch: boolean;
+  /** 형태 필터(`?type=loan`) — 임대 계열 딜만. `null`은 전부 */
+  type: TransferTypeFilter | null;
   /**
    * 목록·상세 2분할(lg+)에서 오른쪽 판에 연 딜 — `null`이면 화면 순서상 첫 딜이다.
    * 고르면 주소가 그 딜의 상세 경로(`/transfers/<id>` — `boardDealHref`)가 된다. 로그인 복귀 주소(`next`)와 옛 공유 링크는
@@ -92,6 +96,7 @@ export function useBoardFilters(): BoardFilters {
       sort: parseTransferSort(searchParams.get("sort") ?? undefined),
       club: parseTransferClub(searchParams.get("club") ?? undefined),
       watch: parseTransferWatch(searchParams.get("watch") ?? undefined),
+      type: parseTransferType(searchParams.get("type")),
       deal: pathDeal ?? parsePostId(searchParams.get("deal") ?? ""),
     };
   }, [pathname, searchParams]);

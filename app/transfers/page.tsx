@@ -27,7 +27,7 @@ const BOARD_METADATA: Metadata = {
   // ⚠ 색인 대상 목록이라 description을 채운다 — 비우면 루트의 사이트 소개 한 줄이 이 화면의
   //   검색 결과 설명이 된다.
   description: DESCRIPTION,
-  // ⚠ **canonical에서 리그·정렬·구단·관심 쿼리를 항상 떨어뜨린다.** 같은 집합의 부분·순서만 다른 중복이라
+  // ⚠ **canonical에서 리그·정렬·구단·관심·형태 쿼리를 항상 떨어뜨린다.** 같은 집합의 부분·순서만 다른 중복이라
   //   색인 대상이 아니다(글 목록의 정렬과 같은 처리). `noindex`를 함께 걸지 않는다.
   alternates: { canonical: ROUTES.transferList },
   // ⚠ openGraph를 채우는 순간 루트 이미지 상속이 사라지므로 `images`를 함께 명시한다.
@@ -203,7 +203,7 @@ const fetchTransferBoard = cache(async (): Promise<TransferBoard> => {
 });
 
 /**
- * ⚠ 필터(`?league=`·`?sort=`·`?club=`·`?watch=`)를 여기서 읽지 않는다 — 뷰가 **주소에서 직접** 읽는다(`useBoardFilters`). 서버는
+ * ⚠ 필터(`?league=`·`?sort=`·`?club=`·`?watch=`·`?type=`)를 여기서 읽지 않는다 — 뷰가 **주소에서 직접** 읽는다(`useBoardFilters`). 서버는
  *   필터와 무관하게 범위 안 딜 전체를 내리고, 공유 링크·새로고침의 첫 렌더도 뷰가 같은 주소로 계산한다. 화면 안에서
  *   필터를 바꾸면 서버를 부르지 않는다.
  * ⚠ 그 훅이 `useSearchParams`라 이 라우트는 **동적(`ƒ`)이어야 한다** — 지금은 `hasSessionCookie()`가 쿠키를 읽어

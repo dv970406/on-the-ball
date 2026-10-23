@@ -144,24 +144,39 @@ const qualifierTime = (claim, prop) => {
   return q ? (q.datavalue?.value?.time ?? "") : null;
 };
 
+/** 취득 방식(P1642) "임대" — 소속팀 기록에 이 한정자가 있으면 그 소속은 임대다 */
+export const LOAN_ACQUISITION = "Q2914547";
+/** 한정자 값(항목 id)들 */
+const qualifierIds = (claim, prop) => (claim?.qualifiers?.[prop] ?? []).map((q) => q?.datavalue?.value?.id).filter((id) => typeof id === "string");
+
 /**
  * 현 소속 구단 — 소속팀(P54) 중 **종료일(P582)이 없는 축구 클럽**(국가대표팀·여자팀·유스팀은 P31이 다르다) 가운데 시작일(P580)이
  * 가장 늦은 것. 임대 중이면 임대 구단이 뽑힌다(시작이 더 늦다). 우선 순위(rank=preferred)가 있으면 그것이 먼저다.
  * 종료일 없는 클럽 항목이 하나도 없으면 `null` — 기록이 들쭉날쭉한 항목에서 옛 소속을 지어내지 않는다.
+ *
+ * **보유 구단(`owner`)** — 뽑힌 소속에 취득 방식 "임대"(P1642 = `LOAN_ACQUISITION`) 한정자가 있고 종료일 없는 **다른** 클럽 기록이
+ * 있으면 그 구단이다. 임대 중인 선수의 이적설에서 파는 쪽이다(출발 구단 폴백).
+ * 한정자가 없거나, 다른 열린 기록이 없거나 둘 이상이면 null — 임대를 짐작하지 않는다(실측: 가르나초 — 빌라 기록에 임대 한정자, 첼시 기록이 열려 있다).
  * @param {object} playerEntity wbgetentities의 선수 항목(claims 포함)
  * @param {Record<string, object>} teams P54가 가리키는 항목들(labels·claims)
- * @returns {{ wikidataId: string, nameEn: string | null, nameKo: string | null } | null}
+ * @returns {{ wikidataId: string, nameEn: string | null, nameKo: string | null, owner: { wikidataId: string, nameEn: string | null, nameKo: string | null } | null } | null}
  */
 export function pickCurrentClub(playerEntity, teams) {
   const open = (playerEntity?.claims?.P54 ?? [])
     .filter((c) => c?.rank !== "deprecated" && typeof c?.mainsnak?.datavalue?.value?.id === "string" && qualifierTime(c, "P582") === null)
-    .map((c) => ({ id: c.mainsnak.datavalue.value.id, start: qualifierTime(c, "P580") ?? "", preferred: c.rank === "preferred" }))
+    .map((c) => ({ id: c.mainsnak.datavalue.value.id, start: qualifierTime(c, "P580") ?? "", preferred: c.rank === "preferred", loan: qualifierIds(c, "P1642").includes(LOAN_ACQUISITION) }))
     .filter((c) => claimIds(teams[c.id], "P31").includes(FOOTBALL_CLUB));
   if (!open.length) return null;
   open.sort((a, b) => Number(b.preferred) - Number(a.preferred) || b.start.localeCompare(a.start));
-  const team = teams[open[0].id];
-  const en = team?.labels?.en?.value;
-  return { wikidataId: open[0].id, nameEn: typeof en === "string" ? en.trim() : null, nameKo: koLabel(team) };
+  const describe = (id) => {
+    const team = teams[id];
+    const en = team?.labels?.en?.value;
+    return { wikidataId: id, nameEn: typeof en === "string" ? en.trim() : null, nameKo: koLabel(team) };
+  };
+  // 보유 구단 후보가 둘 이상(종료일이 빠진 옛 소속 기록이 남은 항목)이면 짐작하지 않는다 — 시작일이 비어 뒤로 밀린 진짜 보유 구단 대신
+  // 옛 구단이 뽑혔다
+  const owners = open[0].loan ? [...new Set(open.slice(1).filter((c) => c.id !== open[0].id && !c.loan).map((c) => c.id))] : [];
+  return { ...describe(open[0].id), owner: owners.length === 1 ? describe(owners[0]) : null };
 }
 
 /** wbgetentities 한 번에 실을 항목 수 — API 상한(50) */

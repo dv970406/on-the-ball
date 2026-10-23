@@ -6,7 +6,9 @@
 import { readFileSync } from "node:fs";
 import { presetClubs } from "./lib/transfer/club-display.mjs";
 import { clubRowsToWrite } from "./lib/transfer/derive-deals.mjs";
+import { trackedWindowKey } from "./lib/transfer/windows.mjs";
 import {
+  FORM_NOUN,
   MAX_NOTICES_PER_RUN,
   MAX_PER_USER,
   NOTICE_MAX_AGE_MS,
@@ -49,6 +51,11 @@ const routeTs = readFileSync(new URL("../src/entities/transfer/lib/route-label.t
 check("정합 — 행선지에 이름을 적는 구단 수가 화면(route-label.ts의 ROUTE_CLUB_LIMIT)과 같다", Number(/export const ROUTE_CLUB_LIMIT = (\d+);/.exec(routeTs)?.[1]) === ROUTE_CLUB_LIMIT);
 check("정합 — 빈 칸의 낱말(FA·미확인·미정·외 N)이 화면의 것과 같다", ['"FA"', '"미확인"', '"미정"', "외 ${rest}", '" · "'].every((word) => routeTs.includes(word)), "route-label.ts의 문구가 바뀌었다 — notify.mjs의 destinationLabel·planNotices를 함께 고친다");
 
+// 딜 형태가 제목에 붙이는 말도 화면(`deal-form.ts`의 DEAL_FORM noun)의 사본이다 — 완전 이적·모름은 붙이지 않는다(null)
+const formTs = readFileSync(new URL("../src/entities/transfer/lib/deal-form.ts", import.meta.url), "utf8");
+const formNouns = Object.fromEntries([...formTs.matchAll(/^\s*(\w+):\s*\{\s*mark:\s*(?:"[^"]*"|null),\s*label:\s*"[^"]*",\s*noun:\s*(?:"([^"]*)"|null)\s*\},/gm)].map((m) => [m[1], m[2] ?? null]));
+check("정합 — 형태가 제목에 붙이는 말이 화면(deal-form.ts의 DEAL_FORM noun)과 같다", eq(formNouns, FORM_NOUN), JSON.stringify(formNouns));
+
 // ── 계획 ────────────────────────────────────────────────────────────────
 const NOW = Date.parse("2026-10-05T12:00:00Z");
 const change = (over = {}) => ({
@@ -71,6 +78,16 @@ const plan = (...cs) => planNotices(cs, { nowMs: NOW });
   const [n] = plan(change());
   check("상태 변화 — 루머 → 협상은 관심 등록자에게만 알린다(구단 팬에게는 소음)", n && eq([n.status, n.toWatchers, n.toFollowers, n.isNew], ["talks", true, false, false]), JSON.stringify(n));
   check("문구 — 제목은 뱃지 글자 · 선수, 본문은 경로, 주소는 상세", n && eq([n.title, n.body, n.url, n.tag], ["협상 중 · 얀쿠바 민테", "브라이턴 → 리버풀", "/transfers/1", "deal-1"]), JSON.stringify(n));
+}
+{
+  const [n] = plan(change({ form: "loan", prevStage: "talks", stage: "official" }));
+  check("임대 — 제목에 형태를 붙인다(오피셜 · 선수 임대)", n?.title === "오피셜 · 얀쿠바 민테 임대", JSON.stringify(n));
+  check("임대 — 완전 이적·모름은 제목에 형태를 붙이지 않는다", plan(change({ form: "permanent" }))[0]?.title === "협상 중 · 얀쿠바 민테" && plan(change({ form: null }))[0]?.title === "협상 중 · 얀쿠바 민테");
+  // 진행 중 임대의 설명으로 조용히 오피셜이 된 딜에 완전 영입 전환 오피셜 — 단계는 그대로여도 결과가 난 딜의 형태가 바뀐 것은 소식이다
+  const [convert] = plan(change({ form: "loan_convert", prevStage: "official", stage: "official", formChanged: true }));
+  check("임대 — 결과가 난 딜의 형태가 바뀌면(임대 → 완전 영입 전환) 같은 톤이어도 알린다", convert?.title === "오피셜 · 얀쿠바 민테 완전 영입", JSON.stringify(convert));
+  check("임대 — 형태가 그대로면 같은 톤의 오피셜은 다시 알리지 않는다", plan(change({ form: "loan", prevStage: "official", stage: "official" })).length === 0);
+  check("임대 — 진행 중 임대의 설명만으로 바뀐 변화(contextOnly)는 알리지 않는다", plan(change({ form: "loan", prevStage: "agreement", stage: "official", contextOnly: true })).length === 0);
 }
 check("같은 톤 안의 이동(제안 → 협상 · 메디컬 → 개인 합의)은 알리지 않는다", plan(change({ prevStage: "offer", stage: "talks" }), change({ prevStage: "medical", stage: "personal_terms" })).length === 0);
 check("진전 — 합의 임박·합의 완료·오피셜은 구단 팬에게도 알린다", eq(plan(change({ stage: "agreement" }), change({ stage: "here_we_go" }), change({ stage: "official" })).map((n) => [n.status, n.toFollowers]), [["imminent", true], ["hwg", true], ["official", true]]));
@@ -149,8 +166,9 @@ function fakeDb({ logged = [], watches = [], follows = [], subscriptions = [] } 
     from: (table) => ({
       upsert: (rows) => ({
         select: async () => {
-          const fresh = rows.filter((r) => !existing.has(`${r.deal_id}:${r.status}`));
-          for (const r of fresh) existing.add(`${r.deal_id}:${r.status}`);
+          // 실제 기본키와 같은 (딜, 창, 상태)
+          const fresh = rows.filter((r) => !existing.has(`${r.deal_id}:${r.round_key}:${r.status}`));
+          for (const r of fresh) existing.add(`${r.deal_id}:${r.round_key}:${r.status}`);
           log.inserted.push(...fresh);
           return { data: fresh, error: null };
         },
@@ -186,11 +204,15 @@ const VAPID = { subject: "mailto:test@example.com", publicKey: "pub", privateKey
   const db = fakeDb({ watches: [{ deal_id: 1, user_id: "u1" }], subscriptions: [sub("u1", 1), sub("u1", 2)] });
   const sent = [];
   const stats = await runNotifications(db, [change()], { vapid: VAPID, nowMs: NOW, log: quiet, send: async (s, p) => { sent.push([s.endpoint, p.title]); } });
-  check("발송 — 기록을 넣고, 관심 등록자의 모든 기기에 보낸다", eq([stats.planned, stats.fresh, stats.users, stats.sent], [1, 1, 1, 2]) && eq(db.log.inserted, [{ deal_id: 1, status: "talks" }]) && sent.length === 2 && sent.every(([, title]) => title === "협상 중 · 얀쿠바 민테"), JSON.stringify([stats, sent]));
+  check("발송 — 기록을 넣고, 관심 등록자의 모든 기기에 보낸다", eq([stats.planned, stats.fresh, stats.users, stats.sent], [1, 1, 1, 2]) && eq(db.log.inserted, [{ deal_id: 1, round_key: trackedWindowKey(NOW), status: "talks" }]) && sent.length === 2 && sent.every(([, title]) => title === "협상 중 · 얀쿠바 민테"), JSON.stringify([stats, sent]));
   check("발송 — 구독에서 꺼낸 키를 web-push 모양으로 넘긴다(endpoint + keys)", sent.every(([endpoint]) => endpoint.startsWith("https://fcm.googleapis.com/")));
 
   const again = await runNotifications(db, [change()], { vapid: VAPID, nowMs: NOW, log: quiet, send: async () => { throw new Error("보내면 안 된다"); } });
   check("중복 — 이미 알린 (딜, 상태)는 다시 보내지 않는다", eq([again.planned, again.fresh, again.sent], [1, 0, 0]));
+  // 딜 id는 선수당 영구다 — 다음 창의 같은 상태(여름 임대 오피셜 → 다음 해 완전 이적 오피셜)는 다시 알린다
+  const sentNext = [];
+  const next = await runNotifications(db, [change()], { vapid: VAPID, nowMs: NOW, roundKey: "2027-summer", log: quiet, send: async (s, p) => { sentNext.push(p.title); } });
+  check("창 — 다음 창의 같은 (딜, 상태)는 다시 알린다", eq([next.fresh, next.sent], [1, 2]) && trackedWindowKey(NOW) !== "2027-summer", JSON.stringify(next));
 }
 {
   const db = fakeDb({ watches: [{ deal_id: 1, user_id: "u1" }], subscriptions: [sub("u1", 1), sub("u1", 2), sub("u1", 3, { endpoint: "https://evil.example/hook" })] });

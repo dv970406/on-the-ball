@@ -7,11 +7,12 @@
   "필드 정답(선택) — 항목에 있으면 채점하고, 없으면 그 필드는 채점에서 뺀다. null·[]은 \"원문에 없다\"는 정답이다(키가 없는 것과 다르다). 전부 is_move_report의 첫 선수(players[0]) 기준이다.",
   "  timing: current(지금 진행 중이거나 새로 나온 소식) · past(끝난 이적·지난 창의 관심/무산을 돌아보는 글). 이동 보도는 current, 회고로 분류한 보도는 past이고, 그 밖(재계약·인터뷰 등)은 적지 않는다.",
   "  stage: transfer_stage 값(rumour·talks·offer·agreement·personal_terms·medical·here_we_go·official·collapsed·denied) — 이동 보도에만.",
-  "  from: 선수의 현재 소속(자유계약이면 직전 소속, 원문에 없으면 null). to: 협상·제안·합의·메디컬·완료 중인 상대 구단 — 관심·주시만 있는 구단은 행선지가 아니다(단 관심 구단이 딱 하나이고 원문이 다른 관심 구단을 암시하지 않으면 그 구단). 지난 창에 무산된 제안의 상대는 지금 행선지가 아니다.",
+  "  from: 선수를 보유한 구단 — 계약을 넘기는 쪽(임대 중이어도 임대 구단이 아니다, 조기 복귀만 임대 구단. 자유계약이면 직전 소속, 원문에 없으면 null). to: 협상·제안·합의·메디컬·완료 중인 상대 구단 — 관심·주시만 있는 구단은 행선지가 아니다(단 관심 구단이 딱 하나이고 원문이 다른 관심 구단을 암시하지 않으면 그 구단). 지난 창에 무산된 제안의 상대는 지금 행선지가 아니다.",
   "  suitors: to 밖의 관심 구단(집합으로 채점한다). 구단 이름은 전부 scripts/lib/transfer/clubs.mjs의 정규명(사전 밖 구단은 원문 표기).",
   "  fee: 그 선수의 금액 하나 {amount(백만 단위), currency(GBP·EUR·USD), kind(fee·bid·asking_price·release_clause·valuation, 채점자가 갈렸거나 그 밖의 성격이면 null)}. 원문에 그 선수의 금액이 없으면 null.",
   "  출처: 2026-10-01 블라인드 채점(.cache/transfer-eval/qa-1001의 out-A/B/C와 after/out-A2/B2 — 채점 기준 RUBRIC.md, 원문만 읽고 매김)에서만 가져왔다. 두 번 채점된 항목은 필드마다 둘이 같을 때만 넣었다. 2026-09-30 자동 감사는 심사자가 파이프라인 답을 보고 매겨 원천에서 뺐다(파이프라인 답을 정답으로 쓰지 않는다).",
-  "2026-10-10 갱신: 판정 지시문의 행선지 기준이 바뀌어(위 to 정의) 벤치 묶음 68건의 to·suitors를 그 기준의 블라인드 재채점(채점자가 어느 시스템 출력인지 모른 채 원문으로 정답을 먼저 정함)으로 덮었다. stage·from·fee는 없던 것만 더하고, 기존 값과 갈린 필드는 뺐다(두 독립 채점이 엇갈렸다). is_move_report는 고치지 않았다."
+  "2026-10-10 갱신: 판정 지시문의 행선지 기준이 바뀌어(위 to 정의) 벤치 묶음 68건의 to·suitors를 그 기준의 블라인드 재채점(채점자가 어느 시스템 출력인지 모른 채 원문으로 정답을 먼저 정함)으로 덮었다. stage·from·fee는 없던 것만 더하고, 기존 값과 갈린 필드는 뺐다(두 독립 채점이 엇갈렸다). is_move_report는 고치지 않았다.",
+  "2026-10-22 갱신(임대): from의 정의를 \"선수를 보유한 구단(계약을 넘기는 쪽 — 임대 중이어도 임대 구단이 아니다, 조기 복귀만 임대 구단)\"으로 바꿨다. 임대 필드를 더했다 — form(permanent·loan·loan_convert·loan_standing·loan_recall·loan_extend), loan_owner·loan_club(보도 시점에 임대 중이면 보유 구단·임대 구단, 아니면 null), loan_clause(option·obligation·null). fee.kind에 loan_fee(임대료)·buy_clause(완전 이적 조항 금액)를 더했다. 진행 중 임대의 설명(loan_standing)은 이동 보도이고 stage는 null이다. 스냅샷(2026-10-09 export)에서 임대 낱말이 있는 보도 58건을 파이프라인 답을 보지 않은 채점자(LLM 서브에이전트)가 원문만 읽고 매겼다 — 새 41건은 그대로 넣고, 기존 17건은 이동 여부가 같을 때만 임대 필드와 from(새 정의)을 덮었다. 가르나초 조항 기사 2건(1604·9242)은 새 정의로 이동 보도로 고쳤고, 이동 여부가 갈린 다선수 기사(423)는 기존 정답을 뒀다."
  ],
  "items": [
   {
@@ -30,13 +31,17 @@
    "players": [
     "Andria Bartishvili"
    ],
-   "basis": "두 채점자 일치",
+   "basis": "두 채점자 일치 · 2026-10-22 임대 채점(임대 필드)",
    "timing": "current",
    "stage": "official",
    "from": "Kolkheti 1913",
    "to": "Arsenal",
    "suitors": [],
-   "fee": null
+   "fee": null,
+   "form": "permanent",
+   "loan_owner": "Kolkheti 1913",
+   "loan_club": "Iberia 1999",
+   "loan_clause": null
   },
   {
    "id": 6,
@@ -215,6 +220,14 @@
    "basis": "2026-10-01 채점(match_injury)"
   },
   {
+   "id": 302,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c63d7ypd11ydo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-22 임대 채점 — 여자 대표팀 소집 기사"
+  },
+  {
    "id": 310,
    "source": "rss:bbc-football",
    "url": "https://www.bbc.co.uk/sport/football/articles/c68042y9l4kno?at_medium=RSS&amp;at_campaign=rss",
@@ -230,6 +243,22 @@
    "is_move_report": false,
    "players": [],
    "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 329,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c63d7ypd11ydo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-22 임대 채점 — 여자 대표팀 소집 기사"
+  },
+  {
+   "id": 334,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c63d7ypd11ydo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-22 임대 채점 — 여자 대표팀 소집 기사"
   },
   {
    "id": 337,
@@ -536,6 +565,18 @@
    "basis": "판정"
   },
   {
+   "id": 429,
+   "source": "rss:bbc-gossip",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c617jz28nkvgo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [
+    "Max Dowman",
+    "Luke Shaw",
+    "Luca Weinhandl"
+   ],
+   "basis": "2026-10-22 임대 채점 — 여러 선수를 모은 가십 목록 기사"
+  },
+  {
    "id": 430,
    "source": "rss:bbc-gossip",
    "url": "https://www.bbc.co.uk/sport/football/articles/cqzezjn3wzjpo?at_medium=RSS&amp;at_campaign=rss",
@@ -551,6 +592,18 @@
     "Endrick"
    ],
    "basis": "판정"
+  },
+  {
+   "id": 431,
+   "source": "rss:bbc-gossip",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6kg0dvv4drko?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [
+    "Noni Madueke",
+    "Paul Wanner",
+    "Mauro Icardi"
+   ],
+   "basis": "2026-10-22 임대 채점 — 여러 선수를 모은 가십 목록 기사"
   },
   {
    "id": 432,
@@ -1313,6 +1366,14 @@
    "basis": "2026-10-01 채점(other)"
   },
   {
+   "id": 870,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c63d7ypd11ydo?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-22 임대 채점 — 여자 대표팀 소집 기사"
+  },
+  {
    "id": 878,
    "source": "rss:sky-transfers",
    "url": "https://www.skysports.com/football/news/11095/13591878/transfer-news-brentford-hold-kevin-schade-contract-talks-as-arsenal-liverpool-track-germany-winger",
@@ -1582,6 +1643,14 @@
    "is_move_report": false,
    "players": [],
    "basis": "2026-10-01 채점(staff)"
+  },
+  {
+   "id": 1096,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/26/slovenia-scotland-nations-league-match-report",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-22 임대 채점 — 대표팀 경기 기사"
   },
   {
    "id": 1098,
@@ -1894,6 +1963,14 @@
    "basis": "2026-10-01 채점(other)"
   },
   {
+   "id": 1437,
+   "source": "bsky:ryder",
+   "url": "https://bsky.app/profile/leeryder.bsky.social/post/3mwddaddjw22u",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-22 임대 채점 — 루이스 홀의 감독 관련 인터뷰(재계약 후)"
+  },
+  {
    "id": 1440,
    "source": "bsky:ryder",
    "url": "https://bsky.app/profile/leeryder.bsky.social/post/3mwbfdx4ucs26",
@@ -2050,10 +2127,25 @@
    "id": 1604,
    "source": "rss:men-manutd",
    "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/alejandro-garnacho-man-united-villa-34677602",
-   "is_move_report": false,
-   "players": [],
-   "basis": "2026-10-01 채점(retrospective)",
-   "timing": "past"
+   "is_move_report": true,
+   "players": [
+    "Alejandro Garnacho"
+   ],
+   "basis": "2026-10-01 채점(retrospective) · 2026-10-22 임대 채점(진행 중 임대 = 이동 보도로 재분류)",
+   "timing": "current",
+   "from": "Chelsea",
+   "to": "Aston Villa",
+   "suitors": [],
+   "fee": {
+    "amount": 43,
+    "currency": "GBP",
+    "kind": "buy_clause"
+   },
+   "form": "loan_standing",
+   "loan_owner": "Chelsea",
+   "loan_club": "Aston Villa",
+   "loan_clause": "obligation",
+   "stage": null
   },
   {
    "id": 1610,
@@ -2289,6 +2381,16 @@
    "basis": "2026-10-01 채점(transfer_current · 확신 low) · 2026-10-10 이동 여부를 세 채점 다수결로 고침"
   },
   {
+   "id": 1721,
+   "source": "rss:fl-chelsea",
+   "url": "https://www.football.london/chelsea-fc/transfer-news/alejandro-garnacho-demand-made-chelsea-34659961",
+   "is_move_report": false,
+   "players": [
+    "Alejandro Garnacho"
+   ],
+   "basis": "2026-10-22 임대 채점 — 헤스키의 평가·발언 중심 기사, 임대 조건은 배경 설명"
+  },
+  {
    "id": 1723,
    "source": "rss:fl-chelsea",
    "url": "https://www.football.london/chelsea-fc/transfer-news/xabi-alonso-given-morgan-rogers-34658905",
@@ -2320,6 +2422,14 @@
    "is_move_report": false,
    "players": [],
    "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 1734,
+   "source": "rss:fl-arsenal",
+   "url": "https://www.football.london/arsenal-fc/news/arsenal-loan-watch-ethan-nwaneri-34666116",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-22 임대 채점 — 아스날 임대 선수들 근황 목록 기사"
   },
   {
    "id": 1736,
@@ -2466,6 +2576,14 @@
    "basis": "2026-10-01 채점(other)"
   },
   {
+   "id": 1795,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/sport/football/football-news/gallery/seven-lost-tyneside-football-grounds-22454436",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-22 임대 채점 — 옛 경기장 회고 기사"
+  },
+  {
    "id": 1799,
    "source": "rss:chronicle-nufc",
    "url": "https://www.chroniclelive.co.uk/sport/football/transfer-news/newcastle-united-agreed-lewis-halls-34660966",
@@ -2480,6 +2598,14 @@
    "is_move_report": false,
    "players": [],
    "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 1803,
+   "source": "rss:chronicle-nufc",
+   "url": "https://www.chroniclelive.co.uk/sport/football/football-news/lewis-hall-recalls-what-noticed-34663415",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-22 임대 채점 — 루이스 홀 인터뷰"
   },
   {
    "id": 1804,
@@ -2504,6 +2630,30 @@
    "is_move_report": false,
    "players": [],
    "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 1813,
+   "source": "rss:birmingham-villa",
+   "url": "https://www.birminghammail.co.uk/sport/football/transfer-news/aston-villa-chelsea-garnacho-loan-34669898",
+   "is_move_report": true,
+   "players": [
+    "Alejandro Garnacho"
+   ],
+   "timing": "current",
+   "stage": null,
+   "from": "Chelsea",
+   "to": "Aston Villa",
+   "suitors": [],
+   "fee": {
+    "amount": 42.5,
+    "currency": "GBP",
+    "kind": "buy_clause"
+   },
+   "form": "loan_standing",
+   "loan_owner": "Chelsea",
+   "loan_club": "Aston Villa",
+   "loan_clause": "obligation",
+   "basis": "2026-10-22 임대 채점 — 1월 해지 조항 없음·조건부 의무 약 £42.5m 등 임대 조항 설명; 스페인 구단 관심은 이름 없는 언급"
   },
   {
    "id": 1825,
@@ -2640,6 +2790,14 @@
    }
   },
   {
+   "id": 1903,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/milan-athekame-builds-switzerland-debut",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-22 임대 채점 — 임대 선수의 대표팀 데뷔 기사"
+  },
+  {
    "id": 1905,
    "source": "rss:sempremilan",
    "url": "https://sempremilan.com/vladimirov-pandolfi-milan-futuro-talents-eye",
@@ -2702,6 +2860,16 @@
    "players": [],
    "basis": "2026-10-01 채점(retrospective)",
    "timing": "past"
+  },
+  {
+   "id": 1928,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/athekame-milan-player-return-lyon",
+   "is_move_report": false,
+   "players": [
+    "Zachary Athekame"
+   ],
+   "basis": "2026-10-22 임대 채점 — 임대 선수 인터뷰; 임대 종료 후 복귀 희망(계약 만료 복귀)"
   },
   {
    "id": 1930,
@@ -2841,6 +3009,24 @@
    }
   },
   {
+   "id": 1949,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/tomori-when-start-why-fate-sealed",
+   "is_move_report": false,
+   "players": [
+    "Fikayo Tomori"
+   ],
+   "basis": "2026-10-22 임대 채점 — 여름 이적 실패 회고와 현 상황, 지금의 이동 소식 없음"
+  },
+  {
+   "id": 1952,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/modric-croatia-amorim-hopes-part-time",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-22 임대 채점 — 대표팀 소집 기사"
+  },
+  {
    "id": 1953,
    "source": "rss:sempremilan",
    "url": "https://sempremilan.com/milan-begin-talks-napoli-anguissa-agents",
@@ -2973,7 +3159,7 @@
    "players": [
     "Francesco Camarda"
    ],
-   "basis": "2026-10-01 채점(transfer_current)",
+   "basis": "2026-10-01 채점(transfer_current) · 2026-10-22 임대 채점(임대 필드)",
    "timing": "current",
    "stage": "rumour",
    "from": "AC Milan",
@@ -2984,7 +3170,11 @@
     "Brentford",
     "Brighton"
    ],
-   "fee": null
+   "fee": null,
+   "form": "permanent",
+   "loan_owner": null,
+   "loan_club": null,
+   "loan_clause": null
   },
   {
    "id": 1997,
@@ -2993,6 +3183,14 @@
    "is_move_report": false,
    "players": [],
    "basis": "2026-10-01 채점(renewal)"
+  },
+  {
+   "id": 1999,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/how-amorim-plans-utilise-weapon-moreira",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-22 임대 채점 — 여름 영입 선수 활약 기사"
   },
   {
    "id": 4005,
@@ -3166,6 +3364,14 @@
    "is_move_report": false,
    "players": [],
    "basis": "2026-10-01 채점(match_injury)"
+  },
+  {
+   "id": 4117,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/milan-youngster-athekame-bags-two-assists-debut",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-22 임대 채점 — 임대 선수 대표팀 활약 기사"
   },
   {
    "id": 4118,
@@ -3642,6 +3848,78 @@
    "basis": "2026-10-01 채점(renewal)"
   },
   {
+   "id": 6640,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cw770034l523o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Alex Jimenez"
+   ],
+   "timing": "current",
+   "stage": null,
+   "from": "Bournemouth",
+   "to": "Fiorentina",
+   "suitors": [],
+   "fee": {
+    "amount": 17,
+    "currency": "GBP",
+    "kind": "buy_clause"
+   },
+   "form": "loan_standing",
+   "loan_owner": "Bournemouth",
+   "loan_club": "Fiorentina",
+   "loan_clause": "option",
+   "basis": "2026-10-22 임대 채점 — 보머스→피오렌티나 임대에 £17m 구매 옵션이 있다는 조항 설명뿐, 새 움직임 없음"
+  },
+  {
+   "id": 6650,
+   "source": "rss:bbc-gossip",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cw770034l523o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Alex Jimenez"
+   ],
+   "timing": "current",
+   "stage": null,
+   "from": "Bournemouth",
+   "to": "Fiorentina",
+   "suitors": [],
+   "fee": {
+    "amount": 17,
+    "currency": "GBP",
+    "kind": "buy_clause"
+   },
+   "form": "loan_standing",
+   "loan_owner": "Bournemouth",
+   "loan_club": "Fiorentina",
+   "loan_clause": "option",
+   "basis": "2026-10-22 임대 채점 — 보머스→피오렌티나 임대에 £17m 구매 옵션이 있다는 조항 설명뿐, 새 움직임 없음"
+  },
+  {
+   "id": 6660,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cw770034l523o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Alex Jimenez"
+   ],
+   "timing": "current",
+   "stage": null,
+   "from": "Bournemouth",
+   "to": "Fiorentina",
+   "suitors": [],
+   "fee": {
+    "amount": 17,
+    "currency": "GBP",
+    "kind": "buy_clause"
+   },
+   "form": "loan_standing",
+   "loan_owner": "Bournemouth",
+   "loan_club": "Fiorentina",
+   "loan_clause": "option",
+   "basis": "2026-10-22 임대 채점 — 보머스→피오렌티나 임대에 £17m 구매 옵션이 있다는 조항 설명뿐, 새 움직임 없음"
+  },
+  {
    "id": 6661,
    "source": "rss:bbc-football",
    "url": "https://www.bbc.co.uk/sport/football/articles/cw770034l523o?at_medium=RSS&amp;at_campaign=rss",
@@ -3785,6 +4063,30 @@
    }
   },
   {
+   "id": 6670,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/cw770034l523o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Alex Jimenez"
+   ],
+   "timing": "current",
+   "stage": null,
+   "from": "Bournemouth",
+   "to": "Fiorentina",
+   "suitors": [],
+   "fee": {
+    "amount": 17,
+    "currency": "GBP",
+    "kind": "buy_clause"
+   },
+   "form": "loan_standing",
+   "loan_owner": "Bournemouth",
+   "loan_club": "Fiorentina",
+   "loan_clause": "option",
+   "basis": "2026-10-22 임대 채점 — 보머스→피오렌티나 임대에 £17m 구매 옵션이 있다는 조항 설명뿐, 새 움직임 없음"
+  },
+  {
    "id": 6671,
    "source": "rss:bbc-football",
    "url": "https://www.bbc.co.uk/sport/football/articles/c82077kwe70lo?at_medium=RSS&amp;at_campaign=rss",
@@ -3824,6 +4126,66 @@
    "is_move_report": false,
    "players": [],
    "basis": "2026-10-01 채점(interview_opinion)"
+  },
+  {
+   "id": 6692,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c84gkkepxxl4o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Ronald Araujo"
+   ],
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Barcelona",
+   "to": "Liverpool",
+   "suitors": [],
+   "fee": null,
+   "form": "loan_convert",
+   "loan_owner": "Barcelona",
+   "loan_club": "Liverpool",
+   "loan_clause": null,
+   "basis": "2026-10-22 임대 채점 — 리버풀이 바르사에서 임대 온 아라우호의 완전 영입을 진지하게 검토(검토 단계=루머)"
+  },
+  {
+   "id": 6702,
+   "source": "rss:bbc-gossip",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c84gkkepxxl4o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Ronald Araujo"
+   ],
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Barcelona",
+   "to": "Liverpool",
+   "suitors": [],
+   "fee": null,
+   "form": "loan_convert",
+   "loan_owner": "Barcelona",
+   "loan_club": "Liverpool",
+   "loan_clause": null,
+   "basis": "2026-10-22 임대 채점 — 리버풀이 바르사에서 임대 온 아라우호의 완전 영입을 진지하게 검토(검토 단계=루머)"
+  },
+  {
+   "id": 6712,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c84gkkepxxl4o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Ronald Araujo"
+   ],
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Barcelona",
+   "to": "Liverpool",
+   "suitors": [],
+   "fee": null,
+   "form": "loan_convert",
+   "loan_owner": "Barcelona",
+   "loan_club": "Liverpool",
+   "loan_clause": null,
+   "basis": "2026-10-22 임대 채점 — 리버풀이 바르사에서 임대 온 아라우호의 완전 영입을 진지하게 검토(검토 단계=루머)"
   },
   {
    "id": 6718,
@@ -3883,6 +4245,26 @@
    "fee": null
   },
   {
+   "id": 6722,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c84gkkepxxl4o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Ronald Araujo"
+   ],
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Barcelona",
+   "to": "Liverpool",
+   "suitors": [],
+   "fee": null,
+   "form": "loan_convert",
+   "loan_owner": "Barcelona",
+   "loan_club": "Liverpool",
+   "loan_clause": null,
+   "basis": "2026-10-22 임대 채점 — 리버풀이 바르사에서 임대 온 아라우호의 완전 영입을 진지하게 검토(검토 단계=루머)"
+  },
+  {
    "id": 6724,
    "source": "rss:bbc-football",
    "url": "https://www.bbc.co.uk/sport/football/articles/c84gkkepxxl4o?at_medium=RSS&amp;at_campaign=rss",
@@ -3924,6 +4306,111 @@
    "is_move_report": false,
    "players": [],
    "basis": "2026-10-01 채점(renewal)"
+  },
+  {
+   "id": 6740,
+   "source": "rss:bbc-gossip",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6eq8eygy4e5o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Alejandro Garnacho"
+   ],
+   "timing": "current",
+   "stage": null,
+   "from": "Chelsea",
+   "to": "Aston Villa",
+   "suitors": [],
+   "fee": null,
+   "form": "loan_standing",
+   "loan_owner": "Chelsea",
+   "loan_club": "Aston Villa",
+   "loan_clause": null,
+   "basis": "2026-10-22 임대 채점 — 첼시·빌라 시즌 임대에 1월 해지 조항이 없다는 조항 설명, 새 움직임 없음"
+  },
+  {
+   "id": 6748,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6eq8eygy4e5o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Alejandro Garnacho"
+   ],
+   "timing": "current",
+   "stage": null,
+   "from": "Chelsea",
+   "to": "Aston Villa",
+   "suitors": [],
+   "fee": null,
+   "form": "loan_standing",
+   "loan_owner": "Chelsea",
+   "loan_club": "Aston Villa",
+   "loan_clause": null,
+   "basis": "2026-10-22 임대 채점 — 첼시·빌라 시즌 임대에 1월 해지 조항이 없다는 조항 설명, 새 움직임 없음"
+  },
+  {
+   "id": 6756,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6eq8eygy4e5o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Alejandro Garnacho"
+   ],
+   "timing": "current",
+   "stage": null,
+   "from": "Chelsea",
+   "to": "Aston Villa",
+   "suitors": [],
+   "fee": null,
+   "form": "loan_standing",
+   "loan_owner": "Chelsea",
+   "loan_club": "Aston Villa",
+   "loan_clause": null,
+   "basis": "2026-10-22 임대 채점 — 첼시·빌라 시즌 임대에 1월 해지 조항이 없다는 조항 설명, 새 움직임 없음"
+  },
+  {
+   "id": 6764,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6eq8eygy4e5o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Alejandro Garnacho"
+   ],
+   "timing": "current",
+   "stage": null,
+   "from": "Chelsea",
+   "to": "Aston Villa",
+   "suitors": [],
+   "fee": null,
+   "form": "loan_standing",
+   "loan_owner": "Chelsea",
+   "loan_club": "Aston Villa",
+   "loan_clause": null,
+   "basis": "2026-10-22 임대 채점 — 첼시·빌라 시즌 임대에 1월 해지 조항이 없다는 조항 설명, 새 움직임 없음"
+  },
+  {
+   "id": 6765,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c6eq8eygy4e5o?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": true,
+   "players": [
+    "Tyler Morton"
+   ],
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Lyon",
+   "to": null,
+   "suitors": [
+    "Liverpool",
+    "Nottingham Forest",
+    "Crystal Palace",
+    "Brighton"
+   ],
+   "fee": null,
+   "form": "permanent",
+   "loan_owner": null,
+   "loan_club": null,
+   "loan_clause": null,
+   "basis": "2026-10-22 임대 채점 — 리버풀이 리옹의 모턴 복귀 영입 검토, 다른 구단도 주시(임대 여부 원문에 없음)"
   },
   {
    "id": 9239,
@@ -3969,9 +4456,21 @@
    "id": 9242,
    "source": "rss:bbc-football",
    "url": "https://www.bbc.co.uk/sport/football/articles/c6eq8eygy4e5o?at_medium=RSS&amp;at_campaign=rss",
-   "is_move_report": false,
-   "players": [],
-   "basis": "2026-10-10 블라인드 재채점(한 명, 현재 기준)"
+   "is_move_report": true,
+   "players": [
+    "Alejandro Garnacho"
+   ],
+   "basis": "2026-10-10 블라인드 재채점(한 명, 현재 기준) · 2026-10-22 임대 채점(진행 중 임대 = 이동 보도로 재분류)",
+   "timing": "current",
+   "from": "Chelsea",
+   "to": "Aston Villa",
+   "suitors": [],
+   "fee": null,
+   "form": "loan_standing",
+   "loan_owner": "Chelsea",
+   "loan_club": "Aston Villa",
+   "loan_clause": null,
+   "stage": null
   },
   {
    "id": 9243,
@@ -4684,12 +5183,42 @@
    "basis": "2026-10-01 채점(staff)"
   },
   {
+   "id": 12112,
+   "source": "rss:gffn",
+   "url": "https://www.getfootballnewsfrance.com/2026/corinthians-push-to-sign-renato-sanches-after-getafe-move-falls-through/",
+   "is_move_report": true,
+   "players": [
+    "Renato Sanches"
+   ],
+   "timing": "current",
+   "stage": "rumour",
+   "from": null,
+   "to": null,
+   "suitors": [
+    "Corinthians"
+   ],
+   "fee": null,
+   "form": "permanent",
+   "loan_owner": null,
+   "loan_club": null,
+   "loan_clause": null,
+   "basis": "2026-10-22 임대 채점 — PSG와 계약 해지된 자유계약 선수에게 코린치안스가 영입 추진(헤타페 행은 무산); 협상 단계 명시 없음"
+  },
+  {
    "id": 12114,
    "source": "rss:sempremilan",
    "url": "https://sempremilan.com/ac-milan-24m-loss-2025-26-key-figures",
    "is_move_report": false,
    "players": [],
    "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12115,
+   "source": "rss:sempremilan",
+   "url": "https://sempremilan.com/how-milan-loanees-faring-2026-27-so-far",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-22 임대 채점 — 밀란 임대 선수들 근황 목록 기사"
   },
   {
    "id": 12121,
@@ -4969,13 +5498,24 @@
    "players": [
     "Kosta Nedeljkovic"
    ],
-   "basis": "2026-10-01 채점(transfer_current · 확신 low)",
+   "basis": "2026-10-01 채점(transfer_current · 확신 low) · 2026-10-22 임대 채점(임대 필드)",
    "timing": "current",
    "stage": "rumour",
-   "from": "Rangers",
+   "from": "Aston Villa",
    "to": null,
    "suitors": [],
-   "fee": null
+   "fee": null,
+   "loan_owner": "Aston Villa",
+   "loan_club": "Rangers",
+   "loan_clause": null
+  },
+  {
+   "id": 12244,
+   "source": "rss:bbc-football",
+   "url": "https://www.bbc.co.uk/sport/football/articles/c64gvnzey95go?at_medium=RSS&amp;at_campaign=rss",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-22 임대 채점 — 임대 선수 부상 기사"
   },
   {
    "id": 12249,
@@ -5343,6 +5883,14 @@
    "basis": "2026-10-01 채점(other)"
   },
   {
+   "id": 12466,
+   "source": "rss:guardian-football",
+   "url": "https://www.theguardian.com/football/2026/sep/29/uswnt-roster-spain-ashley-sanchez-mallory-swanson-naomi-girma",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-22 임대 채점 — 여자 대표팀 소집"
+  },
+  {
    "id": 12467,
    "source": "rss:men-mancity",
    "url": "https://www.manchestereveningnews.co.uk/sport/football/football-news/man-city-charges-live-sanctions-34691802",
@@ -5365,6 +5913,14 @@
    "is_move_report": false,
    "players": [],
    "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 12483,
+   "source": "rss:fl-tottenham",
+   "url": "https://www.football.london/tottenham-hotspur-fc/news/jermain-defoe-remembers-strange-dimitar-34691767",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-22 임대 채점 — 과거 회상 인터뷰"
   },
   {
    "id": 12488,
@@ -5651,6 +6207,16 @@
    ]
   },
   {
+   "id": 15946,
+   "source": "rss:birmingham-villa",
+   "url": "https://www.birminghammail.co.uk/sport/football/transfer-news/aston-villa-liverpool-harvey-elliott-34691373",
+   "is_move_report": false,
+   "players": [
+    "Harvey Elliott"
+   ],
+   "basis": "2026-10-22 임대 채점 — 지난 임대 회고·격려 기사"
+  },
+  {
    "id": 15948,
    "source": "rss:bbc-football",
    "url": "https://www.bbc.co.uk/sport/football/articles/c63eqg2wz7ndo?at_medium=RSS&amp;at_campaign=rss",
@@ -5793,6 +6359,14 @@
    "is_move_report": false,
    "players": [],
    "basis": "2026-10-01 채점(other)"
+  },
+  {
+   "id": 16025,
+   "source": "rss:fl-tottenham",
+   "url": "https://www.football.london/tottenham-hotspur-fc/players/tottenham-news-donley-de-zerbi-34695094",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-22 임대 채점 — 임대 선수의 유스 경로 관련 인터뷰"
   },
   {
    "id": 16033,
@@ -6061,6 +6635,28 @@
    "basis": "2026-10-01 채점(other)"
   },
   {
+   "id": 16181,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/endrick-eager-for-roma-mourinho-real-madrid/",
+   "is_move_report": true,
+   "players": [
+    "Endrick"
+   ],
+   "timing": "current",
+   "stage": "rumour",
+   "from": "Real Madrid",
+   "to": null,
+   "suitors": [
+    "Roma"
+   ],
+   "fee": null,
+   "form": "loan",
+   "loan_owner": null,
+   "loan_club": null,
+   "loan_clause": null,
+   "basis": "2026-10-22 임대 채점 — 임대 합의가 무리뉴에 막혔고 엔드릭이 2027년 로마행을 원함 — 다음 창을 향한 관심 단계"
+  },
+  {
    "id": 16187,
    "source": "rss:football-italia",
    "url": "https://football-italia.net/muzzi-rejected-arsenal-wenger-cagliari-fury/",
@@ -6068,6 +6664,14 @@
    "players": [],
    "basis": "2026-10-01 채점(retrospective)",
    "timing": "past"
+  },
+  {
+   "id": 16189,
+   "source": "rss:football-italia",
+   "url": "https://football-italia.net/fagioli-my-greatest-italy-dream-play-world-cup/",
+   "is_move_report": false,
+   "players": [],
+   "basis": "2026-10-22 임대 채점 — 대표팀 복귀 인터뷰"
   },
   {
    "id": 16196,

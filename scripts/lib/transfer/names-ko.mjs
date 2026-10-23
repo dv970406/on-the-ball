@@ -112,10 +112,22 @@ export function createNameBook({ players = {}, clubs = {}, cache = [] } = {}) {
       const row = cached.get(`player_club:${key}`);
       return row?.wikidata_id ? row.name_en : null;
     },
-    /** 현 소속을 지금 찾아야 하는가 — 캐시가 없거나 `CLUB_RECHECK_MS`가 지났다(찾지 못한 행도 그때 다시 본다) */
+    /**
+     * 임대 중인 선수를 보유한 구단(정규 영문명) — 자동 캐시(위키데이터 P54의 임대 한정자, `kind = 'player_owner_club'`). 임대 중이면
+     * 현 소속(`currentClub`)은 임대 구단이라, 파생이 출발 구단을 이 값으로 바로잡는다. 임대 중이 아니면(wikidata_id null) 없는 것이다.
+     */
+    ownerClub: (key) => {
+      const row = cached.get(`player_owner_club:${key}`);
+      return row?.wikidata_id ? row.name_en : null;
+    },
+    /**
+     * 현 소속을 지금 찾아야 하는가 — 캐시가 없거나 `CLUB_RECHECK_MS`가 지났다(찾지 못한 행도 그때 다시 본다). 현 소속은 찾았는데 보유 구단 행
+     * (`player_owner_club` — 임대가 아니면 wikidata_id null로 남는다)이 아예 없으면 그 행이 생기기 전에 찾은 것이라 다시 본다.
+     */
     needsClubLookup: (key, nowMs) => {
       const row = cached.get(`player_club:${key}`);
-      return !row || nowMs - Date.parse(row.checked_at) >= CLUB_RECHECK_MS;
+      if (!row || nowMs - Date.parse(row.checked_at) >= CLUB_RECHECK_MS) return true;
+      return Boolean(row.wikidata_id) && !cached.has(`player_owner_club:${key}`);
     },
     /** 사람이 적은 선수 정보(포지션·생년·국적) — 자동 캐시에는 없다 */
     playerInfo: (key) => players[key] ?? null,
@@ -304,6 +316,8 @@ export function canonicalClubName(label) {
  * 선수의 현 소속 구단을 위키데이터(P54)에서 찾아 캐시에 쓴다 — 출발 구단 폴백의 원천(`derive-deals.mjs`).
  * `kind = 'player_club'`, key = 선수 키, name_en = 구단 정규 영문명, wikidata_id = 구단 항목. 찾지 못한 선수도 쓴다
  * (wikidata_id null · name_en은 선수 이름으로 자리를 채운다 — 매시 다시 찾지 않게, `CLUB_RECHECK_MS` 뒤 재확인).
+ * 임대 중이면(`pickCurrentClub`의 `owner`) 보유 구단을 `kind = 'player_owner_club'`로 함께 쓰고, 아니면 그 행을 비운다(wikidata_id null) —
+ * 임대가 끝난 선수의 옛 보유 구단이 남지 않게 현 소속과 **함께** 쓴다.
  * 사전 밖 구단은 구단 캐시 행(`kind = 'club'`)도 함께 써서 화면이 한국어로 그린다. 항목 id가 없는 선수(사람 사전만)는 먼저 찾는다.
  * ⚠ 네트워크·HTTP 오류가 난 선수는 쓰지 않는다 — 다음 실행이 다시 찾는다.
  * @param {{ playerKey: string, player: string, wikidataId: string | null }[]} needs
@@ -342,16 +356,28 @@ export async function lookupCurrentClubs(supabase, needs, { fetchImpl = fetch, l
       continue;
     }
     const club = r.club;
+    // 사전 밖 구단은 구단 캐시 행도 쓴다(화면이 한국어로 그린다)
+    const clubRow = (canonical, c) => {
+      if (!isKnownClub(canonical) && !clubDisplay(canonical).league && !book?.entry("club", canonical)?.wikidata_id && !rows.some((x) => x.kind === "club" && x.key === canonical)) {
+        rows.push({ kind: "club", key: canonical, name_en: canonical.slice(0, 120), name_ko: c.nameKo, wikidata_id: c.wikidataId, source: "wikidata", checked_at: now });
+      }
+    };
+    const owner = club?.nameEn && club.owner?.nameEn ? club.owner : null;
     if (club?.nameEn) {
       const canonical = canonicalClubName(club.nameEn);
       rows.push({ kind: "player_club", key: n.playerKey, name_en: canonical.slice(0, 120), name_ko: null, wikidata_id: club.wikidataId, source: "wikidata", checked_at: now });
-      if (!isKnownClub(canonical) && !clubDisplay(canonical).league && !book?.entry("club", canonical)?.wikidata_id && !rows.some((x) => x.kind === "club" && x.key === canonical)) {
-        rows.push({ kind: "club", key: canonical, name_en: canonical.slice(0, 120), name_ko: club.nameKo, wikidata_id: club.wikidataId, source: "wikidata", checked_at: now });
-      }
+      clubRow(canonical, club);
       out.found += 1;
     } else {
       rows.push({ kind: "player_club", key: n.playerKey, name_en: n.player.slice(0, 120), name_ko: null, wikidata_id: null, source: "wikidata", checked_at: now });
       out.notFound += 1;
+    }
+    if (owner) {
+      const canonical = canonicalClubName(owner.nameEn);
+      rows.push({ kind: "player_owner_club", key: n.playerKey, name_en: canonical.slice(0, 120), name_ko: null, wikidata_id: owner.wikidataId, source: "wikidata", checked_at: now });
+      clubRow(canonical, owner);
+    } else {
+      rows.push({ kind: "player_owner_club", key: n.playerKey, name_en: n.player.slice(0, 120), name_ko: null, wikidata_id: null, source: "wikidata", checked_at: now });
     }
   }
   if (needs.length > limit) out.warnings.push(`현 소속 조회 상한(${limit}) — 남은 ${needs.length - limit}명은 다음 실행이 찾는다`);

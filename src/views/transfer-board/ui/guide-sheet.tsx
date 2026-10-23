@@ -1,7 +1,7 @@
 "use client";
 
 import { CircleHelp } from "lucide-react";
-import { CredibilityMark, StatusBadge } from "@/entities/transfer";
+import { CredibilityMark, DealFormMark, StatusBadge } from "@/entities/transfer";
 import { cn } from "@/shared/lib";
 import { Icon, Sheet } from "@/shared/ui";
 
@@ -18,6 +18,17 @@ const STAGE_GUIDE = [
   { stage: "official", text: "구단이나 선수가 공식으로 발표했어요." },
   { stage: "collapsed", text: "협상까지 갔지만 깨졌다고 전해졌어요." },
   { stage: "denied", text: "루머 단계에서 사실이 아니라고 전해졌어요." },
+] as const;
+
+/**
+ * 형태 표지 범례 — 표지는 목록이 그리는 것과 같은 컴포넌트(`DealFormMark`)라 모양이 어긋나지 않는다. 형태·조항만 넘긴다.
+ * 완전 이적은 표지가 없어 범례에 넣지 않는다(마지막 줄의 글이 그것을 말한다).
+ */
+const FORM_GUIDE = [
+  { form: "loan", loanClause: null, text: "소유권은 그대로 두고 다른 구단에서 뛰는 이적이에요." },
+  { form: "loan", loanClause: "obligation", text: "조건이 맞으면 임대 구단이 완전히 사야 하는 임대예요. 옆의 금액은 그때의 금액이에요." },
+  { form: "loan", loanClause: "option", text: "임대 구단이 원하면 완전히 살 수 있는 임대예요." },
+  { form: "loan_convert", loanClause: null, text: "지금 임대로 뛰는 구단이 그 선수를 완전히 영입하려는 움직임이에요." },
 ] as const;
 
 /** 달 5단계 — 차오를수록 믿을 만하다(낮은 쪽부터 읽는다) */
@@ -51,7 +62,7 @@ interface GuideSheetProps {
 }
 
 /**
- * 이적 소식 읽는 법 — 상태 뱃지(단계)와 출처 공신력(🎖️·달)이 무슨 뜻인지 한 장으로 설명하는 시트.
+ * 이적 소식 읽는 법 — 상태 뱃지(단계) · 형태 표지(임대) · 출처 공신력(🎖️·달)이 무슨 뜻인지 한 장으로 설명하는 시트.
  *
  * ⚠ 텍스트와 잉크 그레이뿐이다 — 새 색·알약·그림자를 만들지 않는다. 뱃지·공신력 표시는 목록과 같은 컴포넌트를 그대로 쓴다.
  * ⚠ 시트 안에 시트·다이얼로그를 겹치지 않는다(`useFocusTrap`이 이중이 된다) — 읽기만 하는 한 장이다.
@@ -78,6 +89,21 @@ export function GuideSheet({ open, onClose }: GuideSheetProps) {
             </li>
           ))}
         </ul>
+
+        <h3 className="mt-5 text-[13px] font-medium text-ink">형태</h3>
+        <ul className="mt-2.5 flex flex-col gap-3">
+          {FORM_GUIDE.map(({ form, loanClause, text }) => (
+            <li key={`${form}-${loanClause ?? ""}`} className="flex items-start gap-3">
+              <span className="flex w-[72px] shrink-0 justify-start pt-px">
+                <DealFormMark deal={{ form, loanClause }} />
+              </span>
+              <p className="min-w-0 flex-1 text-[13px] leading-[1.5] text-ink-secondary">{text}</p>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 text-[13px] leading-[1.5] text-ink-mute">
+          표지가 없는 딜은 임대로 보도되지 않은 딜이에요. 경로는 선수를 보유한 구단에서 출발하고, 다른 구단에 임대 중이면 출발 아래에 ‘○○ 임대 중’으로 적어요.
+        </p>
 
         <h3 className="mt-5 text-[13px] font-medium text-ink">출처 공신력</h3>
         <ul className="mt-2.5 flex flex-col gap-3">

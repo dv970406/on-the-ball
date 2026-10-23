@@ -4,7 +4,7 @@ import { feeKindCaption, feeLabel } from "../lib/fee";
 import type { TransferDeal } from "../model/types";
 
 interface FeeValueProps {
-  deal: Pick<TransferDeal, "feeAmount" | "feeCurrency" | "feeKind" | "isFreeAgent">;
+  deal: Pick<TransferDeal, "feeAmount" | "feeCurrency" | "feeKind" | "isFreeAgent" | "loanClause">;
   /** 크기·자간·색·취소선 등 — 호출부의 칸이 정한다(금액 기준) */
   className?: string;
   /**
@@ -28,7 +28,7 @@ interface FeeValueProps {
  */
 export function FeeValue({ deal, className, labelClassName = "text-[13px]", caption = true }: FeeValueProps) {
   const label = feeLabel(deal);
-  const kind = caption && label.kind === "fee" ? feeKindCaption(deal.feeKind) : null;
+  const kind = caption && label.kind === "fee" ? feeKindCaption(deal.feeKind, deal.loanClause) : null;
   return (
     <span
       className={cn(

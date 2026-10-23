@@ -53,6 +53,8 @@ const DEEP_IMPORT_ALLOWED = new Set([
   "@/entities/transfer/lib/fee",
   // 딜의 공유 제목·설명·카드 이미지 — 상세와 보드의 `?deal=` 공유가 같은 카드를 낸다
   "@/entities/transfer/lib/deal-meta",
+  // 딜 형태(임대) 표지·임대 중 문구 — 딜 공유 카드(opengraph-image)가 화면의 형태 표지와 같은 글자로 그린다
+  "@/entities/transfer/lib/deal-form",
   "@/entities/session/lib/auth-error-message",
   "@/features/sign-in/lib/pkce-verifier",
 ]);

@@ -18,6 +18,11 @@ export type {
   // 상태 톤 — 보드의 지수 띠가 톤별 건수를 센다
   TransferStatus,
 } from "./model/types";
+// ⚠ 딜 형태(임대)의 표기·필터 — 보드의 형태 필터(`?type=loan`)·읽는 법 시트, 상세·판의 형태 표지가 쓴다. 서버 page(제목)는
+//    `lib/deal-form` 직접 경로로 쓴다(`lib/deal-meta`가 그 경로로 가져간다)
+export type { TransferTypeFilter } from "./lib/deal-form";
+export { clauseNote, dealMatchesType, isLoanForm, loanNote, parseTransferType } from "./lib/deal-form";
+export { DealFormMark } from "./ui/deal-form-mark";
 // ⚠ 리그 시트가 5개 리그를 이 순서로 그린다 — 손으로 다시 적지 않는다(망라성 가드가 여기 있다)
 export { TRANSFER_LEAGUES } from "./model/types";
 export { transferKeys } from "./api/keys";

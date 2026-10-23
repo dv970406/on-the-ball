@@ -9,6 +9,7 @@ import { parsePostId } from "@/shared/lib/post-id";
 import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
 import { buildDealQuery } from "@/entities/transfer/api/list-query";
 import { buildDeal } from "@/entities/transfer/api/mappers";
+import { dealFormMark, loanNote } from "@/entities/transfer/lib/deal-form";
 import { feeKindLabel, feeLabel } from "@/entities/transfer/lib/fee";
 import { playerName } from "@/entities/transfer/lib/player-name";
 import { destinationClubs, routeLabels, ROUTE_CLUB_LIMIT } from "@/entities/transfer/lib/route-label";
@@ -17,7 +18,9 @@ import { DEAL_CARD_ALT, DEAL_CARD_SIZE } from "@/entities/transfer/lib/deal-meta
 import type { TransferClub, TransferDeal, TransferStatus } from "@/entities/transfer/model/types";
 
 /**
- * 딜 상세의 공유 카드 — 선수 · 상태 · 경로 · 이적료를 한 장에 그린다.
+ * 딜 상세의 공유 카드 — 선수 · 상태 · 형태(임대) · 경로 · 이적료를 한 장에 그린다.
+ * 임대 계열이면 상태 뱃지 옆에 형태 표지(`임대·의무` — 화면의 `DealFormMark`와 같은 글자)를, 선수가 다른 구단에 임대 중이면 경로
+ * 아래에 "○○ 임대 중"(`loanNote`)을 그린다 — 경로만 보면 완전 이적으로 읽힌다.
  *
  * 단톡방·커뮤니티에 붙인 링크가 **그 딜의 카드**로 보이게 하는 것이 목적이다 — 사이트 공통 이미지는 어느 딜이든
  * 같은 그림이라 프리뷰만으로는 무슨 소식인지 알 수 없다.
@@ -185,7 +188,9 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const destinations = destinationClubs(deal).slice(0, ROUTE_CLUB_LIMIT);
   const fee = feeLabel(deal);
   // 금액의 성격(제안액·요구액…)을 제목으로 — 상세의 이적료 카드와 같은 판정이다(금액이 없으면 성격도 없다)
-  const feeCaption = feeKindLabel(fee.kind === "fee" ? deal.feeKind : null);
+  const feeCaption = feeKindLabel(fee.kind === "fee" ? deal.feeKind : null, deal.loanClause);
+  const form = dealFormMark(deal);
+  const note = loanNote(deal);
   const name = playerName(deal);
 
   const [font, mark, fromCrest, ...toCrests] = await Promise.all([
@@ -215,23 +220,42 @@ export default async function Image({ params }: { params: Promise<{ id: string }
             {mark && <img src={mark} width={48} height={48} alt="" />}
             온더볼
           </div>
-          {status !== null && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                height: 56,
-                padding: "0 26px",
-                borderRadius: 28,
-                border: `2px solid ${STATUS_STYLE[status].border}`,
-                background: STATUS_STYLE[status].background,
-                color: STATUS_STYLE[status].color,
-                fontSize: 30,
-              }}
-            >
-              {STATUS_LABEL[status]}
-            </div>
-          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            {/* 형태 표지 — 사각형 테두리(뱃지는 알약)로 갈린다. 화면의 `DealFormMark`와 같은 글자다 */}
+            {form && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  height: 56,
+                  padding: "0 20px",
+                  borderRadius: 12,
+                  border: `2px solid ${TOKEN_COLORS.hairlineStrong}`,
+                  color: TOKEN_COLORS.inkSecondary,
+                  fontSize: 30,
+                }}
+              >
+                {form.mark}
+              </div>
+            )}
+            {status !== null && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  height: 56,
+                  padding: "0 26px",
+                  borderRadius: 28,
+                  border: `2px solid ${STATUS_STYLE[status].border}`,
+                  background: STATUS_STYLE[status].background,
+                  color: STATUS_STYLE[status].color,
+                  fontSize: 30,
+                }}
+              >
+                {STATUS_LABEL[status]}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 본문 — 선수 이름 + 경로. 남는 높이의 가운데에 놓는다 */}
@@ -293,6 +317,8 @@ export default async function Image({ params }: { params: Promise<{ id: string }
               </div>
             </div>
           </div>
+          {/* 임대 중인 선수 — 경로 밖의 상태라 경로 아래 한 줄로(세 구단을 화살표로 이으면 연쇄 이적으로 읽힌다) */}
+          {note && <div style={{ display: "flex", marginTop: 16, fontSize: 28, color: TOKEN_COLORS.inkMute }}>{note}</div>}
         </div>
 
         {/* 바닥 — 이적료(성격과 함께) + 보도 수. 위쪽 헤어라인이 본문과 가른다 */}

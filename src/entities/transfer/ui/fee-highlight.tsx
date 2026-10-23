@@ -1,5 +1,6 @@
 // ⚠ `"use client"`가 없다 — 상호작용이 없는 렌더러라 서버 렌더 여지를 남긴다(`architecture.md`)
 import { cn } from "@/shared/lib/cn";
+import { clauseNote } from "../lib/deal-form";
 import { feeKindLabel } from "../lib/fee";
 import type { TransferDeal } from "../model/types";
 import { FeeDelta } from "./fee-delta";
@@ -25,10 +26,12 @@ interface FeeHighlightProps {
  */
 export function FeeHighlight({ deal, valueClassName, className }: FeeHighlightProps) {
   const hasFee = deal.feeAmount !== null;
+  // 임대의 완전 이적 조항 금액 — 지금 오간 금액이 아니라 앞으로의 조건부 금액이라는 것을 금액 아래에서 말한다
+  const condition = hasFee ? clauseNote(deal) : null;
   return (
     <section aria-label="이적료" className={className}>
       <span className="label-mono">
-        {feeKindLabel(hasFee ? deal.feeKind : null)}
+        {feeKindLabel(hasFee ? deal.feeKind : null, deal.loanClause)}
       </span>
       <FeeValue
         deal={deal}
@@ -36,6 +39,7 @@ export function FeeHighlight({ deal, valueClassName, className }: FeeHighlightPr
         className={cn("mt-1.5 block leading-none text-ink", valueClassName ?? "text-[36px] tracking-[-1.5px]")}
         labelClassName="text-[20px] font-medium"
       />
+      {condition && <p className="mt-2 text-[12px] text-ink-mute">{condition}</p>}
       {hasFee && <FeeDelta deal={deal} lead className="mt-2 text-[13px]" />}
       <FeeRangeBar deal={deal} className="mt-4" />
     </section>

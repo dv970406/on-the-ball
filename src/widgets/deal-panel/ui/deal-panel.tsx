@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import {
   ContractTerms,
+  DealFormMark,
   DealInfoLine,
   DealRouteCard,
   FeeHighlight,
@@ -100,6 +101,8 @@ export function DealPanel({ deal, userId, nowMs, active, onSignInRequired }: Dea
         <header>
           <div className="flex items-center gap-2">
             <StatusBadge stage={deal.stage} />
+            {/* 형태 표지(임대) — 진전과 다른 축이라 뱃지 옆에 따로 선다. 완전 이적·모름은 그리지 않는다 */}
+            <DealFormMark deal={deal} />
             {/* nowrap + flex-none — 뱃지가 길어져도 시각이 줄 바꿈되지 않는다 */}
             <span className="ml-auto flex-none whitespace-nowrap text-[11px] text-ink-mute-2">
               업데이트{" "}

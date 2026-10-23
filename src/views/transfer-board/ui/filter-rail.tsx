@@ -2,7 +2,7 @@
 
 import { Bell, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { memo, type MouseEvent } from "react";
-import type { TransferLeague, TransferSort } from "@/entities/transfer";
+import type { TransferLeague, TransferSort, TransferTypeFilter } from "@/entities/transfer";
 import { cn } from "@/shared/lib";
 import { chipClassName, Icon } from "@/shared/ui";
 import { boardHref } from "../lib/board-href";
@@ -21,6 +21,10 @@ interface FilterRailProps {
   sort: TransferSort;
   /** 관심 딜만 보는가 — URL이 소유한다(`?watch=1`) */
   watch: boolean;
+  /** 형태 필터 — URL이 소유한다(`?type=loan`). `null`은 전부 */
+  type: TransferTypeFilter | null;
+  /** 리그 안의 임대 딜 수 — 0이면 임대 칩을 그리지 않는다(누르면 빈 보드다). 켜져 있으면 풀 길이 있어야 하므로 그린다 */
+  loanCount: number;
   /** 비로그인인가(복원 전에는 서버가 본 사용자로 판정한다 — `useTransferBoard`) — 관심 칩이 필터 대신 로그인 안내를 연다 */
   isGuest: boolean;
   onOpenLeague: () => void;
@@ -47,7 +51,7 @@ const PAGER =
   "absolute inset-y-0 my-auto hidden size-7 place-items-center rounded-sm border border-hairline bg-canvas text-ink-secondary transition-colors duration-150 ease-otb hover:bg-canvas-soft md:grid";
 
 /**
- * 필터 레일 — 왼쪽에 리그 버튼(시트를 연다)을 고정하고 그 뒤로 관심 칩과 구단 칩이 흐른다. 보드의 **필터는 이 한 줄이 전부**다
+ * 필터 레일 — 왼쪽에 리그 버튼(시트를 연다)을 고정하고 그 뒤로 관심 칩 · 임대 칩 · 구단 칩이 흐른다. 보드의 **필터는 이 한 줄이 전부**다
  * (구간 탭은 이동, 정렬은 순서 — 둘 다 필터가 아니라 다른 줄·다른 형태다).
  *
  * 팬이 이적 소식을 읽는 단위는 리그가 아니라 **구단**이다 — 리그 필터는 목록을 5분의 1로밖에 줄이지 못한다. 리그는
@@ -60,6 +64,9 @@ const PAGER =
  *   안내를 연다(이동이 아니라 동작이라 앵커가 아니다). 이미 `?watch=1`로 들어온 비로그인(공유 링크)에게는 링크로
  *   그려 필터를 풀 수 있게 한다. 서버 HTML도 같은 판정이다 — 익명에게 늘 빈 보드인 `?watch=1`을 크롤 가능한 앵커로
  *   내보내지 않는다.
+ * ⚠ **임대 칩**(`?type=loan`)은 임대 계열 딜(임대·완전 영입 전환·조기 복귀·임대 연장)만 남긴다. 구간(진전 축)으로 나누지 않고
+ *   칩으로 거른다 — 형태는 진전과 직교하는 축이라 구간에 넣으면 임대 오피셜이 오피셜 구간에서 빠진다. 리그 안에 임대 딜이 없으면
+ *   그리지 않는다(켜져 있으면 풀 수 있게 그린다). 관심 칩처럼 켜지면 ×가 붙는다.
  * ⚠ **`전체 구단` 칩이 없다.** 필터 없음이 기본 상태라 그 칩은 늘 켜져 있는 장식이었다 → 선택된 칩에 ×를 붙이고 그 칩의
  *   링크가 필터를 푼다(`href`가 구단 `null`). 칩 하나가 줄고 "무엇이 걸려 있는가"가 또렷해진다.
  * ⚠ **칩에 건수를 적지 않는다.** 순서가 이미 건수순이고, 누르면 구간 제목이 건수를 말한다 — 한 화면에 숫자 20개가
@@ -87,6 +94,8 @@ export const FilterRail = memo(function FilterRail({
   league,
   sort,
   watch,
+  type,
+  loanCount,
   isGuest,
   onOpenLeague,
   onWatchSignInRequired,
@@ -148,7 +157,7 @@ export const FilterRail = memo(function FilterRail({
             </button>
           ) : (
             <BoardLink
-              href={boardHref(league, sort, club, !watch)}
+              href={boardHref({ league, sort, club, watch: !watch, type })}
               aria-current={watch ? "page" : undefined}
               className={chipClassName(watch, CHIP_LAYOUT)}
             >
@@ -156,8 +165,19 @@ export const FilterRail = memo(function FilterRail({
             </BoardLink>
           )}
 
+          {(loanCount > 0 || type !== null) && (
+            <BoardLink
+              href={boardHref({ league, sort, club, watch, type: type === null ? "loan" : null })}
+              aria-current={type !== null ? "page" : undefined}
+              className={chipClassName(type !== null, CHIP_LAYOUT)}
+            >
+              임대
+              {type !== null && <ClearFilterMark />}
+            </BoardLink>
+          )}
+
           {showClubChips &&
-            clubs.map((o) => <ClubChip key={o.code} option={o} club={club} league={league} sort={sort} watch={watch} />)}
+            clubs.map((o) => <ClubChip key={o.code} option={o} club={club} league={league} sort={sort} watch={watch} type={type} />)}
         </nav>
         {back && (
           <button type="button" tabIndex={-1} aria-hidden onMouseDown={keepFocus} onClick={() => page(-1)} className={cn(PAGER, "left-0")}>

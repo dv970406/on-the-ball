@@ -101,11 +101,47 @@ const ALABA = { ...NO_FIX, player: "David Alaba" };
   check("재계약 — 행선지가 있으면 가드가 걸리지 않는다(이적하며 새 계약)", parseJudgement(J({ move: true, stage: "agreement", to: "Tottenham", evidence: "rumours of a potential return to Tottenham come to an end", summary_ko: "요약." }), KANE, opt).kind === "move");
 }
 
+// ── 임대 ────────────────────────────────────────────────────────────────
+{
+  const opt = { ...NO_FIX, player: "Alejandro Garnacho" };
+  const GARN = "Alejandro Garnacho joined Aston Villa on loan from Chelsea in the summer with an obligation to buy. The obligation is worth £42.5m and looks easily achievable.";
+  const standing = parseJudgement(J({ move: true, on_loan: { owner: "Chelsea", at: "Aston Villa" }, form: "loan_standing", loan_clause: "obligation", stage: "agreement", from: "Chelsea", to: "Aston Villa", fee: { text: "£42.5m", amount: 42.5, currency: "GBP", kind: "buy_clause" }, evidence: "joined Aston Villa on loan from Chelsea", summary_ko: "요약." }), GARN, opt);
+  check("임대 — 진행 중 임대는 형태·보유 구단·임대 구단·의무 조항·조항 금액을 받고 단계는 버린다(새 움직임이 아니다)",
+    eq([standing.kind, standing.form, standing.stage, standing.loanOwner, standing.loanClub, standing.loanClause, standing.fee?.kind], ["move", "loan_standing", null, "Chelsea", "Aston Villa", "obligation", "buy_clause"]), JSON.stringify(standing));
+  const NOLOAN = "Chelsea have agreed a £40m fee with Aston Villa for Alejandro Garnacho.";
+  const noLoan = parseJudgement(J({ move: true, on_loan: { owner: "Chelsea", at: "Aston Villa" }, form: "loan", loan_clause: "option", stage: "agreement", from: "Chelsea", to: "Aston Villa", fee: { text: "£40m", amount: 40, currency: "GBP", kind: "buy_clause" }, evidence: "agreed a £40m fee", summary_ko: "요약." }), NOLOAN, opt);
+  check("임대 — 원문에 임대 낱말이 없으면 완전 이적으로 접고 임대 상태·조항·임대 금액을 버린다(판정은 남긴다)",
+    eq([noLoan.kind, noLoan.form, noLoan.loanOwner, noLoan.loanClub, noLoan.loanClause, noLoan.fee], ["move", "permanent", null, null, null, null]), JSON.stringify(noLoan));
+  const NOCLAUSE = "Napoli have agreed a loan deal with Chelsea for Alejandro Garnacho.";
+  const noClause = parseJudgement(J({ move: true, form: "loan", loan_clause: "option", stage: "agreement", from: "Chelsea", to: "Napoli", evidence: "agreed a loan deal with Chelsea", summary_ko: "요약." }), NOCLAUSE, opt);
+  check("임대 — 원문이 조항을 말하지 않으면 조항을 버린다", noClause.form === "loan" && noClause.loanClause === null && noClause.stage === "agreement", JSON.stringify(noClause));
+  check("임대 — 형태를 묻기 전의 옛 원출력은 형태가 없다(모른다 — 완전 이적으로 짐작하지 않는다)", parseJudgement(J({ move: true, stage: "agreement", from: "Chelsea", to: "Napoli", evidence: "agreed a loan deal with Chelsea", summary_ko: "요약." }), NOCLAUSE, opt).form === null);
+  const EXT = "Juventus have extended Alejandro Garnacho's loan from Chelsea until the end of next season.";
+  const ext = parseJudgement(J({ move: true, form: "loan_extend", stage: "agreement", from: "Chelsea", evidence: "Juventus have extended Alejandro Garnacho's loan from Chelsea", summary_ko: "요약." }), EXT, opt);
+  check("임대 — 임대 연장은 \"extended\"를 말해도 재계약 가드에 걸리지 않는다", ext.kind === "move" && ext.form === "loan_extend", JSON.stringify(ext));
+  const same = parseJudgement(J({ move: true, on_loan: { owner: "Chelsea", at: "Chelsea" }, form: "permanent", stage: "rumour", from: "Chelsea", suitors: ["Napoli"], evidence: "Napoli have agreed a loan deal with Chelsea", summary_ko: "요약." }), NOCLAUSE, opt);
+  check("임대 — 보유 구단과 임대 구단이 같으면 임대 구단을 버린다", same.loanOwner === "Chelsea" && same.loanClub === null, JSON.stringify(same));
+  const permClause = parseJudgement(J({ move: true, form: "permanent", stage: "rumour", from: "Chelsea", suitors: ["Napoli"], fee: { text: "£42.5m", amount: 42.5, currency: "GBP", kind: "buy_clause" }, evidence: "joined Aston Villa on loan from Chelsea", summary_ko: "요약." }), GARN, opt);
+  check("임대 — 완전 이적 판정의 조항 금액은 받지 않는다(이적료처럼 그려진다)", permClause.fee === null, JSON.stringify(permClause.fee));
+  // 진행 중 임대라면서 원문에 임대 낱말이 없다 — 완전 이적으로 접으면 단계가 비어 파생이 규칙 단계로 딜을 움직인다(가르나초 사고 경로)
+  const PERM_ONLY = "Alejandro Garnacho will join Aston Villa permanently for £42.5m if conditions are met.";
+  const standingNoLoan = parseJudgement(J({ move: true, form: "loan_standing", stage: null, from: "Chelsea", to: "Aston Villa", fee: { text: "£42.5m", amount: 42.5, currency: "GBP", kind: "buy_clause" }, evidence: "will join Aston Villa permanently", summary_ko: "요약." }), PERM_ONLY, opt);
+  check("임대 — 원문에 임대 낱말이 없는 진행 중 임대 판정은 이동 아님이다(완전 이적으로 접어 단계를 비우지 않는다)", standingNoLoan.kind === "not_move" && standingNoLoan.standingWithoutLoan === true, JSON.stringify(standingNoLoan));
+  // 행선지를 못 읽은 이적설 — 지금 임대로 뛰는 구단은 "하나뿐인 다른 구단"이 아니다
+  const DIG = "There is interest in Michele Di Gregorio, who is on loan at Bournemouth from Juventus.";
+  const dig = parseJudgement(J({ move: true, form: "permanent", on_loan: { owner: "Juventus", at: "Bournemouth" }, stage: "rumour", from: "Juventus", to: null, suitors: [], evidence: "There is interest in Michele Di Gregorio", summary_ko: "요약." }), DIG, { ...NO_FIX, player: "Michele Di Gregorio" });
+  check("임대 — 행선지를 못 읽은 보도에서 임대 구단을 행선지로 올리지 않는다(디 그레고리오 → 본머스가 아니다)", dig.kind === "move" && dig.to === null && dig.loanClub === "Bournemouth", JSON.stringify(dig));
+  const CONV = "Atletico Madrid want to keep John Doe, on loan from Juventus, and are interested in a permanent deal.";
+  const conv = parseJudgement(J({ move: true, form: "loan_convert", on_loan: { owner: "Juventus", at: "Atletico Madrid" }, stage: "rumour", from: "Juventus", to: null, suitors: [], evidence: "Atletico Madrid want to keep John Doe", summary_ko: "요약." }), CONV, { ...NO_FIX, player: "John Doe" });
+  check("임대 — 완전 영입 전환에서 행선지가 비면 지금 임대로 뛰는 구단이 행선지다", conv.to === "Atletico Madrid", JSON.stringify(conv));
+  check("임대 — 일반어 \"options\"는 조항 낱말이 아니다", parseJudgement(J({ move: true, form: "loan", loan_clause: "option", stage: "agreement", from: "Chelsea", to: "Napoli", evidence: "agreed a loan deal with Chelsea", summary_ko: "요약." }), "Napoli have agreed a loan deal with Chelsea for Alejandro Garnacho. United have other options in attack.", opt).loanClause === null);
+}
+
 // ── 해석 ────────────────────────────────────────────────────────────────
 const BODY = "Udinese have reached a verbal agreement with David Alaba! Austrian star leaves Real Madrid as a free agent.";
 {
   const r = parseJudgement(J({ move: true, player: "David Alaba", player_ko: "다비드 알라바", stage: "agreement", from: "Real Madrid", to: "Udinese", evidence: "reached a verbal agreement with David Alaba", summary_ko: "다비드 알라바가 우디네세와 구두 합의했다." }), BODY, ALABA);
-  check("이동 + 근거 + 선수·단계·구단·요약 → move", eq(r, { kind: "move", rawClubs: ["Real Madrid", "Udinese"], player: "David Alaba", playerKo: "다비드 알라바", stage: "agreement", evidence: "reached a verbal agreement with David Alaba", from: "Real Madrid", to: "Udinese", suitors: [], fee: null, summary: "다비드 알라바가 우디네세와 구두 합의했다.", summaryIssue: null }), JSON.stringify(r));
+  check("이동 + 근거 + 선수·단계·구단·요약 → move", eq(r, { kind: "move", rawClubs: ["Real Madrid", "Udinese"], player: "David Alaba", playerKo: "다비드 알라바", stage: "agreement", evidence: "reached a verbal agreement with David Alaba", from: "Real Madrid", to: "Udinese", suitors: [], form: null, loanOwner: null, loanClub: null, loanClause: null, fee: null, summary: "다비드 알라바가 우디네세와 구두 합의했다.", summaryIssue: null }), JSON.stringify(r));
 }
 // ── 시점·금액·한 토큰 이름·요약 문자 ────────────────────────────────────
 {
@@ -224,6 +260,9 @@ check("구단 언급 — 원문에 없으면 null, 있으면 다듬은 표기", 
   check("구단 — 최근에 찾아봤지만 클럽이 아니었던 이름은 다시 찾지 않고 버린다", !r.suitors.includes("Austria") && !lookups.includes("Austria"));
   check("구단 — 위키데이터에 없는 이름은 버리고 캐시에 '없음'으로 남긴다", !r.suitors.includes("Norway") && rows.some((x) => x.key === "Norway" && x.wikidata_id === null) && rows.some((x) => x.key === "Sturm Graz" && x.name_ko === "SK 슈투름 그라츠"));
   check("구단 — 관심 구단이 출발·행선지와 같은 정규명이면 뺀다(Man United = from)", !r.suitors.includes("Manchester United") && eq(lookups, ["Sturm Graz", "Norway"]));
+  const loan = await resolveClubs({ from: "Man Utd", to: null, suitors: [], loanOwner: "Man Utd", loanClub: "Sturm Graz" }, book, { lookup, cacheRows: rows, nowMs: Date.parse("2026-09-28T00:00:00Z") });
+  check("구단 — 임대 상태(보유 구단·임대 구단)도 같은 정규화·확인을 지난다", loan.loanOwner === "Manchester United" && loan.loanClub === "Sturm Graz");
+  check("구단 — 임대 상태가 없는 호출은 둘 다 null이다", (await resolveClubs({ from: null, to: null, suitors: [] }, book, { lookup, cacheRows: rows })).loanOwner === null);
 }
 
 // ── 요약 검증 ─────────────────────────────────────────────────────────
@@ -256,7 +295,7 @@ const names = createNameBook({ players: { "david alaba": { ko: "다비드 알라
   check("요청 — 표기는 그 보도의 구단·선수 중 표기가 있는 것만(프리셋 · 자동 캐시 · 사람 사전)",
     eq(buildGlossary(need, names), ["Real Madrid = 레알 마드리드", "Udinese = 우디네세", "Watford = 왓퍼드 FC", "David Alaba = 다비드 알라바"]), JSON.stringify(buildGlossary(need, names)));
   check("요청 — 같은 입력이면 같은 요청(변동값이 없다)", JSON.stringify(req) === JSON.stringify(buildJudgeRequest(need, names, "system")));
-  check("요청 — 스키마는 모든 필드를 요구하고 다른 필드를 막는다", JUDGE_SCHEMA.additionalProperties === false && eq(JUDGE_SCHEMA.required, ["evidence_ids", "timing", "player", "why", "move", "stage", "from", "to", "suitors", "fee", "player_ko", "summary_ko"]));
+  check("요청 — 스키마는 모든 필드를 요구하고 다른 필드를 막는다", JUDGE_SCHEMA.additionalProperties === false && eq(JUDGE_SCHEMA.required, ["evidence_ids", "timing", "player", "on_loan", "why", "move", "form", "loan_clause", "stage", "from", "to", "suitors", "fee", "player_ko", "summary_ko"]));
 }
 {
   const sys = buildSystem({ "pre-contract": "사전 계약" });
@@ -341,7 +380,7 @@ const noLookup = async () => ({ wikidataId: null, nameKo: null });
   check("저장 — 이동·아님·판정 불가는 쓰고, 일시 실패는 쓰지 않는다(다음 실행이 다시 묻는다)", eq(db.writes.map((w) => w.id), [1, 2, 3, 5, 6, 7]));
   const w1 = db.writes[0];
   check("저장 — 이동은 판정·선수·근거·구단·단계·관심 구단·요약·시각을 쓴다",
-    eq(Object.keys(w1).sort(), ["id", "summary_ko", "verdict", "verdict_article_chars", "verdict_at", "verdict_attempts", "verdict_evidence", "verdict_fee_amount", "verdict_fee_currency", "verdict_fee_kind", "verdict_from", "verdict_input", "verdict_model", "verdict_player", "verdict_player_name", "verdict_prompt", "verdict_raw", "verdict_stage", "verdict_suitors", "verdict_to"]) && typeof w1.verdict_raw === "string" && JSON.parse(w1.verdict_raw).move === true && w1.verdict_from === "Real Madrid" && w1.verdict_to === "Udinese" && w1.verdict_stage === "agreement" && w1.verdict_player_name === "David Alaba" && w1.summary_ko === "다비드 알라바가 우디네세와 구두 합의했다.", JSON.stringify(w1));
+    eq(Object.keys(w1).sort(), ["id", "summary_ko", "verdict", "verdict_article_chars", "verdict_at", "verdict_attempts", "verdict_evidence", "verdict_fee_amount", "verdict_fee_currency", "verdict_fee_kind", "verdict_form", "verdict_from", "verdict_input", "verdict_loan_clause", "verdict_loan_club", "verdict_loan_owner", "verdict_model", "verdict_player", "verdict_player_name", "verdict_prompt", "verdict_raw", "verdict_stage", "verdict_suitors", "verdict_to"]) && typeof w1.verdict_raw === "string" && JSON.parse(w1.verdict_raw).move === true && w1.verdict_from === "Real Madrid" && w1.verdict_to === "Udinese" && w1.verdict_stage === "agreement" && w1.verdict_player_name === "David Alaba" && w1.summary_ko === "다비드 알라바가 우디네세와 구두 합의했다.", JSON.stringify(w1));
   check("저장 — 아님은 요약을 비우고 근거를 남긴다", db.writes[1].verdict === "not_move" && db.writes[1].summary_ko === null && db.writes[1].verdict_evidence === "Alan Shearer in agreement with Thomas Tuchel" && db.writes[1].verdict_from === null);
   check("저장 — 옛 판정 없는 판정 불가는 값 없이 선수·시각·실패 횟수만, 요약은 비운다(재계약·회고 요약이 남지 않게)", db.writes[2].verdict === null && db.writes[2].verdict_player === "joao pedro" && db.writes[2].verdict_at && db.writes[2].summary_ko === null && db.writes[2].verdict_attempts === 1);
   check("저장 — 성공은 실패 횟수를 0으로, 출처(모델·지시문 지문·원문 지문)를 남긴다", w1.verdict_attempts === 0 && w1.verdict_model === JUDGE_MODEL && w1.verdict_prompt === judgeFingerprint(buildSystem()) && w1.verdict_input === sourceFingerprint(prepareJudgeInput(needs[0]).numbered.text) && w1.verdict_article_chars === null);
@@ -559,6 +598,18 @@ const N = (o) => JSON.stringify({ evidence_ids: [], timing: "current", player: n
   check("재생 — 판정 불가로 읽혀도 옛 판정을 지우지 않는다", r.kept === 1 && !db.writes.some((w) => w.id === 3));
   check("재생 — 판정 없는 행에 남은 요약은 걷는다", db.writes.find((w) => w.id === 4)?.summary_ko === null);
   check("재생 — 시도 횟수·출처 컬럼은 쓰지 않는다(새 시도가 아니다)", db.writes.every((w) => !("verdict_attempts" in w) && !("verdict_model" in w)));
+}
+
+{
+  // 기사 본문을 받는 소스 — 판정 때도 본문 없이 물은 행(verdict_article_chars 0)은 저장된 글만으로 재생하고, 본문을 보고 판정한 행은
+  // 본문을 다시 못 받으면 건드리지 않는다(번호가 다른 원문을 가리킨다)
+  const db = fakeDb();
+  const names = createNameBook({ players: { "david alaba": { ko: "다비드 알라바" } } });
+  const print = sourceFingerprint(prepareJudgeInput({ body: BODY }).numbered.text);
+  const raw = N({ evidence_ids: [1], move: true, player: "David Alaba", stage: "agreement", to: "Udinese", summary_ko: "David Alaba가 Udinese와 합의했다." });
+  const row = (id, extra) => ({ id, body: BODY, source_id: "rss:bbc", url: `https://example.com/${id}`, verdict_at: "2026-09-30T00:00:00.000Z", verdict_player: "david alaba", verdict_suitors: [], verdict_raw: raw, verdict: null, verdict_input: print, ...extra });
+  const r = await replayJudgements(db, [row(1, { verdict_article_chars: 0 }), row(2, { verdict_article_chars: 1800 })], { names, corrections: {}, lookup: noLookup, fetchImpl: async () => ({ ok: false, status: 403, text: async () => "" }) });
+  check("재생 — 본문 없이 판정한 행은 본문을 다시 못 받아도 저장된 글로 재생하고, 본문을 보고 판정한 행은 건드리지 않는다", eq(db.writes.map((w) => w.id), [1]) && r.skipped === 1, JSON.stringify([db.writes.map((w) => w.id), r.skipped]));
 }
 
 // ── 일시 실패(시간 초과·연결·서버 오류)는 빠짐없이 다시 묻는다 ───────────────────────

@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import {
   ContractTerms,
+  DealFormMark,
   DealInfoLine,
   DealMiniCard,
   DealRouteCard,
@@ -266,6 +267,8 @@ export function TransferDetailView({
                 <header>
                   <div className="flex items-center gap-2">
                     <StatusBadge stage={deal.stage} />
+                    {/* 형태 표지(임대) — 진전과 다른 축이라 뱃지 옆에 따로 선다. 완전 이적·모름은 그리지 않는다 */}
+                    <DealFormMark deal={deal} />
                     {/* nowrap + flex-none — 뱃지가 길어져도 시각이 줄 바꿈되지 않는다. 넓은 화면에서는 뱃지 옆에 붙는다 */}
                     <span className="ml-auto flex-none whitespace-nowrap font-mono text-[11px] tabular-nums text-ink-mute-2 lg:ml-1">
                       업데이트{" "}

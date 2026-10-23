@@ -94,6 +94,7 @@ export function newFieldScore() {
     asked: 0, invalid: 0, tp: 0, fp: 0, fn: 0, tn: 0,
     player: [0, 0], timing: [0, 0], stage: [0, 0], stageNear: [0, 0], from: [0, 0], to: [0, 0], clubSet: [0, 0], suitors: [0, 0],
     feeNone: [0, 0], feeAmount: [0, 0], feeCurrency: [0, 0], feeKind: [0, 0],
+    form: [0, 0], loanOwner: [0, 0], loanClub: [0, 0], loanClause: [0, 0],
     misses: {},
   };
 }
@@ -146,6 +147,11 @@ export function scoreVerdict(score, g, v) {
     score.suitors[1] += 1;
     if (j < 1) miss("suitors");
   }
+  // 임대 — 형태·보유 구단·임대 구단·조항. 형태를 묻기 전의 판정(`verdict_form` null)은 형태를 틀린 것으로 센다(답을 내지 않았다)
+  if ("form" in g) tick("form", (v.verdict_form ?? null) === g.form);
+  if ("loan_owner" in g) tick("loanOwner", clubKey(v.verdict_loan_owner) === clubKey(g.loan_owner));
+  if ("loan_club" in g) tick("loanClub", clubKey(v.verdict_loan_club) === clubKey(g.loan_club));
+  if ("loan_clause" in g) tick("loanClause", (v.verdict_loan_clause ?? null) === g.loan_clause);
   if ("fee" in g) {
     const amount = v.verdict_fee_amount == null ? null : Number(v.verdict_fee_amount);
     if (!g.fee) tick("feeNone", amount == null);
@@ -168,6 +174,7 @@ export function formatFieldScore(s, { indent = "  ", showMisses = true } = {}) {
     `시점 ${pair(s.timing)} · 선수 ${pair(s.player)}`,
     `단계 ${pair(s.stage)} (이웃까지 ${pair(s.stageNear)}) · 출발 ${pair(s.from)} · 행선지 ${pair(s.to)} · 관련 구단 집합 ${pair(s.clubSet)} · 관심 구단 Jaccard ${s.suitors[1] ? (s.suitors[0] / s.suitors[1]).toFixed(2) : "—"} (${s.suitors[1]}건)`,
     `금액: 없음을 없음으로 ${pair(s.feeNone)} · 금액 ${pair(s.feeAmount)} · 통화 ${pair(s.feeCurrency)} · 성격 ${pair(s.feeKind)}`,
+    `임대: 형태 ${pair(s.form)} · 보유 구단 ${pair(s.loanOwner)} · 임대 구단 ${pair(s.loanClub)} · 조항 ${pair(s.loanClause)}`,
   ];
   if (showMisses) for (const [f, ids] of Object.entries(s.misses)) lines.push(`  틀림 ${f}: ${ids.slice(0, 15).map((id) => `#${id}`).join(" ")}${ids.length > 15 ? ` 외 ${ids.length - 15}` : ""}`);
   return lines.map((l) => `${indent}${l}`);

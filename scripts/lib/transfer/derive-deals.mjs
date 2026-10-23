@@ -15,6 +15,8 @@
  *      그 보도들만으로 정하고(보도 수·배정은 전 보도), 판정이 덜 찬 동안 단계의 후퇴는 저장된 단계로 미룬다(`holdStage`).
  *      같은 보도를 옮긴 두 매체는 판정 뒤의 신호로 한 보도로 접고(`foldEchoes`), 딜 금액은 딜의 상대가 낸 지금의 금액만 쓴다(`dealFee`).
  *   6. 방향 — 출발·행선지 중 하나는 있어야 하고 그중 하나는 5대 리그 구단이어야 한다. LLM이 읽은 구단이 규칙 표보다 크다.
+ *   7. 임대 — 진행 중인 임대를 설명할 뿐인 보도(`loan_standing` — 문맥 보도)는 보도 수에만 들고 단계·방향·결과 시각·알림을 움직이지
+ *      않으며 새 딜을 열지 못한다. 형태가 임대·임대 연장인 딜은 행선지(없으면 관심 구단)가 5대 리그일 때만 싣는다(유스 임대가 보드를 덮지 않게).
  *
  * 두 층으로 나뉜다.
  *   - `deriveDeals(rows, opts)` — **순수 함수**. 행 배열 → 딜·구단·행 배정. 회귀 테스트(`test-transfer-derive.mjs`)가
@@ -32,7 +34,7 @@ import { canonicalClubName } from "./clubs.mjs";
 import { contractText, parseContract } from "./contract.mjs";
 import { DEST, FORMER, FROM, LEFT_FREE, SUITOR_FROM, addVotes, collectVotes, topVote } from "./direction.mjs";
 import { extractTransfer } from "./extract.mjs";
-import { JUDGE_MAX_PER_RUN, JUDGE_RETRY_MS, SUMMARY_RETRY_WINDOW_MS, moneyMentions, normalizeQuote, replayJudgements, wantsArticle } from "./judge.mjs";
+import { JUDGE_MAX_PER_RUN, JUDGE_RETRY_MS, LOAN_CUE, LOAN_FORMS, SUMMARY_RETRY_WINDOW_MS, moneyMentions, normalizeQuote, replayJudgements, wantsArticle } from "./judge.mjs";
 import { buildNameBook, createNameBook, loadGlossary, loadNameCache, loadPlayerDictionary, lookupAndCache, lookupCurrentClubs, missingNames, overlayNameRows, syncDictionaryNames } from "./names-ko.mjs";
 import { RANK, RENEWAL, cleanBody, isDead, isRoundup, isRoundupItem, mentionRe, sentencesOf } from "./story.mjs";
 import { normalizePlayer } from "./player-key.mjs";
@@ -133,6 +135,16 @@ export function dedupeRows(rows) {
 
 /** 그 선수에 대한 LLM 판정 — 다른 선수로 판정했으면(추출이 바뀌어 딜이 옮겨 감) 판정이 없는 것이다 */
 const verdictOf = (r, key) => (r.verdict_player === key ? (r.verdict ?? null) : null);
+/** 그 선수의 "이동" 판정이 읽은 사건의 형태 — 형태를 묻기 전의 판정·판정 없는 행은 null(모른다) */
+const formOf = (r, key) => (verdictOf(r, key) === "move" ? (r.verdict_form ?? null) : null);
+/**
+ * 문맥 보도 — 새 움직임 없이 진행 중인 임대와 그 조항을 설명할 뿐인 보도(`loan_standing`). 가르나초의 "여름에 의무 조항이 붙은 임대로
+ * 빌라에 갔고 조건이 맞으면 £42.5m에 완전 이적" 기사가 "합의 임박"이 되어 구단 팬에게 알림까지 갔다(운영). 보도 수·타임라인·배정에는
+ * 들지만 단계·방향·결과 시각·알림을 움직이지 않고, 문맥 보도만으로는 새 딜을 열지 않는다(판정자는 지울 수만 있다).
+ */
+const isContext = (r, key) => formOf(r, key) === "loan_standing";
+/** 딜의 형태가 임대 계열인가 — 금액 성격·관문이 갈린다 */
+const isLoanForm = (form) => form != null && LOAN_FORMS.includes(form);
 /** 판정 불가·실패 재시도 간격의 상한 — 같은 이유로 실패하는 행을 하루마다 끝없이 묻지 않는다(한 행 9회가 있었다) */
 const JUDGE_BACKOFF_MAX_MS = 7 * DAY_MS;
 /** 매체 RSS인데 기사 본문 없이 난 판정을, 본문을 받으러 다시 묻는 횟수 상한 */
@@ -174,12 +186,14 @@ export function retryDelayMs(attempts) {
  */
 export const hasRawVerdict = (r) => ("verdict_raw" in r ? r.verdict_raw != null : r.has_raw === true);
 
-export function judgeMode(r, key, nowMs, { rejudge = false, upgrade = false, stalePrompt = null } = {}) {
+export function judgeMode(r, key, nowMs, { rejudge = false, upgrade = false, stalePrompt = null, loanOnly = false } = {}) {
   if (rejudge) return "full";
   const attempts = Number(r.verdict_attempts) || 0;
   if (isCarried(r) && attempts >= CARRIED_DAILY_ATTEMPTS) return carriedSlotDue(r, nowMs) ? "full" : null;
   if (r.verdict_player !== key || !r.verdict_at) return "full";
-  if (stalePrompt && r.verdict_prompt !== stalePrompt) return "full";
+  // `loanOnly`(`--rejudge-stale --loan-only`) — 지시문이 바뀐 행 중 **임대를 말하는 행만** 다시 묻는다(임대 필드를 더한 지시문 변경의
+  // 비용을 임대 보도로 좁힌다. 나머지 낡은 판정은 형태가 없는 것(모른다)으로 읽혀 틀린 값이 되지 않는다)
+  if (stalePrompt && r.verdict_prompt !== stalePrompt && (!loanOnly || mentionsLoan(r))) return "full";
   const waited = nowMs - Date.parse(r.verdict_at) >= retryDelayMs(attempts);
   if (r.verdict == null) return waited ? "full" : null;
   if (upgrade && r.verdict === "move" && !hasRawVerdict(r) && (attempts === 0 || waited)) return "full";
@@ -187,6 +201,9 @@ export function judgeMode(r, key, nowMs, { rejudge = false, upgrade = false, sta
   if (r.verdict === "move" && r.summary_ko == null && waited && nowMs - ts(r) <= SUMMARY_RETRY_WINDOW_MS) return "summary";
   return null;
 }
+
+/** 임대를 말하는 보도인가 — 저장된 글(영문)이나 판정 요약(한국어)에 임대 낱말이 있다(`--loan-only`의 대상) */
+export const mentionsLoan = (r) => LOAN_CUE.test(r.body ?? "") || /임대/u.test(r.summary_ko ?? "");
 
 /** 이월된 행 — 앞 실행에서 일시 실패로 판정을 못 받았다(판정 시각 없이 `verdict_attempts`만 있다) */
 const isCarried = (r) => !r.verdict_at && (Number(r.verdict_attempts) || 0) > 0;
@@ -208,7 +225,8 @@ function carriedSlotDue(r, nowMs) {
 /** 물을 때 함께 넘기는 그 행의 기존 판정(`judge.mjs`가 새 답이 실패하면 옛 판정을 지키는 데 쓴다) */
 const PREV_COLUMNS = [
   "verdict", "verdict_player", "verdict_player_name", "verdict_evidence", "verdict_from", "verdict_to", "verdict_suitors", "verdict_stage",
-  "verdict_fee_amount", "verdict_fee_currency", "verdict_fee_kind", "verdict_at", "verdict_attempts",
+  "verdict_fee_amount", "verdict_fee_currency", "verdict_fee_kind", "verdict_form", "verdict_loan_owner", "verdict_loan_club", "verdict_loan_clause",
+  "verdict_at", "verdict_attempts",
 ];
 const prevVerdict = (r) => Object.fromEntries(PREV_COLUMNS.map((c) => [c, c === "verdict_attempts" ? Number(r[c]) || 0 : (r[c] ?? null)]));
 
@@ -578,6 +596,17 @@ function resolveStage(items) {
 const SETTLED = new Set(["here_we_go", "official"]);
 
 /**
+ * 단계가 그대로여도 **결과가 난 딜의 형태가 바뀌면** 소식이다(`writeDeals`의 변화 목록) — 진행 중 임대의 설명으로 조용히 오피셜이 된 딜
+ * (문맥 보도 — 알리지 않는다)에 완전 영입 전환 오피셜이 오면 단계가 오피셜 → 오피셜이라 그 소식이 영영 나가지 않았다.
+ * ⚠ 저장된 형태가 있을 때만 센다 — 형태 컬럼이 처음 채워지는 실행(모름 → 임대)은 소식이 아니다(그날 결과 난 임대 딜 전부가 알림이 된다).
+ * @param {{ stage: string, form?: string | null } | null} prev 저장된 딜
+ * @param {{ stage: string, form: string | null }} next 새로 쓴 딜
+ */
+export function isSettledFormChange(prev, next) {
+  return prev != null && prev.stage === next.stage && SETTLED.has(next.stage) && prev.form != null && next.form != null && prev.form !== next.form;
+}
+
+/**
  * 결과가 정해진 시각(`transfer_deal.settled_at`) — 딜 단계가 합의 완료·오피셜일 때만 값이 있다.
  * 보도를 시간순으로 훑어 **마지막 결렬·부인 뒤로 처음 나온** 합의 완료·오피셜 보도의 게시 시각이다(되살아난 딜은
  * 되살아난 뒤의 시각). 오피셜 보도를 본 뒤의 결렬·부인은 무시한다 — 오피셜은 뒤집히지 않는다(`resolveStage`와 같은 판정).
@@ -700,7 +729,24 @@ function resolveFee(items) {
  *   (본문은 저장하지 않는다) 근거 구절·요약만 보므로 시점을 놓칠 수 있다. 한 문장이 두 구단의 제안을 함께 말하면 딜의 상대가
  *   그 문장에 있는 한 받는다(지우는 쪽보다 남기는 쪽으로 기운다 — 빈 칸보다 틀린 칸이 나쁘지만 이 경우는 상대의 금액일 수 있다).
  */
-const BUYER_BOUND_KINDS = new Set(["fee", "bid"]);
+const BUYER_BOUND_KINDS = new Set(["fee", "bid", "loan_fee", "buy_clause"]);
+/**
+ * 임대의 금액(임대료·완전 이적 조항 금액)은 **시점을 보지 않는다** — 여름에 맺은 임대의 조항 금액은 시즌 내내 그 딜의 값이다
+ * ("joined on loan last summer with a £42.5m obligation"의 last summer가 금액을 지난 것으로 만들면 안 된다).
+ * 낸 쪽(임대 구단)이 딜의 상대인지는 본다 — 임대 중인 선수의 제3구단 이적설에 보유 구단–임대 구단 사이의 조항 금액이 붙지 않게.
+ */
+const LOAN_FEE_KINDS = new Set(["loan_fee", "buy_clause"]);
+/**
+ * 딜 형태별로 대표 금액이 될 수 있는 성격 — 임대(새 임대·연장·조기 복귀)는 임대료·조항 금액만이다. 임대설 기사가 곁들이는 선수의
+ * 평가액·요구액을 헤드라인에 걸면 임대가 그 금액의 이적처럼 읽힌다(엔드릭: 임대설인데 "€40M 평가액" — 운영).
+ * 완전 영입 전환은 임대료를 빼고 전부(조항 금액·이적료·제안액·평가액)다. 그 밖(완전 이적·모름)은 임대료·조항 금액만 뺀다.
+ */
+function feeKindAllowed(form, kind) {
+  if (kind == null) return true;
+  if (form === "loan" || form === "loan_extend" || form === "loan_recall") return LOAN_FEE_KINDS.has(kind);
+  if (form === "loan_convert") return kind !== "loan_fee";
+  return !LOAN_FEE_KINDS.has(kind);
+}
 /**
  * 지난 때를 혼자서 말하는 표현. ⚠ "in the January window"·"over the summer"는 여기 없다 — 앞으로의 일("are planning a £60m bid
  * in the January transfer window"·"will table a £60m bid over the summer")에도 그대로 쓰여, 과거 동사와 함께일 때만 지난 때다(`AMBIGUOUS_TIME_EN`).
@@ -836,6 +882,7 @@ function pastCueOnAmountKo(clause, fee) {
 /** 그 금액이 지난 일의 것인가 — 영문 절 또는 한국어 요약 절에서 지난 때 표현이 그 금액에 붙어 있다 */
 function isPastFee(r, fee, sentences) {
   if (fee.kind === "fee" && ["official", "here_we_go", "agreement"].includes(r.verdict_stage)) return false;
+  if (LOAN_FEE_KINDS.has(fee.kind)) return false;
   const same = (m) => m.currency === fee.currency && Math.abs(m.amount - fee.amount) < 0.011;
   for (const s of sentences) for (const clause of s.split(CLAUSE_EN)) if (pastCueOnAmountEn(clause, same)) return true;
   if (r.summary_ko) for (const clause of r.summary_ko.split(CLAUSE_KO)) if (pastCueOnAmountKo(clause, fee)) return true;
@@ -898,8 +945,10 @@ const citedOutlet = (r) => (r.attribution === "cited" && r.attributed_to ? norma
 /** 두 판정 행이 같은 보도를 옮긴 것인가(위 a~c). 같은 선수의 "이동" 판정끼리만 부른다 */
 function isEcho(a, b) {
   if (Math.abs(ts(a) - ts(b)) > ECHO_WINDOW_MS) return false;
-  // 단계가 다르면 같은 보도가 아니다 — 요약·근거가 같아도 한쪽이 더 진전된 판정이면 접는 순간 그 판정이 사라진다
+  // 단계가 다르면 같은 보도가 아니다 — 요약·근거가 같아도 한쪽이 더 진전된 판정이면 접는 순간 그 판정이 사라진다.
+  // 형태도 같아야 한다 — 진행 중 임대의 설명(문맥 보도)과 임대 발표를 접으면 사건이 사라진다
   if ((a.verdict_stage ?? null) !== (b.verdict_stage ?? null)) return false;
+  if ((a.verdict_form ?? null) !== (b.verdict_form ?? null)) return false;
   const sa = a.summary_ko ? normSummary(a.summary_ko) : "";
   if ([...sa].length >= ECHO_SUMMARY_MIN && sa === (b.summary_ko ? normSummary(b.summary_ko) : "")) return true;
   const outlet = citedOutlet(a);
@@ -977,8 +1026,8 @@ export function clubRowsToWrite(derivedClubs, names = createNameBook()) {
 /**
  * @param {object[]} rows  transfer_news 행(id, source_id, stage, players, body, published_at, relevance, verdict*, summary_ko)
  * @param {{ nowMs: number, windows?: object[], names?: ReturnType<typeof createNameBook>, memo?: ReturnType<typeof createExtractMemo>,
- *   requireVerified?: boolean, requireVerdict?: boolean, upgradeVerdicts?: boolean, rejudge?: boolean, rejudgeStalePrompt?: string | null,
- *   existingKeys?: Set<string> | Map<string, { stage: string, settled_at: string | null }>, judgeLimit?: number }} opts
+ *   requireVerified?: boolean, requireVerdict?: boolean, upgradeVerdicts?: boolean, rejudge?: boolean, rejudgeStalePrompt?: string | null, loanOnly?: boolean,
+ *   existingKeys?: Set<string> | Map<string, { stage: string, settled_at: string | null, form?: string | null, loan_clause?: string | null }>, judgeLimit?: number }} opts
  *   `requireVerified`: 확인된 선수(`names.isVerifiedPlayer`)의 딜만 만든다 — 판정과 함께 켜면 `canOpenUnverified`가 예외를 연다.
  *     운영 실행(`runDerivation`)이 켠다.
  *   `requireVerdict`: LLM 판정(`judge.mjs`)을 관문으로 쓴다 — "이동 아님" 보도는 딜에서 빼고, **새 딜**은 "이동"
@@ -986,6 +1035,7 @@ export function clubRowsToWrite(derivedClubs, names = createNameBook()) {
  *     보드가 비지 않게). 운영 실행이 켠다. `rejudge`면 저장된 판정이 있어도 전부 다시 묻는다.
  *   `upgradeVerdicts`: 원출력이 없는 옛 형식의 "이동" 판정을 한 번 다시 묻는다(시점·금액을 읽기 전의 판정). 운영 실행이 켠다.
  *   `rejudgeStalePrompt`: 지금 지시문의 지문(`judgeFingerprint`) — 주어지면 판정 행의 `verdict_prompt`가 다른 행을 다시 묻는다.
+ *   `loanOnly`: `rejudgeStalePrompt`와 함께 — 그중 임대를 말하는 보도만(`mentionsLoan`) 다시 묻는다.
  *   `existingKeys`: 저장된 딜 — `Map(deal_key → { stage, settled_at })`이면 판정이 덜 찬 딜의 단계 후퇴·결과 시각을 저장된 값으로 지킨다
  *     (`holdStage`·`settledAtFor`). `Set`(키만)이면 지키지 않는다.
  *   `judgeLimit`: 실행당 판정 상한(기본 `JUDGE_MAX_PER_RUN`) — 탐색용 몫(상한의 1/3)을 정하는 데 쓴다(`orderJudgeNeeds`).
@@ -1006,7 +1056,68 @@ export function clubRowsToWrite(derivedClubs, names = createNameBook()) {
 function withCanonicalVerdictClubs(r) {
   const canon = (c) => (c ? canonicalClubName(c) : c);
   const suitors = r.verdict_suitors ? [...new Set(r.verdict_suitors.map(canon))] : r.verdict_suitors;
-  return { ...r, verdict_from: canon(r.verdict_from), verdict_to: canon(r.verdict_to), verdict_suitors: suitors };
+  return {
+    ...r, verdict_from: canon(r.verdict_from), verdict_to: canon(r.verdict_to), verdict_suitors: suitors,
+    verdict_loan_owner: canon(r.verdict_loan_owner ?? null), verdict_loan_club: canon(r.verdict_loan_club ?? null),
+  };
+}
+
+/**
+ * 딜의 형태 — **사건 보도**(문맥 보도 제외)의 판정 형태로 투표한다(최신 보도 2배, 동률이면 최신 보도의 형태). 형태를 읽은 판정이
+ * 하나도 없으면 문맥 보도가 있을 때 임대(진행 중인 임대가 있다는 것은 임대가 성사됐다는 뜻이다), 아니면 null(모른다 — 화면은 표지를 그리지 않는다).
+ * ⚠ 형태를 묻기 전의 옛 판정(null)은 표가 아니다 — 완전 이적으로 세면 임대를 다시 물은 보도가 옛 판정들에 묻힌다.
+ */
+function resolveForm(events, context, key) {
+  const votes = new Map();
+  const latest = new Map();
+  const last = events.at(-1);
+  for (const it of events) {
+    const f = formOf(it.row, key);
+    if (!f || f === "loan_standing") continue;
+    votes.set(f, (votes.get(f) ?? 0) + (it === last ? 2 : 1));
+    latest.set(f, Math.max(latest.get(f) ?? 0, ts(it.row)));
+  }
+  if (!votes.size) return context.length ? "loan" : null;
+  return [...votes.entries()].sort(([fa, a], [fb, b]) => b - a || latest.get(fb) - latest.get(fa))[0][0];
+}
+
+/**
+ * 지금의 사건 — 선수당 딜이 하나라 한 창 안의 두 사건(임대 조기 복귀 오피셜 → 완전 이적 합의, 완전 이적 루머 → 임대 오피셜)이 한 딜에 섞인다.
+ * 섞인 채 단계를 정하면 "오피셜은 뒤집히지 않는다"에 걸려 새 사건이 앞 사건의 오피셜로 굳거나, 새 사건의 진전이 묻힌다.
+ * 형태를 읽은 **가장 최근 사건 보도의 형태**를 지금의 사건으로 보고, 그 형태로 바뀐 시점(다른 형태의 마지막 보도) 뒤의 보도만 쓴다 —
+ * **건수 투표가 아니라 시간 순서**다(완전 이적 루머 4건 뒤의 임대 오피셜 1건이 지금의 사건이다).
+ * 판정이 한 번 흔들린 것을 전환으로 읽지 않게 완충을 둔다 — 전환은 새 형태의 보도가 둘 이상이거나, 새 구간의 단계가 앞 구간보다 진전했거나
+ * 같거나, 앞 사건이 이미 결과가 났을 때(합의 완료·오피셜)만이다. 아니면 `null`(사건이 하나다 — 전부 쓰고 형태는 투표).
+ * @returns {{ items: object[], form: string } | null}
+ */
+function currentEvent(events, key) {
+  const formed = events.filter((it) => formOf(it.row, key)).sort((a, b) => ts(a.row) - ts(b.row));
+  if (!formed.length) return null;
+  const form = formOf(formed.at(-1).row, key);
+  const lastOther = formed.findLast((it) => formOf(it.row, key) !== form);
+  if (!lastOther) return null;
+  const cut = ts(lastOther.row);
+  const before = events.filter((it) => ts(it.row) <= cut);
+  const after = events.filter((it) => ts(it.row) > cut);
+  const oldStage = resolveStage(before);
+  const newStage = resolveStage(after);
+  const switched = after.filter((it) => formOf(it.row, key) === form).length >= 2 || RANK.indexOf(newStage) >= RANK.indexOf(oldStage) || SETTLED.has(oldStage);
+  return switched ? { items: after, form } : null;
+}
+
+/**
+ * 판정 행 중 가장 최근의 값 — 임대 상태·조항은 지금의 사실이라 최신 보도를 따른다. 형태까지 읽은 판정(`verdict_form`이 있다)이 값을
+ * 비웠으면 "지금은 아니다"라는 답이라 거기서 멈춘다 — 건너뛰면 복귀한 선수에게 옛 임대 구단이 남아 화면이 "빌라 임대 중"을 그리고
+ * 그 구단 팬에게 알림이 간다. 형태를 묻기 전의 옛 판정은 그 필드를 물은 적이 없어 건너뛴다.
+ */
+function latestJudged(items, key, pick) {
+  for (const it of [...items].sort((a, b) => ts(b.row) - ts(a.row))) {
+    if (verdictOf(it.row, key) !== "move") continue;
+    const v = pick(it.row);
+    if (v != null) return v;
+    if (it.row.verdict_form != null) return null;
+  }
+  return null;
 }
 
 export function deriveDeals(rows, opts) {
@@ -1014,7 +1125,7 @@ export function deriveDeals(rows, opts) {
   const names = opts.names ?? createNameBook({ players: loadPlayerDictionary(), clubs: loadGlossary().clubs });
   const startMs = derivationStartMs(opts.nowMs, windows);
   const memo = opts.memo ?? createExtractMemo();
-  const modeOpts = { rejudge: Boolean(opts.rejudge), upgrade: Boolean(opts.upgradeVerdicts), stalePrompt: opts.rejudgeStalePrompt ?? null };
+  const modeOpts = { rejudge: Boolean(opts.rejudge), upgrade: Boolean(opts.upgradeVerdicts), stalePrompt: opts.rejudgeStalePrompt ?? null, loanOnly: Boolean(opts.loanOnly) };
   // 저장된 딜 — Set(키만 — 테스트·옛 호출부)이든 Map(키 → { stage, settled_at })이든 받는다. 저장된 값은 Map일 때만 있다
   const existing = opts.existingKeys ?? new Set();
   const storedDeal = (k) => (existing instanceof Map ? (existing.get(k) ?? null) : null);
@@ -1092,15 +1203,17 @@ export function deriveDeals(rows, opts) {
 
     let items = [];
     for (const r of group) {
-      const stage = stageFor(r, key, mentions, memo);
-      if (stage === "unknown") { skip("그 선수의 단계 없음"); continue; }
+      // 문맥 보도(진행 중 임대의 설명)는 단계가 없다 — 규칙 단계로 떨어뜨리지 않는다(규칙은 "agreement"를 읽어 딜을 "합의 임박"으로 만들었다)
+      const context = isContext(r, key);
+      const stage = context ? null : stageFor(r, key, mentions, memo);
+      if (!context && stage === "unknown") { skip("그 선수의 단계 없음"); continue; }
       const all = memo.sentences(r);
       const sentences = all.filter((s) => mentions.test(s));
       // 계약·이적료·주급은 추출기가 **그 선수 한 명만** 잡은 기사라면 기사 전체에서 읽는다 — 로마노는 둘째 문장을
       // "Former … centre back signs a one year deal until June 2027"처럼 이름 없이 쓴다
       const single = playersOf(r).every((p) => mentions.test(p));
       const storySentences = single ? all : sentences;
-      items.push({ row: r, stage, sentences, storySentences, fee: feeFor(r, key, storySentences, memo) });
+      items.push({ row: r, stage, context, sentences, storySentences, fee: feeFor(r, key, storySentences, memo) });
     }
     if (!items.length) continue;
     // 판정을 다시 물을 대상은 접기 전의 전 보도다 — 접힌 행도 판정 갱신(옛 형식·요약 재시도)은 받는다
@@ -1127,25 +1240,76 @@ export function deriveDeals(rows, opts) {
      * 미룬다(아래 `holdStage`) — 루머 10건 딜에 부인 1건만 먼저 판정되면 "부인" 알림이 나가고 다음 시간에 루머로 돌아왔다.
      */
     const awaiting = reported.some((it) => verdictOf(it.row, key) == null && (Number(it.row.verdict_attempts) || 0) < REPEATED_FAILURE_ATTEMPTS);
+    /*
+     * 사건 보도와 문맥 보도(진행 중 임대의 설명 — `isContext`)를 가른다. 단계·방향·결과 시각·확인 관문·같은 보도 접기는 사건 보도로 정하고,
+     * 문맥 보도는 보도 수·배정(`reported`)과 임대 상태·조항·조항 금액에만 든다. 사건 보도가 없으면(문맥뿐) 방향은 문맥 보도로 읽고
+     * 단계는 오피셜이다(진행 중인 임대가 있다는 것은 임대가 성사됐다는 뜻이다) — 그런 딜은 이미 있는 딜일 때만 남는다(아래 판정 관문).
+     */
+    const context = items.filter((it) => it.context);
+    const events = items.filter((it) => !it.context);
+    const contextOnly = !events.length;
+    const stored = storedDeal(dealKey(key));
+    /*
+     * 문맥 보도만 판정됐는데 **판정을 기다리는 사건 보도**가 남은 기존 딜은 그 판정이 올 때까지 저장된 단계·결과 시각·형태·조항을 그대로 둔다
+     * (양방향 동결). 문맥뿐으로 보면 그 사건(제3구단 루머)이 있는 딜에 오피셜을 지어내고, 판정 전 보도의 규칙 단계로 정하면 규칙이 읽은
+     * "합의 완료"가 딜을 올려 알림까지 나간다(가르나초 사고와 같은 경로). 반복 실패로 포기한 보도는 기다리지 않는다.
+     */
+    const frozen = contextOnly && stored && reported.some((it) => !it.context && verdictOf(it.row, key) == null && (Number(it.row.verdict_attempts) || 0) < REPEATED_FAILURE_ATTEMPTS) ? stored : null;
+    // 단계·방향·결과 시각은 지금의 사건(`currentEvent`)의 보도로 정한다 — 한 창 안의 두 사건이 한 딜에 섞인다
+    const segment = contextOnly ? null : currentEvent(events, key);
+    const form = frozen ? (frozen.form ?? null) : segment ? segment.form : resolveForm(events, context, key);
+    items = contextOnly ? context : segment ? segment.items : events;
+    // 임대 상태 — 보도 시점에 선수가 임대 중이면 보유 구단과 임대 구단(최신 판정). 문맥 보도까지 본다(지금의 사실이다)
+    const allJudged = [...events, ...context];
+    let loanOwner = latestJudged(allJudged, key, (r) => r.verdict_loan_owner);
+    let loanClubName = latestJudged(allJudged, key, (r) => r.verdict_loan_club);
+    const loanClause = frozen ? (frozen.loan_clause ?? null) : ["loan", "loan_convert", "loan_extend"].includes(form) ? latestJudged(allJudged, key, (r) => r.verdict_loan_clause) : null;
 
     const dir = resolveDirection(items, player, key);
+    /*
+     * 출발은 **선수를 보유한 구단**이다(조기 복귀만 임대 구단이 계약을 넘긴다). 판정이 보유 구단을 읽었으면 출발이 비었을 때 그 구단을 쓰고,
+     * 임대 구단을 출발로 적은 옛 판정이 이겼으면(지시문이 "임대 중이면 임대로 뛰는 구단"이던 때) 보유 구단으로 바로잡는다
+     * — 디 그레고리오의 볼로냐 이적설이 "본머스 → 볼로냐"로 나갔다(파는 쪽은 유벤투스).
+     */
+    if (loanOwner && form !== "loan_recall" && loanOwner !== dir.to && (!dir.from || (loanClubName && dir.from === loanClubName))) dir.from = loanOwner;
     /*
      * 출발 구단 폴백 — 보도가 소속을 말하지 않으면 사전의 현 소속(위키데이터 P54 캐시 — `names.currentClub`)을 쓴다.
      * 유명 선수의 출발이 "미확인"으로 뜨는 것은 기사가 소속을 굳이 적지 않아서다(케인 — 운영). 자유계약은 소속이 없고,
      * 행선지와 같은 구단은 이미 옮긴 뒤의 기록이라 쓰지 않는다. 보도가 소속을 말하면(규칙·LLM 표) 그쪽이 먼저다.
      */
     let usedFallback = false;
-    if (!dir.from && !dir.isFree) {
+    // 출발을 위키데이터 캐시(현 소속·보유 구단)로 정했는가 — 그 캐시는 낡을 수 있어 재확인 대상이다(아래 `clubNeeds`)
+    let usedClubCache = false;
+    /*
+     * 판정이 임대 상태를 읽지 못한 딜 — 위키데이터 캐시가 임대를 안다면(`names.ownerClub` — 현 소속 기록에 임대 한정자) 같은 바로잡기를 한다.
+     * 출발이 비었거나 캐시의 현 소속(= 임대 구단)이면 보유 구단으로 바꾸고 임대 구단을 함께 둔다. 원소속 → 현 임대 구단 전환설은
+     * 현 소속이 행선지와 같아 출발이 비던 자리다. 조기 복귀는 임대 구단이 계약을 넘기는 쪽이라 바꾸지 않는다.
+     */
+    const cachedOwner = loanOwner || dir.isFree || form === "loan_recall" ? null : names.ownerClub(key);
+    if (cachedOwner && cachedOwner !== dir.to) {
+      const cachedCurrent = names.currentClub(key);
+      if (!dir.from || dir.from === cachedCurrent) {
+        if (!dir.from) usedFallback = true;
+        usedClubCache = true;
+        dir.from = cachedOwner;
+        loanOwner = cachedOwner;
+        loanClubName ??= cachedCurrent;
+      }
+    }
+    // 임대 중인 선수의 현 소속(위키데이터)은 임대 구단일 수 있다 — 임대 상태를 아는 딜에는 쓰지 않는다(보유 구단은 위에서 채웠다)
+    if (!dir.from && !dir.isFree && !loanClubName) {
       const current = names.currentClub(key);
       if (current && current !== dir.to) {
         dir.from = current;
         usedFallback = true;
+        usedClubCache = true;
       }
     }
     // 재계약·첫 프로 계약 표현이 있고 **옮긴다는 표현이 하나도 없으면** 이적이 아니다("first professional contract" 공지,
     // "Napoli reach agreement to extend X contract"처럼 소속 구단이 행선지로 읽히는 재계약)
     const story = items.flatMap((it) => it.storySentences);
-    if (!dir.isFree && story.some((s) => RENEWAL.test(s)) && !story.some((s) => MOVE.test(s))) {
+    // 임대 형태로 판정된 딜은 이 가드를 타지 않는다 — 임대 연장("loan extended")·진행 중 임대("will stay")가 재계약 낱말에 걸린다
+    if (!dir.isFree && !isLoanForm(form) && story.some((s) => RENEWAL.test(s)) && !story.some((s) => MOVE.test(s))) {
       skip("재계약·첫 프로 계약");
       continue;
     }
@@ -1165,11 +1329,17 @@ export function deriveDeals(rows, opts) {
     }
     // 행선지 밖의 관심 구단(정규명, 유력한 순) — 이름 조회 대상이고 관문·자식 행의 근거다
     const suitorCanonicals = rankSuitors(items, key).filter((c) => c !== dir.from && c !== dir.to);
-    const stored = storedDeal(dealKey(key));
-    const stage = opts.requireVerdict && awaiting && stored ? holdStage(resolveStage(items), stored.stage) : resolveStage(items);
-    // 딜 금액 후보 — 딜의 상대(행선지, 없으면 관심 구단 맨 앞)가 낸 지금의 금액만(`dealFee`). 직전 보도·범위도 이 후보로 센다
-    const feeCtx = { judged: items.some((it) => verdictOf(it.row, key) === "move"), target: dir.to ?? suitorCanonicals[0] ?? null, sellers: new Set([dir.from].filter(Boolean)) };
-    const { fee, prev, low, high } = resolveFee(items.map((it) => ({ ...it, fee: dealFee(it, feeCtx, memo) })));
+    const resolved = frozen ? frozen.stage : contextOnly ? "official" : resolveStage(items);
+    const stage = opts.requireVerdict && awaiting && stored ? holdStage(resolved, stored.stage) : resolved;
+    // 딜 금액 후보 — 딜의 상대(행선지, 없으면 관심 구단 맨 앞)가 낸 지금의 금액만(`dealFee`). 직전 보도·범위도 이 후보로 센다.
+    // 임대 계열 딜은 문맥 보도의 금액(조항 금액·임대료)도 후보다 — 진행 중 임대의 조항 금액은 문맥 보도가 말한다(가르나초의 £42.5m 의무)
+    const feeCtx = { judged: allJudged.some((it) => verdictOf(it.row, key) === "move"), target: dir.to ?? suitorCanonicals[0] ?? null, sellers: new Set([dir.from, loanOwner].filter(Boolean)) };
+    const feePool = (isLoanForm(form) && !contextOnly ? [...items, ...context] : items).sort((a, b) => ts(a.row) - ts(b.row) || a.row.id - b.row.id);
+    const feeCandidates = feePool.map((it) => ({ ...it, fee: dealFee(it, feeCtx, memo) })).map((it) => (it.fee && !feeKindAllowed(form, it.fee.kind) ? { ...it, fee: null } : it));
+    // 대표 금액 — 조항 금액이 있으면 임대료는 대표가 아니다(임대료는 계약 조건 줄의 `loan_fee_text`로 따로 그린다)
+    const hasClauseFee = feeCandidates.some((it) => it.fee?.kind === "buy_clause");
+    const { fee, prev, low, high } = resolveFee(feeCandidates.map((it) => (hasClauseFee && it.fee?.kind === "loan_fee" ? { ...it, fee: null } : it)));
+    const loanFee = isLoanForm(form) ? feeCandidates.filter((it) => it.fee?.kind === "loan_fee").at(-1)?.fee ?? null : null;
     const addOn = fee ? firstOf(items.flatMap((it) => it.storySentences), (ex) => (ex.addOnAmount != null && ex.addOnCurrency === fee.currency ? ex.addOnAmount : null), memo) : null;
     const wage = firstOf(items.flatMap((it) => it.storySentences), (ex) => ex.wageText, memo);
     const contract = contractText(parseContract(items.flatMap((it) => it.storySentences)));
@@ -1206,8 +1376,12 @@ export function deriveDeals(rows, opts) {
         continue;
       }
     }
-    // 출발 구단이 비었으면(폴백도 없었다) 현 소속을 찾을 대상이다 — 확인된 선수만(항목 id가 있으면 함께 넘긴다)
-    if (!dir.from && !dir.isFree && names.needsClubLookup(key, opts.nowMs)) {
+    /*
+     * 출발 구단을 보도가 말하지 않았으면(비었거나 캐시로 채웠다) 현 소속을 찾을 대상이다 — 확인된 선수만(항목 id가 있으면 함께 넘긴다).
+     * ⚠ 캐시로 채운 딜도 넣는다 — 빈 출발만 보면 캐시가 한 번 생긴 선수는 다시 확인되지 않아, 임대가 끝난 선수의 옛 보유 구단이 출발로 남고
+     *   보유 구단 행이 생기기 전에 찾은 선수는 영영 보유 구단을 모른다(재확인 주기는 `needsClubLookup`이 정한다).
+     */
+    if ((!dir.from || usedClubCache) && !dir.isFree && names.needsClubLookup(key, opts.nowMs)) {
       clubNeeds.push({ playerKey: key, player, wikidataId: names.entry("player", key)?.wikidata_id ?? null });
     }
     if (usedFallback) fromFallback += 1;
@@ -1224,6 +1398,21 @@ export function deriveDeals(rows, opts) {
         skip("판정 대기(LLM)");
         continue;
       }
+    }
+    // 문맥 보도만으로는 새 딜을 열지 않는다 — 진행 중인 임대의 설명은 소식이 아니다(판정자는 지울 수만 있다). 이미 있는 딜은 남긴다.
+    // 판정을 기다리는 사건 보도가 있어도 같다 — 새 딜은 "이동" 판정을 받은 사건 보도가 있어야 연다
+    if (!events.length && !existing.has(dealKey(key))) {
+      skip("진행 중 임대 문맥만");
+      continue;
+    }
+    /*
+     * 임대 관문 — 형태가 임대·임대 연장이면 **5대 리그로 들어오는** 것만 싣는다: 행선지가 5대 리그, 행선지가 없으면 관심 구단 중 하나가
+     * 5대 리그. 5대 리그 구단이 하부 리그로 보내는 유망주 임대는 한 창에 구단마다 십여 건이라 보드를 덮는다. 완전 영입 전환·조기 복귀는
+     * 지금의 관문(출발·행선지 중 하나가 5대 리그)을 그대로 쓴다.
+     */
+    if ((form === "loan" || form === "loan_extend") && ![dir.to, ...suitorCanonicals].some(isTopLeague)) {
+      skip("5대 리그 밖으로 가는 임대");
+      continue;
     }
     // 관심 구단의 구단 행 — 출발·행선지와 겹치는 코드는 뺀다. 화면이 전부 엠블럼·이름으로 그린다(`transfer_deal_suitor`)
     const suitorClubs = suitorCanonicals
@@ -1243,8 +1432,11 @@ export function deriveDeals(rows, opts) {
       skip("5대 리그 밖");
       continue;
     }
+    // 지금 임대로 뛰는 구단 — 출발(보유 구단)과 같은 코드면 뜻이 없다(조기 복귀의 출발은 임대 구단이다 — 그때도 같은 구단이라 비운다)
+    const loanClubRec = loanClubName ? clubRecord(loanClubName, names) : null;
+    const loanClub = loanClubRec && loanClubRec.code !== fromClub?.code ? loanClubRec : null;
     // 구단 행은 관문을 지난 딜의 것만 쓴다
-    for (const c of [fromClub, toClub, ...suitorClubs]) if (c) clubs.set(c.code, c);
+    for (const c of [fromClub, toClub, loanClub, ...suitorClubs]) if (c) clubs.set(c.code, c);
     if (!playerKo) missingKo.push(player);
 
     const times = [...reported.map((it) => ts(it.row)), ...echoTimes];
@@ -1270,14 +1462,22 @@ export function deriveDeals(rows, opts) {
       wage_text: wage ? clampCp(wage, 20) : null,
       // ⚠ 이적료가 확인되면 자유계약이 아니다(DB CHECK `transfer_deal_free_agent_no_fee`) — 화면은
       //   이적료가 있으면 금액, 없고 이 값이 켜졌으면 "FA(자유 계약)", 둘 다 아니면 "미공개"를 그린다
-      is_free_agent: dir.isFree && !fee,
-      settled_at: settledAtFor(items, stage, awaiting ? stored : null, reported),
+      // 임대 계열은 자유계약이 아니다 — 소속이 없는 선수는 빌려줄 수 없다(기사 문장의 "free agent"가 다른 선수의 것이거나 지난 일이다)
+      is_free_agent: dir.isFree && !fee && !isLoanForm(form),
+      form,
+      loan_club_code: loanClub?.code ?? null,
+      loan_clause: loanClause,
+      // 임대료는 대표 금액이 조항 금액일 때만 따로 둔다 — 대표 금액이 곧 임대료면 같은 금액이 계약 조건에 두 줄로 그려진다
+      loan_fee_text: loanFee && fee?.kind === "buy_clause" ? clampCp(loanFee.text, 40) : null,
+      settled_at: frozen ? (frozen.settled_at ?? null) : settledAtFor(items, stage, awaiting ? stored : null, reported),
       first_reported_at: new Date(Math.min(...times)).toISOString(),
       latest_reported_at: new Date(Math.max(...times)).toISOString(),
       report_count: reported.length,
       rowIds: reported.map((it) => it.row.id),
       // 관심 구단 코드(유력한 순 — `rankSuitors`) — `transfer_deal` 컬럼이 아니라 자식 행(`transfer_deal_suitor`)으로 쓴다
       suitorCodes: suitorClubs.map((c) => c.code),
+      // 단계가 문맥 보도만으로 정해졌는가 — 알림이 이 변화를 보내지 않는다(컬럼이 아니다)
+      contextOnly,
     });
     for (const it of reported) assignments.set(it.row.id, dealKey(key));
   }
@@ -1332,7 +1532,7 @@ const SUITORS = "transfer_deal_suitor";
  *   판정(`writeDeals`의 해제)이 이 행들을 봐야 한다. 빼면 그 행이 옛 딜을 계속 가리킨다.
  * ⚠ 걸러진 행은 `skipped`의 "단계 없음"·"관련성 미달" 집계에서도 빠진다(로그 숫자만 줄고 판정은 같다).
  */
-const ROW_COLUMNS = "id, source_id, external_id, url, stage, players, clubs, body, published_at, relevance, deal_id, verdict, verdict_player, verdict_player_name, verdict_evidence, verdict_at, verdict_from, verdict_to, verdict_suitors, verdict_stage, verdict_fee_amount, verdict_fee_currency, verdict_fee_kind, verdict_model, verdict_prompt, verdict_input, verdict_article_chars, verdict_attempts, summary_ko";
+const ROW_COLUMNS = "id, source_id, external_id, url, stage, players, clubs, body, published_at, relevance, deal_id, verdict, verdict_player, verdict_player_name, verdict_evidence, verdict_at, verdict_from, verdict_to, verdict_suitors, verdict_stage, verdict_fee_amount, verdict_fee_currency, verdict_fee_kind, verdict_form, verdict_loan_owner, verdict_loan_club, verdict_loan_clause, verdict_model, verdict_prompt, verdict_input, verdict_article_chars, verdict_attempts, summary_ko";
 
 /**
  * @param {{ fullRaw?: boolean }} [opts] `fullRaw` — 원출력 값까지 읽는다(재생 `--replay`만 쓴다)
@@ -1379,6 +1579,7 @@ const DEAL_COLUMNS = [
   "deal_key", "player", "player_ko", "position", "birth_year", "nationality", "from_club_code", "to_club_code", "stage",
   "fee_amount", "fee_currency", "fee_text", "fee_kind", "prev_fee_amount", "fee_low_amount", "fee_high_amount", "add_on_amount",
   "contract_text", "wage_text", "is_free_agent", "first_reported_at", "latest_reported_at", "report_count", "settled_at",
+  "form", "loan_club_code", "loan_clause", "loan_fee_text",
 ];
 const CLUB_COLUMNS = ["code", "canonical", "name", "short_name", "league"];
 const TIME_COLUMNS = new Set(["first_reported_at", "latest_reported_at", "settled_at"]);
@@ -1481,7 +1682,7 @@ export async function writeDeals(supabase, derived, rows, opts = {}) {
     if (error) throw new Error(`딜 조회 실패: ${error.message}`);
     for (const d of data) stored.set(d.deal_key, d);
   }
-  const dealRows = derived.deals.map(({ rowIds: _rowIds, suitorCodes: _suitorCodes, ...d }) => d);
+  const dealRows = derived.deals.map(({ rowIds: _rowIds, suitorCodes: _suitorCodes, contextOnly: _contextOnly, ...d }) => d);
   const changedDeals = dealRows.filter((d) => !stored.has(d.deal_key) || !sameRow(DEAL_COLUMNS, stored.get(d.deal_key), d));
   const dealUp = await upsertRows(supabase, DEALS, changedDeals.map((d) => ({ ...d, updated_at: now })), { onConflict: "deal_key" }, { log });
   stats.deals = dealUp.saved.length;
@@ -1512,10 +1713,13 @@ export async function writeDeals(supabase, derived, rows, opts = {}) {
   const derivedByKey = new Map(derived.deals.map((d) => [d.deal_key, d]));
   const changes = [];
   for (const saved of dealUp.saved) {
-    const prevStage = stored.get(saved.deal_key)?.stage ?? null;
+    const prev = stored.get(saved.deal_key) ?? null;
+    const prevStage = prev?.stage ?? null;
     const dealId = idByKey.get(saved.deal_key);
-    if (dealId == null || prevStage === saved.stage) continue;
+    if (dealId == null) continue;
     const deal = derivedByKey.get(saved.deal_key);
+    const formChanged = isSettledFormChange(prev, deal);
+    if (prevStage === saved.stage && !formChanged) continue;
     const destinations = [deal.to_club_code, ...deal.suitorCodes].filter(Boolean);
     const latestSummary = deal.rowIds
       .map((id) => rowById.get(id))
@@ -1530,7 +1734,10 @@ export async function writeDeals(supabase, derived, rows, opts = {}) {
       fromShort: deal.from_club_code ? (clubShort.get(deal.from_club_code) ?? null) : null,
       toShorts: destinations.flatMap((code) => clubShort.get(code) ?? []),
       isFreeAgent: deal.is_free_agent === true,
-      clubCodes: [...new Set([deal.from_club_code, ...destinations].filter(Boolean))],
+      form: deal.form ?? null,
+      formChanged,
+      contextOnly: deal.contextOnly === true,
+      clubCodes: [...new Set([deal.from_club_code, ...destinations, deal.loan_club_code].filter(Boolean))],
       latestReportedAt: deal.latest_reported_at,
       summary: latestSummary ?? null,
     });
@@ -1611,7 +1818,8 @@ export async function writeDeals(supabase, derived, rows, opts = {}) {
 /**
  * 조회 → 파생 → 이름 조회 → LLM 판정·요약 → (dryRun이 아니면) 쓰기.
  * `rejudgeStalePrompt`(지금 지시문의 지문)를 주면 다른 지문으로 난 판정만 다시 묻고, `judgeLimit`은 판정 상한이다(판정 함수에 넘긴 값과 같게).
- * @param {{ dryRun?: boolean, rejudge?: boolean, rejudgeStalePrompt?: string | null, judgeLimit?: number, nowMs?: number, log?: Console, fetchImpl?: typeof fetch, lookupNames?: boolean,
+ * `loanOnly`는 `rejudgeStalePrompt`와 함께 — 지시문이 바뀐 판정 중 임대를 말하는 보도만 다시 묻는다(`mentionsLoan`).
+ * @param {{ dryRun?: boolean, rejudge?: boolean, rejudgeStalePrompt?: string | null, loanOnly?: boolean, judgeLimit?: number, nowMs?: number, log?: Console, fetchImpl?: typeof fetch, lookupNames?: boolean,
  *   judge?: ((needs: object[], names: object) => Promise<{ updates: object[] }>) | null }} opts
  *   `judge`는 판정 함수(`judge.mjs`의 `runJudgements`를 호출부가 감싸 넘긴다). 없으면(키가 없다) 판정하지 않는다 —
  *   판정이 없는 **새** 딜은 열리지 않고 이미 있는 딜은 남는다. `rejudge`는 저장된 판정을 무시하고 전부 다시 묻는다.
@@ -1657,12 +1865,12 @@ export async function runDerivation(supabase, opts = {}) {
   // 이미 저장된 딜 — 판정이 없어도 남기고(판정이 멎은 시간에 보드가 통째로 비지 않게), 판정이 덜 찬 딜은 저장된 단계·결과 시각을 지킨다.
   // 같은 결과를 `writeDeals`가 대조에 다시 쓴다(`loadStoredDeals` — 딜 표는 실행당 한 번 읽는다)
   const storedDeals = await loadStoredDeals(supabase);
-  const existingKeys = new Map([...storedDeals].map(([k, d]) => [k, { stage: d.stage, settled_at: d.settled_at }]));
+  const existingKeys = new Map([...storedDeals].map(([k, d]) => [k, { stage: d.stage, settled_at: d.settled_at, form: d.form, loan_clause: d.loan_clause }]));
   // 이름을 찾아 다시 파생할 때 추출을 되풀이하지 않도록 메모를 여러 번의 파생이 나눠 쓴다
   const memo = createExtractMemo();
   const derive = (rejudge = false) => deriveDeals(rows, {
     nowMs, windows, names, memo, requireVerified: true, requireVerdict: true, upgradeVerdicts: true, rejudge, existingKeys,
-    rejudgeStalePrompt: opts.rejudgeStalePrompt ?? null, judgeLimit: opts.judgeLimit,
+    rejudgeStalePrompt: opts.rejudgeStalePrompt ?? null, loanOnly: Boolean(opts.loanOnly), judgeLimit: opts.judgeLimit,
   });
   let derived = derive(Boolean(opts.rejudge));
 

@@ -2,14 +2,16 @@ import { ArrowRight, Slash, X } from "lucide-react";
 // ⚠ 배럴이 아니라 직접 경로다 — `"use client"`가 없어 서버 렌더 여지를 남긴다(`pill.tsx`와 같은 이유)
 import { cn } from "@/shared/lib/cn";
 import { Icon } from "@/shared/ui";
+import { loanNote } from "../lib/deal-form";
 import { destinationClubs, routeLabels } from "../lib/route-label";
 import { isDeadStage } from "../lib/stage";
 import type { TransferDeal } from "../model/types";
 import { CrestStack } from "./crest-stack";
+import { DealFormMark } from "./deal-form-mark";
 import { TransferCrest } from "./transfer-crest";
 
 interface ClubRouteProps {
-  deal: Pick<TransferDeal, "fromClub" | "toClub" | "isFreeAgent" | "suitors" | "stage">;
+  deal: Pick<TransferDeal, "fromClub" | "toClub" | "isFreeAgent" | "suitors" | "stage" | "form" | "loanClause" | "loanClub">;
   /** 엠블럼 px */
   size: number;
   className?: string;
@@ -26,6 +28,10 @@ interface ClubRouteProps {
  *   접은 글자(앞 셋 + `외 N`)를 **두 줄까지** 흘린다 — 한 줄 `truncate`면 세 번째 구단이 잘려 `외 N`의 수가 거짓이 된다.
  * ⚠ 표지(`data-name` — 이름 글자, `data-route-to` — 행선지 덩어리, 구단이 여럿이면 `"stacked"`)는 표의 범위(`DealTable`)가 md+에서 잘림을 풀고 줄을
  *   바꾸는 데 쓴다. 이 컴포넌트는 폭을 모른다 — 캐러셀·미니 카드에서는 표지가 아무 일도 하지 않는다.
+ * ⚠ **임대** — 형태 표지(`DealFormMark` — `임대·의무`)를 출발 앞에 둔다("임대·의무: 첼시 → 빌라"로 읽힌다). 출발은 늘 보유 구단이고,
+ *   선수가 다른 구단에 임대 중이면 그 구단은 **경로 밖 한 줄**(`loanNote` — "빌라 임대 중")로만 적는다 — 세 구단을 화살표로 이으면
+ *   "빌라가 나폴리에 판다"는 연쇄 이적으로 읽힌다. 그 줄은 DOM에서 출발 바로 뒤(스크린리더: "첼시, 빌라 임대 중, 행선지 나폴리")이고
+ *   화면에서는 맨 아래 줄(`order-last basis-full`)이다. 엠블럼 폭만큼 들여 출발 이름 아래에 선다.
  * ⚠ 죽은 딜은 화살표 대신 원을 그린다 — 결렬은 X, 부인은 빗금(`/`). 원(`rounded-full`)은 컨트롤이 아니라 표시 요소 —
  *   `styling.md` "대상이 아닌 것". 크림슨 채움이지만 행 전체가 `grayscale`이라 회색으로 보인다(색이 아니라 형태가 뜻을 진다).
  */
@@ -35,21 +41,31 @@ export function ClubRoute({ deal, size, className, "data-col": dataCol }: ClubRo
   const denied = deal.stage === "denied";
   const destinations = destinationClubs(deal);
   const stacked = destinations.length > 1;
+  const note = loanNote(deal);
   return (
     <span
       data-col={dataCol}
       className={cn(
         "flex min-w-0 items-center gap-[5px] text-[12px] text-ink-mute",
         stacked ? "items-start" : "whitespace-nowrap",
+        note && "flex-wrap gap-y-0.5",
         className,
       )}
     >
+      <DealFormMark deal={deal} />
       <span className="inline-flex min-w-0 items-center gap-[5px]">
         <TransferCrest club={deal.fromClub} size={size} />
         <span data-name="" className="truncate">
           {label.from}
         </span>
       </span>
+      {note && (
+        // 출발 이름 아래로 들인다 — 엠블럼 폭(prop px)만큼이라 style로 준다(`styling.md`의 동적 값)
+        <span data-via="" className="order-last basis-full whitespace-normal break-keep text-[11px] text-ink-mute" style={{ paddingLeft: size + 5 }}>
+          <span className="sr-only">, </span>
+          {note}
+        </span>
+      )}
       {dead ? (
         <span
           aria-hidden

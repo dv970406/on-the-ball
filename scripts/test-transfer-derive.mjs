@@ -7,7 +7,7 @@
  */
 import { createNameBook } from "./lib/transfer/names-ko.mjs";
 import { isRoundup } from "./lib/transfer/story.mjs";
-import { CARRIED_DAILY_ATTEMPTS, JUDGE_TIER, boardScopeStartMs, clubRecord, createExtractMemo, dealKey, dedupeRows, deriveDeals, derivationStartMs, hasRawVerdict, holdStage, judgeMode, normalizePlayer, orderJudgeNeeds, retryDelayMs, windowSpan } from "./lib/transfer/derive-deals.mjs";
+import { CARRIED_DAILY_ATTEMPTS, JUDGE_TIER, boardScopeStartMs, clubRecord, createExtractMemo, dealKey, dedupeRows, deriveDeals, derivationStartMs, hasRawVerdict, holdStage, judgeMode, normalizePlayer, orderJudgeNeeds, retryDelayMs, windowSpan, isSettledFormChange } from "./lib/transfer/derive-deals.mjs";
 
 const NOW = Date.parse("2026-09-25T00:00:00Z");
 const WINDOWS = [
@@ -416,7 +416,11 @@ const CASES = [
 ];
 
 // ── 출발 구단 폴백 — 보도가 소속을 말하지 않으면 현 소속 캐시(player_club)를 쓴다 ──
-const clubCache = (club) => [{ kind: "player_club", key: "john doe", name_en: club, name_ko: null, wikidata_id: "Q9", checked_at: "2026-09-24T00:00:00Z" }];
+// 현 소속 캐시 — 보유 구단 행(임대 아님: wikidata_id null)까지 있는 최근 조회. 보유 구단 행이 없으면 그 행이 생기기 전의 조회라 다시 본다
+const clubCache = (club, { owner = true } = {}) => [
+  { kind: "player_club", key: "john doe", name_en: club, name_ko: null, wikidata_id: "Q9", checked_at: "2026-09-24T00:00:00Z" },
+  ...(owner ? [{ kind: "player_owner_club", key: "john doe", name_en: "John Doe", name_ko: null, wikidata_id: null, checked_at: "2026-09-24T00:00:00Z" }] : []),
+];
 const withClub = (rows, cache) => deriveDeals(rows, { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: DICT, cache }) });
 const FALLBACK = {
   used: withClub([row("Chelsea want John Doe and he could join Chelsea in January.", { stage: "rumour" })], clubCache("Bayern Munich")),
@@ -425,6 +429,13 @@ const FALLBACK = {
   notFound: withClub([row("Chelsea are keen on John Doe and could make a bid in January.", { stage: "rumour" })], [{ kind: "player_club", key: "john doe", name_en: "John Doe", name_ko: null, wikidata_id: null, checked_at: "2026-09-24T00:00:00Z" }]),
   stale: withClub([row("Chelsea are keen on John Doe and could make a bid in January.", { stage: "rumour" })], [{ kind: "player_club", key: "john doe", name_en: "John Doe", name_ko: null, wikidata_id: null, checked_at: "2026-08-01T00:00:00Z" }]),
   reported: withClub([row("John Doe could join Chelsea from Bayern in January.", { stage: "rumour" })], clubCache("Benfica")),
+  // 보유 구단 행이 생기기 전에 찾은 현 소속 — 폴백은 쓰되 다시 조회한다(배포 직후의 운영 캐시)
+  noOwnerRow: withClub([row("Chelsea want John Doe and he could join Chelsea in January.", { stage: "rumour" })], clubCache("Bayern Munich", { owner: false })),
+  // 임대가 끝났을지 모르는 옛 보유 구단 — 출발을 캐시로 정했으니 재확인 주기가 지나면 다시 조회한다(빈 출발만 보면 영영 다시 보지 않았다)
+  staleOwner: withClub([row("Chelsea want John Doe and he could join Chelsea in January.", { stage: "rumour" })], [
+    { kind: "player_club", key: "john doe", name_en: "Aston Villa", name_ko: null, wikidata_id: "Q9", checked_at: "2026-06-01T00:00:00Z" },
+    { kind: "player_owner_club", key: "john doe", name_en: "Manchester United", name_ko: null, wikidata_id: "Q18656", checked_at: "2026-06-01T00:00:00Z" },
+  ]),
 };
 
 // ── 판정이 있는 딜에서는 규칙의 약한 행선지 문형만으로 행선지를 정하지 않는다 ──
@@ -834,7 +845,166 @@ const SETTLE = {
   unjudged: withStored([row("Chelsea keen on John Doe of Benfica.", ST("rumour")), row("Official: Chelsea sign John Doe from Benfica.", { stage: "official", published_at: "2026-09-21T00:00:00Z" })], stored("official", null)),
 };
 
+// ── 임대 ─────────────────────────────────────────────────────────────
+// 판정이 읽은 형태·임대 상태 — 진행 중 임대(loan_standing)는 문맥 보도라 단계가 없다(judge.mjs가 버린다)
+const L = (form, extra = {}) => MOVE({ verdict_form: form, verdict_stage: form === "loan_standing" ? null : (extra.verdict_stage ?? "agreement"), ...extra });
+const GARNACHO = () => [
+  row("John Doe joined Aston Villa on loan from Chelsea in the summer with an obligation to buy worth £42.5m.", { stage: "agreement", ...L("loan_standing", { verdict_from: "Chelsea", verdict_to: "Aston Villa", verdict_loan_owner: "Chelsea", verdict_loan_club: "Aston Villa", verdict_loan_clause: "obligation", verdict_fee_amount: 42.5, verdict_fee_currency: "GBP", verdict_fee_kind: "buy_clause" }) }),
+  row("Aston Villa will make John Doe's loan from Chelsea permanent if they avoid relegation — the £42.5m obligation looks easily achievable.", { stage: "agreement", ...L("loan_standing", { verdict_from: "Chelsea", verdict_to: "Aston Villa", verdict_loan_owner: "Chelsea", verdict_loan_club: "Aston Villa", verdict_loan_clause: "obligation", verdict_fee_amount: 42.5, verdict_fee_currency: "GBP", verdict_fee_kind: "buy_clause" }) }),
+];
+const LOAN = {
+  // 가르나초형 — 이미 있는 딜에 진행 중 임대의 설명만 남았다: 임대 오피셜 · 의무 조항 금액 · 결과 시각 없음 · 알림 대상 아님
+  standing: withStored(GARNACHO(), stored("agreement")),
+  // 문맥 보도만으로는 새 딜을 열지 않는다
+  standingNew: judged(GARNACHO()),
+  // 임대 중인 선수의 제3구단 이적설 — 옛 판정이 출발을 임대 구단으로 적었어도 보유 구단으로 바로잡는다
+  thirdClub: judged([row("Bologna are monitoring John Doe, who is owned by Juventus but on loan at Bournemouth.", { stage: "rumour", ...L("permanent", { verdict_stage: "rumour", verdict_from: "Bournemouth", verdict_suitors: ["Bologna"], verdict_loan_owner: "Juventus", verdict_loan_club: "Bournemouth" }) })]),
+  // 5대 리그 밖으로 가는 임대(유망주의 하부 리그 임대)는 싣지 않는다
+  youth: judged([row("Celtic agree loan deal for John Doe from Chelsea.", { stage: "agreement", ...L("loan", { verdict_from: "Chelsea", verdict_to: "Celtic" }) })]),
+  // 임대설에 곁들인 평가액은 대표 금액이 아니다(임대가 그 금액의 이적처럼 읽힌다)
+  valuation: judged([row("AC Milan want John Doe on loan from Real Madrid, who value him at €40m.", { stage: "rumour", ...L("loan", { verdict_stage: "rumour", verdict_from: "Real Madrid", verdict_to: "AC Milan", verdict_fee_amount: 40, verdict_fee_currency: "EUR", verdict_fee_kind: "valuation" }) })]),
+  // 임대료와 조항 금액 — 대표는 조항 금액, 임대료는 따로 / 조항은 최신 판정
+  fees: judged([
+    row("Napoli agree £5m loan fee with Chelsea for John Doe.", { stage: "agreement", ...L("loan", { verdict_from: "Chelsea", verdict_to: "Napoli", verdict_fee_amount: 5, verdict_fee_currency: "GBP", verdict_fee_kind: "loan_fee" }) }),
+    row("Napoli's loan for John Doe from Chelsea includes a £40m option to buy.", { stage: "agreement", ...L("loan", { verdict_from: "Chelsea", verdict_to: "Napoli", verdict_loan_clause: "option", verdict_fee_amount: 40, verdict_fee_currency: "GBP", verdict_fee_kind: "buy_clause" }) }),
+  ]),
+  // 임대 구단으로의 완전 영입 전환 — 출발은 보유 구단, 행선지는 임대 구단(현 소속 폴백이 행선지와 같아 비던 자리)
+  convert: judged([row("Atletico Madrid are trying to convince Juventus to sell John Doe, currently on loan in Madrid, for £21m.", { stage: "talks", ...L("loan_convert", { verdict_stage: "talks", verdict_to: "Atletico Madrid", verdict_loan_owner: "Juventus", verdict_loan_club: "Atletico Madrid", verdict_fee_amount: 21, verdict_fee_currency: "GBP", verdict_fee_kind: "valuation" }) })]),
+  // 임대 연장 — "extension"이 재계약 가드에 걸리지 않는다
+  extend: judged([row("Chelsea and Napoli agree loan extension for John Doe.", { stage: "agreement", ...L("loan_extend", { verdict_from: "Chelsea", verdict_to: "Napoli", verdict_loan_owner: "Chelsea", verdict_loan_club: "Napoli" }) })]),
+  // 사건 보도와 문맥 보도가 섞이면 단계는 사건 보도로 — 문맥 보도의 규칙 단계("agreement")가 루머 딜을 올리지 않는다
+  mixed: withStored([
+    ...GARNACHO(),
+    row("Napoli are keen on John Doe, who is owned by Chelsea and on loan at Aston Villa.", { stage: "rumour", ...L("permanent", { verdict_stage: "rumour", verdict_from: "Chelsea", verdict_suitors: ["Napoli"], verdict_loan_owner: "Chelsea", verdict_loan_club: "Aston Villa" }) }),
+  ], stored("rumour")),
+  // 판정을 기다리는 사건 보도가 남은 기존 딜 — 그 판정이 올 때까지 저장된 단계·형태를 그대로 둔다(오피셜을 지어내지 않는다)
+  pendingEvent: withStored([...GARNACHO(), row("Napoli are keen on John Doe, who is owned by Chelsea.", { stage: "rumour" })], stored("rumour")),
+  // 같은 동결 — 판정 전 보도의 규칙 단계("합의 완료")가 딜을 올리지 않고, 저장된 임대 형태·조항·결과 시각을 지우지 않는다(깜빡임)
+  pendingRaise: withStored([...GARNACHO(), row("Napoli have reached an agreement for John Doe, here we go.", { stage: "here_we_go" })], new Map([[JOHN, { stage: "official", settled_at: null, form: "loan", loan_clause: "obligation" }]])),
+  // 반복 실패로 포기한 판정 전 보도는 기다리지 않는다 — 문맥 보도뿐인 딜이다
+  pendingGivenUp: withStored([...GARNACHO(), row("Napoli are keen on John Doe, who is owned by Chelsea.", { stage: "here_we_go", verdict_attempts: 6 })], stored("rumour")),
+  // 완전 이적 루머 여러 건 뒤의 임대 오피셜 — 지금의 사건은 시간 순서로 정한다(건수 투표면 최신 오피셜이 버려진다)
+  rumoursThenLoan: judged([
+    ...[1, 2, 3].map((i) => row(`Report ${i}: Napoli want John Doe from Chelsea.`, { stage: "rumour", ...L("permanent", { verdict_stage: "rumour", verdict_from: "Chelsea", verdict_to: "Napoli" }) })),
+    row("Napoli are in talks for John Doe.", { stage: "talks", ...L("permanent", { verdict_stage: "talks", verdict_from: "Chelsea", verdict_to: "Napoli" }) }),
+    row("Napoli sign John Doe on loan from Chelsea.", { stage: "official", ...L("loan", { verdict_stage: "official", verdict_from: "Chelsea", verdict_to: "Napoli" }) }),
+  ]),
+  // 판정이 한 번 흔들린 최신 보도(완전 이적 합의 4건 뒤 "임대 루머" 1건)는 전환이 아니다
+  wobble: judged([
+    ...[1, 2, 3, 4].map((i) => row(`Outlet ${i}: Napoli agree deal for John Doe from Chelsea.`, { stage: "agreement", ...L("permanent", { verdict_from: "Chelsea", verdict_to: "Napoli" }) })),
+    row("Napoli could also take John Doe on loan.", { stage: "rumour", ...L("loan", { verdict_stage: "rumour", verdict_from: "Chelsea", verdict_to: "Napoli" }) }),
+  ]),
+  // 조기 복귀 오피셜을 여러 매체가 보도한 뒤의 완전 이적 합의 — 앞 사건이 결과가 났으니 새 사건이다
+  recallsThenSale: judged([
+    ...[1, 2, 3].map((i) => row(`Outlet ${i}: Chelsea recall John Doe from his loan at Aston Villa.`, { stage: "official", ...L("loan_recall", { verdict_stage: "official", verdict_from: "Aston Villa", verdict_to: "Chelsea", verdict_loan_owner: "Chelsea", verdict_loan_club: "Aston Villa" }) })),
+    row("Napoli agree deal to sign John Doe from Chelsea.", { stage: "agreement", ...L("permanent", { verdict_from: "Chelsea", verdict_to: "Napoli" }) }),
+  ]),
+  // 협상 뒤 다른 형태로 읽힌 결렬 한 건 — 죽은 단계를 버리지 않는다
+  talksThenCollapse: judged([
+    ...[1, 2, 3].map((i) => row(`Outlet ${i}: Napoli in talks for John Doe from Chelsea.`, { stage: "talks", ...L("permanent", { verdict_stage: "talks", verdict_from: "Chelsea", verdict_to: "Napoli" }) })),
+    row("John Doe's loan move to Napoli has collapsed.", { stage: "collapsed", ...L("loan", { verdict_stage: "collapsed", verdict_from: "Chelsea", verdict_to: "Napoli" }) }),
+  ]),
+  // 같은 창의 두 사건 — 조기 복귀 오피셜 뒤 완전 이적 합의: 단계·방향은 딜의 형태(완전 이적)의 보도로, 복귀한 선수에게 옛 임대 구단을 남기지 않는다
+  recallThenSale: judged([
+    row("Chelsea recall John Doe from his loan at Aston Villa.", { stage: "official", ...L("loan_recall", { verdict_stage: "official", verdict_from: "Aston Villa", verdict_to: "Chelsea", verdict_loan_owner: "Chelsea", verdict_loan_club: "Aston Villa" }) }),
+    row("Napoli agree deal to sign John Doe from Chelsea.", { stage: "agreement", ...L("permanent", { verdict_from: "Chelsea", verdict_to: "Napoli" }) }),
+  ]),
+  // 대표 금액이 임대료뿐이면 임대료를 따로 두지 않는다(같은 금액이 계약 조건에 두 줄로 그려진다)
+  loanFeeOnly: judged([row("Napoli agree £5m loan fee with Chelsea for John Doe, with an option to buy.", { stage: "agreement", ...L("loan", { verdict_from: "Chelsea", verdict_to: "Napoli", verdict_loan_clause: "option", verdict_fee_amount: 5, verdict_fee_currency: "GBP", verdict_fee_kind: "loan_fee" }) })]),
+  // 형태를 묻기 전의 옛 판정 — 형태는 모른다(null)
+  legacy: judged([row("Chelsea agree deal for John Doe from Benfica.", { stage: "agreement", ...MOVE({ verdict_stage: "agreement", verdict_from: "Benfica", verdict_to: "Chelsea" }) })]),
+};
+const loanPick = (d) => d && pick(d, ["stage", "form", "from_club_code", "to_club_code", "loan_club_code", "loan_clause", "fee_amount", "fee_kind", "loan_fee_text", "settled_at", "report_count", "contextOnly"]);
+
 const UNIT = [
+  {
+    name: "임대 — 진행 중 임대의 설명만 남은 기존 딜은 임대 오피셜 · 의무 조항 금액 · 결과 시각 없음 · 알림 대상 아님(가르나초)",
+    got: loanPick(LOAN.standing.deals[0]),
+    want: { stage: "official", form: "loan", from_club_code: "chelsea", to_club_code: "aston-villa", loan_club_code: "aston-villa", loan_clause: "obligation", fee_amount: 42.5, fee_kind: "buy_clause", loan_fee_text: null, settled_at: null, report_count: 2, contextOnly: true },
+  },
+  {
+    name: "임대 — 판정을 기다리는 사건 보도가 남은 딜은 저장된 단계를 지킨다(오피셜을 지어내지 않는다 · 임대 구단은 문맥 보도로)",
+    got: pick(LOAN.pendingEvent.deals[0] ?? {}, ["stage", "form", "from_club_code", "loan_club_code", "settled_at"]),
+    want: { stage: "rumour", form: null, from_club_code: "chelsea", loan_club_code: "aston-villa", settled_at: null },
+  },
+  {
+    name: "임대 — 판정 전 보도의 규칙 단계는 딜을 올리지 않고 저장된 형태·조항을 지우지 않는다(양방향 동결)",
+    got: pick(LOAN.pendingRaise.deals[0] ?? {}, ["stage", "form", "loan_clause", "settled_at"]),
+    want: { stage: "official", form: "loan", loan_clause: "obligation", settled_at: null },
+  },
+  { name: "임대 — 반복 실패로 포기한 판정 전 보도는 기다리지 않는다(문맥 보도뿐 — 임대 오피셜)", got: pick(LOAN.pendingGivenUp.deals[0] ?? {}, ["stage", "form", "contextOnly"]), want: { stage: "official", form: "loan", contextOnly: true } },
+  { name: "사건 전환 — 완전 이적 루머 여러 건 뒤의 임대 오피셜이 지금의 사건이다(시간 순서 — 건수 투표가 아니다)", got: pick(LOAN.rumoursThenLoan.deals[0] ?? {}, ["stage", "form"]), want: { stage: "official", form: "loan" } },
+  { name: "사건 전환 — 판정이 한 번 흔들린 최신 보도는 전환이 아니다(합의 4건 뒤 임대 루머 1건)", got: pick(LOAN.wobble.deals[0] ?? {}, ["stage", "form"]), want: { stage: "agreement", form: "permanent" } },
+  { name: "사건 전환 — 조기 복귀 오피셜 여러 건 뒤의 완전 이적 합의는 새 사건이다", got: pick(LOAN.recallsThenSale.deals[0] ?? {}, ["stage", "form", "from_club_code", "to_club_code", "loan_club_code", "settled_at"]), want: { stage: "agreement", form: "permanent", from_club_code: "chelsea", to_club_code: "napoli", loan_club_code: null, settled_at: null } },
+  {
+    name: "알림 변화 — 결과가 난 딜의 형태가 바뀌면 같은 단계여도 변화다(저장된 형태가 없던 첫 실행 · 결과 전 단계 · 같은 형태는 아니다)",
+    got: [
+      isSettledFormChange({ stage: "official", form: "loan" }, { stage: "official", form: "loan_convert" }),
+      isSettledFormChange({ stage: "official", form: null }, { stage: "official", form: "loan" }),
+      isSettledFormChange({ stage: "agreement", form: "permanent" }, { stage: "agreement", form: "loan" }),
+      isSettledFormChange({ stage: "official", form: "loan" }, { stage: "official", form: "loan" }),
+      isSettledFormChange(null, { stage: "official", form: "loan" }),
+    ],
+    want: [true, false, false, false, false],
+  },
+  { name: "사건 전환 — 다른 형태로 읽힌 결렬 한 건도 죽은 단계로 반영한다", got: LOAN.talksThenCollapse.deals[0]?.stage, want: "collapsed" },
+  {
+    name: "임대 — 조기 복귀 오피셜 뒤의 완전 이적 합의는 합의 단계이고 옛 임대 구단을 남기지 않는다",
+    got: pick(LOAN.recallThenSale.deals[0] ?? {}, ["stage", "form", "from_club_code", "to_club_code", "loan_club_code", "settled_at"]),
+    want: { stage: "agreement", form: "permanent", from_club_code: "chelsea", to_club_code: "napoli", loan_club_code: null, settled_at: null },
+  },
+  { name: "임대 — 대표 금액이 임대료면 임대료를 따로 적지 않는다", got: pick(LOAN.loanFeeOnly.deals[0] ?? {}, ["fee_amount", "fee_kind", "loan_fee_text"]), want: { fee_amount: 5, fee_kind: "loan_fee", loan_fee_text: null } },
+  { name: "임대 — 진행 중 임대의 설명만으로는 새 딜을 열지 않는다", got: [LOAN.standingNew.deals.length, LOAN.standingNew.skipped["진행 중 임대 문맥만"]], want: [0, 1] },
+  {
+    name: "임대 — 임대 중인 선수의 제3구단 이적설은 출발이 보유 구단이고 임대 구단을 따로 둔다(디 그레고리오)",
+    got: pick(LOAN.thirdClub.deals[0] ?? {}, ["form", "from_club_code", "to_club_code", "loan_club_code", "suitorCodes"]),
+    want: { form: "permanent", from_club_code: "juventus", to_club_code: null, loan_club_code: "bournemouth", suitorCodes: ["bologna"] },
+  },
+  { name: "임대 — 5대 리그 밖으로 가는 임대는 싣지 않는다(유망주 하부 리그 임대)", got: [LOAN.youth.deals.length, LOAN.youth.skipped["5대 리그 밖으로 가는 임대"]], want: [0, 1] },
+  { name: "임대 — 임대설에 곁들인 평가액은 대표 금액이 아니다", got: pick(LOAN.valuation.deals[0] ?? {}, ["form", "fee_amount", "fee_kind"]), want: { form: "loan", fee_amount: null, fee_kind: null } },
+  { name: "임대 — 대표 금액은 조항 금액이고 임대료는 따로 적는다, 조항은 최신 판정", got: pick(LOAN.fees.deals[0] ?? {}, ["form", "fee_amount", "fee_kind", "loan_fee_text", "loan_clause"]), want: { form: "loan", fee_amount: 40, fee_kind: "buy_clause", loan_fee_text: "£5m", loan_clause: "option" } },
+  {
+    name: "임대 — 완전 영입 전환은 출발이 보유 구단, 행선지가 임대 구단이다(현 소속 폴백이 행선지와 같아 비던 자리)",
+    got: pick(LOAN.convert.deals[0] ?? {}, ["form", "stage", "from_club_code", "to_club_code", "fee_kind"]),
+    want: { form: "loan_convert", stage: "talks", from_club_code: "juventus", to_club_code: "atletico-madrid", fee_kind: "valuation" },
+  },
+  { name: "임대 — 임대 연장은 재계약 가드에 걸리지 않는다", got: pick(LOAN.extend.deals[0] ?? {}, ["form", "stage", "from_club_code", "to_club_code"]), want: { form: "loan_extend", stage: "agreement", from_club_code: "chelsea", to_club_code: "napoli" } },
+  {
+    name: "임대 — 사건 보도가 있으면 단계·형태는 사건 보도로 정하고 문맥 보도는 보도 수에만 든다",
+    got: pick(LOAN.mixed.deals[0] ?? {}, ["stage", "form", "from_club_code", "loan_club_code", "report_count", "contextOnly"]),
+    want: { stage: "rumour", form: "permanent", from_club_code: "chelsea", loan_club_code: "aston-villa", report_count: 3, contextOnly: false },
+  },
+  { name: "임대 — 형태를 묻기 전의 옛 판정만 있으면 형태를 모른다(null)", got: LOAN.legacy.deals[0]?.form, want: null },
+  {
+    name: "임대 — 임대 계열 딜은 자유계약이 아니다(문장에 free agent가 섞여도)",
+    got: judged([row("Inter and Bologna agree loan extension for John Doe, who had been linked as a free agent option earlier.", { stage: "agreement", ...L("loan_extend", { verdict_from: "Inter", verdict_to: "Bologna" }) })]).deals[0]?.is_free_agent,
+    want: false,
+  },
+  {
+    name: "임대 — 판정이 임대 상태를 못 읽어도 위키데이터 캐시가 임대를 알면 출발을 보유 구단으로, 임대 구단을 함께 둔다",
+    got: (() => {
+      const cache = [
+        { kind: "player_club", key: "john doe", name_en: "Aston Villa", name_ko: null, wikidata_id: "Q18711", checked_at: "2026-09-24T00:00:00Z" },
+        { kind: "player_owner_club", key: "john doe", name_en: "Chelsea", name_ko: null, wikidata_id: "Q9616", checked_at: "2026-09-24T00:00:00Z" },
+      ];
+      const opts = { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: DICT, cache }), requireVerified: true, requireVerdict: true, existingKeys: new Set() };
+      // 옛 판정 — 출발을 임대 구단으로 적었다 / 출발이 없고 행선지가 임대 구단(전환설)
+      const third = deriveDeals([row("Napoli want John Doe of Aston Villa.", { stage: "rumour", ...MOVE({ verdict_stage: "rumour", verdict_from: "Aston Villa", verdict_suitors: ["Napoli"] }) })], opts).deals[0];
+      const convert = deriveDeals([row("Aston Villa want to sign John Doe permanently.", { stage: "talks", ...MOVE({ verdict_stage: "talks", verdict_to: "Aston Villa" }) })], opts).deals[0];
+      return [third?.from_club_code, third?.loan_club_code, convert?.from_club_code, convert?.to_club_code];
+    })(),
+    want: ["chelsea", "aston-villa", "chelsea", "aston-villa"],
+  },
+  {
+    name: "임대 — --loan-only는 지시문이 바뀐 판정 중 임대를 말하는 보도(본문·요약)만 다시 묻는다",
+    got: [
+      judgeMode({ body: "Chelsea agree deal for John Doe.", summary_ko: "요약", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_raw: "{}", verdict_prompt: "old" }, "john doe", NOW, { stalePrompt: "new", loanOnly: true }),
+      judgeMode({ body: "John Doe is on loan at Napoli.", summary_ko: "요약", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_raw: "{}", verdict_prompt: "old" }, "john doe", NOW, { stalePrompt: "new", loanOnly: true }),
+      judgeMode({ body: "Napoli want John Doe.", summary_ko: "첼시 소속으로 나폴리에 임대 중인 존 도", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_raw: "{}", verdict_prompt: "old" }, "john doe", NOW, { stalePrompt: "new", loanOnly: true }),
+      judgeMode({ body: "Chelsea agree deal for John Doe.", summary_ko: "요약", verdict: "move", verdict_player: "john doe", verdict_at: "2026-09-24T00:00:00Z", verdict_raw: "{}", verdict_prompt: "old" }, "john doe", NOW, { stalePrompt: "new" }),
+    ],
+    want: [null, "full", "full", "full"],
+  },
   { name: "우선순위 — priority가 작은 것부터(층 순서)", got: ORDER.tiers, want: [4, 3, 2, 1] },
   { name: "우선순위 — 상한 안에서 탐색용은 exploreMax건까지만 앞에 두고 나머지는 뒤로 민다", got: ORDER.capped, want: [5, 4, 1, 2, 3] },
   { name: "우선순위 — 같은 priority면 행 id 순(결정적)", got: ORDER.ties, want: [3, 9] },
@@ -844,7 +1014,7 @@ const UNIT = [
     want: [904, 903, 902, 901, 905],
   },
   { name: "원출력 표지 — 값을 읽지 않은 행은 표지로, 판정·재생이 값을 입힌 행은 그 값으로 판정한다", got: [hasRawVerdict({ has_raw: true }), hasRawVerdict({ has_raw: false }), hasRawVerdict({ has_raw: true, verdict_raw: null }), hasRawVerdict({ has_raw: false, verdict_raw: "{}" }), hasRawVerdict({})], want: [true, false, false, true, false] },
-  { name: "우선순위 — 물을 대상에 게시 시각·방식·옛 판정을 싣는다", got: [PRIO.judgeNeeds[0].published_at === PRIO_ROWS()[3].published_at, PRIO.judgeNeeds[0].mode, Object.keys(PRIO.judgeNeeds[0].prev).length, PRIO.judgeNeeds[0].prev.verdict_attempts], want: [true, "full", 13, 0] },
+  { name: "우선순위 — 물을 대상에 게시 시각·방식·옛 판정을 싣는다", got: [PRIO.judgeNeeds[0].published_at === PRIO_ROWS()[3].published_at, PRIO.judgeNeeds[0].mode, Object.keys(PRIO.judgeNeeds[0].prev).length, PRIO.judgeNeeds[0].prev.verdict_attempts], want: [true, "full", 17, 0] },
   { name: "우선순위 — 이월된 행은 같은 층의 새 보도보다 먼저, 다른 층은 넘지 않는다", got: CARRIED.judgeNeeds.map((x) => x.id), want: [904, 903, 901, 902, 905] },
   { name: "우선순위 — 이월된 행은 실패 수와 무관하게 다음 실행이 곧바로 묻는다(재시도 간격은 판정 시각이 있는 행에만)", got: judgeMode({ verdict: null, verdict_player: "john doe", verdict_at: null, verdict_attempts: 2 }, "john doe", NOW), want: "full" },
   { name: "금액 시점 — \"in the January transfer window\"의 제안은 앞으로의 일이다", got: PAST.futureWindow.deals[0]?.fee_amount, want: 60 },
@@ -958,6 +1128,8 @@ const UNIT = [
   { name: "관심 구단 — 저장된 판정의 별칭(\"Hull\")을 지금의 사전으로 맞춰 헐 시티가 한 코드로만 실린다", got: [VERDICT.suitorsAlias.deals[0]?.suitorCodes, VERDICT.suitorsAlias.clubs.map((c) => c.code).sort()], want: [["arsenal", "hull-city"], ["arsenal", "hull-city", "sturm-graz"]] },
   { name: "관심 구단 — 행선지 없이 관심 구단만 있는 루머(비5대 리그 소속, 5대 리그 구단들이 관심)도 딜이고 이름 조회 대상에 관심 구단이 든다", got: [VERDICT.suitorsOnly.deals[0]?.to_club_code ?? null, VERDICT.suitorsOnly.deals[0]?.suitorCodes, VERDICT.suitorsOnly.nameNeeds[0]?.suitorCanonicals], want: [null, ["arsenal", "brighton-hove"], ["Arsenal", "Brighton"]] },
   { name: "폴백 — 보도에 소속이 없으면 현 소속 캐시가 출발 구단이다(행선지는 그대로)", got: [FALLBACK.used.deals[0]?.from_club_code, FALLBACK.used.deals[0]?.to_club_code, FALLBACK.used.fromFallback, FALLBACK.used.clubNeeds.length], want: ["bayern-munchen", "chelsea", 1, 0] },
+  { name: "폴백 — 보유 구단 행이 생기기 전에 찾은 현 소속은 쓰되 다시 조회한다", got: [FALLBACK.noOwnerRow.deals[0]?.from_club_code, FALLBACK.noOwnerRow.clubNeeds.map((n) => n.playerKey)], want: ["bayern-munchen", ["john doe"]] },
+  { name: "폴백 — 캐시의 보유 구단으로 정한 출발도 재확인 주기가 지나면 다시 조회한다(임대가 끝났을 수 있다)", got: [FALLBACK.staleOwner.deals[0]?.from_club_code, FALLBACK.staleOwner.deals[0]?.loan_club_code, FALLBACK.staleOwner.clubNeeds.map((n) => n.playerKey)], want: ["man-united", "aston-villa", ["john doe"]] },
   { name: "폴백 — 현 소속이 행선지와 같으면(이미 옮긴 뒤의 기록) 쓰지 않는다", got: [FALLBACK.sameAsTo.deals[0]?.from_club_code ?? null, FALLBACK.sameAsTo.deals[0]?.to_club_code, FALLBACK.sameAsTo.fromFallback], want: [null, "chelsea", 0] },
   { name: "폴백 — 자유계약이면 소속이 없으니 쓰지 않는다", got: [FALLBACK.free.deals[0]?.from_club_code ?? null, FALLBACK.free.fromFallback, FALLBACK.free.clubNeeds.length], want: [null, 0, 0] },
   { name: "폴백 — 캐시가 없거나 못 찾은 채 오래됐으면 조회 대상이고, 최근에 못 찾았으면 다시 묻지 않는다", got: [FALLBACK.notFound.clubNeeds.length, FALLBACK.stale.clubNeeds.map((n) => n.playerKey)], want: [0, ["john doe"]] },

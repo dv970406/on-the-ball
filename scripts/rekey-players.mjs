@@ -13,7 +13,7 @@
  * 옮기는 것(순서가 규약이다 — 실패하면 거기서 멈추고 된 것까지 보고한다):
  *   1. `transfer_deal.deal_key` — `dealKey(옛 키)` → `dealKey(새 키)`. 새 키 딜이 이미 있으면 옮기지 않고 "병합 필요"로 보고만.
  *   2. `transfer_news.verdict_player` — 그 행의 선수 이름(`players`·`verdict_player_name`)으로 확인된 옛 키 → 새 키.
- *   3. `transfer_name_ko`의 선수 키(`player`·`player_club`) — 옛 키 → 새 키. 새 키 행이 이미 있으면 손대지 않고 보고만.
+ *   3. `transfer_name_ko`의 선수 키(`player`·`player_club`·`player_owner_club`) — 옛 키 → 새 키. 새 키 행이 이미 있으면 손대지 않고 보고만.
  *   4. `players-ko.json`(사람 사전)은 파일이라 손대지 않는다 — 옛 키가 남아 있으면 경고.
  *
  * ⚠ **멱등**이다 — 옮긴 뒤에는 옛 키 행이 없어 다음 실행의 계획이 비어 있다.
@@ -28,6 +28,8 @@ import { loadPlayerDictionary } from "./lib/transfer/names-ko.mjs";
 import { normalizePlayer } from "./lib/transfer/player-key.mjs";
 
 /** 새 규칙이 옮기는 글자 — `player-key.mjs`의 `LATIN_FOLD`와 같은 집합 */
+/** 키가 선수 키인 이름 캐시 종류 — 선수 표기 · 현 소속 · 임대 중인 선수의 보유 구단 */
+export const PLAYER_KEY_KINDS = ["player", "player_club", "player_owner_club"];
 export const FOLD_CHARS = /[øØæÆœŒßłŁđĐðÐþÞı]/u;
 
 /** 옛 정규형 — 바뀌기 전의 `normalizePlayer` 그대로(이 스크립트 전용 사본. 새 코드에서 쓰지 않는다) */
@@ -128,7 +130,7 @@ export function planRekey({ deals = [], news = [], nameRows = [], dictKeys = [] 
   const nameConflicts = [];
   const existingNameKeys = new Set(nameRows.map((r) => `${r.kind}\u0000${r.key}`));
   for (const r of nameRows) {
-    if (r.kind !== "player" && r.kind !== "player_club") continue;
+    if (!PLAYER_KEY_KINDS.includes(r.kind)) continue;
     const t = targets.get(r.key);
     if (!t) continue;
     if (existingNameKeys.has(`${r.kind}\u0000${t.newKey}`)) nameConflicts.push({ kind: r.kind, from: t.oldKey, to: t.newKey });
@@ -229,7 +231,7 @@ async function main(argv) {
   const [deals, news, nameRows] = await Promise.all([
     readRange(() => supabase.from("transfer_deal").select("id, deal_key, player").order("id"), "딜"),
     readRange(() => supabase.from("transfer_news").select("id, players, verdict_player_name, verdict_player").order("id"), "보도"),
-    readRange(() => supabase.from("transfer_name_ko").select("kind, key, name_en").in("kind", ["player", "player_club"]).order("kind").order("key"), "이름 캐시"),
+    readRange(() => supabase.from("transfer_name_ko").select("kind, key, name_en").in("kind", PLAYER_KEY_KINDS).order("kind").order("key"), "이름 캐시"),
   ]);
   const dictKeys = Object.keys(loadPlayerDictionary());
 

@@ -2,6 +2,7 @@
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
 import { Icon } from "@/shared/ui";
+import { dealFormLabel, loanNote } from "../lib/deal-form";
 import { destinationClubs, routeLabels } from "../lib/route-label";
 import type { TransferClub, TransferDeal } from "../model/types";
 import { TransferCrest } from "./transfer-crest";
@@ -12,6 +13,7 @@ function RouteCell({
   club,
   text,
   clubs,
+  note,
   className,
 }: {
   label: string;
@@ -20,6 +22,8 @@ function RouteCell({
   text: string;
   /** 행선지 칸의 구단들 — 둘 이상이면 한 줄에 하나씩 전부 적는다(여러 구단이 노리는 루머) */
   clubs?: TransferClub[];
+  /** 칸 아래 한 줄 — 보유 구단(FROM) 칸의 "○○ 임대 중"(`loanNote`). 세 번째 칸을 만들지 않는다 */
+  note?: string | null;
   className?: string;
 }) {
   const listed = clubs && clubs.length > 1 ? clubs : null;
@@ -57,28 +61,39 @@ function RouteCell({
           {club?.league && <div className="mt-1 text-[11px] text-ink-mute">{club.league}</div>}
         </>
       )}
+      {note && <div className="mt-1 break-keep text-[11px] text-ink-mute">{note}</div>}
     </div>
   );
 }
 
 interface DealRouteCardProps {
-  deal: Pick<TransferDeal, "fromClub" | "toClub" | "isFreeAgent" | "suitors" | "stage">;
+  deal: Pick<TransferDeal, "fromClub" | "toClub" | "isFreeAgent" | "suitors" | "stage" | "form" | "loanClause" | "loanClub">;
   className?: string;
 }
 
 /**
  * 경로 카드 — 3열 `1fr 32px 1fr`, To 칸만 canvas-soft, 가운데 칸 좌우 헤어라인.
  * 딜 상세(좁은 화면)와 보드의 오른쪽 판(`widgets/deal-panel`)이 같은 카드를 그린다.
+ * - 임대 계열이면 카드 머리에 **형태 띠**를 둔다("형태 · 완전 이적 의무부 임대") — 경로만 보면 완전 이적으로 읽힌다. 완전 이적·모름은
+ *   띠를 그리지 않는다(보드 대부분이 완전 이적이라 모든 카드에 띠를 두면 소음이다).
+ * - FROM은 늘 **보유 구단**이고, 선수가 다른 구단에 임대 중이면 그 칸 아래 "○○ 임대 중"을 적는다(`loanNote` — 정식명).
  */
 export function DealRouteCard({ deal, className }: DealRouteCardProps) {
   const labels = routeLabels(deal, { full: true });
   const destinations = destinationClubs(deal);
+  const form = deal.form !== null && deal.form !== "permanent" ? dealFormLabel(deal) : null;
   return (
     <section
       aria-label="이적 경로"
       className={cn("grid grid-cols-[1fr_32px_1fr] overflow-hidden rounded-lg border border-hairline", className)}
     >
-      <RouteCell label="FROM" club={deal.fromClub} text={labels.from} />
+      {form && (
+        <div className="col-span-3 flex items-baseline gap-2 border-b border-hairline px-[14px] py-2">
+          <span className="label-mono">형태</span>
+          <span className="text-[13px] font-medium text-ink">{form}</span>
+        </div>
+      )}
+      <RouteCell label="FROM" club={deal.fromClub} text={labels.from} note={loanNote(deal, { full: true })} />
       <div aria-hidden className="flex items-center justify-center border-x border-hairline text-ink">
         <Icon as={ArrowRight} size={16} />
       </div>

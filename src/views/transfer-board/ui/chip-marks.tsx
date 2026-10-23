@@ -1,5 +1,5 @@
 import { Heart, X } from "lucide-react";
-import type { TransferLeague, TransferSort } from "@/entities/transfer";
+import type { TransferLeague, TransferSort, TransferTypeFilter } from "@/entities/transfer";
 import { cn } from "@/shared/lib";
 import { chipClassName, Icon } from "@/shared/ui";
 import { boardHref } from "../lib/board-href";
@@ -41,18 +41,19 @@ interface ClubChipProps {
   league: TransferLeague | null;
   sort: TransferSort;
   watch: boolean;
+  type: TransferTypeFilter | null;
   /** 칩 크기 — 줄마다 다르다(칩 줄은 기본 칩, 레일은 작은 칩) */
   className?: string;
   /** 구단 이름 뒤에 딜 수를 붙인다(레일) */
   showCount?: boolean;
 }
 
-/** 구단 필터 칩 하나 — 누르면 그 구단으로 거르고, 켜진 칩을 다시 누르면 푼다. 다른 필터(리그·정렬·관심)는 그대로 싣는다 */
-export function ClubChip({ option, club, league, sort, watch, className, showCount = false }: ClubChipProps) {
+/** 구단 필터 칩 하나 — 누르면 그 구단으로 거르고, 켜진 칩을 다시 누르면 푼다. 다른 필터(리그·정렬·관심·형태)는 그대로 싣는다 */
+export function ClubChip({ option, club, league, sort, watch, type, className, showCount = false }: ClubChipProps) {
   const on = club === option.code;
   return (
     <BoardLink
-      href={boardHref(league, sort, on ? null : option.code, watch)}
+      href={boardHref({ league, sort, club: on ? null : option.code, watch, type })}
       aria-current={on ? "page" : undefined}
       className={chipClassName(on, cn("inline-flex items-center gap-1 whitespace-nowrap", className))}
     >

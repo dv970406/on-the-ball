@@ -8,6 +8,9 @@
  *   from / to / suitors  출발·행선지·그 밖의 관심 구단. 모델은 **원문에 적힌 구단명을 그대로** 옮기고, 코드가 원문 대조 →
  *                 구단 사전 정규화 → 사전 밖 이름은 **위키데이터로 축구 클럽인지 확인**한다(`resolveClubs`). 원문에 없는 구단은 받지 않는다.
  *   timing        그 이동 소식이 지금의 것(current)인가 지난 일의 회고(past)인가 — past면 코드가 "이동 아님"으로 접는다.
+ *   on_loan       보도 시점에 선수가 임대 중이면 보유 구단(owner)과 지금 임대로 뛰는 구단(at). 구단과 같은 대조·확인을 지난다.
+ *   form          사건의 형태(완전 이적·임대·완전 영입 전환·진행 중 임대·조기 복귀·임대 연장)와 loan_clause(옵션·의무).
+ *                 원문에 임대 낱말이 없으면 코드가 완전 이적으로 접는다(`judgeLoan`). 진행 중 임대(loan_standing)는 단계가 없다.
  *   fee           그 선수의 금액 하나와 그 성격(이적료·제안액·요구액·바이아웃·평가액). 코드가 **원문에 그 금액이 있는지** 대조한다.
  *   summary_ko    한국어 1~2문장 요약(이동일 때만). 원문 전문을 번역하지 않는다 — DB CHECK 160자.
  *
@@ -36,7 +39,7 @@ import { lookupKo } from "./wikidata.mjs";
 import { clampCp } from "../sync-db.mjs";
 import { normalizePlayer } from "./player-key.mjs";
 import { DAY_MS, escapeRe, HOUR_MS, sha1Hex } from "./util.mjs";
-import { ARTICLE_MAX_CHARS, FEE_CURRENCIES, FEE_KINDS, JUDGE_CONFIG, JUDGE_STAGES, SUITORS_MAX, buildJudgeRequest, buildSystem, ellipsize, judgeFingerprint, prepareJudgeInput } from "./judge-prompt.mjs";
+import { ARTICLE_MAX_CHARS, FEE_CURRENCIES, FEE_KINDS, JUDGE_CONFIG, JUDGE_STAGES, LOAN_CLAUSES, LOAN_FORMS, MOVE_FORMS, SUITORS_MAX, buildJudgeRequest, buildSystem, ellipsize, judgeFingerprint, prepareJudgeInput } from "./judge-prompt.mjs";
 
 // 요청 쪽(지시문·출력 형식·사용자 메시지)은 judge-prompt.mjs에 있다 — 기존 소비자가 이 파일에서 가져가던 이름을 그대로 내보낸다
 export * from "./judge-prompt.mjs";
@@ -352,6 +355,37 @@ export function judgeFee(fee, sentText) {
 }
 
 /**
+ * 원문이 임대를 말하는 낱말 — 판정자가 적은 임대 형태·임대 상태·임대 금액은 이것이 원문에 있어야 받는다. 모델이 이적설을 "임대"로
+ * 지어 적으면 딜에 없는 임대 표지가 붙는다(이름·구단·금액을 원문과 대조하는 것과 같은 원칙).
+ */
+export const LOAN_CUE = /\b(?:loan(?:s|ed|ee|ees)?|on-loan|recall(?:s|ed|ing)?|cut short|spending the season at)\b|임대/iu;
+/** 완전 이적 조항을 말하는 낱말 — 옵션·의무 표지는 이것이 원문에 있어야 받는다 */
+export const CLAUSE_CUE = /\b(?:option\s+to\s+(?:buy|sign|make)|(?:buy|purchase|buy-back|buyback)\s+option|option\s+(?:clause|of|worth|for|fee)|(?:with|an|the|includes?|including)\s+(?:an?\s+|the\s+)?option|obligat(?:ion|ory|ed)|mandatory|compulsory|buy(?:-|\s)?clause|purchase clause|permanent (?:deal|transfer|move|basis)|make (?:the|his|it|that) (?:move|deal|loan) permanent|made permanent|becomes? permanent)\b|옵션|의무/iu;
+/** 임대의 금액 — 임대 형태가 아닌 판정에서 이 성격의 금액은 받지 않는다 */
+const LOAN_FEE_KINDS = new Set(["loan_fee", "buy_clause"]);
+/** 조항(옵션·의무)이 붙을 수 있는 형태 — 조기 복귀에는 조항이 없다 */
+const CLAUSE_FORMS = new Set(["loan", "loan_convert", "loan_standing", "loan_extend"]);
+
+/**
+ * 판정자가 적은 형태·임대 상태·조항 → 받을 값. 판정은 그대로 두고 **필드만** 버린다(금액 대조와 같은 원칙).
+ * - 형태가 없으면 null(형태를 묻기 전의 옛 원출력 — 재생). 임대 형태인데 원문에 임대 낱말이 없으면 완전 이적으로 접는다.
+ * - 임대 상태(owner·at)는 원문에 임대 낱말이 있고 그 구단이 원문에 있을 때만. 둘이 같은 구단이면 at을 버린다.
+ * - 조항은 조항이 붙는 형태이고 원문에 조항 낱말이 있을 때만.
+ * @returns {{ form: string | null, owner: string | null, at: string | null, clause: string | null }}
+ */
+export function judgeLoan(obj, sentText) {
+  const loanText = LOAN_CUE.test(sentText);
+  let form = MOVE_FORMS.includes(obj?.form) ? obj.form : null;
+  if (form && LOAN_FORMS.includes(form) && !loanText) form = "permanent";
+  const status = obj?.on_loan && typeof obj.on_loan === "object" && loanText ? obj.on_loan : null;
+  const owner = status ? clubMentionIn(status.owner, sentText) : null;
+  let at = status ? clubMentionIn(status.at, sentText) : null;
+  if (owner && at && normalizeQuote(owner) === normalizeQuote(at)) at = null;
+  const clause = form && CLAUSE_FORMS.has(form) && LOAN_CLAUSES.includes(obj?.loan_clause) && CLAUSE_CUE.test(sentText) ? obj.loan_clause : null;
+  return { form, owner, at, clause };
+}
+
+/**
  * 한 토큰 이름을 전체 이름으로 푼다 — 판정자가 "Haaland"·"Alaba"만 적은 보도. 원문에 그 성으로 끝나는 전체 이름이 하나뿐이면
  * 그것, 아니면 이름 사전(사람 사전 · 확인된 선수)에서 그 성을 가진 선수가 한 명뿐일 때 그 선수다. 못 풀면 null — 한 토큰 이름
  * 하나로는 누구인지 특정하지 않는다(진짜 한 이름 선수는 사람 사전이 맡는다).
@@ -427,7 +461,8 @@ function evidenceOf(obj, sentText, sentences) {
  *   (있으면 모델의 player를 무시한다) · `names`는 한 토큰 이름을 풀 이름 사전(`fullNameFor`) · `article`은 받은 기사 본문(제목뿐 판정) ·
  *   `sentences`는 번호표(`numbered.sentences` — `[n]`의 평문 문장이 `sentences[n-1]`)
  * @returns {{ kind: "move", rawClubs: string[], player: string, playerKo: string | null, stage: string | null, evidence: string, from: string | null,
- *   to: string | null, suitors: string[], fee: { amount: number, currency: string, kind: string } | null, summary: string | null, summaryIssue: string | null }
+ *   to: string | null, suitors: string[], form: string | null, loanOwner: string | null, loanClub: string | null, loanClause: string | null,
+ *   fee: { amount: number, currency: string, kind: string } | null, summary: string | null, summaryIssue: string | null }
  *   | { kind: "not_move", evidence: string | null, retrospective?: true, unnamed?: true, mention?: string | null, titleOnly?: true, renewal?: true }
  *   | { kind: "invalid", reason: string, quote?: string }}
  */
@@ -471,20 +506,33 @@ export function parseJudgement(raw, sentText, { corrections, player = null, name
   if (from && to && normalizeQuote(from) === normalizeQuote(to)) from = to = null; // 같은 구단이 양쪽에 오면 어느 쪽도 믿지 않는다
   let suitors = [...new Set((Array.isArray(obj.suitors) ? obj.suitors : []).map((s) => clubMentionIn(s, sentText)).filter((s) => s && s !== from && s !== to))].slice(0, SUITORS_MAX);
   ({ to, suitors } = normalizeDestination({ to, suitors }, sentText));
-  // 모델이 행선지도 관심 구단도 비웠지만 짧은 글에 출발 구단 말고 구단이 하나뿐이면 그 구단이 행선지다
-  if (!to && !suitors.length) to = loneOtherClub(sentText, from);
+  const loan = judgeLoan(obj, sentText);
+  // 진행 중인 임대를 말한다면서 원문에 임대 낱말이 없다 — 새 움직임이 없다는 판정이라 이동 아님이다. 완전 이적으로 접으면 단계가 비어
+  // 파생이 그 보도의 규칙 단계("합의 임박" 등)로 딜을 움직인다(가르나초의 진행 중 임대 기사가 그렇게 "합의 임박"이 됐다)
+  if (obj.form === "loan_standing" && loan.form !== "loan_standing") {
+    return { kind: "not_move", evidence: clampCp(evidence, EVIDENCE_MAX_CHARS), standingWithoutLoan: true };
+  }
+  // 모델이 행선지도 관심 구단도 비웠지만 짧은 글에 출발 구단 말고 구단이 하나뿐이면 그 구단이 행선지다 — 판정이 읽은 임대 구단·보유
+  // 구단은 그 "하나"가 아니다("on loan at Bournemouth from Juventus"의 본머스는 사려는 쪽이 아니다). 단 완전 영입 전환·임대 연장은 지금
+  // 임대로 뛰는 구단이 곧 상대라 행선지가 비었으면 그 구단이다
+  if (!to && !suitors.length) to = (loan.form === "loan_convert" || loan.form === "loan_extend") && loan.at ? loan.at : loneOtherClub(sentText, from, [loan.at, loan.owner]);
   // 재계약 가드 — 근거가 **지금 구단과의 계약**(new contract·extension)이고 행선지가 없는데 단계가 진전(협상·합의·완료)이면 그 진전은
   // 재계약의 것이다. 모델이 같은 기사를 어떤 날은 "부인", 어떤 날은 "합의"로 읽어 케인의 재계약이 다시 "합의 임박"이 됐다(운영 재판정).
   // 이적설 부인·루머로 읽은 판정(rumour·denied·collapsed)은 그대로 둔다 — 재계약이 복귀설을 끝낸다는 보도는 부인이 맞다.
-  const stage = JUDGE_STAGES.includes(obj.stage) ? obj.stage : null;
-  if (!to && stage && !DEAD.includes(stage) && stage !== "rumour" && RENEWAL.test(evidence)) {
+  // 진행 중인 임대를 설명할 뿐인 글은 단계가 없다 — 모델이 단계를 적어도 버린다(파생이 그 보도로 딜의 단계를 움직이지 않는다)
+  const stage = loan.form === "loan_standing" ? null : JUDGE_STAGES.includes(obj.stage) ? obj.stage : null;
+  // 임대 연장은 "extension"을 말해도 재계약이 아니다
+  if (!to && stage && !DEAD.includes(stage) && stage !== "rumour" && loan.form !== "loan_extend" && RENEWAL.test(evidence)) {
     return { kind: "not_move", evidence: clampCp(evidence, EVIDENCE_MAX_CHARS), renewal: true };
   }
   const s = judgeSummary(obj.summary_ko, corrections);
+  // 임대 금액(임대료·조항 금액)은 임대 형태의 판정에서만 받는다 — 완전 이적으로 접힌 판정에 남으면 이적료처럼 그려진다
+  let fee = judgeFee(obj.fee, sentText);
+  if (fee && LOAN_FEE_KINDS.has(fee.kind) && !(loan.form && LOAN_FORMS.includes(loan.form))) fee = null;
   return {
     kind: "move",
     // 모델이 적은 그대로의 구단 표기 — 요약에 영문으로 남은 구단명을 한국어로 바꾸는 데 쓴다(`localizeSummary`)
-    rawClubs: [obj.from, obj.to, ...(Array.isArray(obj.suitors) ? obj.suitors : [])].filter((c) => typeof c === "string" && c.trim()),
+    rawClubs: [obj.from, obj.to, ...(Array.isArray(obj.suitors) ? obj.suitors : []), obj.on_loan?.owner, obj.on_loan?.at].filter((c) => typeof c === "string" && c.trim()),
     player: found,
     playerKo: koNameOf(obj.player_ko, corrections),
     stage,
@@ -492,7 +540,11 @@ export function parseJudgement(raw, sentText, { corrections, player = null, name
     from,
     to,
     suitors,
-    fee: judgeFee(obj.fee, sentText),
+    form: loan.form,
+    loanOwner: loan.owner,
+    loanClub: loan.at,
+    loanClause: loan.clause,
+    fee,
     summary: s.text ?? null,
     summaryIssue: s.reason ?? null,
   };
@@ -526,11 +578,13 @@ const LONE_CLUB_MAX_CHARS = 350;
  * 행선지다(감사: 이카르디 → 토트넘, 코네 → 첼시). 전 소속("former X"·"from X")으로 나온 구단, 복수 표지가 있는 글은 받지 않는다.
  * @returns 정규 영문명 또는 null
  */
-export function loneOtherClub(text, from) {
+export function loneOtherClub(text, from, exclude = []) {
   if ([...text].length > LONE_CLUB_MAX_CHARS || text.includes("[기사 본문]")) return null;
   const origin = from ? (detectClubs(from)[0] ?? null) : null;
   if (!origin) return null; // 출발 구단을 모르면 남은 하나가 출발인지 행선지인지 알 수 없다
-  const others = detectClubs(text).filter((c) => c !== origin);
+  // 행선지가 될 수 없는 구단(판정이 읽은 임대 구단·보유 구단)은 "하나뿐"을 셀 때도 뺀다
+  const skip = new Set(exclude.filter(Boolean).map((c) => detectClubs(c)[0] ?? c));
+  const others = detectClubs(text).filter((c) => c !== origin && !skip.has(c));
   if (others.length !== 1) return null;
   // 이름 없는 구단 무리("Championship clubs"·"several sides")가 함께 나오면 관심 구단이 여럿이다(`PLURAL_CUE`) — 하나로 확정하지 않는다
   if (/\b(?:former|ex-)/iu.test(text) || PLURAL_CUE.test(text) || !SUITOR_CUE.test(text)) return null;
@@ -569,7 +623,7 @@ export function normalizeDestination({ to, suitors }, sentText) {
 /**
  * 원문 표기의 구단들 → 정규 영문명. 구단 사전에 있으면 정규명, 없으면 **위키데이터에서 축구 클럽으로 확인된 이름만** 원문 표기
  * 그대로 받는다(캐시 `transfer_name_ko`에 남고, 표기가 있으면 화면·요약이 그 한글명을 쓴다). 확인되지 않으면 null.
- * @param {{ from: string | null, to: string | null, suitors: string[] }} m
+ * @param {{ from: string | null, to: string | null, suitors: string[], loanOwner?: string | null, loanClub?: string | null }} m 임대 상태(보유 구단·임대 구단)도 같은 확인을 지난다
  * @param {ReturnType<import("./names-ko.mjs").createNameBook>} book
  * @param {{ lookup?: typeof lookupKo, cacheRows?: object[], nowMs?: number }} opts `cacheRows`에 새로 확인한 행을 모아 준다(호출부가 한 번에 쓴다)
  */
@@ -608,7 +662,10 @@ export async function resolveClubs(m, book, { lookup = lookupKo, cacheRows = [],
     const c = await resolve(s);
     if (c && c !== from && c !== to && !suitors.includes(c)) suitors.push(c);
   }
-  return { from, to, suitors };
+  const loanOwner = await resolve(m.loanOwner ?? null);
+  let loanClub = await resolve(m.loanClub ?? null);
+  if (loanClub && loanClub === loanOwner) loanClub = null;
+  return { from, to, suitors, loanOwner, loanClub };
 }
 
 /**
@@ -733,6 +790,7 @@ async function settleJudgement(n, judged, rawText, ctx) {
     verdict: null, verdict_player: n.playerKey, verdict_player_name: null, verdict_evidence: null, verdict_from: null, verdict_to: null,
     verdict_suitors: [], verdict_stage: null, verdict_at: at,
     verdict_fee_amount: null, verdict_fee_currency: null, verdict_fee_kind: null,
+    verdict_form: null, verdict_loan_owner: null, verdict_loan_club: null, verdict_loan_clause: null,
     // 원출력 — 상한을 넘거나(요약이 비정상적으로 길다) 출력 상한에 잘렸으면 남기지 않는다. 잘린 JSON은 재생할 수 없다
     verdict_raw: rawText && !judged.truncated && [...rawText].length <= RAW_MAX_CHARS ? rawText : null,
     // 실패 횟수 — 판정 불가는 +1. 매체 RSS인데 본문을 못 받은 채 낸 판정도 +1이다(파생이 이 값으로 본문 재시도를 센다), 받았으면 0
@@ -748,6 +806,7 @@ async function settleJudgement(n, judged, rawText, ctx) {
       verdict: "move", verdict_player: key, verdict_player_name: judged.player, verdict_evidence: judged.evidence,
       verdict_from: clubs.from, verdict_to: clubs.to, verdict_suitors: clubs.suitors, verdict_stage: judged.stage,
       verdict_fee_amount: judged.fee?.amount ?? null, verdict_fee_currency: judged.fee?.currency ?? null, verdict_fee_kind: judged.fee?.kind ?? null,
+      verdict_form: judged.form ?? null, verdict_loan_owner: clubs.loanOwner ?? null, verdict_loan_club: clubs.loanClub ?? null, verdict_loan_clause: judged.loanClause ?? null,
     });
     if (judged.summary) {
       out.summarized += 1;
@@ -826,7 +885,7 @@ async function flushNames(supabase, out, clubCache, nameRun, names) {
 }
 
 /** 저장된 판정과 재생한 판정이 같은가 — 재생은 달라진 행만 쓴다 */
-const REPLAY_COLUMNS = ["verdict", "verdict_player", "verdict_player_name", "verdict_evidence", "verdict_from", "verdict_to", "verdict_suitors", "verdict_stage", "verdict_fee_amount", "verdict_fee_currency", "verdict_fee_kind", "summary_ko"];
+const REPLAY_COLUMNS = ["verdict", "verdict_player", "verdict_player_name", "verdict_evidence", "verdict_from", "verdict_to", "verdict_suitors", "verdict_stage", "verdict_fee_amount", "verdict_fee_currency", "verdict_fee_kind", "verdict_form", "verdict_loan_owner", "verdict_loan_club", "verdict_loan_clause", "summary_ko"];
 const sameVerdict = (a, b) => REPLAY_COLUMNS.every((c) => (c.includes("fee_amount") ? Number(a[c] ?? NaN) === Number(b[c] ?? NaN) || (a[c] == null && b[c] == null) : JSON.stringify(a[c] ?? null) === JSON.stringify(b[c] ?? null)));
 
 /**
@@ -850,7 +909,8 @@ export async function replayJudgements(supabase, rows, { names, fetchImpl = fetc
     let article = "";
     if (wantsArticle(r)) {
       article = await fetchArticleText(r.url, fetchImpl);
-      if (!article) { out.skipped += 1; continue; }
+      // 판정 때도 본문 없이 물었으면(`verdict_article_chars` 0) 저장된 글만으로 재생한다 — 같은 글인지는 아래 원문 지문 대조가 지킨다
+      if (!article && r.verdict_article_chars !== 0) { out.skipped += 1; continue; }
     }
     const input = prepareJudgeInput(r, article);
     if (r.verdict_input && r.verdict_input !== sourceFingerprint(input.numbered.text)) { out.inputChanged += 1; continue; }

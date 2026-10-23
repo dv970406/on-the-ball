@@ -1,6 +1,7 @@
 // ⚠ `"use client"`가 없다 — 상호작용이 없는 렌더러라 서버 렌더 여지를 남긴다(`architecture.md`)
 import type { ReactNode } from "react";
 import { cn } from "@/shared/lib/cn";
+import { dealFormLabel, isLoanForm } from "../lib/deal-form";
 import { feeKindLabel, formatFee } from "../lib/fee";
 import type { TransferDeal } from "../model/types";
 
@@ -13,26 +14,36 @@ interface ContractTermsProps {
 }
 
 /**
- * 계약 조건 — 이적료 성격 · 옵션 · 주급 · 계약 · 직전 보도 금액을 한 줄씩(`<dl>`).
+ * 계약 조건 — 형태 · 이적료 성격 · 옵션 · 임대료 · 주급 · 계약 · 직전 보도 금액을 한 줄씩(`<dl>`).
  * 넓은 화면의 딜 상세 곁 칸과 보드의 오른쪽 판(`widgets/deal-panel`)이 같은 목록을 그린다.
  *
  * - **금액에 딸린 줄(성격·옵션·직전 보도)은 이적료가 있을 때만** 둔다 — 비교할 금액이 없는 줄은 늘 `—`라 정보가 없다.
  *   "옵션 없음"도 이적료가 있을 때만 뜻이 있다(이적료 카드와 같은 판단).
  * - **직전 보도는 금액만이다.** 그 보도의 시각은 딜에 없다(`prev_fee_amount`만 저장된다) — 지어내지 않는다.
  * - 주급·계약은 원문 표기 그대로다(원화 환산은 하지 않는다 — 하드코딩 환율은 거짓 숫자다).
+ * - **형태는 알 때만** 둔다(완전 이적 포함) — 모르면 줄이 없다(완전 이적으로 짐작하지 않는다). 임대료는 대표 금액이 조항 금액일 때
+ *   따로 저장된 원문 표기(`loanFeeText`)이고, 있을 때만 둔다.
  */
 export function ContractTerms({ deal, className }: ContractTermsProps) {
   const fee = (amount: number | null) => formatFee({ amount, currency: deal.feeCurrency });
   const rows: { label: string; value: ReactNode }[] = [];
+  const form = dealFormLabel(deal);
+  if (form !== null) rows.push({ label: "형태", value: <span className="font-sans">{form}</span> });
   if (deal.feeAmount !== null) {
-    rows.push({ label: "이적료 성격", value: <span className="font-sans">{feeKindLabel(deal.feeKind)}</span> });
-    const add = fee(deal.addOnAmount);
-    const max = deal.addOnAmount === null ? null : fee(deal.feeAmount + deal.addOnAmount);
-    rows.push({
-      label: "옵션",
-      value: add !== null && max !== null ? `+${add} · 최대 ${max}` : <span className="font-sans">없음</span>,
-    });
+    rows.push({ label: "이적료 성격", value: <span className="font-sans">{feeKindLabel(deal.feeKind, deal.loanClause)}</span> });
+    // 추가 지급(add-on) 줄 — 임대 계열 딜에는 두지 않는다. "옵션 없음"이 "완전 이적 옵션이 없다"로 읽혀 형태 줄의 조항과 부딪힌다
+    // (임대의 조항은 형태·금액 성격 줄이 말한다 — 대표 금액이 임대료여도 같다)
+    if (!isLoanForm(deal.form) && deal.feeKind !== "buy_clause") {
+      const add = fee(deal.addOnAmount);
+      const max = deal.addOnAmount === null ? null : fee(deal.feeAmount + deal.addOnAmount);
+      rows.push({
+        label: "옵션",
+        value: add !== null && max !== null ? `+${add} · 최대 ${max}` : <span className="font-sans">없음</span>,
+      });
+    }
   }
+  // 대표 금액이 곧 임대료면 위의 금액 줄이 그것이다 — 같은 금액을 두 줄로 그리지 않는다
+  if (deal.loanFeeText !== null && deal.feeKind !== "loan_fee") rows.push({ label: "임대료", value: deal.loanFeeText });
   rows.push({ label: "주급", value: deal.wageText ?? EMPTY });
   rows.push({ label: "계약", value: deal.contractText ?? EMPTY });
   if (deal.feeAmount !== null) rows.push({ label: "직전 보도", value: fee(deal.prevFeeAmount) ?? EMPTY });

@@ -99,8 +99,8 @@ export function TransferBoardView({
   serverNowMs,
   scopeStartIso,
 }: TransferBoardViewProps) {
-  // 필터(`?league=`·`?sort=`·`?club=`·`?watch=`)와 고른 딜(상세 경로 또는 `?deal=`)은 **주소가 소유한다** — SSR 첫 렌더부터 화면 안 이동까지 소스가 하나다
-  const { league, sort, club: requestedClub, watch, deal: requestedDeal } = useBoardFilters();
+  // 필터(`?league=`·`?sort=`·`?club=`·`?watch=`·`?type=`)와 고른 딜(상세 경로 또는 `?deal=`)은 **주소가 소유한다** — SSR 첫 렌더부터 화면 안 이동까지 소스가 하나다
+  const { league, sort, club: requestedClub, watch, type, deal: requestedDeal } = useBoardFilters();
 
   // ⚠ **서버 시각이 우선이다** — `useNowMs()`는 세션당 한 번 고정되므로 클라 값을 앞에 두면
   //   낡은 시계가 갓 받은 서버 시각을 이긴다(`data-and-state.md`). `??`가 단축평가라 훅은
@@ -118,10 +118,11 @@ export function TransferBoardView({
     sort,
     club: requestedClub,
     watch,
+    type,
     nowMs,
     serverNowMs,
   });
-  const { clubChips, club, watchedCount, isGuest } = filter;
+  const { clubChips, club, watchedCount, loanCount, isGuest } = filter;
   const allDeals = deals.data;
 
   // 구간마다의 화면 배치(소구간·열기 순) — 그리는 쪽과 판의 기본 선택이 **같은 결과**를 본다(`groupLayout`)
@@ -140,6 +141,7 @@ export function TransferBoardView({
     sort,
     club,
     watch,
+    type,
     enabled: split,
   });
   const selectedId = split ? (selectedDeal?.id ?? null) : null;
@@ -182,7 +184,7 @@ export function TransferBoardView({
   /** 리그는 URL이 소유한다 — `replace`라 뒤로가기 스택에 리그 변경이 쌓이지 않는다. 리그를 바꾸면 구단 필터는 푼다(다른 리그의 구단이다) */
   const handleLeagueSelect = (next: TransferLeague | null) => {
     setLeagueSheetOpen(false);
-    if (next !== league) navigateBoard(boardHref(next, sort, null, watch), "replace");
+    if (next !== league) navigateBoard(boardHref({ league: next, sort, club: null, watch, type }), "replace");
   };
   /**
    * 판에 열린 딜(2분할일 때만) — 누르는 순간에 읽는다. 렌더 값을 콜백이 잡으면 행을 고를 때마다 콜백이 바뀌어 메모된 레일이
@@ -206,9 +208,9 @@ export function TransferBoardView({
     () =>
       promptSignIn({
         action: "관심 딜을 모아 보려면",
-        next: boardHref(league, sort, club, true, selectedIdRef.current),
+        next: boardHref({ league, sort, club, watch: true, type }, selectedIdRef.current),
       }),
-    [promptSignIn, league, sort, club],
+    [promptSignIn, league, sort, club, type],
   );
 
   // ⚠ `nowMs`가 `null`인 것은 서버 시각 없이 마운트된 하이드레이션 전 한 프레임뿐이다(이 앱의
@@ -288,6 +290,7 @@ export function TransferBoardView({
                   sort={sort}
                   club={club}
                   watch={watch}
+                  type={type}
                   isGuest={isGuest}
                   selectedId={railSelectedId}
                   onWatchSignInRequired={promptWatchSignIn}
@@ -321,7 +324,7 @@ export function TransferBoardView({
                     counts={counts}
                     active={activeGroup}
                     onJump={jump}
-                    trailing={<SortLinks league={league} sort={sort} club={club} watch={watch} />}
+                    trailing={<SortLinks league={league} sort={sort} club={club} watch={watch} type={type} />}
                   />
                   <FilterRail
                     clubs={clubChips}
@@ -329,6 +332,8 @@ export function TransferBoardView({
                     league={league}
                     sort={sort}
                     watch={watch}
+                    type={type}
+                    loanCount={loanCount}
                     isGuest={isGuest}
                     onOpenLeague={openLeagueSheet}
                     onWatchSignInRequired={promptWatchSignIn}
@@ -358,7 +363,7 @@ export function TransferBoardView({
                         layouts={layouts}
                         nowMs={nowMs}
                         sort={sort}
-                        expanded={watch}
+                        expanded={watch || type !== null}
                         reportScale={reportScale}
                         selectedId={selectedId}
                       />
@@ -391,7 +396,7 @@ export function TransferBoardView({
                 "로그인"이 지금 주소로 돌아오면 보드가 아니라 상세가 뜬다. 판의 로그인 안내와 같은 보드 주소(`?deal=`)다.
               */}
               <div
-                {...{ [RETURN_PATH_ATTR]: selectedId === null ? undefined : boardHref(league, sort, club, watch, selectedId) }}
+                {...{ [RETURN_PATH_ATTR]: selectedId === null ? undefined : boardHref({ league, sort, club, watch, type }, selectedId) }}
                 onClickCapture={keepBoardEntryOnSameUrlLink}
                 className="hidden border-l border-hairline-cool lg:sticky lg:top-0 lg:block lg:h-[calc(100dvh-56px-env(safe-area-inset-top))] lg:self-start"
               >
@@ -403,7 +408,7 @@ export function TransferBoardView({
                     nowMs={nowMs}
                     active={split}
                     onSignInRequired={(action) =>
-                      promptSignIn({ action, next: boardHref(league, sort, club, watch, selectedDeal.id) })
+                      promptSignIn({ action, next: boardHref({ league, sort, club, watch, type }, selectedDeal.id) })
                     }
                   />
                 ) : (

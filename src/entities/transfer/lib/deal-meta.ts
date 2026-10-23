@@ -3,6 +3,7 @@ import { ROUTES } from "@/shared/config";
 import { clamp } from "@/shared/lib/text";
 import { headlineReports } from "../api/mappers";
 import type { TransferDeal, TransferReport } from "../model/types";
+import { dealNoun, loanNote } from "./deal-form";
 import { playerName } from "./player-name";
 import { destinationClubs, routeLabels } from "./route-label";
 import { STAGE_STATUS, STATUS_LABEL } from "./stage";
@@ -23,7 +24,9 @@ export const DEAL_CARD_SIZE = { width: 1200, height: 630 };
 export const DEAL_CARD_ALT = "온더볼 — 이적 딜 카드(선수 · 이적 경로 · 이적료)";
 
 /**
- * 검색 결과·공유 카드의 제목 — `선수 이적 · 출발 → 행선지 (상태)`.
+ * 검색 결과·공유 카드의 제목 — `선수 이적 · 출발 → 행선지 (상태)`. 임대 계열이면 "이적" 자리에 형태의 말이 온다
+ * (`가르나초 임대 · 첼시 → 빌라 (오피셜)` — `dealNoun`). "선수 + 임대" 검색어와 맞고, 임대를 완전 이적으로 말하지 않는다.
+ * 임대 구단(경로 밖)은 제목에 넣지 않는다 — 제목이 길면 상태까지 잘린다. 설명의 경로 폴백이 그것을 말한다.
  *
  * 사람들은 선수 이름과 구단 이름을 함께 검색한다("케인 바이에른") — 제목이 선수 이름뿐이면 그 검색어와 맞는 말이 없다.
  * 선수 이름을 맨 앞에 둔다(잘려도 남는다). 경로는 약칭이다(제목이 길면 검색 결과에서 잘린다).
@@ -38,7 +41,7 @@ export function dealMetaTitle(deal: TransferDeal): string {
   const to = clubs.length > 1 ? `${clubs[0].shortName} 등` : labels.to;
   const status = STAGE_STATUS[deal.stage];
   const suffix = status === null ? "" : ` (${STATUS_LABEL[status]})`;
-  return clamp(`${playerName(deal)} 이적 · ${labels.from} → ${to}${suffix}`, META_TITLE_MAX);
+  return clamp(`${playerName(deal)} ${dealNoun(deal.form)} · ${labels.from} → ${to}${suffix}`, META_TITLE_MAX);
 }
 
 /**
@@ -56,7 +59,9 @@ export function dealMetaDescription(deal: TransferDeal, reports: TransferReport[
   const status = STAGE_STATUS[deal.stage];
   // 화면(경로 카드·`ClubRoute`)과 **같은 문구**다 — 빈 칸의 말(`FA`·`미확인`·`미정`·`외 N`)까지 `routeLabels`가 정한다.
   const labels = routeLabels(deal, { full: true });
-  const route = `${labels.from} → ${labels.to}`;
+  // 임대 중인 선수는 출발(보유 구단) 뒤에 임대 상태를 괄호로 단다 — 경로 밖 한 줄(`loanNote`)을 한 문장으로 옮긴 것이다
+  const note = loanNote(deal, { full: true });
+  const route = `${labels.from}${note ? `(${note})` : ""} → ${labels.to}`;
   return clamp(status === null ? route : `${route} · ${STATUS_LABEL[status]}`, META_DESCRIPTION_MAX);
 }
 

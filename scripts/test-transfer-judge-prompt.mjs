@@ -15,6 +15,7 @@ import {
   JUDGE_MODEL,
   JUDGE_SCHEMA,
   JUDGE_STAGES,
+  MOVE_FORMS,
   buildBasis,
   buildClubTable,
   buildGlossary,
@@ -37,7 +38,8 @@ function check(name, ok, detail = "") {
 }
 const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-const KEY_ORDER = ["evidence_ids", "timing", "player", "why", "move", "stage", "from", "to", "suitors", "fee", "player_ko", "summary_ko"];
+// 임대 상태(on_loan)는 사실이라 결론(move·form) 앞에, 형태·조항은 결론이라 단계 앞에 둔다
+const KEY_ORDER = ["evidence_ids", "timing", "player", "on_loan", "why", "move", "form", "loan_clause", "stage", "from", "to", "suitors", "fee", "player_ko", "summary_ko"];
 /** reasoning_extraction 거절을 부르는 말 — 필드 이름·설명·지시문 어디에도 두지 않는다 */
 const BANNED = /reasoning|thinking|chain[- ]of[- ]thought|생각 과정|사고 과정|추론/i;
 const SYSTEM = buildSystem();
@@ -203,6 +205,21 @@ check("표기 — 선수 키가 없으면 선수 줄 없음", eq(buildGlossary({
   check("용어 — 임대·완전 이적·스왑딜", terms.loan === "임대" && terms["permanent deal / permanent transfer"] === "완전 이적" && terms["swap deal"] === "스왑딜");
 }
 
+// ── 임대 ──────────────────────────────────────────────────────────────
+{
+  const sys = buildSystem({}, []);
+  check("지시문 — 형태 여섯(완전 이적·임대·전환·진행 중·조기 복귀·연장)을 모두 설명한다", MOVE_FORMS.every((f) => sys.includes(`- ${f}:`)));
+  check("지시문 — 출발은 임대 구단이 아니라 보유 구단이다(조기 복귀만 예외)", sys.includes("임대로 뛰는 구단이 아니라 보유한 구단") && sys.includes("loan_recall이면 지금 임대로 뛰는 구단"));
+  check("지시문 — 진행 중 임대(loan_standing)는 단계가 null이다", sys.includes("form이 loan_standing이면 null"));
+  check("지시문 — 계약 만료 복귀·출전 규정 기사는 이동이 아니다", sys.includes("계약 만료 복귀") && sys.includes("출전 규정"));
+  check("지시문 — 임대료·조항 금액을 성격으로 받고 셀온·위약금은 적지 않는다", sys.includes("loan_fee(임대료)") && sys.includes("buy_clause(") && sys.includes("셀온"));
+  check("스키마 — 임대 상태는 보유 구단·임대 구단 두 칸이고 다른 필드를 막는다", (() => {
+    const o = JUDGE_SCHEMA.properties.on_loan.anyOf[0];
+    return o.additionalProperties === false && eq(o.required, ["owner", "at"]) && eq(Object.keys(o.properties), ["owner", "at"]);
+  })());
+  check("금액 성격 — 임대료·조항 금액이 DB enum에 맞춰 들어 있다", ["loan_fee", "buy_clause"].every((k) => FEE_KINDS.includes(k)));
+}
+
 // ── 예시 ──────────────────────────────────────────────────────────────
 {
   const typeOk = (v, s) => {
@@ -222,7 +239,10 @@ check("표기 — 선수 키가 없으면 선수 줄 없음", eq(buildGlossary({
     check(`예시 ${i + 1} — 키 집합·순서가 스키마와 같다`, eq(Object.keys(o), KEY_ORDER));
     check(`예시 ${i + 1} — 값이 스키마 타입에 맞는다`, typeOk(o, JUDGE_SCHEMA));
     check(`예시 ${i + 1} — 근거 번호가 원문 안이고 1~3개`, o.evidence_ids.length >= 1 && o.evidence_ids.length <= 3 && o.evidence_ids.every((id) => id >= 1 && id <= n));
-    check(`예시 ${i + 1} — 이동이면 단계·요약, 아니면 둘 다 null`, o.move ? JUDGE_STAGES.includes(o.stage) && typeof o.summary_ko === "string" : o.stage === null && o.summary_ko === null);
+    // 진행 중 임대(loan_standing)는 이동이어도 단계가 없다 — 새 움직임이 아니다
+    check(`예시 ${i + 1} — 이동이면 단계·요약, 아니면 둘 다 null`, o.move ? (o.form === "loan_standing" ? o.stage === null : JUDGE_STAGES.includes(o.stage)) && typeof o.summary_ko === "string" : o.stage === null && o.summary_ko === null);
+    check(`예시 ${i + 1} — 이동이면 형태가 있고, 아니면 형태·조항이 null`, o.move ? MOVE_FORMS.includes(o.form) : o.form === null && o.loan_clause === null);
+    check(`예시 ${i + 1} — 조항은 조항이 붙는 임대 형태에만`, o.loan_clause === null || ["loan", "loan_convert", "loan_standing", "loan_extend"].includes(o.form));
     if (o.summary_ko) {
       const len = [...o.summary_ko].length;
       check(`예시 ${i + 1} — 요약이 90~140자 두 문장`, len >= 90 && len <= 140 && o.summary_ko.split(/(?<=다\.)\s/).length === 2, `${len}자`);

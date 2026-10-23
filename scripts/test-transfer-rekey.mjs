@@ -44,6 +44,7 @@ const news = [
 const nameRows = [
   { kind: "player", key: OLD, name_en: HOJ },
   { kind: "player_club", key: OLD, name_en: "Tottenham Hotspur" },
+  { kind: "player_owner_club", key: OLD, name_en: "Tottenham Hotspur" },
   { kind: "club", key: OLD, name_en: "x" },
 ];
 const plan = planRekey({ deals, news, nameRows, dictKeys: [OLD, "harry kane"] });
@@ -51,7 +52,7 @@ const plan = planRekey({ deals, news, nameRows, dictKeys: [OLD, "harry kane"] })
 check("딜 — 옛 키 딜만 새 키로(id 그대로)", eq(plan.dealMoves.map((m) => [m.id, m.from, m.to]), [[223, dealKey(OLD), dealKey(NEW)]]));
 check("딜 — 충돌 없음", plan.dealConflicts.length === 0);
 check("보도 — 그 선수의 행만(1·3), 다른 선수 이름의 행(4)·대상 아닌 행(2)은 빼고", eq(plan.newsMoves.map((m) => m.id), [1, 3]) && plan.newsMoves.every((m) => m.to === NEW));
-check("이름 캐시 — player·player_club만", eq(plan.nameMoves.map((m) => m.kind), ["player", "player_club"]));
+check("이름 캐시 — 선수 키인 종류(player·player_club·player_owner_club)만", eq(plan.nameMoves.map((m) => m.kind), ["player", "player_club", "player_owner_club"]));
 check("사람 사전의 옛 키는 경고만", eq(plan.dictWarnings.map((w) => w.oldKey), [OLD]));
 
 // 둘 다 있는 충돌

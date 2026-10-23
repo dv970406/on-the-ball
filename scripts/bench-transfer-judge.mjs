@@ -6,6 +6,8 @@
  *   node scripts/bench-transfer-judge.mjs --run --config s5-adaptive --reps 3 --out .cache/transfer-eval/bench/<이름>
  *   node scripts/bench-transfer-judge.mjs --run --fill --config s5-adaptive --reps 3 --out …  # 반복 파일에서 판정을 못 받은 항목만 다시 묻는다
  *   node scripts/bench-transfer-judge.mjs --compare <디렉터리|파일 ...> [--reparse] [--detail] [--by-config] [--common]
+ *   --fixture <묶음.json>: 고정 묶음 대신 다른 묶음(같은 모양 `{ items: [{ id, player }] }`)을 묻는다. 계획·--run·--fill에 같은 값을 준다
+ *   --budget <달러>: 이 실행의 비용 상한 — 나가 있는 호출을 최악값(출력 상한)으로 잡아 두고, 상한을 넘을 호출은 보내지 않는다(빠진 항목은 --fill로)
  *
  * - `--run`이 없으면 API를 부르지 않는다. 반복마다 `<out>/<설정>-r<n>.json` = `{ config, rep, model, out: [저장값], usage }`를 쓴다
  *   (`.cache/transfer-eval/qa-1001/prompt/`의 옛 결과 `{ variant, out, usage }`와 같은 모양이라 함께 비교된다).
@@ -19,6 +21,7 @@
  * ⚠ 비용 추정은 글자 수로 어림한 값이다(±30%) — 생각(thinking) 토큰은 설정마다 달라 가정치를 따로 적는다. 실제 값은 `--compare`가 낸다.
  */
 import fs from "node:fs";
+import Anthropic from "@anthropic-ai/sdk";
 import path from "node:path";
 import { loadEnv } from "./lib/sync-db.mjs";
 import { extractTransfer } from "./lib/transfer/extract.mjs";
@@ -29,7 +32,7 @@ import { fetchArticleText, replayJudgements, runJudgements, wantsArticle } from 
 import { JUDGE_CONFIGS, JUDGE_SCHEMA, buildJudgeRequest, buildSystem } from "./lib/transfer/judge-prompt.mjs";
 import { DIR, GOLDEN, SNAPSHOT, clubKey, createFakeDb, formatFieldScore, newFieldScore, pct, rawOf, scoreVerdict } from "./eval-transfer.mjs";
 
-const FIXTURE = "scripts/fixtures/transfer-judge-bench.json";
+const DEFAULT_FIXTURE = "scripts/fixtures/transfer-judge-bench.json";
 const BENCH_DIR = `${DIR}/bench`;
 const ARTICLES = `${BENCH_DIR}/articles.json`;
 const LOOKUPS = `${BENCH_DIR}/lookups.json`;
@@ -48,13 +51,47 @@ const argv = process.argv.slice(2);
 const flag = (name) => argv.includes(name);
 const opt = (name, fallback = null) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : fallback);
 const readJson = (file, fallback) => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : fallback);
+const FIXTURE = opt("--fixture", DEFAULT_FIXTURE);
+
+// ── 비용 상한 ─────────────────────────────────────────────────────────
+
+/**
+ * 비용 상한을 거는 클라이언트 — 호출마다 최악 비용(입력 전부 캐시 미스 + 출력 상한)을 먼저 잡아 두고 응답의 실제 사용량으로 바꾼다. 잡아 둔
+ * 값까지 더해 상한을 넘으면 그 호출을 보내지 않고 계정 사용 한도와 같은 오류를 던진다 — 판정 실행이 새 호출을 멈추고(이미 보낸 것은 끝낸다)
+ * 남은 항목은 빠진 항목으로 남는다. 동시에 나가는 호출이 있어도 합이 상한을 넘지 않는다.
+ */
+function budgeted(api, config, budget) {
+  if (!Number.isFinite(budget)) return api;
+  const price = PRICES[config.model];
+  if (!price) throw new Error(`--budget: ${config.model}의 단가를 모른다`);
+  let spent = 0;
+  let reserved = 0;
+  const worst = (request) => (JSON.stringify(request).length / 3 * price.input + (config.maxTokens ?? 4_000) * price.output) / 1e6;
+  const create = async (request, ...rest) => {
+    const hold = worst(request);
+    if (spent + reserved + hold > budget) {
+      throw new Anthropic.APIError(400, undefined, `bench budget: usage limit $${budget} (spent $${spent.toFixed(3)})`, undefined);
+    }
+    reserved += hold;
+    try {
+      const res = await api.messages.create(request, ...rest);
+      const u = res.usage ?? {};
+      spent += ((u.input_tokens ?? 0) * price.input + (u.output_tokens ?? 0) * price.output + (u.cache_read_input_tokens ?? 0) * price.cacheRead + (u.cache_creation_input_tokens ?? 0) * price.cacheWrite) / 1e6;
+      return res;
+    } finally {
+      reserved -= hold;
+    }
+  };
+  return { messages: { create } };
+}
 
 // ── 입력 ──────────────────────────────────────────────────────────────
 
-function loadInputs() {
+function loadInputs(ids = null) {
   if (!fs.existsSync(SNAPSHOT)) throw new Error(`스냅샷이 없다(${SNAPSHOT}) — node scripts/eval-transfer.mjs --export --remote`);
   const snap = JSON.parse(fs.readFileSync(SNAPSHOT, "utf8"));
-  const fixture = JSON.parse(fs.readFileSync(FIXTURE, "utf8")).items;
+  // ids를 주면(재해석) 묶음 파일이 아니라 결과 파일의 항목을 쓴다 — 다른 묶음으로 돌린 결과도 기사 본문을 찾는다
+  const fixture = ids ? ids.map((id) => ({ id, player: null })) : JSON.parse(fs.readFileSync(FIXTURE, "utf8")).items;
   const byId = new Map(snap.rows.map((r) => [r.id, r]));
   const missing = fixture.filter((it) => !byId.has(it.id)).map((it) => it.id);
   if (missing.length) throw new Error(`스냅샷에 없는 벤치 항목: ${missing.join(" ")}`);
@@ -175,6 +212,7 @@ async function plan() {
   saveJson(ARTICLES, articles.cache);
   const fetchImpl = articleFetch(needs, articles.cache);
   const lookups = cachedLookup(true);
+  const client = budgeted(new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, timeout: 60_000, maxRetries: 1 }), config, Number(opt("--budget", "Infinity")));
 
   for (let rep = 1; rep <= reps; rep += 1) {
     const file = `${outDir}/${configKey}-r${rep}.json`;
@@ -187,7 +225,7 @@ async function plan() {
       continue;
     }
     if (prior) console.log(`  반복 ${rep}: 빠진 항목 ${todo.length}건만 묻는다`);
-    const v = await runJudgements(createFakeDb(), todo, { apiKey: env.ANTHROPIC_API_KEY, names: names(), config, system, limit: todo.length, fetchImpl, lookup: lookups.lookup, nowMs, log: console });
+    const v = await runJudgements(createFakeDb(), todo, { client, names: names(), config, system, limit: todo.length, fetchImpl, lookup: lookups.lookup, nowMs, log: console });
     lookups.save();
     // 판정이 난 행만 남긴다 — 일시 실패로 이월된 행(연속 실패 수만 있다)은 판정이 아니다. 다음 --fill이 다시 묻는다
     const judgedRows = v.updates.filter((u) => "verdict_at" in u);
@@ -234,9 +272,13 @@ const FIELDS = {
   feeAmount: (u) => (u.verdict_fee_amount == null ? null : `${Number(u.verdict_fee_amount)} ${u.verdict_fee_currency ?? ""}`),
   feeKind: (u) => u.verdict_fee_kind ?? null,
   playerKo: (u) => (u.verdict === "move" ? (rawOf(u)?.player_ko ?? null) : null),
+  form: (u) => u.verdict_form ?? null,
+  loanOwner: (u) => clubKey(u.verdict_loan_owner),
+  loanClub: (u) => clubKey(u.verdict_loan_club),
+  loanClause: (u) => u.verdict_loan_clause ?? null,
 };
 /** "구조화 필드 전부 일치" — 요약·선수 표기를 뺀 판정 필드 */
-const STRUCTURED = ["move", "timing", "player", "stage", "from", "to", "suitors", "feeAmount", "feeKind"];
+const STRUCTURED = ["move", "timing", "player", "stage", "from", "to", "suitors", "feeAmount", "feeKind", "form", "loanOwner", "loanClub", "loanClause"];
 /**
  * 모델의 원출력 그대로의 필드 — 해석(원문 대조·구단 정규화·접기)이 흡수하기 전의 흔들림이다. 저장값의 흔들림과 함께 봐야
  * "모델이 흔들렸는데 해석이 막았다"와 "모델은 같았는데 해석이 갈랐다"를 가른다. 원출력이 없으면(형식 깨짐) "∅".
@@ -246,9 +288,10 @@ const rawField = (key) => (u) => {
   if (!o) return "∅";
   if (key === "suitors") return [...(Array.isArray(o.suitors) ? o.suitors : [])].sort().join("|");
   if (key === "fee") return o.fee ? `${o.fee.amount} ${o.fee.currency} ${o.fee.kind}` : null;
+  if (key === "on_loan") return o.on_loan ? `${o.on_loan.owner ?? ""}→${o.on_loan.at ?? ""}` : null;
   return o[key] ?? null;
 };
-const RAW_FIELDS = Object.fromEntries(["move", "timing", "player", "stage", "from", "to", "suitors", "fee", "player_ko"].map((k) => [`원출력 ${k}`, rawField(k)]));
+const RAW_FIELDS = Object.fromEntries(["move", "timing", "player", "stage", "from", "to", "suitors", "fee", "player_ko", "form", "on_loan", "loan_clause"].map((k) => [`원출력 ${k}`, rawField(k)]));
 const RAW_STRUCTURED = Object.keys(RAW_FIELDS).filter((k) => k !== "원출력 player_ko");
 
 async function compare(inputs) {
@@ -285,22 +328,27 @@ async function compare(inputs) {
   const results = [...groups.values()].map((g) => summarize(g, golden));
   printTable(results);
   if (flag("--detail")) for (const r of results) printDetail(r);
-  if (reparse) console.log(`\n(--reparse: 원출력을 지금의 해석으로 다시 읽었다 — 구단 확인 캐시 적중 ${reparse.stats.hit} · 캐시 밖이라 확인 못 함 ${reparse.stats.miss})`);
+  if (reparse) console.log(`\n(--reparse: 원출력을 지금의 해석으로 다시 읽었다 — 구단 확인 캐시 적중 ${reparse.stats.hit} · 캐시 밖이라 확인 못 함 ${reparse.stats.miss} · 본문이 없어 건너뜀 ${reparse.skipped} · 원문 지문이 달라 건너뜀 ${reparse.inputChanged})`);
 }
 
 /** 원출력 재해석 — 저장된 원출력을 지금의 `parseJudgement`·구단 확인으로 다시 읽는다(API·네트워크 0건) */
 function reparser() {
-  const { byId, needs, names, nowMs } = loadInputs();
-  const { cache } = loadArticles(needs);
-  const fetchImpl = articleFetch(needs, cache);
   const lookups = cachedLookup(false);
   const fn = async (out) => {
+    // 본문은 결과 파일의 항목으로 찾는다 — 고정 묶음으로 찾으면 묶음 밖 항목은 본문이 없어 재생을 조용히 건너뛴다
+    const { byId, needs, names, nowMs } = loadInputs(out.map((u) => u.id));
+    const { cache } = loadArticles(needs);
+    const fetchImpl = articleFetch(needs, cache);
     const rows = out.filter((u) => byId.has(u.id)).map((u) => ({ ...byId.get(u.id), ...u }));
     const v = await replayJudgements(createFakeDb(), rows, { names: names(), fetchImpl, lookup: lookups.lookup, nowMs });
+    fn.skipped += v.skipped;
+    fn.inputChanged += v.inputChanged;
     const changed = new Map(v.updates.map((u) => [u.id, u]));
     return out.map((u) => ({ ...u, ...(changed.get(u.id) ?? {}) }));
   };
   fn.stats = lookups.stats;
+  fn.skipped = 0;
+  fn.inputChanged = 0;
   return fn;
 }
 
@@ -351,6 +399,7 @@ function printTable(results) {
     row("출발 · 행선지", (r) => `${accuracy(r.score.from)} · ${accuracy(r.score.to)}`),
     row("관련 구단 집합 · 관심 구단 Jaccard", (r) => `${accuracy(r.score.clubSet)} · ${r.score.suitors[1] ? (r.score.suitors[0] / r.score.suitors[1]).toFixed(2) : "—"}`),
     row("금액 · 성격 · 없음", (r) => `${accuracy(r.score.feeAmount)} · ${accuracy(r.score.feeKind)} · ${accuracy(r.score.feeNone)}`),
+    row("임대: 형태 · 보유 · 임대 구단 · 조항", (r) => `${accuracy(r.score.form)} · ${accuracy(r.score.loanOwner)} · ${accuracy(r.score.loanClub)} · ${accuracy(r.score.loanClause)}`),
     row("호출당 입력 · 캐시 읽기 · 출력", (r) => (r.usage.calls ? `${Math.round(r.usage.input / r.usage.calls)} · ${Math.round(r.usage.cacheRead / r.usage.calls)} · ${Math.round(r.usage.output / r.usage.calls)}` : "—")),
     row("비용(합 · 호출당)", (r) => (r.usage.calls ? `$${r.cost.toFixed(3)} · $${(r.cost / r.usage.calls).toFixed(4)}` : "—")),
   ];

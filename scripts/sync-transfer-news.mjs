@@ -10,6 +10,8 @@
  *   node scripts/sync-transfer-news.mjs --derive-only --dry-run  # 파생 결과 요약만 찍고 쓰지 않는다(LLM도 부르지 않는다)
  *   node scripts/sync-transfer-news.mjs --derive-only --rejudge  # 저장된 판정을 무시하고 전부 다시 묻는다(지시문·사전을 고친 뒤)
  *   node scripts/sync-transfer-news.mjs --derive-only --rejudge-stale  # 지금 지시문과 다른 지문으로 난 판정만 다시 묻는다(상한 안에서 — 남으면 다시 돌린다)
+ *   node scripts/sync-transfer-news.mjs --derive-only --rejudge-stale --loan-only  # 그중 임대를 말하는 보도만 다시 묻는다(임대 필드를 더한 지시문 변경용)
+ *   node scripts/sync-transfer-news.mjs --derive-only --rejudge-stale --dry-run    # 다시 물을 대상 수만 찍는다(API를 부르지 않는다)
  *   node scripts/sync-transfer-news.mjs --derive-only --replay   # 저장된 원출력을 지금의 해석으로 다시 읽는다(API를 부르지 않는다 — 해석만 고친 뒤)
  *   node scripts/sync-transfer-news.mjs --verify                 # 계정 인증·채널 출처를 점검한다
  *   node scripts/sync-transfer-news.mjs --remote                 # 원격 프로젝트에 쓴다(명시적일 때만). 대상은 환경변수다 —
@@ -46,10 +48,11 @@ const deriveOnly = argv.includes("--derive-only");
 const rejudge = argv.includes("--rejudge");
 const replay = argv.includes("--replay");
 const rejudgeStale = argv.includes("--rejudge-stale");
+const loanOnly = argv.includes("--loan-only");
 const onlyArg = flag(argv, "only");
 
 // 모르는 플래그와 뜻이 겹치는 조합은 거부한다 — 조용히 무시하면 의도와 다른 일이 원격에 일어난다
-const KNOWN = new Set(["--remote", "--dry-run", "--reprocess", "--derive-only", "--rejudge", "--rejudge-stale", "--replay", "--verify", "--only"]);
+const KNOWN = new Set(["--remote", "--dry-run", "--reprocess", "--derive-only", "--rejudge", "--rejudge-stale", "--loan-only", "--replay", "--verify", "--only"]);
 const unknownFlags = argv.filter((a, i) => a.startsWith("--") ? !KNOWN.has(a) : argv[i - 1] !== "--only");
 if (unknownFlags.length) usage(`알 수 없는 인자: ${unknownFlags.join(" ")}`);
 if (argv.includes("--only") && !onlyArg) usage("--only 뒤에 소스 id가 필요합니다");
@@ -58,7 +61,9 @@ if ([dryRun && !deriveOnly, reprocess, deriveOnly, argv.includes("--verify")].fi
 }
 if (replay && (!deriveOnly || dryRun || rejudge)) usage("--replay 는 --derive-only 와 함께만 씁니다(--dry-run·--rejudge 와는 함께 쓸 수 없습니다)");
 if (rejudge && (!deriveOnly || dryRun)) usage("--rejudge 는 --derive-only 와 함께만 씁니다(--dry-run 과는 함께 쓸 수 없습니다)");
-if (rejudgeStale && (!deriveOnly || dryRun || rejudge || replay)) usage("--rejudge-stale 는 --derive-only 와 함께만 씁니다(--dry-run·--rejudge·--replay 와는 함께 쓸 수 없습니다)");
+// --dry-run과는 함께 쓸 수 있다 — 드라이런은 판정을 부르지 않고 다시 물을 대상 수만 찍는다(비용을 미리 본다)
+if (rejudgeStale && (!deriveOnly || rejudge || replay)) usage("--rejudge-stale 는 --derive-only 와 함께만 씁니다(--rejudge·--replay 와는 함께 쓸 수 없습니다)");
+if (loanOnly && !rejudgeStale) usage("--loan-only 는 --rejudge-stale 과 함께만 씁니다");
 if (reprocess && onlyArg) usage("--reprocess 는 저장분 전체를 다시 추출합니다 — --only 와 함께 쓸 수 없습니다");
 if (deriveOnly && onlyArg) usage("--derive-only 는 소스를 읽지 않습니다 — --only 와 함께 쓸 수 없습니다");
 
@@ -98,7 +103,7 @@ if (dryRun && !deriveOnly) {
 const { env, url, supabase } = connectFromEnv(argv, ["ANTHROPIC_API_KEY", "NEXT_PUBLIC_VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY", "VAPID_SUBJECT"]);
 
 if (deriveOnly) {
-  await derive({ dryRun, rejudge, replay, rejudgeStale });
+  await derive({ dryRun, rejudge, replay, rejudgeStale, loanOnly });
   console.log(`\n대상: ${url}`);
   process.exit(process.exitCode ?? 0);
 }
@@ -153,7 +158,7 @@ async function expand() {
  * 키가 없으면 판정 없이 파생한다. 원격 실행에서 키가 없으면 실패다 — 조용히 지나가면 새 딜이 영영 열리지 않고 화면이 영문으로 남는다.
  * 판정이 계통적으로 실패해도(인증) 파생은 끝까지 쓴다(새 딜은 닫힘·기존 딜은 유지) — 종료 코드만 올린다.
  */
-async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: reread = false, rejudgeStale: stale = false, notify: announce = false }) {
+async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: reread = false, rejudgeStale: stale = false, loanOnly: loansOnly = false, notify: announce = false }) {
   try {
     // --rejudge는 사람이 한 번에 끝내려고 돌리는 명령이다 — 실행당 상한을 크게 연다(비용은 호출부가 안다). 파생의 정렬도 같은 상한을 본다
     const limit = again ? 1000 : judgeLib.JUDGE_MAX_PER_RUN;
@@ -162,7 +167,7 @@ async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: rer
     if (stale) {
       if (typeof judgeLib.judgeFingerprint !== "function") throw new Error("judge-prompt.mjs에 judgeFingerprint가 없습니다 — --rejudge-stale을 쓸 수 없습니다");
       stalePrompt = judgeLib.judgeFingerprint(judgeLib.buildSystem(), judgeLib.JUDGE_CONFIG);
-      console.log(`\n지시문 지문 ${stalePrompt}과 다른 판정만 다시 묻는다(상한 ${limit}건 — 남으면 다시 돌린다)`);
+      console.log(`\n지시문 지문 ${stalePrompt}과 다른 판정${loansOnly ? " 중 임대를 말하는 보도" : ""}만 다시 묻는다(상한 ${limit}건 — 남으면 다시 돌린다)`);
     }
     const apiKey = env.ANTHROPIC_API_KEY;
     if (!apiKey && !summaryOnly) {
@@ -191,7 +196,7 @@ async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: rer
         process.exitCode = 1;
       }
     }
-    const r = await runDerivation(supabase, { dryRun: summaryOnly, rejudge: again, replay: reread, judge, judgeLimit: limit, rejudgeStalePrompt: stalePrompt });
+    const r = await runDerivation(supabase, { dryRun: summaryOnly, rejudge: again, replay: reread, judge, judgeLimit: limit, rejudgeStalePrompt: stalePrompt, loanOnly: loansOnly });
     const s = r.summary;
     const stages = Object.entries(s.stages).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(" · ") || "—";
     console.log(`\n딜 파생${summaryOnly ? "(드라이런)" : ""}: 딜 ${s.deals} · 구단 ${s.clubs} · 연결된 보도 ${s.linkedRows}건`);

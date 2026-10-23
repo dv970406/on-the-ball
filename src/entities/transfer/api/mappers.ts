@@ -30,7 +30,7 @@ export const RUMOR_CAROUSEL_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
 const CLUB_COLUMNS = "code, name, short_name, league";
 const DEAL_COLUMNS =
-  "id, player, player_ko, position, birth_year, nationality, stage, fee_amount, fee_currency, fee_text, fee_kind, prev_fee_amount, fee_low_amount, fee_high_amount, add_on_amount, contract_text, wage_text, latest_reported_at, report_count, is_free_agent";
+  "id, player, player_ko, position, birth_year, nationality, stage, form, loan_clause, loan_fee_text, fee_amount, fee_currency, fee_text, fee_kind, prev_fee_amount, fee_low_amount, fee_high_amount, add_on_amount, contract_text, wage_text, latest_reported_at, report_count, is_free_agent";
 /**
  * ⚠ **`body`가 없다.** anon·authenticated에는 `body`를 뺀 컬럼만 grant돼 있어 `select=*`도
  *   `body`도 42501이다(`api-and-db.md` 이적 소식 절) — 그래서 컬럼을 나열한다.
@@ -49,7 +49,7 @@ const LATEST_REPORT_COLUMNS = "source_id, attribution, attributed_to, published_
  * PostgREST select 문자열의 단일 소스 — 스키마가 바뀌면 여기 한 곳만 고친다.
  *
  * ⚠ **`transfer_club!컬럼명` 형태로 경로를 못박는다.** `transfer_deal → transfer_club` 경로가
- *   출발·도착 둘이라 그냥 `transfer_club(...)`은 PGRST201이다.
+ *   출발·도착·임대 구단 셋이라 그냥 `transfer_club(...)`은 PGRST201이다.
  * ⚠ `transfer_deal_watch(user_id)` 임베딩은 SELECT 정책이 "내 행만"이라 **배열 길이가 곧
  *   "내가 관심 등록했는가"** 다. 목록에도 실려야 행이 관심 표시를 그릴 수 있다.
  * ⚠ `suitors:transfer_deal_suitor(...)`는 딜의 관심 구단 자식 행이다 — 화면이 전부 그리므로 코드가 아니라 구단 행을 임베딩한다.
@@ -60,14 +60,14 @@ const LATEST_REPORT_COLUMNS = "source_id, attribution, attributed_to, published_
  *   `GenericStringError`가 된다(실측). 한 템플릿 리터럴로 둔다.
  */
 export const DEAL_LIST_SELECT =
-  `${DEAL_COLUMNS}, from:transfer_club!from_club_code(${CLUB_COLUMNS}), to:transfer_club!to_club_code(${CLUB_COLUMNS}), suitors:transfer_deal_suitor(position, club:transfer_club(${CLUB_COLUMNS})), transfer_deal_watch(user_id), latest:transfer_news!deal_id(${LATEST_REPORT_COLUMNS})` as const;
+  `${DEAL_COLUMNS}, from:transfer_club!from_club_code(${CLUB_COLUMNS}), to:transfer_club!to_club_code(${CLUB_COLUMNS}), loan:transfer_club!loan_club_code(${CLUB_COLUMNS}), suitors:transfer_deal_suitor(position, club:transfer_club(${CLUB_COLUMNS})), transfer_deal_watch(user_id), latest:transfer_news!deal_id(${LATEST_REPORT_COLUMNS})` as const;
 
 /**
  * 상세 select — 최신 보도 임베딩이 **없다.** 상세는 타임라인 전체를 따로 받으므로
  * (`REPORT_SELECT`) 같은 행을 두 번 받을 이유가 없다.
  */
 export const DEAL_DETAIL_SELECT =
-  `${DEAL_COLUMNS}, from:transfer_club!from_club_code(${CLUB_COLUMNS}), to:transfer_club!to_club_code(${CLUB_COLUMNS}), suitors:transfer_deal_suitor(position, club:transfer_club(${CLUB_COLUMNS})), transfer_deal_watch(user_id)` as const;
+  `${DEAL_COLUMNS}, from:transfer_club!from_club_code(${CLUB_COLUMNS}), to:transfer_club!to_club_code(${CLUB_COLUMNS}), loan:transfer_club!loan_club_code(${CLUB_COLUMNS}), suitors:transfer_deal_suitor(position, club:transfer_club(${CLUB_COLUMNS})), transfer_deal_watch(user_id)` as const;
 
 /** 상세의 보도 타임라인 — 딜에 묶인 보도 전부(정렬은 `list-query.ts`) */
 export const REPORT_SELECT = `${REPORT_COLUMNS}` as const;
@@ -226,6 +226,9 @@ export interface DealSelectRow {
   birth_year: TransferDealRow["birth_year"];
   nationality: TransferDealRow["nationality"];
   stage: TransferDealRow["stage"];
+  form: TransferDealRow["form"];
+  loan_clause: TransferDealRow["loan_clause"];
+  loan_fee_text: TransferDealRow["loan_fee_text"];
   fee_amount: TransferDealRow["fee_amount"];
   fee_currency: TransferDealRow["fee_currency"];
   fee_text: TransferDealRow["fee_text"];
@@ -241,6 +244,8 @@ export interface DealSelectRow {
   is_free_agent: TransferDealRow["is_free_agent"];
   from: ClubSelectRow | null;
   to: ClubSelectRow | null;
+  /** 지금 임대로 뛰는 구단 */
+  loan: ClubSelectRow | null;
   /** 관심 구단(자식 행) — 임베딩 순서는 보장되지 않아 `position`으로 매퍼가 정렬한다 */
   suitors: { position: number; club: ClubSelectRow | null }[] | null;
   /** SELECT 정책이 "내 행만"이라 길이가 0 또는 1이다 */
@@ -257,6 +262,10 @@ export function buildDeal(row: DealSelectRow): TransferDeal {
     nationality: row.nationality,
     fromClub: buildClub(row.from),
     toClub: buildClub(row.to),
+    form: row.form,
+    loanClub: buildClub(row.loan),
+    loanClause: row.loan_clause,
+    loanFeeText: row.loan_fee_text,
     stage: row.stage,
     feeAmount: row.fee_amount,
     feeCurrency: row.fee_currency,

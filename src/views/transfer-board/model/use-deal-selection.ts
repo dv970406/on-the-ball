@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ROUTES } from "@/shared/config";
 import { parsePostId } from "@/shared/lib";
-import type { TransferDealListItem, TransferLeague, TransferSort } from "@/entities/transfer";
+import type { TransferDealListItem, TransferLeague, TransferSort, TransferTypeFilter } from "@/entities/transfer";
 import { boardDealHref, dealIdOfBoardPath } from "../lib/board-href";
 import { SPLIT_QUERY } from "../ui/use-deal-select";
 import type { GroupLayout } from "../lib/screen-order";
@@ -21,6 +21,7 @@ interface UseDealSelectionArgs {
   sort: TransferSort;
   club: string | null;
   watch: boolean;
+  type: TransferTypeFilter | null;
   /** 2분할이 실제로 서 있는가 — 주소 정리(아래 effect)가 이 값으로 갈린다 */
   enabled: boolean;
 }
@@ -60,7 +61,7 @@ interface Held {
  * ⚠ 필터 링크(`boardHref`의 기본 인자)는 `deal`을 싣지 않는다 — 필터를 바꾸면 선택이 풀리고 기본값으로 간다.
  * ⚠ **보고 있던 딜은 필터가 그대로인 동안 붙든다**(`held`). 주소에 딜이 없을 때 기본 선택은 목록 첫 딜이라, 관심 필터에서 판의
  *   "빼기"를 누르면 낙관적 갱신이 그 딜을 목록에서 빼는 순간 판이 **다음 딜로 넘어갔다** — 방금 누른 버튼이 다른 딜의 것이 된다.
- *   그래서 지금 열린 딜이 보드(필터 무관 전체)에 남아 있으면 목록에서 빠져도 그 딜을 연다. 필터(리그·정렬·구단·관심)를 바꾸면
+ *   그래서 지금 열린 딜이 보드(필터 무관 전체)에 남아 있으면 목록에서 빠져도 그 딜을 연다. 필터(리그·정렬·구단·관심·형태)를 바꾸면
  *   놓는다 — 새 목록의 첫 딜로 간다. 판단 근거가 렌더마다 바뀌는 값이라 렌더 중에 갱신한다(이전 렌더의 값을 기억하는 React
  *   권장 형태 — effect로 맞추면 한 프레임 다음 딜이 그려진다).
  * ⚠ 주소 정리(아래 effect — `replace`라 기록이 쌓이지 않고 필터 파라미터는 원래 표기 그대로 둔다):
@@ -80,9 +81,10 @@ export function useDealSelection({
   sort,
   club,
   watch,
+  type,
   enabled,
 }: UseDealSelectionArgs) {
-  const filterKey = `${league ?? ""}|${sort}|${club ?? ""}|${watch ? 1 : 0}`;
+  const filterKey = `${league ?? ""}|${sort}|${club ?? ""}|${watch ? 1 : 0}|${type ?? ""}`;
   const [held, setHeld] = useState<Held | null>(null);
 
   const selectedDeal = useMemo<TransferDealListItem | null>(() => {
@@ -136,8 +138,8 @@ export function useDealSelection({
   }, [router]);
 
   const select = useCallback(
-    (id: number) => navigateBoard(boardDealHref(id, league, sort, club, watch), "replace"),
-    [league, sort, club, watch],
+    (id: number) => navigateBoard(boardDealHref(id, { league, sort, club, watch, type }), "replace"),
+    [league, sort, club, watch, type],
   );
 
   return { selectedDeal, select };

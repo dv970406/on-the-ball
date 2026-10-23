@@ -57,11 +57,14 @@ export function dealIsWatched(deal: Pick<TransferDeal, "isWatched">, watchOnly: 
   return !watchOnly || deal.isWatched;
 }
 
-/** 구단 필터 — 출발·행선지·관심 구단(`suitorCodes`) 어느 자리에든 그 구단이 있으면 포함. `null`은 전체 */
+/**
+ * 구단 필터 — 출발·행선지·관심 구단(`suitorCodes`)·**지금 임대로 뛰는 구단** 어느 자리에든 그 구단이 있으면 포함. `null`은 전체.
+ * 임대 구단을 보는 이유: 빌라에서 임대로 뛰는 선수의 제3구단 이적설은 빌라 팬의 일이다(출발은 보유 구단이라 경로에 빌라가 없다).
+ */
 export function dealHasClub(
-  deal: Pick<TransferDeal, "fromClub" | "toClub" | "suitors">,
+  deal: Pick<TransferDeal, "fromClub" | "toClub" | "suitors" | "loanClub">,
   club: string | null,
 ): boolean {
   if (club === null) return true;
-  return deal.fromClub?.code === club || deal.toClub?.code === club || deal.suitors.some((c) => c.code === club);
+  return deal.fromClub?.code === club || deal.toClub?.code === club || deal.loanClub?.code === club || deal.suitors.some((c) => c.code === club);
 }

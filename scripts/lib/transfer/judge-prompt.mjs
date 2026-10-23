@@ -17,8 +17,17 @@ import { HOUR_MS, sha1Hex } from "./util.mjs";
 
 /** 관심 구단 상한 — DB CHECK(`transfer_news_verdict_suitors_size`)와 같은 값 */
 export const SUITORS_MAX = 10;
-/** 금액의 성격 — `transfer_fee_kind` enum과 같은 값 */
-export const FEE_KINDS = ["fee", "bid", "asking_price", "release_clause", "valuation"];
+/** 금액의 성격 — `transfer_fee_kind` enum과 같은 값. 임대료(`loan_fee`)·완전 이적 조항 금액(`buy_clause`)은 임대 보도에만 있다 */
+export const FEE_KINDS = ["fee", "bid", "asking_price", "release_clause", "valuation", "loan_fee", "buy_clause"];
+/**
+ * 보도가 말하는 사건의 형태 — `transfer_move_form` enum과 같은 값.
+ * `loan_standing`(새 움직임 없이 진행 중인 임대·조항을 설명하는 보도)은 딜의 단계를 움직이지 않는다(`derive-deals.mjs`의 문맥 보도).
+ */
+export const MOVE_FORMS = ["permanent", "loan", "loan_convert", "loan_standing", "loan_recall", "loan_extend"];
+/** 임대의 형태 — 완전 이적 말고 전부 */
+export const LOAN_FORMS = MOVE_FORMS.filter((f) => f !== "permanent");
+/** 임대에 붙은 완전 이적 조항 — `transfer_loan_clause` enum과 같은 값 */
+export const LOAN_CLAUSES = ["option", "obligation"];
 export const FEE_CURRENCIES = ["GBP", "EUR", "USD"];
 /** 저장된 글의 상한(글자) — 기자 속보는 핵심을 첫 문장에 쓰므로 뒤를 자른다 */
 export const BODY_MAX_CHARS = 1_200;
@@ -62,13 +71,22 @@ const nullable = (schema) => ({ anyOf: [schema, { type: "null" }] });
 export const JUDGE_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["evidence_ids", "timing", "player", "why", "move", "stage", "from", "to", "suitors", "fee", "player_ko", "summary_ko"],
+  required: ["evidence_ids", "timing", "player", "on_loan", "why", "move", "form", "loan_clause", "stage", "from", "to", "suitors", "fee", "player_ko", "summary_ko"],
   properties: {
     evidence_ids: { type: "array", items: { type: "integer" } },
     timing: nullable({ type: "string", enum: ["current", "past"] }),
     player: nullable({ type: "string" }),
+    // 선수의 임대 상태는 결론(move·form) 앞에 **사실로** 먼저 적게 한다 — 형태가 이 사실을 따라 정해진다
+    on_loan: nullable({
+      type: "object",
+      additionalProperties: false,
+      required: ["owner", "at"],
+      properties: { owner: nullable({ type: "string" }), at: nullable({ type: "string" }) },
+    }),
     why: { type: "string" },
     move: { type: "boolean" },
+    form: nullable({ type: "string", enum: MOVE_FORMS }),
+    loan_clause: nullable({ type: "string", enum: LOAN_CLAUSES }),
     stage: nullable({ type: "string", enum: JUDGE_STAGES }),
     from: nullable({ type: "string" }),
     to: nullable({ type: "string" }),
@@ -193,7 +211,8 @@ export function buildClubTable(clubs = { ...Object.fromEntries(presetClubs().map
 
 /**
  * 완성 예시 — 이름은 전부 지어낸 것이다(진짜 이름이면 모델이 베껴 쓴다). 출력은 `JUDGE_SCHEMA`의 키 순서 그대로다(테스트가 대조한다).
- * 유형: 관심 구단 여럿(to null) · 지난 창 무산의 회고(past) · 공식 발표 + 금액 + 요약 · 재계약.
+ * 유형: 관심 구단 여럿(to null) · 지난 창 무산의 회고(past) · 공식 발표 + 금액 + 요약 · 재계약 · 진행 중 임대의 의무 조항(loan_standing) ·
+ * 임대 중인 선수의 제3구단 이적설(from = 소유 구단).
  */
 export const JUDGE_EXAMPLES = [
   {
@@ -207,8 +226,11 @@ export const JUDGE_EXAMPLES = [
       evidence_ids: [2],
       timing: "current",
       player: "Rafael Ostoja",
+      on_loan: null,
       why: "세 구단이 주시만 하고 있고 협상·제안 상대가 없어 행선지를 정할 수 없다.",
       move: true,
+      form: "permanent",
+      loan_clause: null,
       stage: "rumour",
       from: "Varnholm",
       to: null,
@@ -229,8 +251,11 @@ export const JUDGE_EXAMPLES = [
       evidence_ids: [2],
       timing: "past",
       player: "Jonas Halvorsen",
+      on_loan: null,
       why: "지난여름 창에 무산된 이적을 선수가 돌아보는 인터뷰이고 지금 새 움직임은 없다.",
       move: false,
+      form: null,
+      loan_clause: null,
       stage: null,
       from: "Brennmoor",
       to: null,
@@ -251,8 +276,11 @@ export const JUDGE_EXAMPLES = [
       evidence_ids: [1, 2],
       timing: "current",
       player: "Marco Velloni",
+      on_loan: null,
       why: "구단이 영입을 공식 발표했고 이적료가 원문에 적혀 있다.",
       move: true,
+      form: "permanent",
+      loan_clause: null,
       stage: "official",
       from: "Ostrava Rovers",
       to: "Dunmore Athletic",
@@ -273,8 +301,11 @@ export const JUDGE_EXAMPLES = [
       evidence_ids: [2],
       timing: "current",
       player: "Leo Marchetti",
+      on_loan: null,
       why: "지금 소속 구단과의 재계약 소식이라 구단 이동이 아니다.",
       move: false,
+      form: null,
+      loan_clause: null,
       stage: null,
       from: "Kestrel City",
       to: null,
@@ -282,6 +313,56 @@ export const JUDGE_EXAMPLES = [
       fee: null,
       player_ko: null,
       summary_ko: null,
+    },
+  },
+  {
+    input: [
+      "<기준>\n보도 날짜: 2026-10-08 (한국 시각)\n이적시장: 창 사이\n직전 창: 2026 여름 (마감 2026-09-02)\n다음 창: 2027 겨울 (개장 2027-01-01)\n</기준>",
+      "<선수>Tomas Brevik</선수>",
+      "<표기>\nTomas Brevik = 토마스 브레비크\n</표기>",
+      "<원문>\n[1] Brevik set to stay at Dunmore for good\n[2] Tomas Brevik joined Dunmore Athletic on loan from Kestrel City in the summer with an obligation to buy.\n[3] The obligation is worth £38m and is triggered if Dunmore avoid relegation, which looks easily achievable.\n</원문>",
+    ].join("\n"),
+    output: {
+      evidence_ids: [2, 3],
+      timing: "current",
+      player: "Tomas Brevik",
+      on_loan: { owner: "Kestrel City", at: "Dunmore Athletic" },
+      why: "여름에 의무 조항이 붙은 임대로 이미 옮겼고, 새 움직임 없이 그 조항을 설명하는 글이다.",
+      move: true,
+      form: "loan_standing",
+      loan_clause: "obligation",
+      stage: null,
+      from: "Kestrel City",
+      to: "Dunmore Athletic",
+      suitors: [],
+      fee: { text: "£38m", amount: 38, currency: "GBP", kind: "buy_clause" },
+      player_ko: "토마스 브레비크",
+      summary_ko: "Kestrel City에서 Dunmore Athletic으로 완전 이적 의무 조항이 포함된 임대 중인 토마스 브레비크가 시즌 뒤 완전 이적할 가능성이 높다. 의무 조항 금액은 £38m이고 조건은 Dunmore의 강등 회피다.",
+    },
+  },
+  {
+    input: [
+      "<기준>\n보도 날짜: 2026-11-20 (한국 시각)\n이적시장: 창 사이\n직전 창: 2026 여름 (마감 2026-09-02)\n다음 창: 2027 겨울 (개장 2027-01-01)\n</기준>",
+      "<선수>Lukas Hendl</선수>",
+      "<표기>\n(없음)\n</표기>",
+      "<원문>\n[1] Valborg eye on-loan goalkeeper Hendl\n[2] Valborg are monitoring Lukas Hendl, who is owned by Ostrava Rovers but spending the season on loan at Brennmoor.\n[3] Ostrava would want around €15m for the 24-year-old.\n</원문>",
+    ].join("\n"),
+    output: {
+      evidence_ids: [2, 3],
+      timing: "current",
+      player: "Lukas Hendl",
+      on_loan: { owner: "Ostrava Rovers", at: "Brennmoor" },
+      why: "임대 중인 선수에게 제3구단이 관심을 보이고, 파는 쪽은 소유 구단이다.",
+      move: true,
+      form: "permanent",
+      loan_clause: null,
+      stage: "rumour",
+      from: "Ostrava Rovers",
+      to: null,
+      suitors: ["Valborg"],
+      fee: { text: "€15m", amount: 15, currency: "EUR", kind: "asking_price" },
+      player_ko: null,
+      summary_ko: "Ostrava Rovers 소속으로 Brennmoor에 임대 중인 골키퍼 Lukas Hendl을 Valborg가 주시하고 있다. Ostrava Rovers의 요구액은 €15m 안팎으로 전해졌다.",
     },
   },
 ];
@@ -300,7 +381,7 @@ export const JUDGE_EXAMPLES = [
 export function buildSystem(terms = loadGlossary().terms, clubLines = buildClubTable()) {
   const termLines = Object.entries(terms).map(([en, ko]) => `${en} → ${ko}`);
   const examples = JUDGE_EXAMPLES.map((e, i) => `예시 ${i + 1}\n입력:\n${e.input}\n출력:\n${JSON.stringify(e.output)}`);
-  return `너는 축구 이적 보도를 읽는 편집자다. <원문>이 <선수>의 구단 이동을 지금 보도하는지 판정하고, 근거 문장·시점·선수·단계·구단·금액과 한국어 요약을 낸다. 출력 필드는 아래 순서대로 채운다 — 근거 문장과 시점을 먼저 정하고 결론은 그 뒤에 적는다.
+  return `너는 축구 이적 보도를 읽는 편집자다. <원문>이 <선수>의 구단 이동을 지금 보도하는지 판정하고, 근거 문장·시점·선수·임대 상태·형태·단계·구단·금액과 한국어 요약을 낸다. 출력 필드는 아래 순서대로 채운다 — 근거 문장과 시점을 먼저 정하고 결론은 그 뒤에 적는다.
 
 [입력]
 - <기준>: 보도 날짜(한국 시각)와 그 날짜가 어느 이적시장 창 안인지·창 사이인지, 직전 창 마감과 다음 창 개장. 없으면 원문만으로 판단한다.
@@ -310,10 +391,12 @@ export function buildSystem(terms = loadGlossary().terms, clubLines = buildClubT
 
 [evidence_ids] 판정의 근거가 된 문장 번호 1~3개(<원문>에 있는 번호만). move가 true면 옮김(관심·협상·제안·합의·발표·무산·부인)을 말하는 문장에서 고른다 — 재계약·계약 연장 문장은 이동의 근거가 아니다. move가 false면 이동이 아니라고 본 문장을 고르고, 마땅한 문장이 없으면 [].
 
-[timing] <기준>의 보도 날짜를 기준으로 판단한다. current — 지금 창이나 다음 창을 향한 움직임(새 관심·협상·제안·합의·메디컬·발표, 지금 일어난 무산·부인). past — 지난 창에 이미 끝난 이적·무산·관심을 돌아보는 글과 그 뒷이야기(뒤늦게 공개된 이적료·협상 과정, 대리인·변호사·전 감독의 설명, 이적한 뒤의 적응·평가, 지난 창 영입을 정리·평가하는 베스트 영입·결산 기사, 무산된 이적을 회상하는 선수 인터뷰). 지난 일을 언급해도 지금 다시 움직임이 있다는 소식(1월에 재도전한다, 여전히 원한다, 다시 접촉했다)이면 current다. 이적과 무관한 글은 null.
-예: "X reflects on collapse of City move"(창 사이) → past · "Braga president reveals fee Newcastle paid for X" → past · "X rejected interest from Liverpool this summer"(창 사이) → past · "X still keen to join Liverpool after summer move failed" → current · "Juventus confirm signing of X"(창 안) → current.
+[timing] <기준>의 보도 날짜를 기준으로 판단한다. current — 지금 창이나 다음 창을 향한 움직임(새 관심·협상·제안·합의·메디컬·발표, 지금 일어난 무산·부인). past — 지난 창에 이미 끝난 이적·무산·관심을 돌아보는 글과 그 뒷이야기(뒤늦게 공개된 이적료·협상 과정, 대리인·변호사·전 감독의 설명, 이적한 뒤의 적응·평가, 지난 창 영입을 정리·평가하는 베스트 영입·결산 기사, 무산된 이적을 회상하는 선수 인터뷰). 지난 일을 언급해도 지금 다시 움직임이 있다는 소식(1월에 재도전한다, 여전히 원한다, 다시 접촉했다)이면 current다. 지금 진행 중인 임대와 그 조항(완전 이적 옵션·의무)을 설명하는 글은 그 임대가 지난 창에 성사됐어도 past가 아니라 current이고 form은 loan_standing이다 — 그 임대는 아직 끝나지 않은 지금의 사실이다. 이적과 무관한 글은 null.
+예: "X reflects on collapse of City move"(창 사이) → past · "Braga president reveals fee Newcastle paid for X" → past · "X rejected interest from Liverpool this summer"(창 사이) → past · "X still keen to join Liverpool after summer move failed" → current · "Juventus confirm signing of X"(창 안) → current · "X, on loan at Villa from Chelsea, will join permanently next summer if conditions are met"(창 사이) → current(loan_standing).
 
 [player] <선수>가 있으면 그 이름을 그대로 옮긴다. <선수>가 비어 있으면 원문이 이동을 다루는 선수 한 명의 이름을 원문 표기 그대로 적는다 — 성과 이름이 원문에 모두 있으면 전체 이름. 적기 전에 그 사람이 이동 당사자인지 본다: 재계약한 선수, 배경으로 언급된 선수, 곁다리로 나온 선수는 당사자가 아니다. 여러 선수를 같은 비중으로 다루면 제목([1])·첫 문장의 선수다. 감독·코치·임원·에이전트는 선수가 아니다. 선수를 특정할 수 없으면 null이고 move는 false다.
+
+[on_loan] 보도 시점에 선수가 다른 구단에 임대 중이면 {owner: 선수를 보유한 구단, at: 지금 임대로 뛰는 구단}, 아니면 null. 원문에 적힌 구단명을 글자 그대로 옮기고, 원문에 없는 쪽은 null이다. 원문이 임대 중이라고 말할 때만 적는다(on loan at · loanee · spending the season at · loaned to) — 지난 임대(예전에 임대로 뛰었다)는 null이다.
 
 [why] 이 판정을 내린 까닭을 한국어 한 문장, 30단어 이내로. 근거 문장에 있는 사실만 짧게 적는다.
 
@@ -327,9 +410,22 @@ false:
 - <선수>는 곁다리이고 다른 사람의 이동을 다루는 글
 - 제목에만 이적 낱말이 있고 본문이 다른 이야기인 글
 - 입단 테스트·전지훈련 합류(계약을 맺었다는 말이 없으면)
+- 임대 기간이 끝나 원소속 구단으로 돌아가는 것(계약 만료 복귀) — 조기 복귀(recall)는 이동이다
+- 임대 선수가 원소속 구단과의 경기에 뛸 수 없다·컵 대회 출전 자격 같은 출전 규정 기사
 관용구에 속지 않는다: "in agreement with"(의견 동의), "not interested in", 낚시성 제목.
 
-[stage] move가 true일 때 보도가 말하는 단계 하나, false면 null. 한 글에 여러 단계가 나오면 가장 진전된 하나다. 단서:
+[form] move가 true일 때 이 보도가 말하는 사건의 형태 하나, false면 null.
+- permanent: 완전 이적(이적료·자유계약 포함). 임대 중인 선수가 소유 구단에서 제3구단으로 완전 이적하는 이적설도 여기다.
+- loan: 새 임대 — 임대 이적설·임대 협상·임대 합의·임대 발표. 임대 중인 선수가 다른 구단으로 다시 임대되는 것도 여기다.
+- loan_convert: 지금 임대로 뛰는 구단이 그 선수를 완전 영입하려는 움직임 — 옵션 행사·의무 조항 발동이 지금 일어났다·완전 영입 협상·조기 완전 영입.
+- loan_standing: 이미 성사된 임대와 거기 붙은 조항을 설명할 뿐 새 움직임이 없는 글 — "여름에 임대로 왔고 조건이 맞으면 시즌 뒤 £40m에 완전 이적한다", "옵션이 없다". 새 협상·발동·행사가 있으면 loan_convert다.
+- loan_recall: 임대를 조기에 끝내고 소유 구단으로 돌아오는 것(recall · cut short).
+- loan_extend: 임대 기간 연장.
+임대 낱말(loan · loanee · recall)이 원문에 없으면 permanent다.
+
+[loan_clause] 이 보도의 임대(새 임대든 진행 중인 임대든)에 붙은 완전 이적 조항 — option(option to buy · 옵션) · obligation(obligation to buy · mandatory · 조건부 의무 포함), 원문이 말하지 않으면 null. form이 permanent·loan_recall이면 null.
+
+[stage] move가 true일 때 보도가 말하는 단계 하나, false면 null. form이 loan_standing이면 null이다(새 움직임이 없다). 한 글에 여러 단계가 나오면 가장 진전된 하나다. 단서:
 - rumour: interested · monitoring · linked · target · on the radar · enquiry (관심·주시·연결·문의)
 - talks: in talks · negotiations · contact · approach (협상·접촉)
 - offer: bid · offer submitted · proposal (제안·입찰 제출)
@@ -343,19 +439,20 @@ false:
 글의 주제가 다른 구단의 관심이고 소속 구단의 "팔 생각이 없다"는 곁들인 말이면 denied가 아니라 rumour다.
 
 [from / to / suitors] 원문에 적힌 구단명을 글자 그대로 옮긴다(번역·줄임·정규화하지 않는다). 원문에 없으면 null·[].
-- from: 선수의 현재 소속 구단(자유계약이면 직전 소속, 임대 중이면 임대로 뛰는 구단).
-- to: 협상·제안·합의·메디컬·완료 중인 상대 구단만 — 원문이 그 구단과의 그 단계를 말할 때다.
+- from: 선수의 계약을 넘기는 쪽 — 선수를 보유한 구단이다(자유계약이면 직전 소속). 임대 중이어도 임대로 뛰는 구단이 아니라 보유한 구단이다. 단 form이 loan_recall이면 지금 임대로 뛰는 구단이다.
+- to: 협상·제안·합의·메디컬·완료 중인 상대 구단만 — 원문이 그 구단과의 그 단계를 말할 때다. loan_convert·loan_standing·loan_extend는 지금 임대로 뛰는 구단, loan_recall은 보유한 구단이다.
 - suitors: 관심·주시·연결 수준의 구단은 몇 개든(하나뿐이어도) 전부 여기에 언급 순으로 적는다(최대 ${SUITORS_MAX}). 협상 상대가 없으면 to는 null이고 그 구단들을 전부 suitors에 적는다. to와 suitors에 같은 구단을 적지 않는다.
 - suitors에는 이 글이 지금 관심을 보인다고 말하는 구단만 적는다 — 과거에 무산된 이적의 상대나 다른 루머의 구단은 넣지 않는다.
 예: "Bayern are keen on X" → to null, suitors [Bayern] · "Tottenham, Newcastle and Chelsea are interested in X" → to null, suitors 셋 · "Chelsea have opened talks over X, while United and Liverpool are monitoring" → to Chelsea, suitors [United, Liverpool] · "Real Madrid have made a bid for Stuttgart's X" → from Stuttgart, to Real Madrid.
 
-[fee] 그 선수의 이동에 붙은 금액 하나와 그 성격, 원문에 없으면 null. 제목·첫 문단이 그 선수에 대해 말하는 금액을 고르고, 같은 비중이면 fee > bid > asking_price > release_clause > valuation 순이다. text는 원문의 금액 표기 그대로("£60m", "€20-25m"). amount는 백만 단위 숫자(£60m → 60, €500k → 0.5), currency는 GBP·EUR·USD. kind: fee(합의·완료된 이적료) · bid(제안·입찰액) · asking_price(구단의 요구액·가격표) · release_clause(바이아웃) · valuation(평가액·예상액 — 합의 전 "~규모의 딜 논의"도 여기다). 범위(€20-25m)면 amount는 높은 값, 같은 금액을 두 통화로 적었으면(€100m (£86m)) 먼저 적힌 쪽. 다른 선수의 금액, 주급·연봉, 옵션(add-ons)은 적지 않는다.
+[fee] 그 선수의 이동에 붙은 금액 하나와 그 성격, 원문에 없으면 null. 제목·첫 문단이 그 선수에 대해 말하는 금액을 고르고, 같은 비중이면 fee > bid > asking_price > release_clause > valuation 순이다. text는 원문의 금액 표기 그대로("£60m", "€20-25m"). amount는 백만 단위 숫자(£60m → 60, €500k → 0.5), currency는 GBP·EUR·USD. kind: fee(합의·완료된 이적료) · bid(제안·입찰액) · asking_price(구단의 요구액·가격표) · release_clause(바이아웃) · valuation(평가액·예상액 — 합의 전 "~규모의 딜 논의"도 여기다) · loan_fee(임대료) · buy_clause(임대에 붙은 완전 이적 옵션·의무 금액). 임대 보도에서 조항 금액과 임대료가 함께 나오면 buy_clause다. 재판매(셀온) 조항 몫·위약금은 적지 않는다. 범위(€20-25m)면 amount는 높은 값, 같은 금액을 두 통화로 적었으면(€100m (£86m)) 먼저 적힌 쪽. 다른 선수의 금액, 주급·연봉, 옵션(add-ons)은 적지 않는다.
 
 [player_ko] 선수의 한글 표기. <표기>에 "="로 적힌 표기는 그대로 쓴다. "≈"로 적힌 표기는 외래어 표기법식 참고값이다 — 한국 팬·매체가 쓰는 통용 표기가 같으면 그대로, 다르면 통용 표기를 쓴다(예: 가크포 → 각포, 홀란 → 홀란드, 판 데이크 → 반 다이크). 통용 표기를 모르면 ≈ 표기를 쓴다. <표기>에 없으면 통용 표기를 쓰고(Cody Gakpo → 코디 각포, Erling Haaland → 엘링 홀란드, Trent Alexander-Arnold → 트렌트 알렉산더-아놀드), 모르면 null이다(음역을 지어내지 않는다). 이니셜은 영문 대문자 그대로 둘 수 있다("JJ 가브리엘").
 
 [summary_ko] move가 true일 때만 한국어 두 문장, 공백 포함 90~140자. false면 null.
 - 첫 문장: 누가(현 소속) 어디로 가는지, 또는 어떤 구단들이 관심을 보이는지와 그 단계.
-- 둘째 문장: 원문에 있는 것 가운데 금액(성격과 함께 — "£60m 제안이 거절됐다", "요구액은 €100m"), 임대·자유계약 여부, 다른 관심 구단, 계약 기간. 요구액·제안액을 이적료라고 쓰지 않는다.
+- 둘째 문장: 원문에 있는 것 가운데 금액(성격과 함께 — "£60m 제안이 거절됐다", "요구액은 €100m", "완전 이적 의무 조항 금액은 £38m"), 임대·자유계약 여부, 다른 관심 구단, 계약 기간. 요구액·제안액·조항 금액을 이적료라고 쓰지 않는다.
+- 임대 중인 선수는 보유 구단과 임대 구단을 함께 밝힌다("X 소속으로 Y에 임대 중인"). 진행 중인 임대를 설명하는 글(loan_standing)을 새 이적처럼 쓰지 않는다.
 - 보도의 확신 수준 그대로 쓴다: reportedly → "~로 전해졌다", could → "~할 수 있다". 관심을 합의처럼 올려 쓰지 않는다.
 - 행선지에는 "~로/~에", 출발에는 "~에서"를 붙인다.
 - 금액은 원문의 기호·단위 그대로(£69m, €500k) — "6900만 파운드"·"69M"으로 바꾸지 않는다. 날짜·숫자도 원문 값 그대로.

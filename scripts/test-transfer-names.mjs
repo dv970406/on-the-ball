@@ -220,14 +220,29 @@ check("딜의 선수·구단 중 빠진 것만, 중복 없이",
 
 // ── 현 소속 구단(P54) — 종료일 없는 축구 클럽 중 시작이 가장 늦은 것 ────────────────────
 const team = (id, en, ko, p31 = "Q476028") => ({ labels: { en: { value: en }, ko: { value: ko } }, claims: { P31: [claim(p31)] } });
-const p54 = (id, { start, end, rank } = {}) => ({
+const p54 = (id, { start, end, rank, loan } = {}) => ({
   rank: rank ?? "normal",
   mainsnak: { datavalue: { value: { id } } },
-  qualifiers: { ...(start ? { P580: [{ datavalue: { value: { time: start } } }] } : {}), ...(end === undefined ? {} : { P582: [end ? { datavalue: { value: { time: end } } } : {}] }) },
+  qualifiers: {
+    ...(start ? { P580: [{ datavalue: { value: { time: start } } }] } : {}),
+    ...(end === undefined ? {} : { P582: [end ? { datavalue: { value: { time: end } } } : {}] }),
+    // 취득 방식(P1642) = 임대(Q2914547)
+    ...(loan ? { P1642: [{ datavalue: { value: { id: "Q2914547" } } }] } : {}),
+  },
 });
 const TEAMS = { Q10: team("Q10", "Tottenham Hotspur F.C.", "토트넘 홋스퍼 FC"), Q11: team("Q11", "FC Bayern Munich", "FC 바이에른 뮌헨"), Q12: team("Q12", "England national football team", "잉글랜드 축구 국가대표팀", "Q6979593"), Q13: team("Q13", "Loan Town", "론 타운") };
 const kane = { claims: { P54: [p54("Q10", { start: "+2009-01-01T00:00:00Z", end: "+2023-08-12T00:00:00Z" }), p54("Q11", { start: "+2023-08-12T00:00:00Z" }), p54("Q12", { start: "+2015-03-27T00:00:00Z" })] } };
-check("현 소속 — 종료된 소속·국가대표팀을 빼고 남은 클럽", eq(pickCurrentClub(kane, TEAMS), { wikidataId: "Q11", nameEn: "FC Bayern Munich", nameKo: "FC 바이에른 뮌헨" }));
+check("현 소속 — 종료된 소속·국가대표팀을 빼고 남은 클럽", eq(pickCurrentClub(kane, TEAMS), { wikidataId: "Q11", nameEn: "FC Bayern Munich", nameKo: "FC 바이에른 뮌헨", owner: null }));
+{
+  // 가르나초형 — 임대 한정자가 붙은 현 소속(빌라 자리) + 종료일 없는 다른 클럽(첼시 자리) + 국가대표팀
+  const onLoan = { claims: { P54: [p54("Q11", { start: "+2025-08-30T00:00:00Z" }), p54("Q12", { start: "+2023-01-01T00:00:00Z" }), p54("Q13", { start: "+2026-07-23T00:00:00Z", rank: "preferred", loan: true })] } };
+  const r = pickCurrentClub(onLoan, TEAMS);
+  check("보유 구단 — 현 소속에 임대 한정자가 있으면 열린 다른 클럽이 보유 구단이다(국가대표팀은 빼고)", r?.wikidataId === "Q13" && r?.owner?.wikidataId === "Q11", JSON.stringify(r));
+  check("보유 구단 — 임대 한정자가 없으면 보유 구단을 짐작하지 않는다", pickCurrentClub({ claims: { P54: [p54("Q11", { start: "+2023-08-12T00:00:00Z" }), p54("Q13", { start: "+2026-01-10T00:00:00Z" })] } }, TEAMS)?.owner === null);
+  // 종료일이 빠진 옛 소속 기록이 남아 보유 구단 후보가 둘이다 — 시작일 없는 진짜 보유 구단 대신 옛 구단을 뽑지 않는다
+  check("보유 구단 — 열린 다른 클럽이 둘 이상이면 짐작하지 않는다", pickCurrentClub({ claims: { P54: [p54("Q10", { start: "+2020-01-01T00:00:00Z" }), p54("Q11", {}), p54("Q13", { start: "+2026-07-23T00:00:00Z", loan: true })] } }, TEAMS)?.owner === null);
+  check("보유 구단 — 임대 기록뿐이고 열린 다른 클럽이 없으면 null", pickCurrentClub({ claims: { P54: [p54("Q13", { start: "+2026-07-23T00:00:00Z", loan: true })] } }, TEAMS)?.owner === null);
+}
 check("현 소속 — 임대 중이면 시작이 더 늦은 임대 구단", pickCurrentClub({ claims: { P54: [p54("Q11", { start: "+2023-08-12T00:00:00Z" }), p54("Q13", { start: "+2026-01-10T00:00:00Z" })] } }, TEAMS)?.wikidataId === "Q13");
 check("현 소속 — 값 없는 종료일(somevalue)도 끝난 소속이다", pickCurrentClub({ claims: { P54: [p54("Q11", { start: "+2023-08-12T00:00:00Z", end: null })] } }, TEAMS) === null);
 check("현 소속 — 종료일 없는 클럽이 하나도 없으면 null(지어내지 않는다)", pickCurrentClub({ claims: { P54: [p54("Q10", { end: "+2023-08-12T00:00:00Z" })] } }, TEAMS) === null && pickCurrentClub({ claims: {} }, TEAMS) === null);
@@ -237,9 +252,13 @@ const clubBook = createNameBook({ cache: [
   { kind: "player_club", key: "harry kane", name_en: "Bayern Munich", name_ko: null, wikidata_id: "Q11", checked_at: new Date(NOW - 86_400_000).toISOString() },
   { kind: "player_club", key: "finn jeltsch", name_en: "Finn Jeltsch", name_ko: null, wikidata_id: null, checked_at: new Date(NOW - 86_400_000).toISOString() },
   { kind: "player_club", key: "old man", name_en: "Old Club", name_ko: null, wikidata_id: "Q99", checked_at: new Date(NOW - CLUB_RECHECK_MS - 1).toISOString() },
+  { kind: "player_owner_club", key: "harry kane", name_en: "Harry Kane", name_ko: null, wikidata_id: null, checked_at: new Date(NOW - 86_400_000).toISOString() },
+  // 보유 구단 행이 생기기 전에 찾은 현 소속 — 그 행을 채우러 한 번 다시 본다
+  { kind: "player_club", key: "jamie gittens", name_en: "Chelsea", name_ko: null, wikidata_id: "Q9616", checked_at: new Date(NOW - 86_400_000).toISOString() },
 ] });
 check("사전 — 현 소속은 찾은 행만 값이고, 못 찾은 행·없는 행은 null", clubBook.currentClub("harry kane") === "Bayern Munich" && clubBook.currentClub("finn jeltsch") === null && clubBook.currentClub("nobody") === null);
 check("사전 — 조회 대상: 없는 행·재확인 주기가 지난 행(찾았어도 소속은 바뀐다), 최근 행은 아니다", clubBook.needsClubLookup("nobody", NOW) && clubBook.needsClubLookup("old man", NOW) && !clubBook.needsClubLookup("harry kane", NOW) && !clubBook.needsClubLookup("finn jeltsch", NOW));
+check("사전 — 현 소속은 찾았는데 보유 구단 행이 없으면(그 행이 생기기 전의 조회) 다시 본다", clubBook.needsClubLookup("jamie gittens", NOW));
 
 // ── 표기의 기준은 팬들이 쓰는 표기다 — 사람 사전 → 판정자의 통용 표기 → 위키데이터 레이블 ──
 {
@@ -330,6 +349,29 @@ check("사전 — 조회 대상: 없는 행·재확인 주기가 지난 행(찾�
     eq(seen, ["wbsearchentities:Amu Gae", "wbgetentities:Q20", "wbgetentities:Q21", "wbgetentities:Q30"]) && r.found === 2 && upserts.filter((x) => x.kind === "club").length === 1 && eq(r.written, upserts),
     JSON.stringify([seen, upserts, r]),
   );
+  check("현 소속 캐시 — 임대 중이 아닌 선수는 보유 구단 행을 비운다(옛 보유 구단이 남지 않게)", upserts.filter((x) => x.kind === "player_owner_club").length === 2 && upserts.filter((x) => x.kind === "player_owner_club").every((x) => x.wikidata_id === null), JSON.stringify(upserts));
+}
+{
+  // 임대 중인 선수 — 현 소속(임대 구단)과 보유 구단을 함께 쓴다
+  const claim = (id) => ({ mainsnak: { datavalue: { value: { id } } } });
+  const loanQ = { P1642: [{ datavalue: { value: { id: "Q2914547" } } }], P580: [{ datavalue: { value: { time: "+2026-07-23T00:00:00Z" } } }] };
+  const E = {
+    Q40: { claims: { P54: [{ mainsnak: { datavalue: { value: { id: "Q9616" } } }, qualifiers: { P580: [{ datavalue: { value: { time: "+2025-08-30T00:00:00Z" } } }] } }, { rank: "preferred", mainsnak: { datavalue: { value: { id: "Q18711" } } }, qualifiers: loanQ }] } },
+    Q9616: { labels: { en: { value: "Chelsea F.C." } }, claims: { P31: [claim("Q476028")] } },
+    Q18711: { labels: { en: { value: "Aston Villa F.C." } }, claims: { P31: [claim("Q476028")] } },
+  };
+  const f = async (url) => {
+    const q = new URL(url).searchParams;
+    return { ok: true, json: async () => ({ entities: Object.fromEntries(q.get("ids").split("|").filter((id) => E[id]).map((id) => [id, E[id]])) }) };
+  };
+  const upserts = [];
+  const db = { from: () => ({ upsert: async (rows) => { upserts.push(...rows); return { error: null }; } }) };
+  await lookupCurrentClubs(db, [{ playerKey: "alejandro garnacho", player: "Alejandro Garnacho", wikidataId: "Q40" }], { fetchImpl: f });
+  const club = upserts.find((x) => x.kind === "player_club");
+  const owner = upserts.find((x) => x.kind === "player_owner_club");
+  check("현 소속 캐시 — 임대 중이면 현 소속은 임대 구단, 보유 구단을 함께 쓴다(가르나초)", club?.name_en === "Aston Villa" && owner?.name_en === "Chelsea" && owner?.wikidata_id === "Q9616", JSON.stringify(upserts));
+  const book = createNameBook({ cache: upserts });
+  check("이름 사전 — 보유 구단은 ownerClub, 현 소속은 currentClub", book.ownerClub("alejandro garnacho") === "Chelsea" && book.currentClub("alejandro garnacho") === "Aston Villa");
 }
 
 console.log(`\n이름 사전 ${pass}/${pass + fail} 통과`);

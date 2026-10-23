@@ -135,10 +135,16 @@ export type Database = {
           fee_low_amount: number | null
           fee_text: string | null
           first_reported_at: string
+          form: Database["public"]["Enums"]["transfer_move_form"] | null
           from_club_code: string | null
           id: number
           is_free_agent: boolean
           latest_reported_at: string
+          loan_clause:
+            | Database["public"]["Enums"]["transfer_loan_clause"]
+            | null
+          loan_club_code: string | null
+          loan_fee_text: string | null
           nationality: string | null
           player: string
           player_ko: string | null
@@ -163,10 +169,16 @@ export type Database = {
           fee_low_amount?: number | null
           fee_text?: string | null
           first_reported_at: string
+          form?: Database["public"]["Enums"]["transfer_move_form"] | null
           from_club_code?: string | null
           id?: never
           is_free_agent?: boolean
           latest_reported_at: string
+          loan_clause?:
+            | Database["public"]["Enums"]["transfer_loan_clause"]
+            | null
+          loan_club_code?: string | null
+          loan_fee_text?: string | null
           nationality?: string | null
           player: string
           player_ko?: string | null
@@ -191,10 +203,16 @@ export type Database = {
           fee_low_amount?: number | null
           fee_text?: string | null
           first_reported_at?: string
+          form?: Database["public"]["Enums"]["transfer_move_form"] | null
           from_club_code?: string | null
           id?: never
           is_free_agent?: boolean
           latest_reported_at?: string
+          loan_clause?:
+            | Database["public"]["Enums"]["transfer_loan_clause"]
+            | null
+          loan_club_code?: string | null
+          loan_fee_text?: string | null
           nationality?: string | null
           player?: string
           player_ko?: string | null
@@ -211,6 +229,13 @@ export type Database = {
           {
             foreignKeyName: "transfer_deal_from_club_code_fkey"
             columns: ["from_club_code"]
+            isOneToOne: false
+            referencedRelation: "transfer_club"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "transfer_deal_loan_club_code_fkey"
+            columns: ["loan_club_code"]
             isOneToOne: false
             referencedRelation: "transfer_club"
             referencedColumns: ["code"]
@@ -400,16 +425,19 @@ export type Database = {
       transfer_deal_push_log: {
         Row: {
           deal_id: number
+          round_key: string
           sent_at: string
           status: Database["public"]["Enums"]["transfer_status_tone"]
         }
         Insert: {
           deal_id: number
+          round_key?: string
           sent_at?: string
           status: Database["public"]["Enums"]["transfer_status_tone"]
         }
         Update: {
           deal_id?: number
+          round_key?: string
           sent_at?: string
           status?: Database["public"]["Enums"]["transfer_status_tone"]
         }
@@ -554,8 +582,14 @@ export type Database = {
           verdict_fee_kind:
             | Database["public"]["Enums"]["transfer_fee_kind"]
             | null
+          verdict_form: Database["public"]["Enums"]["transfer_move_form"] | null
           verdict_from: string | null
           verdict_input: string | null
+          verdict_loan_clause:
+            | Database["public"]["Enums"]["transfer_loan_clause"]
+            | null
+          verdict_loan_club: string | null
+          verdict_loan_owner: string | null
           verdict_model: string | null
           verdict_player: string | null
           verdict_player_name: string | null
@@ -599,8 +633,16 @@ export type Database = {
           verdict_fee_kind?:
             | Database["public"]["Enums"]["transfer_fee_kind"]
             | null
+          verdict_form?:
+            | Database["public"]["Enums"]["transfer_move_form"]
+            | null
           verdict_from?: string | null
           verdict_input?: string | null
+          verdict_loan_clause?:
+            | Database["public"]["Enums"]["transfer_loan_clause"]
+            | null
+          verdict_loan_club?: string | null
+          verdict_loan_owner?: string | null
           verdict_model?: string | null
           verdict_player?: string | null
           verdict_player_name?: string | null
@@ -644,8 +686,16 @@ export type Database = {
           verdict_fee_kind?:
             | Database["public"]["Enums"]["transfer_fee_kind"]
             | null
+          verdict_form?:
+            | Database["public"]["Enums"]["transfer_move_form"]
+            | null
           verdict_from?: string | null
           verdict_input?: string | null
+          verdict_loan_clause?:
+            | Database["public"]["Enums"]["transfer_loan_clause"]
+            | null
+          verdict_loan_club?: string | null
+          verdict_loan_owner?: string | null
           verdict_model?: string | null
           verdict_player?: string | null
           verdict_player_name?: string | null
@@ -743,6 +793,16 @@ export type Database = {
         | "asking_price"
         | "release_clause"
         | "valuation"
+        | "loan_fee"
+        | "buy_clause"
+      transfer_loan_clause: "option" | "obligation"
+      transfer_move_form:
+        | "permanent"
+        | "loan"
+        | "loan_convert"
+        | "loan_standing"
+        | "loan_recall"
+        | "loan_extend"
       transfer_stage:
         | "rumour"
         | "talks"
@@ -903,6 +963,17 @@ export const Constants = {
         "asking_price",
         "release_clause",
         "valuation",
+        "loan_fee",
+        "buy_clause",
+      ],
+      transfer_loan_clause: ["option", "obligation"],
+      transfer_move_form: [
+        "permanent",
+        "loan",
+        "loan_convert",
+        "loan_standing",
+        "loan_recall",
+        "loan_extend",
       ],
       transfer_stage: [
         "rumour",

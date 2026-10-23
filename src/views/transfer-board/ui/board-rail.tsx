@@ -8,9 +8,11 @@ import {
   FeeValue,
   playerName,
   StatusBadge,
+  isLoanForm,
   type TransferDealListItem,
   type TransferLeague,
   type TransferSort,
+  type TransferTypeFilter,
 } from "@/entities/transfer";
 import { ROUTES } from "@/shared/config";
 import { cn, formatCount } from "@/shared/lib";
@@ -33,6 +35,7 @@ interface BoardRailProps {
   sort: TransferSort;
   club: string | null;
   watch: boolean;
+  type: TransferTypeFilter | null;
   isGuest: boolean;
   /** 오른쪽 판에 열린 딜 — 관심 딜 목록에서 같은 딜을 표시한다 */
   selectedId: number | null;
@@ -41,7 +44,7 @@ interface BoardRailProps {
 }
 
 /**
- * `min-[90rem]` 왼쪽 레일 — 관심 딜 · 리그 · 구단. 그 폭에서 가운데의 `FilterRail`(리그 시트 버튼 + 칩 한 줄)을 대신한다.
+ * `min-[90rem]` 왼쪽 레일 — 관심 딜 · 리그 · 형태 · 구단. 그 폭에서 가운데의 `FilterRail`(리그 시트 버튼 + 칩 한 줄)을 대신한다.
  *
  * ⚠ **링크가 만드는 주소는 `FilterRail`·리그 시트와 같다**(`boardHref`) — 리그를 바꾸면 구단 필터를 푼다(다른 리그의 구단이다).
  *   전부 `BoardLink`라 서버를 부르지 않고 주소만 바꾼다. 선택 표시는 `aria-current="page"`.
@@ -50,6 +53,8 @@ interface BoardRailProps {
  * ⚠ 비로그인에게는 관심 딜 자리가 로그인 안내 한 줄 + 버튼이다(누르면 `SignInDialog`). 이미 `?watch=1`로 들어온 비로그인도
  *   "관심만 보기"를 풀 수 있게 그 링크는 남기고, 그때는 버튼을 걷는다(같은 필터를 두 자리가 말하지 않는다 — `FilterRail`의
  *   관심 칩과 같은 판정).
+ * ⚠ **형태**(전체 · 임대)는 리그와 같은 목록 모양이다 — 건수는 고른 리그 안에서 센다(`FilterRail`의 임대 칩과 같은 기준). 그 안에 임대 딜이
+ *   하나도 없고 필터도 꺼져 있으면 절을 그리지 않는다(누르면 빈 보드다). 형태를 바꿔도 다른 필터는 그대로다.
  * ⚠ 구단 칩에 **건수를 적는다**(`FilterRail`과 다르다) — 세로 레일은 리그 목록이 건수를 함께 말하고 칩이 여러 줄로
  *   감겨 순서만으로는 많고 적음이 읽히지 않는다. 한 줄 가로 레일은 순서가 곧 건수라 숫자를 뺀다.
  * ⚠ `memo`다 — 사유는 `FilterRail`과 같다(행을 고를 때마다 보드가 다시 그려진다). 그래서 `selectedId`는 **관심 딜을 골랐을
@@ -63,6 +68,7 @@ export const BoardRail = memo(function BoardRail({
   sort,
   club,
   watch,
+  type,
   isGuest,
   selectedId,
   onWatchSignInRequired,
@@ -76,6 +82,16 @@ export const BoardRail = memo(function BoardRail({
       ),
     [deals],
   );
+  // 형태 건수는 고른 리그 안에서 센다 — 가로 칩 줄(`FilterRail`)과 같은 기준이다(리그 안에 임대가 없으면 항목을 그리지 않는다 — 누르면 빈 보드다)
+  const { inLeague, loanCount } = useMemo(() => {
+    const scoped = deals.filter((d) => dealInLeague(d, league));
+    return { inLeague: scoped.length, loanCount: scoped.filter((d) => isLoanForm(d.form)).length };
+  }, [deals, league]);
+  // 형태 목록 — 리그 목록과 같은 모양(값 · 라벨 · 건수)
+  const typeOptions: { value: TransferTypeFilter | null; label: string; count: number }[] = [
+    { value: null, label: "전체", count: inLeague },
+    { value: "loan", label: "임대", count: loanCount },
+  ];
 
   return (
     <aside aria-label="관심 딜·필터" className="py-4">
@@ -89,7 +105,7 @@ export const BoardRail = memo(function BoardRail({
           </h2>
           {(!isGuest || watch) && (
             <BoardLink
-              href={boardHref(league, sort, club, !watch)}
+              href={boardHref({ league, sort, club, watch: !watch, type })}
               aria-current={watch ? "page" : undefined}
               className={cn(
                 "inline-flex items-center gap-0.5 text-[11.5px] transition-colors duration-150 ease-otb",
@@ -162,7 +178,7 @@ export const BoardRail = memo(function BoardRail({
             return (
               <li key={label} className={cn("relative", on && RAIL_ON)}>
                 <BoardLink
-                  href={boardHref(value, sort, null, watch)}
+                  href={boardHref({ league: value, sort, club: null, watch, type })}
                   aria-current={on ? "page" : undefined}
                   className={cn(
                     "flex items-center justify-between px-4 py-[7px] text-[13.5px] transition-colors duration-150 ease-otb hover:bg-canvas-soft",
@@ -177,6 +193,34 @@ export const BoardRail = memo(function BoardRail({
           })}
         </ul>
       </section>
+
+      {(loanCount > 0 || type !== null) && (
+        <section aria-labelledby="tm-rail-type" className="pb-[18px]">
+          <h2 id="tm-rail-type" className="px-4 pb-2 text-[12px] font-medium text-ink-mute">
+            형태
+          </h2>
+          <ul>
+            {typeOptions.map(({ value, label, count }) => {
+              const on = value === type;
+              return (
+                <li key={label} className={cn("relative", on && RAIL_ON)}>
+                  <BoardLink
+                    href={boardHref({ league, sort, club, watch, type: value })}
+                    aria-current={on ? "page" : undefined}
+                    className={cn(
+                      "flex items-center justify-between px-4 py-[7px] text-[13.5px] transition-colors duration-150 ease-otb hover:bg-canvas-soft",
+                      on ? "font-medium text-ink" : "text-ink-secondary",
+                    )}
+                  >
+                    {label}
+                    <span className="font-mono text-[12px] tabular-nums text-ink-mute-2">{formatCount(count)}</span>
+                  </BoardLink>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {(clubs.length >= 2 || club !== null) && (
         <section aria-labelledby="tm-rail-club">
@@ -197,6 +241,7 @@ export const BoardRail = memo(function BoardRail({
                 league={league}
                 sort={sort}
                 watch={watch}
+                type={type}
                 className="px-[9px] py-[7px] text-[12.5px]"
                 showCount
               />
