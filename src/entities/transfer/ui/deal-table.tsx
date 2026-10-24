@@ -14,16 +14,18 @@ import type { TransferSort } from "../model/types";
  *   새로 열지 않으려고 묶음 안의 순서로 찾는다. ⚠ 그래서 `DealRow`의 묶음 안 순서를 바꾸면 여기도 함께 바꾼다.
  * - `[data-name]` — 표에서 **잘리지 않고 줄바꿈하는** 이름 글자(선수명 · 경로의 출발·행선지 약칭).
  *
- * 열: md(768–1439) 상태 · 선수 · 경로 · 이적료 · 업데이트(5열) / `min-[90rem]` 상태 · 선수 · 경로 · 이적료 · 변동 · 보도 ·
- * 업데이트(7열). 표 머리와 행 링크가 **같은 표지**(`data-deal-cols`)라 열 폭의 리터럴이 여기 한 곳뿐이다.
+ * 열: md(768–1679) 상태 · 선수 · 경로 · 이적료 · 업데이트(5열) / `min-[105rem]`(1680) 상태 · 선수 · 경로 · 이적료 · 변동 · 보도 ·
+ * 업데이트(7열). ⚠ 7열은 보드의 왼쪽 레일(`min-[90rem]`)보다 **늦게** 연다 — 레일이 생기는 1440px에서 목록이 750px 안팎으로 줄어,
+ *   거기서 열 둘을 더하면 경로 칸이 170px로 좁아져 행선지가 하나뿐인 행까지 두 줄로 꺾였다(실측 113행 중 37행). 1680px부터는
+ *   7열에서도 경로 칸이 270px 이상이다. 레일·판의 폭을 바꾸면 이 경계도 다시 잰다. 표 머리와 행 링크가 **같은 표지**(`data-deal-cols`)라 열 폭의 리터럴이 여기 한 곳뿐이다.
  * 디바이더: 같은 구간의 행 사이에만(`[data-deal-row]+[data-deal-row]` — 형제 선택자). 모바일은 행 패딩 안에서 끝나고
  * (`inset-x-3`), 표에서는 전폭이다. 접힌 행(`hidden`)도 형제 자리에 남아 선이 끊기지 않는다.
  *
  * ⚠ **표의 이름은 자르지 않는다** — 좁은 칸에 두 구단을 놓는 자리라 약칭이지만, 약칭도 잘리면 어느 구단인지 알 수 없다
  *   (`api-and-db.md`). 1024px 2분할에서 경로 칸은 200px 안팎이라 출발·행선지·관심 구단 엠블럼이 한 줄에 들지 않는다 →
  *   md+에서 경로 칸은 **줄을 바꾼다**: 출발 덩어리(엠블럼 + 약칭)는 통째로 한 줄에 서고, 행선지 덩어리가 들지 않으면 다음
- *   줄로 내려간다(`flex-wrap`). 행선지가 여럿이면 그 덩어리를 풀어 "출발 → 엠블럼들" / "이름들"로 선다(이름 글자가 칸 폭을
- *   다 쓴다). 이름 글자는 낱말 단위로 꺾인다(`break-keep` — 한 낱말이 칸보다 길 때만 그 안에서 꺾는다). 열 폭도 경로에 더
+ *   줄로 내려간다(`flex-wrap`). 행선지가 여럿이면 가장 유력한 하나 + `외 N곳`만 적는다(전부는 판·상세의 관심 구단 목록이
+ *   적는다 — `ClubRoute`). 확실한 행선지가 없는 루머면 그 구단 앞에 `유력`을 단다. 이름 글자는 낱말 단위로 꺾인다(`break-keep` — 한 낱말이 칸보다 길 때만 그 안에서 꺾는다). 열 폭도 경로에 더
  *   준다 — 이름 칸은 줄을 바꿀 수 있어 좁아도 되고, 상태·이적료 칸은 가장 긴 값(`합의 임박`·`FA(자유 계약)`)에 맞춘다.
  *   모바일은 그대로 한 줄 + 말줄임이다(행 폭이 화면 폭이라 약칭이 들어간다 — 모바일 결과를 바꾸지 않는다).
  * ⚠ 죽은 딜의 흐림은 `opacity`가 아니라 글자색 토큰(`text-ink-mute`)이다 — 행이 칸마다 자기 색을 갖고 있어 범위가 따로 흐리게 할 일이 없다.
@@ -42,7 +44,7 @@ import type { TransferSort } from "../model/types";
 const TABLE_SCOPE = [
   // 열
   "md:[&_[data-deal-cols]]:grid-cols-[72px_minmax(0,1fr)_minmax(0,1.8fr)_104px_64px]",
-  "min-[90rem]:[&_[data-deal-cols]]:grid-cols-[72px_minmax(0,1fr)_minmax(0,1.7fr)_104px_56px_72px_64px]",
+  "min-[105rem]:[&_[data-deal-cols]]:grid-cols-[72px_minmax(0,1fr)_minmax(0,1.7fr)_104px_56px_72px_64px]",
   // 디바이더
   "[&_[data-deal-row]+[data-deal-row]]:before:absolute [&_[data-deal-row]+[data-deal-row]]:before:inset-x-3 [&_[data-deal-row]+[data-deal-row]]:before:top-0 [&_[data-deal-row]+[data-deal-row]]:before:h-px [&_[data-deal-row]+[data-deal-row]]:before:bg-hairline-cool [&_[data-deal-row]+[data-deal-row]]:before:content-['']",
   "md:[&_[data-deal-row]+[data-deal-row]]:before:inset-x-0",
@@ -64,18 +66,20 @@ const TABLE_SCOPE = [
   "md:[&_[data-g=meta]>:not(:first-child)]:hidden",
   // 칸 — 경로(줄바꿈 — 위 주석)
   "md:[&_[data-col=route]]:col-start-3 md:[&_[data-col=route]]:row-start-1 md:[&_[data-col=route]]:mt-0 md:[&_[data-col=route]]:flex-wrap md:[&_[data-col=route]]:items-center md:[&_[data-col=route]]:gap-y-0.5 md:[&_[data-col=route]]:whitespace-normal md:[&_[data-col=route]]:break-keep",
-  // 행선지가 여럿이면 덩어리를 풀어(엠블럼 겹치기와 이름 글자가 따로 줄을 탄다) "출발 → 엠블럼들" / "이름들" 두 줄로 선다
-  "md:[&_[data-route-to=stacked]]:contents",
+  // 행선지가 여럿이면 엠블럼 겹치기 + 이름 셋 대신 "가장 유력한 하나 + 외 N곳" 한 덩어리로 — 경로 칸이 한 줄에 선다(`ClubRoute`)
+  "md:[&_[data-route-to=stacked]]:hidden md:[&_[data-route-lead]]:inline-flex",
+  // 확실한 행선지가 없는 루머의 그 구단 앞 `유력`(`ClubRoute`) — 표에서만 보인다
+  "md:[&_[data-route-likely]]:inline",
   "md:[&_[data-col=route]_[data-name]]:decoration-ink-mute-2 md:[&_[data-col=route]_[data-name]]:decoration-[1.5px]",
   // 이름 글자 — 말줄임·줄 수 제한을 풀고 낱말 단위로 꺾는다
   "md:[&_[data-name]]:line-clamp-none md:[&_[data-name]]:whitespace-normal md:[&_[data-name]]:break-keep md:[&_[data-name]]:[overflow-wrap:anywhere]",
   // 칸 — 이적료
   "md:[&_[data-g=money]>:first-child]:col-start-4 md:[&_[data-g=money]>:first-child]:row-start-1 md:[&_[data-g=money]>:first-child]:justify-self-end md:[&_[data-g=money]>:first-child]:text-[14px] md:[&_[data-g=money]>:first-child]:decoration-ink-mute-2 md:[&_[data-g=money]>:first-child]:decoration-[1.5px]",
-  // 칸 — 변동(`min-[90rem]`만 — 열 머리가 "변동"이라 "직전 보도 대비" 글자를 걷는다)
-  "md:[&_[data-g=money]>:nth-child(2)]:hidden min-[90rem]:[&_[data-g=money]>:nth-child(2)]:col-start-5 min-[90rem]:[&_[data-g=money]>:nth-child(2)]:row-start-1 min-[90rem]:[&_[data-g=money]>:nth-child(2)]:inline-flex min-[90rem]:[&_[data-g=money]>:nth-child(2)]:justify-self-end min-[90rem]:[&_[data-g=money]>:nth-child(2)>:first-child]:hidden",
+  // 칸 — 변동(`min-[105rem]`만 — 열 머리가 "변동"이라 "직전 보도 대비" 글자를 걷는다)
+  "md:[&_[data-g=money]>:nth-child(2)]:hidden min-[105rem]:[&_[data-g=money]>:nth-child(2)]:col-start-5 min-[105rem]:[&_[data-g=money]>:nth-child(2)]:row-start-1 min-[105rem]:[&_[data-g=money]>:nth-child(2)]:inline-flex min-[105rem]:[&_[data-g=money]>:nth-child(2)]:justify-self-end min-[105rem]:[&_[data-g=money]>:nth-child(2)>:first-child]:hidden",
   // 칸 — 보도·업데이트(표 전용 — 행 요소는 모바일에서 `hidden`이다)
-  "min-[90rem]:[&_[data-col=reports]]:col-start-6 min-[90rem]:[&_[data-col=reports]]:row-start-1 min-[90rem]:[&_[data-col=reports]]:flex",
-  "md:[&_[data-col=updated]]:col-start-5 md:[&_[data-col=updated]]:row-start-1 md:[&_[data-col=updated]]:block min-[90rem]:[&_[data-col=updated]]:col-start-7",
+  "min-[105rem]:[&_[data-col=reports]]:col-start-6 min-[105rem]:[&_[data-col=reports]]:row-start-1 min-[105rem]:[&_[data-col=reports]]:flex",
+  "md:[&_[data-col=updated]]:col-start-5 md:[&_[data-col=updated]]:row-start-1 md:[&_[data-col=updated]]:block min-[105rem]:[&_[data-col=updated]]:col-start-7",
 ].join(" ");
 
 interface DealTableProps {
@@ -106,8 +110,8 @@ export function DealTableHead({ sort }: { sort: TransferSort }) {
       <span className={cn("text-right", sort === "fee" && "font-medium text-ink")}>
         이적료{sort === "fee" && " ↓"}
       </span>
-      <span className="hidden text-right min-[90rem]:block">변동</span>
-      <span className="hidden text-right min-[90rem]:block">보도</span>
+      <span className="hidden text-right min-[105rem]:block">변동</span>
+      <span className="hidden text-right min-[105rem]:block">보도</span>
       <span className="text-right">업데이트</span>
     </div>
   );

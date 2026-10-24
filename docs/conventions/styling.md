@@ -316,7 +316,7 @@ resting 상태의 카드·목록·헤더는 **여전히 flat + 1px 헤어라인*
 
 ### 넓은 화면 — 크롬과 오버레이
 
-폭 구간은 `md`(768px)·`lg`(1024px)와 rem으로 쓴 arbitrary variant(`min-[90rem]:` — 1440px, 위 className 절)다 — 브레이크포인트 토큰을 더하지 않는다(`@theme` 동결).
+폭 구간은 `md`(768px)·`lg`(1024px)와 rem으로 쓴 arbitrary variant(`min-[90rem]:` — 1440px · 딜 표의 7열만 `min-[105rem]:` — 1680px, 위 className 절)다 — 브레이크포인트 토큰을 더하지 않는다(`@theme` 동결).
 
 - **768px 미만의 결과를 바꾸지 않는다.** 넓은 화면용 스타일은 `md:`·`lg:` 접두어로만 더한다.
 - **`lg`부터 크롬이 위로 올라간다** — 데스크톱 상단 바(`TopBar`, 높이 `calc(56px + env(safe-area-inset-top))`)가 앱바·하단 탭바를 대신하고, 둘은 `lg:hidden`이다.

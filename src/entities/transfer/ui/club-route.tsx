@@ -4,7 +4,7 @@ import { cn } from "@/shared/lib/cn";
 import { Icon } from "@/shared/ui";
 import { loanNote } from "../lib/deal-form";
 import { destinationClubs, routeLabels } from "../lib/route-label";
-import { isDeadStage } from "../lib/stage";
+import { isDeadStage, isSettledStage } from "../lib/stage";
 import type { TransferDeal } from "../model/types";
 import { CrestStack } from "./crest-stack";
 import { DealFormMark } from "./deal-form-mark";
@@ -28,6 +28,13 @@ interface ClubRouteProps {
  *   접은 글자(앞 셋 + `외 N`)를 **두 줄까지** 흘린다 — 한 줄 `truncate`면 세 번째 구단이 잘려 `외 N`의 수가 거짓이 된다.
  * ⚠ 표지(`data-name` — 이름 글자, `data-route-to` — 행선지 덩어리, 구단이 여럿이면 `"stacked"`)는 표의 범위(`DealTable`)가 md+에서 잘림을 풀고 줄을
  *   바꾸는 데 쓴다. 이 컴포넌트는 폭을 모른다 — 캐러셀·미니 카드에서는 표지가 아무 일도 하지 않는다.
+ * ⚠ 행선지 자리에 구단이 여럿이면 **표(md+)에서는 가장 유력한 하나 + `외 N곳`** 한 덩어리(`data-route-lead`)로 바꿔 그린다 — 엠블럼
+ *   겹치기 + 이름 셋을 그대로 두면 경로 칸이 늘 두 줄로 꺾여 표의 행 높이가 들쭉날쭉했다. 전부는 보드의 오른쪽 판(lg+)과 딜 상세의
+ *   관심 구단 목록이 적는다(넓은 화면의 상세 히어로 `RouteHero`와 같은 판단). 모바일 행은 지금 모양 그대로다.
+ *   두 덩어리를 함께 싣고 범위가 하나만 보이게 한다(`display: none` — 가린 쪽은 스크린리더에도 읽히지 않는다).
+ * ⚠ 확실한 행선지 없이 관심 구단만 있는 살아 있는 루머는 표(md+)에서 그 구단 앞에 `유력`을 단다(`data-route-likely` — 관심 구단이
+ *   하나뿐이어도). 이름 하나만 적으면 행선지로 읽힌다(상세 히어로의 "TO · 유력"과 같은 판단). 결렬·부인은 달지 않는다 — 유력하지 않다.
+ *   결과가 난 딜(합의 완료·오피셜)도 달지 않는다. 모바일 행은 엠블럼 겹치기·이름 나열이 "여럿"을 보여 그대로 둔다.
  * ⚠ **임대** — 형태 표지(`DealFormMark` — `임대·의무`)를 출발 앞에 둔다("임대·의무: 첼시 → 빌라"로 읽힌다). 출발은 늘 보유 구단이고,
  *   선수가 다른 구단에 임대 중이면 그 구단은 **경로 밖 한 줄**(`loanNote` — "빌라 임대 중")로만 적는다 — 세 구단을 화살표로 이으면
  *   "빌라가 나폴리에 판다"는 연쇄 이적으로 읽힌다. 그 줄은 DOM에서 출발 바로 뒤(스크린리더: "첼시, 빌라 임대 중, 행선지 나폴리")이고
@@ -41,6 +48,14 @@ export function ClubRoute({ deal, size, className, "data-col": dataCol }: ClubRo
   const denied = deal.stage === "denied";
   const destinations = destinationClubs(deal);
   const stacked = destinations.length > 1;
+  const lead = destinations[0] ?? null;
+  const likely = deal.toClub === null && lead !== null && !dead && !isSettledStage(deal.stage);
+  // 표(md+) 전용 — 기본은 숨고 범위(`DealTable`)가 md+에서 보인다(위 주석)
+  const likelyMark = likely && (
+    <span data-route-likely="" className="hidden shrink-0 text-[11px] font-normal text-ink-mute">
+      유력
+    </span>
+  );
   const note = loanNote(deal);
   return (
     <span
@@ -83,6 +98,7 @@ export function ClubRoute({ deal, size, className, "data-col": dataCol }: ClubRo
         data-route-to={stacked ? "stacked" : ""}
         className={cn("inline-flex min-w-0 items-center gap-[5px]", dead ? "font-normal text-ink-mute" : "font-medium text-ink")}
       >
+        {!stacked && likelyMark}
         {stacked ? (
           <CrestStack clubs={destinations} size={size} className={dead ? "opacity-50" : undefined} />
         ) : (
@@ -100,6 +116,21 @@ export function ClubRoute({ deal, size, className, "data-col": dataCol }: ClubRo
         </span>
         {dead && <span className="sr-only"> ({denied ? "부인" : "결렬"})</span>}
       </span>
+      {stacked && lead && (
+        // 표(md+) 전용 — 모바일에서는 숨고 범위가 md+에서 보인다(위 주석)
+        <span
+          data-route-lead=""
+          className={cn("hidden min-w-0 items-center gap-[5px]", dead ? "font-normal text-ink-mute" : "font-medium text-ink")}
+        >
+          {likelyMark}
+          <TransferCrest club={lead} size={size} className={dead ? "opacity-50" : undefined} />
+          <span data-name="" className={cn(dead && "line-through decoration-hairline-strong")}>
+            {lead.shortName}
+          </span>
+          <span className="shrink-0 font-normal text-ink-mute">외 {destinations.length - 1}곳</span>
+          {dead && <span className="sr-only"> ({denied ? "부인" : "결렬"})</span>}
+        </span>
+      )}
     </span>
   );
 }
