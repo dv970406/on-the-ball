@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState } from "react";
 import {
   ContractTerms,
@@ -14,6 +15,8 @@ import {
   type TransferDeal,
   type TransferDealListItem,
   type TransferReport,
+  TransferCrest,
+  dealLeagueClubs,
   isSettledStage,
   playerName,
 } from "@/entities/transfer";
@@ -24,7 +27,7 @@ import { ROUTES } from "@/shared/config";
 import type { CommentList } from "@/entities/comment";
 import type { DealPrediction } from "@/entities/prediction";
 import { cn, formatCount, formatRelativeTime, useNowMs } from "@/shared/lib";
-import { Dialog, EmptyState, SignInDialog, Skeleton, StaleBanner } from "@/shared/ui";
+import { Dialog, EmptyState, SignInDialog, Skeleton, StaleBanner, chipClassName } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
 import { useCommentDeletion } from "../model/use-comment-deletion";
 import { useTransferDetail } from "../model/use-transfer-detail";
@@ -167,6 +170,7 @@ export function TransferDetailView({
     ? `${formatCount(commentList.comments.length)}${commentList.truncated ? "+" : ""}`
     : null;
   const reportCount = reports.list ? formatCount(reports.list.length) : null;
+  const clubLinks = deal ? dealLeagueClubs(deal) : [];
   const watchToggle = deal && (
     <WatchToggle
       dealId={deal.id}
@@ -425,6 +429,33 @@ export function TransferDetailView({
                       ))}
                     </ul>
                   </section>
+                )}
+
+                {/*
+                  이 딜에 걸린 구단의 이적시장 — 구단 화면(검색 착지점)으로 가는 길이자 크롤러가 구단 화면을 찾는 길이다.
+                  5대 리그 구단만이다(그 밖은 구단 화면이 없다 — `dealLeagueClubs`). 딜 데이터만으로 그리므로 서버 HTML에 실린다.
+                  프리페치를 끈다 — 구단 화면은 동적 라우트라 뷰포트 프리페치가 받아 오는 것이 없다(`DealRow`와 같은 판단).
+                */}
+                {clubLinks.length > 0 && (
+                  <nav aria-labelledby="detail-clubs-heading" className={cn("mt-8 lg:mt-6", wideCard)}>
+                    <h2 id="detail-clubs-heading" className="text-[17px] font-semibold tracking-[-0.4px] text-ink">
+                      구단별 이적시장
+                    </h2>
+                    <ul className="mt-3 flex flex-wrap gap-2">
+                      {clubLinks.map((club) => (
+                        <li key={club.code}>
+                          <Link
+                            href={ROUTES.transferClub(club.code)}
+                            prefetch={false}
+                            className={chipClassName(false, "inline-flex items-center gap-1.5 text-ink-secondary")}
+                          >
+                            <TransferCrest club={club} size={16} className="shrink-0" />
+                            {club.shortName} 이적시장
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </nav>
                 )}
               </div>
 

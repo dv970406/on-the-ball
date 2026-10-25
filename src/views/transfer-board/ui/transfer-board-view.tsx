@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   TRANSFER_DEAL_LIMIT,
@@ -379,6 +380,27 @@ export function TransferBoardView({
                       딜은 {formatCount(TRANSFER_DEAL_LIMIT)}건까지만 표시하고 있어요.
                     </p>
                   )}
+
+                  {/*
+                    둘러보기 — 구단별·날짜별 화면으로 가는 길. 그 화면들은 검색 착지점이라 크롤러가 보드에서 찾아 들어갈 앵커가 있어야 한다
+                    (사이트맵만으로 두지 않는다). 프리페치를 끈다 — 동적 라우트라 뷰포트 프리페치가 받아 오는 것이 없다(`DealRow`와 같은 판단).
+                  */}
+                  <nav aria-label="이적시장 둘러보기" className="flex flex-wrap gap-x-5 px-5 pt-6 lg:pb-8">
+                    <Link
+                      href={ROUTES.transferClubs}
+                      prefetch={false}
+                      className="inline-flex min-h-11 items-center text-[13px] font-medium text-ink underline decoration-hairline-strong underline-offset-[3px] hover:decoration-ink"
+                    >
+                      구단별 이적시장
+                    </Link>
+                    <Link
+                      href={ROUTES.transferDays}
+                      prefetch={false}
+                      className="inline-flex min-h-11 items-center text-[13px] font-medium text-ink underline decoration-hairline-strong underline-offset-[3px] hover:decoration-ink"
+                    >
+                      날짜별 소식
+                    </Link>
+                  </nav>
                 </div>
               </div>
 
