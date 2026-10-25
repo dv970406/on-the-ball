@@ -1,8 +1,14 @@
 import { cache } from "react";
 import type { MetadataRoute } from "next";
 import { unstable_rethrow } from "next/navigation";
-import { ROUTES, absoluteUrl } from "@/shared/config";
+import { ROUTES, absoluteUrl, boardScopeStartMs } from "@/shared/config";
 import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
+// ⚠ 배럴이 아니라 직접 경로 — 조립·매퍼는 "use client"가 없어 서버에서 쓸 수 있다. 구단·날짜 화면과 **같은 조립**이라
+//   사이트맵이 그 화면이 404를 내는 주소(5대 리그 밖 구단·소식이 없는 날)를 싣지 않는다.
+import { buildClubListQuery, daySummaryStartKey, queryDaySummaries } from "@/entities/transfer/api/list-query";
+import { buildClubList } from "@/entities/transfer/api/mappers";
+import { clubDealSide } from "@/entities/transfer/lib/club-deals";
+import type { TransferDaySummary } from "@/entities/transfer/model/types";
 
 /**
  * 사이트맵.
@@ -29,15 +35,24 @@ import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
 const PAGE_SIZE = 1_000;
 
 /**
- * 한 사이트맵 파일의 URL 상한 — sitemaps.org의 50,000.
+ * 한 사이트맵 파일의 URL 상한 — sitemaps.org의 50,000. 딜 말고도 고정 URL·구단·날짜 URL이 함께 실리므로 딜 몫은
+ * 그만큼 덜어 둔다(`URL_RESERVED`).
  * ⚠ 딜이 이 수를 넘으면 **넘긴 딜이 사이트맵에서 사라진다** → 그때는 `generateSitemaps`로 쪼개
  *   사이트맵 인덱스를 만든다(Next 공식 API). 닿으면 경고를 남겨 그 시점을 놓치지 않게 한다.
  */
 const URL_LIMIT = 50_000;
+/** 딜이 아닌 URL의 몫 — 고정 URL + 5대 리그 구단(약 100) + 날짜(최근 30일)를 넉넉히 덮는다. 묶음이 늘면 함께 늘린다 */
+const URL_RESERVED = 500;
+const DEAL_URL_LIMIT = URL_LIMIT - URL_RESERVED;
 
 interface DealRow {
   id: number;
   latest_reported_at: string;
+  /** 구단 화면의 lastModified를 세는 데 쓴다 — 그 화면이 딜을 고르는 판정(`clubDealSide`)에 그대로 넘긴다 */
+  from_club_code: string | null;
+  to_club_code: string | null;
+  loan_club_code: string | null;
+  transfer_deal_suitor: { club_code: string }[];
 }
 
 /** 딜을 `PAGE_SIZE`씩 넘기며 전부 받는다 — 페이지가 덜 차면 끝이다 */
@@ -45,20 +60,20 @@ async function fetchDealPages(
   supabase: NonNullable<ReturnType<typeof createSupabaseAnonClient>>,
 ): Promise<DealRow[]> {
   const rows: DealRow[] = [];
-  for (let from = 0; from < URL_LIMIT; from += PAGE_SIZE) {
-    const to = Math.min(from + PAGE_SIZE, URL_LIMIT) - 1;
+  for (let from = 0; from < DEAL_URL_LIMIT; from += PAGE_SIZE) {
+    const to = Math.min(from + PAGE_SIZE, DEAL_URL_LIMIT) - 1;
     const { data, error } = await supabase
       .from("transfer_deal")
       // 상세도 보드도 `latest_reported_at`(최신 보도 시각)이 lastModified다 — 아래 주석 참고.
       // ⚠ 범위 필터를 걸지 않는다 — 상세 URL은 창이 지나도 살아 있다(`/transfers/[id]`).
-      .select("id, latest_reported_at")
+      .select("id, latest_reported_at, from_club_code, to_club_code, loan_club_code, transfer_deal_suitor(club_code)")
       .order("id", { ascending: false })
       .range(from, to);
     if (error) throw error;
     rows.push(...data);
     if (data.length < to - from + 1) return rows;
   }
-  console.warn(`[sitemap] 딜이 ${URL_LIMIT}건을 넘었다 — generateSitemaps로 쪼갤 때다`);
+  console.warn(`[sitemap] 딜이 ${DEAL_URL_LIMIT}건을 넘었다 — generateSitemaps로 쪼갤 때다`);
   return rows;
 }
 
@@ -75,12 +90,47 @@ function withLastModified(url: string, lastModified: Date | undefined) {
  *   lastmod를 무시한다 — 상세 URL들의 정확한 값까지 함께 신호를 잃는다.
  *   그래서 그 목록에 실리는 항목의 최신 시각을 쓰고, 알 수 없으면 **생략한다.**
  */
-function staticEntries(transfers: Date | undefined): MetadataRoute.Sitemap {
+function staticEntries(transfers: Date | undefined, days: Date | undefined): MetadataRoute.Sitemap {
   return [
     withLastModified(absoluteUrl(ROUTES.transferList), transfers),
     // 예측 랭킹 — 행 시각(채점 시각)은 매시 움직여 실제 변경과 맞지 않으므로 lastModified를 생략한다
     { url: absoluteUrl(ROUTES.ranking) },
+    // 구단 목록 — 구단 표는 파생이 프리셋에서 채우는 고정 목록이라 말할 수 있는 행 시각이 없다 → 생략한다
+    { url: absoluteUrl(ROUTES.transferClubs) },
+    // 날짜 목록 — 가장 최근 날의 가장 늦은 보도 시각(그 목록에 실리는 항목의 최신 시각)
+    withLastModified(absoluteUrl(ROUTES.transferDays), days),
   ];
+}
+
+/**
+ * 구단 화면 — 5대 리그 구단 전부. lastModified는 **그 화면에 실리는 딜**(보드 범위 안 · 그 구단이 출발·행선지·관심 구단·임대 구단)의
+ * 최신 보도 시각이고, 그런 딜이 없으면 생략한다(요청 시각으로 채우지 않는다).
+ * ⚠ 구단 화면이 범위를 `boardScopeStartMs`로 자른다 — 같은 기준으로 세야 화면과 lastmod가 같은 딜을 본다.
+ */
+function clubEntries(codes: string[], deals: DealRow[], nowMs: number): MetadataRoute.Sitemap {
+  const scopeStartMs = boardScopeStartMs(nowMs);
+  const ref = (code: string | null) => (code === null ? null : { code });
+  // 구단 화면과 같은 판정(`clubDealSide`)에 넘길 모양으로 옮긴다 — 걸리는 자리를 여기서 다시 나열하지 않는다
+  const inScope = deals.flatMap((deal) => {
+    const ms = Date.parse(deal.latest_reported_at);
+    if (ms < scopeStartMs || ms > nowMs) return [];
+    const slots = {
+      fromClub: ref(deal.from_club_code),
+      toClub: ref(deal.to_club_code),
+      loanClub: ref(deal.loan_club_code),
+      suitors: deal.transfer_deal_suitor.map((s) => ({ code: s.club_code })),
+    };
+    return [{ slots, ms }];
+  });
+  return codes.map((code) => {
+    const latestMs = inScope.reduce((max, d) => (d.ms > max && clubDealSide(d.slots, code) !== null ? d.ms : max), -Infinity);
+    return withLastModified(absoluteUrl(ROUTES.transferClub(code)), Number.isFinite(latestMs) ? new Date(latestMs) : undefined);
+  });
+}
+
+/** 날짜 화면 — 소식이 있는 날만(빈 날은 404다). lastModified는 그 날 가장 늦은 보도 시각이다 */
+function dayEntries(days: TransferDaySummary[]): MetadataRoute.Sitemap {
+  return days.map((day) => ({ url: absoluteUrl(ROUTES.transferDay(day.dateKey)), lastModified: new Date(day.latestAt) }));
 }
 
 /** 가장 늦은 시각 — 비어 있으면 `undefined` */
@@ -93,21 +143,40 @@ function latest(dates: Date[]): Date | undefined {
  *   적어 두면 "관리해야 하는데 아무 일도 하지 않는 값"만 는다. `lastModified`는 읽는다.
  */
 const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
-  const statics = staticEntries(undefined);
+  const statics = staticEntries(undefined, undefined);
 
   try {
     const supabase = createSupabaseAnonClient();
     if (!supabase) return statics;
 
-    const rows = await fetchDealPages(supabase);
-
     // 미래 시각을 lastmod로 싣지 않기 위한 기준 — 데이터를 읽은 시각이다
     const nowMs = Date.now();
+    // ⚠ 구단·날짜는 곁다리다 — 실패해도 딜 URL은 그대로 싣는다(그 묶음만 빠진다). 서로의 결과를 쓰지 않아 병렬로 보낸다
+    const [rows, clubs, days] = await Promise.all([
+      fetchDealPages(supabase),
+      buildClubListQuery(supabase).then(({ data, error }) => {
+        if (error) {
+          console.error("[sitemap] 구단 조회 실패:", error);
+          return [];
+        }
+        return buildClubList(data ?? []);
+      }),
+      queryDaySummaries(supabase, daySummaryStartKey(nowMs), nowMs).catch((e: unknown) => {
+        console.error("[sitemap] 날짜 목록 조회 실패:", e);
+        return [];
+      }),
+    ]);
+
     // ⚠ 미래 시각을 싣지 않는다 — 수집기가 10분 여유로 거르지만 CHECK 상한은 +1일이다
     const deals = rows.filter((deal) => Date.parse(deal.latest_reported_at) <= nowMs);
 
     return [
-      ...staticEntries(latest(deals.map((deal) => new Date(deal.latest_reported_at)))),
+      ...staticEntries(
+        latest(deals.map((deal) => new Date(deal.latest_reported_at))),
+        days[0] ? new Date(days[0].latestAt) : undefined,
+      ),
+      ...clubEntries(clubs.map((club) => club.code), rows, nowMs),
+      ...dayEntries(days),
       ...rows.map((deal) => ({
         url: absoluteUrl(ROUTES.transfer(deal.id)),
         // ⚠ `updated_at`(파생 시각)이 아니라 `latest_reported_at`이다 — `updated_at`은 파생 컬럼
