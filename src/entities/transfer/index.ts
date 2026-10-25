@@ -9,6 +9,8 @@ export type {
   ReportSort,
   // 응원 구단(조회·고르는 화면·쓰기 훅)이 구단 한 건을 주고받는다
   TransferClub,
+  TransferDay,
+  TransferDaySummary,
   TransferDeal,
   TransferDealListItem,
   TransferGroupKey,
@@ -28,6 +30,8 @@ export { TRANSFER_LEAGUES } from "./model/types";
 export { transferKeys } from "./api/keys";
 // ⚠ 상한은 서버 안전한 api/mappers에 있다 — 목록 SSR이 같은 값을 써야 하고 화면이 잘림을 말한다
 export { TRANSFER_DEAL_LIMIT } from "./api/mappers";
+// ⚠ 하루에 싣는 보도 상한 — 날짜별 소식 화면이 잘림을 말한다(상한은 서버 안전한 api/mappers에 있다)
+export { TRANSFER_DAY_REPORT_LIMIT } from "./api/mappers";
 // ⚠ 서버가 다른 사용자로 그린 목록의 자리 표시용 사본 — 관심 표시를 캐시에 사실처럼 앉히지 않는다
 export { withoutWatches } from "./api/mappers";
 // ⚠ 딜을 대표하는 보도(요약 있는 최신 → 없으면 최신) — 보드 오른쪽 판이 쓴다. 상세 page(서버)는 `api/mappers` 직접 경로로 같은 함수를 쓴다
@@ -39,6 +43,9 @@ export {
   // 응원 구단 — 5대 리그 구단 목록과 내가 고른 구단. 쓰기는 `features/follow-club`
   useTransferClubListQuery,
   useFollowedClubsQuery,
+  // 날짜별 소식 — 하루의 소식과 최근 날짜 목록(공개 화면이라 "나"와 무관하다)
+  useTransferDayQuery,
+  useTransferDayListQuery,
 } from "./api/queries";
 // ⚠ 구단을 늘어놓는 순서(정식명순)의 단일 소스 — 낙관적 갱신이 조회와 같은 순서로 끼워 넣어야 항목이 튀지 않는다
 export { compareClubs } from "./api/mappers";
@@ -61,6 +68,14 @@ export {
   parseTransferSort,
   parseTransferWatch,
 } from "./lib/league";
+// ⚠ 구단 화면의 영입·방출·임대 선수 구역 — 걸리는 자리는 보드의 구단 필터(`dealHasClub`)와 같다
+export { splitClubDeals } from "./lib/club-deals";
+// 딜에 걸린 5대 리그 구단(구단 화면이 있는 구단) — 딜 상세가 구단 화면으로 잇는다
+export { dealLeagueClubs } from "./lib/club-deals";
+// ⚠ 하루의 소식을 보드의 구간으로 — 구간은 딜의 지금 단계다
+export { groupDayEntries } from "./lib/day";
+// 날짜별 소식의 딜 하나(머리 + 그 날의 보도)
+export { DayEntry } from "./ui/day-entry";
 // ⚠ 루머 구간의 접기 — 식은 루머·열기 상위 판정을 뷰가 다시 짜지 않는다
 export { splitHotRumors } from "./lib/rumor-heat";
 // ⚠ 진행 중 구간의 소구간(합의 임박·협상 중) — 뱃지 톤과 같은 갈림

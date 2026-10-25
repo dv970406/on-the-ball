@@ -1,12 +1,24 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
+// ⚠ 직접 경로 — 이 파일은 서버 page가 import한다(`"use client"`를 담은 배럴을 거치지 않는다)
+import { type KstDay, kstDateKey, parseKstDateKey } from "@/shared/lib/date-key";
+import type { TransferDay, TransferDaySummary } from "../model/types";
 import {
   CLUB_LIST_SELECT,
+  DAY_REPORT_SELECT,
+  DAY_STAMP_SELECT,
   DEAL_DETAIL_SELECT,
   DEAL_LIST_SELECT,
   FOLLOWED_CLUB_SELECT,
   REPORT_SELECT,
+  TRANSFER_DAY_LIST_DAYS,
+  TRANSFER_DAY_REPORT_LIMIT,
+  TRANSFER_DAY_STAMP_MAX_PAGES,
+  TRANSFER_DAY_STAMP_PAGE,
   TRANSFER_DEAL_LIMIT,
+  buildDaySummaries,
+  buildTransferDay,
+  type DayStampSelectRow,
 } from "./mappers";
 
 /**
@@ -85,6 +97,112 @@ export function buildReportsQuery(supabase: SupabaseClient<Database>, dealId: nu
     .select(REPORT_SELECT)
     .eq("deal_id", dealId)
     .order("published_at", { ascending: false });
+}
+
+/**
+ * 하루(한국 시각)의 보도 — 딜에 묶인 것만, 최신순. 상한보다 **한 건 더** 받아 잘림을 정확히 판정한다(`buildTransferDay`).
+ *
+ * ⚠ 경계는 인자로 받는다(`parseKstDateKey`의 시작·끝 — 하루의 자정이라 분 단위보다 거칠다). 안에서 시계를 읽지 않는다 —
+ *   조건이 요청마다 달라지면 익명 Data Cache가 매번 미스다(`nextjs.md` "요청 시각을 조회 조건에 그대로 싣지 않는다").
+ * ⚠ `deal_id`가 있는 보도만 — 딜에 묶이지 않은 보도(이동 아님·판정 전·같은 보도의 사본)는 보드에 없는 소식이다.
+ */
+export function buildDayReportsQuery(supabase: SupabaseClient<Database>, startIso: string, endIso: string) {
+  return supabase
+    .from("transfer_news")
+    .select(DAY_REPORT_SELECT)
+    .not("deal_id", "is", null)
+    .gte("published_at", startIso)
+    .lt("published_at", endIso)
+    .order("published_at", { ascending: false })
+    .limit(TRANSFER_DAY_REPORT_LIMIT + 1);
+}
+
+/**
+ * 소식이 있는 이웃 날 — `before`면 그 시각 **이전**의 가장 늦은 보도, `after`면 그 시각 **이후**의 가장 이른 보도(딜에 묶인 것만).
+ * 날짜 화면의 "이전 날 · 다음 날" 링크가 소식이 없는 날(404)을 가리키지 않게 한다. 경계 규약은 `buildDayReportsQuery`와 같다.
+ */
+export function buildNeighborDayQuery(
+  supabase: SupabaseClient<Database>,
+  boundaryIso: string,
+  direction: "before" | "after",
+) {
+  const base = supabase.from("transfer_news").select(DAY_STAMP_SELECT).not("deal_id", "is", null);
+  const bounded = direction === "before" ? base.lt("published_at", boundaryIso) : base.gte("published_at", boundaryIso);
+  return bounded.order("published_at", { ascending: direction === "after" }).limit(1);
+}
+
+/**
+ * 날짜 목록의 한 페이지 — 그 시각 이후 딜에 묶인 보도의 시각(최신순, `from`부터 `TRANSFER_DAY_STAMP_PAGE`건). 날마다 묶는 것은
+ * `buildDaySummaries`다.
+ * ⚠ 시작은 하루의 자정으로 내려서 받는다(위 경계 규약). 미래 시각은 조건이 아니라 매퍼가 거른다 — 지금 시각을 조건에 실으면
+ *   캐시 키가 요청마다 달라진다. 페이지 범위(`range`)는 URL에 실려 페이지마다 캐시 키가 따로다(사이트맵의 딜 페이지와 같다).
+ * ⚠ 정렬에 `id`를 더한다 — 같은 시각의 행이 페이지 경계에서 빠지거나 두 번 세지지 않게.
+ */
+export function buildDayStampsQuery(supabase: SupabaseClient<Database>, sinceIso: string, from: number) {
+  return supabase
+    .from("transfer_news")
+    .select(DAY_STAMP_SELECT)
+    .not("deal_id", "is", null)
+    .gte("published_at", sinceIso)
+    .order("published_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(from, from + TRANSFER_DAY_STAMP_PAGE - 1);
+}
+
+/**
+ * 하루의 소식을 **조립까지** 한다 — 그 날의 보도와 이웃 날 둘을 병렬로 묻고 `buildTransferDay`로 묶는다.
+ * 클라이언트 훅(`useTransferDayQuery`)과 날짜 page의 SSR이 같은 함수를 부른다 — 이웃 날 판정·잘림 판정이 갈리지 않게.
+ * ⚠ 실패하면 PostgREST 에러를 그대로 던진다 — 한국어로 바꾸는 것은 훅의 몫이고, page는 "조회 실패(unknown)"로 가른다.
+ * ⚠ 쿼리 빌더는 `await`할 때마다 요청을 새로 보낸다 — 여기서 한 번만 기다린다.
+ */
+export async function queryTransferDay(
+  supabase: SupabaseClient<Database>,
+  day: KstDay,
+  nowMs: number,
+): Promise<TransferDay> {
+  const startIso = new Date(day.startMs).toISOString();
+  const endIso = new Date(day.endMs).toISOString();
+  const [reports, prev, next] = await Promise.all([
+    buildDayReportsQuery(supabase, startIso, endIso),
+    buildNeighborDayQuery(supabase, startIso, "before"),
+    buildNeighborDayQuery(supabase, endIso, "after"),
+  ]);
+  const error = reports.error ?? prev.error ?? next.error;
+  if (error) throw error;
+  const neighborKey = (rows: { published_at: string }[] | null) =>
+    rows?.[0] ? kstDateKey(Date.parse(rows[0].published_at)) : null;
+  return buildTransferDay(day.key, reports.data ?? [], { prev: neighborKey(prev.data), next: neighborKey(next.data) }, nowMs);
+}
+
+/**
+ * 날짜 목록의 시작 날 — 오늘을 포함해 최근 `TRANSFER_DAY_LIST_DAYS`일의 첫날(키). 쿼리 키와 조회 조건이 이 값 하나를 본다
+ * (하루에 한 번만 바뀐다 — 익명 Data Cache가 요청마다 미스하지 않는다).
+ */
+export function daySummaryStartKey(nowMs: number): string {
+  return kstDateKey(nowMs - (TRANSFER_DAY_LIST_DAYS - 1) * 86_400_000);
+}
+
+/**
+ * 날짜 목록을 조립까지 한다 — 시작 날 이후의 보도 시각을 페이지로 넘겨 받아 날마다 센다(`buildDaySummaries`).
+ * ⚠ `nowMs`는 미래 보도를 거르는 데만 쓴다(조건에 싣지 않는다). 페이지 상한에 닿았으면 가장 오래된 날을 뺀다.
+ * ⚠ 페이지는 차례로 받는다 — 앞 페이지가 덜 차면 끝이라 다음을 보낼지 알 수 없다(대개 한 페이지로 끝난다).
+ */
+export async function queryDaySummaries(
+  supabase: SupabaseClient<Database>,
+  startKey: string,
+  nowMs: number,
+): Promise<TransferDaySummary[]> {
+  const start = parseKstDateKey(startKey);
+  if (!start) return [];
+  const sinceIso = new Date(start.startMs).toISOString();
+  const rows: DayStampSelectRow[] = [];
+  for (let page = 0; page < TRANSFER_DAY_STAMP_MAX_PAGES; page += 1) {
+    const { data, error } = await buildDayStampsQuery(supabase, sinceIso, page * TRANSFER_DAY_STAMP_PAGE);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if ((data?.length ?? 0) < TRANSFER_DAY_STAMP_PAGE) return buildDaySummaries(rows, { nowMs, truncated: false });
+  }
+  return buildDaySummaries(rows, { nowMs, truncated: true });
 }
 
 /**

@@ -2,7 +2,7 @@
 //    그래서 순수 함수는 배럴이 아니라 직접 경로로 가져온다(`credibility-badge.tsx`와 같은 이유).
 import { ExternalLink } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
-import { formatRelativeTime } from "@/shared/lib/format";
+import { formatClockTime, formatRelativeTime } from "@/shared/lib/format";
 import { Icon } from "@/shared/ui";
 import { reporterName } from "../lib/reporter";
 import type { TransferReport } from "../model/types";
@@ -14,6 +14,11 @@ interface ReportItemProps {
   latest: boolean;
   /** 기준 시각 — `serverNowMs ?? useNowMs()`는 호출부가 한다 */
   nowMs: number | null;
+  /**
+   * 시각을 상대 표기 대신 **한국 시각의 시:분**으로 — 날짜가 이미 정해진 자리(날짜별 소식의 하루)다. 그 화면에서 "3일 전"은
+   * 제목의 날짜와 같은 말을 되풀이하고, 색인에 굳으면 거짓이 된다.
+   */
+  clock?: boolean;
 }
 
 /**
@@ -27,7 +32,7 @@ interface ReportItemProps {
  *   (`styling.md` "대상이 아닌 것").
  * ⚠ 부모는 `<ol>`이다 — 항목 사이 선은 이 항목이 갖고(`first:border-t-0`) 목록은 선을 긋지 않는다.
  */
-export function ReportItem({ report, latest, nowMs }: ReportItemProps) {
+export function ReportItem({ report, latest, nowMs, clock }: ReportItemProps) {
   return (
     <li className="grid grid-cols-[14px_1fr] gap-2.5 border-t border-hairline-cool py-3 first:border-t-0">
       <span className="flex justify-center pt-[5px]" aria-hidden>
@@ -41,7 +46,7 @@ export function ReportItem({ report, latest, nowMs }: ReportItemProps) {
             dateTime={report.publishedAt}
             className="ml-auto shrink-0 whitespace-nowrap font-mono text-[10px] tabular-nums text-ink-mute-2"
           >
-            {formatRelativeTime(report.publishedAt, nowMs)}
+            {clock ? formatClockTime(report.publishedAt) : formatRelativeTime(report.publishedAt, nowMs)}
           </time>
         </div>
         {report.gist && (

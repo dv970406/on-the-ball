@@ -39,6 +39,8 @@ const DEEP_IMPORT_ALLOWED = new Set([
   "@/shared/lib/query-scope",
   // searchParams 첫 값 — 서버 page들이 같은 판정으로 읽는다
   "@/shared/lib/search-params",
+  // 한국 시각 날짜 키 — 날짜별 소식 page(404 판정)·조립(`list-query`·`mappers`, 서버 안전)이 화면과 같은 하루 경계로 자른다
+  "@/shared/lib/date-key",
   "@/entities/transfer/api/list-query",
   // 딜 상세 SSR이 예측(집계·내 표)을 클라이언트 훅과 같은 조립으로 미리 받는다
   "@/entities/prediction/api/list-query",
@@ -55,6 +57,10 @@ const DEEP_IMPORT_ALLOWED = new Set([
   "@/entities/transfer/lib/deal-meta",
   // 딜 형태(임대) 표지·임대 중 문구 — 딜 공유 카드(opengraph-image)가 화면의 형태 표지와 같은 글자로 그린다
   "@/entities/transfer/lib/deal-form",
+  // 구단 코드 형식 판정 — 구단 page가 보드의 `?club=`과 같은 판정으로 404를 가른다
+  "@/entities/transfer/lib/league",
+  // 구단의 영입·방출 구역 — 구단 page의 description이 화면과 같은 구역·건수를 말한다
+  "@/entities/transfer/lib/club-deals",
   "@/entities/session/lib/auth-error-message",
   "@/features/sign-in/lib/pkce-verifier",
 ]);

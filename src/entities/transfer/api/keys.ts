@@ -28,6 +28,10 @@ export const transferKeys = {
     [...transferKeys.detailAll(id), userScope(userId)] as const,
   /** 상세의 보도 타임라인 — 딜 단건과 키를 나눈다(관심 토글이 상세만 무효화한다) */
   reports: (id: number) => [...transferKeys.all, "reports", id] as const,
+  /** 하루(한국 시각 날짜 키)의 소식 — "나"와 무관한 공개 화면이라 스코프가 없다 */
+  day: (dateKey: string) => [...transferKeys.all, "day", dateKey] as const,
+  /** 날짜 목록 — 시작 날(`daySummaryStartKey`)이 키다(하루에 한 번 바뀐다) */
+  days: (startKey: string) => [...transferKeys.all, "days", startKey] as const,
   /** 5대 리그 구단 목록 — 응원 구단을 고르는 화면 */
   clubs: () => [...transferKeys.all, "clubs"] as const,
   /** 내 응원 구단 */

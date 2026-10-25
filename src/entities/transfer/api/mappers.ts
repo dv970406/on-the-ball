@@ -5,6 +5,10 @@ import type {
   TransferDealListItem,
   TransferDealRow,
   TransferDealWatchRow,
+  TransferDay,
+  TransferDayDeal,
+  TransferDayEntry,
+  TransferDaySummary,
   TransferLeague,
   TransferLatestReport,
   TransferNewsRow,
@@ -12,6 +16,8 @@ import type {
   ReportGist,
 } from "../model/types";
 import { TRANSFER_LEAGUES } from "../model/types";
+// ⚠ 직접 경로 — 이 파일은 서버가 import하는 서버 안전 파일이라 `"use client"`를 담은 배럴을 거치지 않는다
+import { kstDateKey } from "@/shared/lib/date-key";
 
 /**
  * 상한·창 상수.
@@ -68,6 +74,18 @@ export const DEAL_LIST_SELECT =
  */
 export const DEAL_DETAIL_SELECT =
   `${DEAL_COLUMNS}, from:transfer_club!from_club_code(${CLUB_COLUMNS}), to:transfer_club!to_club_code(${CLUB_COLUMNS}), loan:transfer_club!loan_club_code(${CLUB_COLUMNS}), suitors:transfer_deal_suitor(position, club:transfer_club(${CLUB_COLUMNS})), transfer_deal_watch(user_id)` as const;
+
+/**
+ * 날짜별 소식 — 그 날의 보도 + 보도가 속한 딜. 딜 쪽에서 보도를 임베딩하지 않고 **보도 쪽에서 딜을** 임베딩한다 —
+ * 하루의 경계는 보도의 게시 시각이라 그 조건을 부모 행에 걸어야 한다(임베딩 필터는 부모 행을 거르지 않는다).
+ * ⚠ 관심 임베딩(`transfer_deal_watch`)이 **없다** — 날짜별 화면은 공개 화면이라 익명으로 받는다(`TransferDayDeal`).
+ * ⚠ `transfer_deal!deal_id` — 보도 → 딜 경로를 못박는다(딜 쪽의 `latest:transfer_news!deal_id`와 같은 FK).
+ */
+export const DAY_REPORT_SELECT =
+  `${REPORT_COLUMNS}, deal:transfer_deal!deal_id(${DEAL_COLUMNS}, from:transfer_club!from_club_code(${CLUB_COLUMNS}), to:transfer_club!to_club_code(${CLUB_COLUMNS}), loan:transfer_club!loan_club_code(${CLUB_COLUMNS}), suitors:transfer_deal_suitor(position, club:transfer_club(${CLUB_COLUMNS})))` as const;
+
+/** 날짜 목록·이웃 날 — 시각과 딜만(날마다 보도·딜 수를 센다) */
+export const DAY_STAMP_SELECT = "published_at, deal_id" as const;
 
 /** 상세의 보도 타임라인 — 딜에 묶인 보도 전부(정렬은 `list-query.ts`) */
 export const REPORT_SELECT = `${REPORT_COLUMNS}` as const;
@@ -308,4 +326,105 @@ export function buildDealListItem(row: DealListSelectRow): TransferDealListItem 
  */
 export function withoutWatches(deals: TransferDealListItem[]): TransferDealListItem[] {
   return deals.map((deal) => (deal.isWatched ? { ...deal, isWatched: false } : deal));
+}
+
+/**
+ * 하루에 싣는 보도 상한 — 한 건 더 받아(`+1`) 잘렸는지를 **정확히** 판정한다(댓글 목록과 같은 방식).
+ * ⚠ 응답 크기가 이 값을 정한다 — 보도마다 딜(구단 셋 + 관심 구단)을 임베딩해 한 행이 약 2KB다(로컬 실측: 35건 70KB).
+ *   Next Data Cache는 2MB를 넘는 응답을 캐시하지 않아, 넘으면 익명 요청마다 DB로 간다(빌드도 화면도 멀쩡해 드러나지 않는다).
+ *   400건이면 약 0.8MB다. 값을 올리려면 응답 크기를 다시 재거나, 딜을 따로 받아 합치는 모양으로 바꾼다.
+ */
+export const TRANSFER_DAY_REPORT_LIMIT = 400;
+/** 날짜 목록에 싣는 날 수 — 오늘을 포함해 최근 이만큼(소식이 없는 날은 빠진다) */
+export const TRANSFER_DAY_LIST_DAYS = 30;
+/**
+ * 날짜 목록이 한 번에 받는 보도 시각 수 — PostgREST `max_rows`와 같은 값이다(더 크게 걸어도 응답은 조용히 이 수에서 잘린다).
+ * 이 크기로 페이지를 넘겨 받는다(`queryDaySummaries`).
+ */
+export const TRANSFER_DAY_STAMP_PAGE = 1_000;
+/**
+ * 날짜 목록이 받는 페이지 수 상한 — 성수기에 하루 수백 건이어도 30일을 담는다. 여기 닿으면 가장 오래된 날은 일부만 받은 것이라
+ * 그 날을 목록에서 뺀다(`buildDaySummaries`) — 건수가 거짓이 되지 않게.
+ */
+export const TRANSFER_DAY_STAMP_MAX_PAGES = 10;
+
+/** `DAY_REPORT_SELECT`가 돌려주는 행 — 보도 + 딜(관심 임베딩 없음) */
+export interface DayReportSelectRow extends ReportSelectRow {
+  deal: Omit<DealSelectRow, "transfer_deal_watch"> | null;
+}
+
+/** `DAY_STAMP_SELECT`가 돌려주는 행 */
+export type DayStampSelectRow = Pick<TransferNewsRow, "published_at" | "deal_id">;
+
+function buildDayDeal(row: Omit<DealSelectRow, "transfer_deal_watch">): TransferDayDeal {
+  // 관심 표시만 걷는다 — 나머지는 상세·목록과 같은 매퍼다(필드가 갈리지 않게)
+  const { isWatched, ...deal } = buildDeal({ ...row, transfer_deal_watch: null });
+  return deal;
+}
+
+/**
+ * 하루의 보도 행 → 딜마다 묶은 소식.
+ * - 행은 최신순으로 들어온다(`buildDayReportsQuery`) — 딜의 순서는 그 딜이 그 날 처음 보인 자리(= 그 날 가장 늦은 보도)다.
+ * - 상한보다 한 건 더 받았으면 잘린 것이다 — 마지막 행을 버리고 `truncated`를 세운다.
+ * - 딜이 없는 행(배정이 풀린 직후)은 버린다 — 조회가 `deal_id`로 거르지만 임베딩이 비는 순간이 있다.
+ * - ⚠ `nowMs`보다 늦은 보도는 버린다 — 날짜 목록(`buildDaySummaries`)과 같은 셈이어야 한다(DB CHECK가 수집 시각 +1일까지
+ *   받는다). 조건에 싣지 않고 여기서 거른다(조건에 지금 시각을 실으면 캐시 키가 요청마다 달라진다).
+ */
+export function buildTransferDay(
+  dateKey: string,
+  rows: DayReportSelectRow[],
+  neighbors: { prev: string | null; next: string | null },
+  nowMs: number,
+): TransferDay {
+  const truncated = rows.length > TRANSFER_DAY_REPORT_LIMIT;
+  const kept = truncated ? rows.slice(0, TRANSFER_DAY_REPORT_LIMIT) : rows;
+  const byDeal = new Map<number, TransferDayEntry>();
+  let reportCount = 0;
+  for (const row of kept) {
+    if (!row.deal || !(Date.parse(row.published_at) <= nowMs)) continue;
+    reportCount += 1;
+    const entry = byDeal.get(row.deal.id);
+    if (entry) entry.reports.push(buildReport(row));
+    else byDeal.set(row.deal.id, { deal: buildDayDeal(row.deal), reports: [buildReport(row)] });
+  }
+  return {
+    dateKey,
+    entries: [...byDeal.values()],
+    reportCount,
+    truncated,
+    prevKey: neighbors.prev,
+    nextKey: neighbors.next,
+  };
+}
+
+/**
+ * 보도 시각 → 날짜 목록(최신 날 먼저). 날짜는 한국 시각이다(`kstDateKey`).
+ * ⚠ `nowMs`보다 늦은 보도는 세지 않는다 — 미래 날짜가 목록·사이트맵에 실리면 그 주소는 404다.
+ * ⚠ 상한에 닿았으면(`truncated`) **가장 오래된 날을 뺀다** — 그 날은 일부만 받아 건수가 거짓이다.
+ */
+export function buildDaySummaries(
+  rows: DayStampSelectRow[],
+  { nowMs, truncated }: { nowMs: number; truncated: boolean },
+): TransferDaySummary[] {
+  const days = new Map<string, { reports: number; deals: Set<number>; latestMs: number; latestAt: string }>();
+  for (const row of rows) {
+    const ms = Date.parse(row.published_at);
+    if (row.deal_id === null || !(ms <= nowMs)) continue;
+    const key = kstDateKey(ms);
+    const day = days.get(key);
+    if (day) {
+      day.reports += 1;
+      day.deals.add(row.deal_id);
+      if (ms > day.latestMs) Object.assign(day, { latestMs: ms, latestAt: row.published_at });
+    } else {
+      days.set(key, { reports: 1, deals: new Set([row.deal_id]), latestMs: ms, latestAt: row.published_at });
+    }
+  }
+  // 키가 `YYYY-MM-DD`라 문자열 순서가 곧 날짜 순서다
+  const keys = [...days.keys()].sort().reverse();
+  if (truncated) keys.pop();
+  return keys.flatMap((key) => {
+    const day = days.get(key);
+    return day ? [{ dateKey: key, reportCount: day.reports, dealCount: day.deals.size, latestAt: day.latestAt }] : [];
+  });
 }

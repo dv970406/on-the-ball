@@ -217,3 +217,40 @@ export interface TransferDealListItem extends TransferDeal {
  *   select 컬럼과 함께 넓힌다(목록 응답의 무게가 딜 수만큼 곱해진다는 것을 먼저 따진다).
  */
 export type TransferLatestReport = Pick<TransferReport, "sourceId" | "attribution" | "attributedTo" | "publishedAt" | "gist">;
+
+/**
+ * 날짜별 소식의 딜 — 딜에서 **관심 표시(`isWatched`)를 뺀** 모양이다.
+ * ⚠ 날짜별 화면은 누가 열든 같은 공개 화면이라 익명으로 받는다(관심 임베딩이 없다). `isWatched: false`로 채워 두면 "담지 않았다"는
+ *   거짓 값이 `TransferDeal`인 척 다른 화면으로 흘러갈 수 있어 필드째 뺀다.
+ */
+export type TransferDayDeal = Omit<TransferDeal, "isWatched">;
+
+/** 날짜별 소식의 한 딜 — 그 딜과 **그 날** 나온 보도(최신순) */
+export interface TransferDayEntry {
+  deal: TransferDayDeal;
+  reports: TransferReport[];
+}
+
+/** 하루(한국 시각)의 이적 소식 */
+export interface TransferDay {
+  /** `YYYY-MM-DD`(`@/shared/lib`의 `kstDateKey`) */
+  dateKey: string;
+  /** 딜마다 묶은 그 날의 보도 — 순서는 화면이 정한다(`groupDayEntries`) */
+  entries: TransferDayEntry[];
+  /** 그 날 받은 보도 수(상한 안) */
+  reportCount: number;
+  /** 상한(`TRANSFER_DAY_REPORT_LIMIT`)에 걸려 그 날의 보도가 잘렸는가 — 화면이 잘림을 말한다 */
+  truncated: boolean;
+  /** 소식이 있는 바로 앞 날 · 바로 뒤 날 — 없으면 `null`. 뒤 날이 미래인지는 화면이 기준 시각으로 거른다 */
+  prevKey: string | null;
+  nextKey: string | null;
+}
+
+/** 날짜 목록의 하루 — 날짜별 소식 목록(`/transfers/daily`)과 사이트맵이 쓴다 */
+export interface TransferDaySummary {
+  dateKey: string;
+  reportCount: number;
+  dealCount: number;
+  /** 그 날 가장 늦은 보도 시각 — 사이트맵의 `lastModified` */
+  latestAt: string;
+}

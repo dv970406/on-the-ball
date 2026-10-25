@@ -2,8 +2,11 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { SIGN_IN_REQUIRED_MESSAGE, requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
+import { parseKstDateKey } from "@/shared/lib";
 import type {
   TransferClub,
+  TransferDay,
+  TransferDaySummary,
   TransferDeal,
   TransferDealListItem,
   TransferReport,
@@ -15,6 +18,8 @@ import {
   buildDealQuery,
   buildFollowedClubsQuery,
   buildReportsQuery,
+  queryDaySummaries,
+  queryTransferDay,
 } from "./list-query";
 import {
   buildClubList,
@@ -165,8 +170,20 @@ const CLUB_LIST_STALE_MS = 60 * 60_000;
  * 5대 리그 구단 전부(정식명순) — 응원 구단을 고르는 화면이 연다.
  * ⚠ "나"에 종속되지 않는다 — 누가 불러도 같은 목록이라 키에 유저가 없다.
  */
-export function useTransferClubListQuery({ enabled = true }: { enabled?: boolean } = {}) {
+interface UseTransferClubListQueryArgs extends PrefetchFreshness {
+  enabled?: boolean;
+  /** 서버 프리페치 — 구단별 화면이 익명으로 받아 내린다("나"와 무관하다) */
+  initialData?: TransferClub[];
+}
+
+export function useTransferClubListQuery({
+  enabled = true,
+  initialData,
+  initialDataUpdatedAt,
+}: UseTransferClubListQueryArgs = {}) {
   return useQuery<TransferClub[], Error>({
+    initialData,
+    initialDataUpdatedAt,
     queryKey: transferKeys.clubs(),
     queryFn: async () => {
       const supabase = requireBrowserSupabase();
@@ -219,5 +236,63 @@ export function useFollowedClubsQuery({
       return buildFollowedClubs(data ?? []);
     },
     enabled: enabled && !!userId,
+  });
+}
+
+interface UseTransferDayQueryArgs extends PrefetchFreshness {
+  /** `YYYY-MM-DD` — 형식 판정은 page가 이미 했다(틀리면 404). 키가 아니면 조회하지 않는다 */
+  dateKey: string;
+  initialData?: TransferDay;
+}
+
+/**
+ * 하루(한국 시각)의 소식 — 딜마다 묶은 그 날의 보도와 이웃 날.
+ * ⚠ "나"에 종속되지 않아 키에 유저가 없다 — 세션 복원을 기다리지 않는다. 조립은 SSR과 같은 `queryTransferDay`다.
+ */
+export function useTransferDayQuery({ dateKey, initialData, initialDataUpdatedAt }: UseTransferDayQueryArgs) {
+  const day = parseKstDateKey(dateKey);
+  return useQuery<TransferDay, Error>({
+    initialData,
+    initialDataUpdatedAt,
+    queryKey: transferKeys.day(dateKey),
+    queryFn: async () => {
+      if (!day) throw new Error("날짜를 읽지 못했어요.");
+      const supabase = requireBrowserSupabase();
+      try {
+        // 미래 보도를 거르는 기준 — queryFn 안에서 읽는다(키에 싣지 않는다)
+        return await queryTransferDay(supabase, day, Date.now());
+      } catch (e) {
+        console.error("[transfer] 날짜별 소식 조회 실패:", e);
+        throw new Error(toDbErrorMessage(e));
+      }
+    },
+    enabled: day !== null,
+  });
+}
+
+interface UseTransferDayListQueryArgs extends PrefetchFreshness {
+  /** 목록의 시작 날 — 서버가 `daySummaryStartKey(nowMs)`로 정해 내린다(키가 서버와 같아야 캐시에 닿는다) */
+  startKey: string;
+  initialData?: TransferDaySummary[];
+}
+
+/**
+ * 날짜 목록 — 시작 날 이후 소식이 있는 날(최신 날 먼저).
+ * ⚠ 미래 보도를 거르는 기준 시각은 **queryFn 안에서** 읽는다 — 조건(키)에 싣지 않는다(`data-and-state.md` 하이드레이션 절).
+ */
+export function useTransferDayListQuery({ startKey, initialData, initialDataUpdatedAt }: UseTransferDayListQueryArgs) {
+  return useQuery<TransferDaySummary[], Error>({
+    initialData,
+    initialDataUpdatedAt,
+    queryKey: transferKeys.days(startKey),
+    queryFn: async () => {
+      const supabase = requireBrowserSupabase();
+      try {
+        return await queryDaySummaries(supabase, startKey, Date.now());
+      } catch (e) {
+        console.error("[transfer] 날짜 목록 조회 실패:", e);
+        throw new Error(toDbErrorMessage(e));
+      }
+    },
   });
 }

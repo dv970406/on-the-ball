@@ -24,6 +24,8 @@ export {
 // 분석 이벤트 — 이름·파라미터의 단일 소스(`AnalyticsEvents`)와 보내는 함수. 측정 ID가 없으면 아무것도 하지 않는다
 export { track } from "./analytics";
 export { parsePostId } from "./post-id";
+// 한국 시각 날짜 키(`YYYY-MM-DD`) — 날짜별 소식 화면의 주소와 하루의 경계(사유는 그 파일 주석)
+export { kstDateKey, kstDateLabel, parseKstDateKey } from "./date-key";
 // 로그인 뒤 돌아올 주소 — 화면이 직접 정한 값(속성)이 있으면 그것, 없으면 지금 주소(사유는 그 파일 주석)
 export { RETURN_PATH_ATTR, currentReturnPath } from "./return-path";
 export {
@@ -43,7 +45,7 @@ export { useItemGuard } from "./use-item-guard";
 export { userScope } from "./query-scope";
 // ⚠ 이 배럴은 "use client" 훅을 포함하므로 서버(proxy·서버 컴포넌트)는 여기서 import 금지.
 //   순수 함수가 필요하면 "@/shared/lib/cn"·"@/shared/lib/format"·"@/shared/lib/post-id"·
-//   "@/shared/lib/text"·"@/shared/lib/query-scope"·"@/shared/lib/search-params"를 직접 import.
+//   "@/shared/lib/text"·"@/shared/lib/query-scope"·"@/shared/lib/search-params"·"@/shared/lib/date-key"를 직접 import.
 //   ⚠ "use client"를 붙이지 않은 shared/ui 컴포넌트도 여기 해당한다 — 배럴을 거치면
 //     서버 렌더 여지를 잃는다(선례: shared/ui/empty-state.tsx).
 //   이 목록이 곧 deep import 화이트리스트다 — 검증은 `pnpm check:conventions`가 한다.

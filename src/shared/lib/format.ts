@@ -90,3 +90,21 @@ export function formatRelativeTime(iso: string, nowMs: number | null): string {
   if (nowMs === null) return withYear;
   return p.year === seoulParts(new Date(nowMs)).year ? monthDay : withYear;
 }
+
+/** ⚠ 모듈 스코프에 한 번만 만든다(`PARTS`와 같은 이유) */
+const CLOCK = new Intl.DateTimeFormat("ko-KR", {
+  timeZone: TIME_ZONE,
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+/**
+ * ISO 시각 → 한국 시각의 시:분(`14:05`). 날짜가 이미 정해진 자리(날짜별 소식의 하루)에서 그 날 안의 시각만 말한다.
+ * ⚠ 기준 시각이 필요 없다 — 시계를 읽지 않는 절대 표기라 서버 HTML과 하이드레이션이 같고, 색인에 굳어도 거짓이 되지 않는다.
+ */
+export function formatClockTime(iso: string): string {
+  const found: Record<string, string> = {};
+  for (const { type, value } of CLOCK.formatToParts(new Date(iso))) found[type] = value;
+  return `${found.hour}:${found.minute}`;
+}

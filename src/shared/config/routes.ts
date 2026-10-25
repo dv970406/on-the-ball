@@ -11,6 +11,19 @@ export const ROUTES = {
    */
   transferList: "/transfers",
   transfer: (id: number | string) => `/transfers/${id}`,
+  /**
+   * 구단별 이적시장 — 5대 리그 구단 목록과 구단 하나의 영입·방출 소식. 검색 착지점(path 분류 — `nextjs.md` 필터 절)이다.
+   * ⚠ 정적 세그먼트(`club`)를 끼운다 — 딜 상세(`/transfers/[id]`)와 같은 깊이에 슬러그를 두지 않는다.
+   * ⚠ 주소는 영구 계약이다 — 코드는 `transfer_club.code`(엠블럼 파일명과 같은 슬러그)다. 코드를 바꾸면 이 주소가 깨진다.
+   */
+  transferClubs: "/transfers/club",
+  transferClub: (code: string) => `/transfers/club/${code}`,
+  /**
+   * 날짜별 이적 소식 — 최근 날짜 목록과 하루(한국 시각)의 소식. 키는 `YYYY-MM-DD`(`@/shared/lib`의 `kstDateKey`)다.
+   * ⚠ 정적 세그먼트(`daily`)를 끼운다(위와 같은 이유).
+   */
+  transferDays: "/transfers/daily",
+  transferDay: (dateKey: string) => `/transfers/daily/${dateKey}`,
 
   // 인증 — 소셜 로그인은 로그인과 가입이 같은 동작이라 화면이 하나다
   signIn: "/sign-in",
@@ -34,8 +47,15 @@ export const ROUTES = {
  * ⚠ `shared`에 있는 이유는 `OAUTH_PROVIDERS`와 같다 — `shared/ui`가 `widgets`를 import할 수 없다.
  */
 export function hasBottomBar(pathname: string): boolean {
-  return activeTabHref(pathname) !== null || pathname.startsWith(`${ROUTES.transferList}/`);
+  return activeTabHref(pathname) !== null || DEAL_DETAIL_PATH.test(pathname);
 }
+
+/**
+ * 딜 상세의 경로 — 관심 토글 바가 있는 화면.
+ * ⚠ `/transfers/` 접두로 넓히지 않는다 — 구단별·날짜별 화면(`/transfers/club/…`·`/transfers/daily/…`)은 같은 접두를 쓰지만
+ *   하단 바가 없어, 토스트가 없는 바 자리만큼 떠서 뜬다. 딜 id는 십진수뿐이다(`parsePostId`).
+ */
+const DEAL_DETAIL_PATH = /^\/transfers\/\d+$/;
 
 /**
  * 이 경로에서 **활성인 탭의 href** — 탭바가 없는 화면이면 `null`.
