@@ -309,6 +309,11 @@ export function isClubName(s) {
   return ALIAS_INDEX.some((a) => a.alias.toLowerCase() === t);
 }
 
+/** 사전에 오른 정규 영문명 전부 — 엠블럼 스크립트가 API의 줄인 이름("Derby")을 정규명("Derby County")으로 풀 때 쓴다 */
+export function knownClubNames() {
+  return Object.keys(CLUB_ALIASES);
+}
+
 /** 사전에 오른 정규 영문명인가(검사용) — 별칭이 풀네임뿐인 구단("Angers SCO")도 있어 매칭으로는 판정할 수 없다 */
 export function isKnownClub(canonical) {
   return Object.hasOwn(CLUB_ALIASES, canonical);

@@ -5,6 +5,7 @@
  *   node scripts/fetch-team-crests.mjs --team 33 --code man-united
  *   node scripts/fetch-team-crests.mjs --league 140       # 해외 리그 전체(라리가 140 · 분데스리가 78 ·
  *                                                         #   세리에 A 135 · 리그 1 61) — 팀 목록 JSON을 stdout에
+ *   node scripts/fetch-team-crests.mjs --league 40        # 5대 리그 밖 리그(아래 EXTRA_LEAGUES) — 파일명을 구단 사전으로 정한다
  *   (--force를 붙이면 이미 있는 파일도 다시 받는다)
  *
  * ⚠ **파일명(code)은 구단 표시 프리셋 `scripts/lib/transfer/club-presets.json`의 `code`와 같아야 한다.**
@@ -31,10 +32,12 @@
  *
  * ⚠ **DB에 접근하지 않는다.** 필요한 자격증명은 API-Football 키 하나뿐이다.
  */
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import sharp from "sharp";
 import { flag, loadEnv, slugify } from "./lib/sync-db.mjs";
 import { createApiFootball } from "./lib/api-football.mjs";
+import { canonicalClubName, isClubName, knownClubNames } from "./lib/transfer/clubs.mjs";
+import { clubCode } from "./lib/transfer/club-display.mjs";
 
 const OUT_DIR = "public/crests";
 
@@ -67,6 +70,104 @@ const force = argv.includes("--force");
 
 /** 해외 리그 — 이적 소식 프리셋(club-presets.json)이 한국어 표기를 갖는 리그만 받는다 */
 const FOREIGN_LEAGUES = new Map([[140, "라리가"], [78, "분데스리가"], [135, "세리에 A"], [61, "리그 1"]]);
+
+/**
+ * **5대 리그 밖**에서 엠블럼을 받는 리그 — 이적설에 자주 나오는 리그를 리그 단위로 통째로 받는다(구단마다 "유명한가"를 사람이
+ * 판단하면 기준이 흔들린다). 프리셋(5대 리그 — 리그 필터·응원 구단의 대상)과 달리 **엠블럼만** 생긴다.
+ * 이적 창마다 승강이 바뀌므로 창이 바뀔 때 다시 돌린다(이미 있는 파일은 덮지 않는다 — 새로 올라온 구단만 받는다).
+ *
+ * ⚠ **파일명은 API 이름이 아니라 딜 파생이 만드는 구단 코드다** — 프리셋 밖 구단의 코드는 `slugify(구단 사전의 정규 영문명)`이다
+ *   (`derive-deals.mjs`의 `clubRecord`). API는 "West Ham"이라 부르고 사전의 정규명은 "West Ham United"라, API 이름으로 지으면
+ *   화면이 찾는 `west-ham-united.png`가 생기지 않는다. 그래서 API 이름을 사전의 **별칭 통째 일치**(`canonicalClubName`)로 정규화한다.
+ *   ⚠ 부분 일치(`detectClubs`)로 넓히지 않는다 — "Sporting Braga"가 "Sporting"(스포르팅 CP)으로 잡혀 남의 엠블럼이 된다.
+ *   사전에 없는 이름은 API 이름 그대로 짓고 `unmatched`로 남긴다 — 위키데이터로 확인된 구단은 원문 표기가 코드라(같은 함수)
+ *   맞을 수도 있고 아닐 수도 있다. 화면에 모노그램으로 남는 구단이 보이면 사전에 별칭을 더하거나 `--team <id> --code <code>`로 받는다.
+ */
+const EXTRA_LEAGUES = new Map([
+  [40, "챔피언십(잉글랜드 2부)"],
+  [94, "프리메이라 리가(포르투갈)"],
+  [88, "에레디비시(네덜란드)"],
+  [203, "쉬페르 리그(튀르키예)"],
+  [179, "프리미어십(스코틀랜드)"],
+  [144, "프로 리그(벨기에)"],
+  [307, "프로 리그(사우디아라비아)"],
+  [253, "MLS(미국)"],
+  [71, "세리이 A(브라질)"],
+]);
+
+/**
+ * 사전 밖 구단의 **표기 변형** — 사전에 없는 구단의 코드는 기사에 적힌 표기 그대로(`slugify(원문 표기)`)라, API의 공식 이름
+ * ("Al-Hilal Saudi FC")과 기사의 표기("Al-Hilal")가 다르면 그림이 생겨도 화면이 찾지 못한다. 그래서 같은 그림을 흔한 표기의
+ * 코드로도 저장한다(한 장 약 5KB — 모노그램으로 떨어지는 것보다 싸다).
+ * - 이름의 법인 접두·접미(`FC`·`SC`·`KV`·`S.K.`·`FK` · 사우디 구단의 `Saudi FC`·`Jeddah` · 벨기에의 `KVC`·`KV`·`SK`)를 걷은 표기.
+ * - 아래 표 — 기사에서 다른 철자·약칭으로 쓰는 구단. 키는 API 이름 그대로다(실행 결과의 `name`).
+ * ⚠ **구단 사전(`clubs.mjs`)에 더하는 것으로 대신하지 않는다** — 사전은 추출·판정 지시문(구단 표)에 쓰여 바꾸면 추출 결과와
+ *   판정 지문이 함께 바뀐다(재추출·재판정). 엠블럼은 화면만의 일이라 파일 이름으로 메운다.
+ * ⚠ 같은 구단이 우리 데이터에 여러 코드로 있을 수 있다(기사마다 철자가 달랐다 — `al-ettifaq`·`al-ittifaq`). 표가 그 둘을 다 덮는다.
+ */
+const CREST_CODE_ALIASES = {
+  "Al-Ettifaq": ["al-ittifaq"],
+  "Al-Qadisiyah FC": ["al-qadsiah", "al-qadisiyah"],
+  "Al-Ittihad FC": ["al-ittihad", "al-ittihad-jeddah"],
+  "Al-Ahli Jeddah": ["al-ahli", "al-ahli-saudi"],
+  "Al-Hilal Saudi FC": ["al-hilal"],
+  "Atletico Paranaense": ["athletico-paranaense"],
+  "Atletico-MG": ["atletico-mineiro"],
+  "Sao Paulo": ["sao-paulo-fc"],
+  "Vasco DA Gama": ["vasco"],
+  "Heart Of Midlothian": ["hearts"],
+  "Union St. Gilloise": ["union-saint-gilloise", "union-sg"],
+  "St. Truiden": ["sint-truiden"],
+  "Standard Liege": ["standard-liege", "standard"],
+  "AZ Alkmaar": ["az"],
+  "PEC Zwolle": ["zwolle"],
+  "Vitória SC": ["vitoria-guimaraes", "vitoria-de-guimaraes"],
+  "Başakşehir": ["istanbul-basaksehir"],
+  "Kasımpaşa": ["kasimpasa"],
+  "Los Angeles Galaxy": ["la-galaxy"],
+  "Los Angeles FC": ["lafc"],
+  "New York City FC": ["new-york-city", "nycfc"],
+};
+
+/** 접미를 걷으면 다른 구단과 겹치는 이름 — "Los Angeles FC"를 걷은 "Los Angeles"는 LA 갤럭시로도 읽힌다 */
+const AMBIGUOUS_CODES = new Set(["los-angeles"]);
+
+/** API 이름의 법인 접두·접미를 걷은 표기 — 걷을 것이 없으면 `null` */
+function strippedName(apiName) {
+  const s = apiName
+    .replace(/\s+(?:Saudi FC|FC|SC|KV|S\.K\.|FK|Jeddah|Saihat)$/u, "")
+    .replace(/^(?:KVC|KV|SK|OH|RAAL)\s+/u, "")
+    .trim();
+  return s && s !== apiName ? s : null;
+}
+
+/**
+ * 5대 리그 밖 리그의 파일명 — 딜 파생과 같은 규칙(`clubCode(정규명) ?? slugify(정규명)`). 사전에서 찾았는지도 돌려준다.
+ * - 사전의 별칭과 통째로 같으면 그 정규명이다.
+ * - 아니면 API가 줄여 쓴 이름("Derby"·"Sheffield Utd")을 풀어 본다 — `Utd`를 `United`로 바꾼 이름으로 **시작하는** 정규명이
+ *   사전에 **하나뿐일 때만** 그것으로 본다("Derby" → "Derby County"). 둘 이상이면 짐작하지 않는다.
+ */
+function extraLeagueCode(apiName) {
+  let canonical = canonicalClubName(apiName);
+  let matched = isClubName(apiName);
+  if (!matched) {
+    const expanded = apiName.replace(/\bUtd\b/g, "United");
+    const hits = knownClubNames().filter((n) => n === expanded || n.startsWith(`${expanded} `));
+    if (hits.length === 1) {
+      canonical = hits[0];
+      matched = true;
+    }
+  }
+  const code = clubCode(canonical) ?? slugify(canonical);
+  // 사전에서 찾은 구단은 파생이 정규명으로 모으므로 접미를 걷은 변형을 만들지 않는다 — 표의 철자 변형만 더한다
+  // (사전에 오르기 전 위키데이터로 쓰인 옛 코드가 남아 있다 — `al-ittifaq`)
+  const stripped = matched ? null : strippedName(apiName);
+  const strippedCode = stripped ? slugify(stripped) : null;
+  const aliases = [
+    ...new Set([...(strippedCode && !AMBIGUOUS_CODES.has(strippedCode) ? [strippedCode] : []), ...(CREST_CODE_ALIASES[apiName] ?? [])]),
+  ].filter((c) => c && c !== code && CODE_RE.test(c));
+  return { code, matched, aliases };
+}
 
 /*
  * ⚠ **모드가 섞인 인자는 거부한다.** 조용히 한쪽만 실행하면 의도와 다른 파일이 생기고 API 한도를 쓴다
@@ -158,9 +259,12 @@ if (argv.includes("--team")) {
  */
 if (argv.includes("--league")) {
   const leagueId = Number(leagueArg);
-  if (!FOREIGN_LEAGUES.has(leagueId)) {
-    usage(`--league는 ${[...FOREIGN_LEAGUES].map(([id, name]) => `${name} ${id}`).join(" · ")} 중 하나입니다`);
+  const extra = EXTRA_LEAGUES.has(leagueId);
+  if (!FOREIGN_LEAGUES.has(leagueId) && !extra) {
+    const all = [...FOREIGN_LEAGUES, ...EXTRA_LEAGUES];
+    usage(`--league는 ${all.map(([id, name]) => `${name} ${id}`).join(" · ")} 중 하나입니다`);
   }
+  const leagueName = FOREIGN_LEAGUES.get(leagueId) ?? EXTRA_LEAGUES.get(leagueId);
   const season = Number(seasonArg ?? (new Date().getUTCMonth() >= 6 ? new Date().getUTCFullYear() : new Date().getUTCFullYear() - 1));
   let list;
   try {
@@ -169,13 +273,15 @@ if (argv.includes("--league")) {
   } catch (e) {
     usage(`✗ ${e.message}`);
   }
-  if (list.length === 0) usage(`✗ ${FOREIGN_LEAGUES.get(leagueId)} ${season} 시즌 팀을 찾지 못했습니다`);
+  if (list.length === 0) usage(`✗ ${leagueName} ${season} 시즌 팀을 찾지 못했습니다`);
   mkdirSync(OUT_DIR, { recursive: true });
-  const result = { league: FOREIGN_LEAGUES.get(leagueId), season, saved: [], kept: [], skipped: [] };
+  const result = { league: leagueName, season, saved: [], kept: [], skipped: [], unmatched: [] };
   const claimed = new Set(); // ⚠ 한 실행 안에서 같은 코드가 두 번 나오면 뒤의 것이 앞의 것을 조용히 덮는다
   let bad = 0;
   for (const t of list) {
-    const code = slugify(t.name);
+    const named = extra ? extraLeagueCode(t.name) : { code: slugify(t.name), matched: true, aliases: [] };
+    const code = named.code;
+    if (!named.matched) result.unmatched.push({ code, apiId: t.id, name: t.name });
     const logo = httpsLogo(t.logo);
     const skip = (reason) => {
       result.skipped.push({ name: t.name, apiId: t.id, reason });
@@ -185,15 +291,21 @@ if (argv.includes("--league")) {
     if (!logo) { skip("엠블럼 주소 없음"); continue; }
     if (claimed.has(code)) { skip(`${code}가 이 리그에서 이미 쓰였다`); continue; }
     claimed.add(code);
-    const entry = { code, apiId: t.id, name: t.name };
-    if (existsSync(`${OUT_DIR}/${code}.png`) && !force) {
+    // 표기 변형(5대 리그 밖 리그만) — 이 리그의 다른 구단이 이미 쓴 코드는 건너뛴다
+    const aliases = named.aliases.filter((c) => !claimed.has(c) && (force || !existsSync(`${OUT_DIR}/${c}.png`)));
+    for (const c of aliases) claimed.add(c);
+    const entry = { code, apiId: t.id, name: t.name, ...(aliases.length ? { aliases } : {}) };
+    const primaryExists = existsSync(`${OUT_DIR}/${code}.png`) && !force;
+    if (primaryExists && aliases.length === 0) {
       result.kept.push(entry);
       continue;
     }
     try {
-      const { output } = await toCrestPng(logo);
-      writeFileSync(`${OUT_DIR}/${code}.png`, output);
-      result.saved.push(entry);
+      // 본 파일이 이미 있으면 그 그림을 변형 이름으로 옮겨 적는다(다시 받지 않는다)
+      const output = primaryExists ? readFileSync(`${OUT_DIR}/${code}.png`) : (await toCrestPng(logo)).output;
+      if (!primaryExists) writeFileSync(`${OUT_DIR}/${code}.png`, output);
+      for (const c of aliases) writeFileSync(`${OUT_DIR}/${c}.png`, output);
+      (primaryExists ? result.kept : result.saved).push(entry);
     } catch (e) {
       bad++;
       console.error(`✗ ${t.name}: ${e instanceof Error ? e.message : String(e)}`);
