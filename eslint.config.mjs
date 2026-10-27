@@ -27,6 +27,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // 이적 품질 검증의 로컬 산출물(평가 스냅샷·벤치 원출력) — 소스가 아니다(gitignore)
     ".cache/**",
+    // 로컬 배포 빌드(`vercel build` → `deploy --prebuilt`)의 산출물 — 소스가 아니다(gitignore)
+    ".vercel/**",
     // supabase CLI가 생성하는 파일 — 손으로 고쳐도 `pnpm db:types`에 덮인다
     "src/types/database.types.ts",
   ]),
