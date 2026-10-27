@@ -560,6 +560,9 @@ path로 둘 수 있는 것은 **닫힌 유한 분류**(DB enum 같은)뿐이다 
 - **뮤테이션의 성공은 그 훅의 `onSuccess`에서 센다**(성공 토스트와 같은 자리). 호출부에 두면 다음
   호출부가 빠뜨리고, 누른 횟수가 아니라 **일어난 일**을 세야 실패한 클릭이 수치에 섞이지 않는다.
   ⚠ 성공하면 화면이 사라지는 동작(소셜 로그인 시작)은 누른 순간에 센다.
+- **공유 주소에는 UTM을 붙인다**(`utm_medium=share` · `utm_source`는 `kakaotalk`·`share_sheet`·`link_copy` — `widgets/sub-header`의 `shareUrl`).
+  공유한 횟수(`share` 이벤트)가 아니라 **공유로 들어온 방문**을 GA4의 유입 채널로 센다. 화면은 UTM을 읽지 않고, canonical은 각 화면이
+  경로만으로 만들어 UTM이 붙은 주소가 별개 페이지로 색인되지 않는다.
 - **화면 조회는 따로 보내지 않는다.** gtag가 주소 변화를 스스로 세므로(`history.pushState` 포함)
   직접 `page_view`를 보내면 두 번 잡힌다. 보드 필터 전환도 그 주소 변화로 잡힌다.
 - ⚠ **`sendGAEvent`를 `shared`에서 import하지 않는다.** `@next/third-parties/google`은 CJS 배럴이라

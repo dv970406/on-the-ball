@@ -239,14 +239,16 @@
 - **`activeNavHref(pathname)`** — 데스크톱 상단 바(`TopBar`)에서 활성인 내비 항목. 탭바 판정(`activeTabHref`)과 다르다 — 딜 상세(`/transfers/[id]`)도 "이적시장"이다(상세는 이적시장 안의 화면이고, 상단 바는 상세에서도 남는다). 내비 항목을 더하면 여기도 함께 고친다.
 - ⚠ **`hasBottomBar`는 폭을 모른다.** 하단 고정 바는 `lg`(1024px)부터 없으므로(탭바는 상단 바로 올라가고 딜 상세의 하단 바도 숨는다) 폭 조건은 소비자가 클래스로 건다(`ToastViewport`의 `lg:` 위치). 경로 판정에 폭을 섞지 않는다 — 서버 렌더에는 폭이 없다.
 - `signInWithNext(pathname)` / `withNext(path, next)` — 복귀 경로를 붙인 URL. 이 형태를 만드는 곳이 가드·`SignInDialog`·`AuthStatus`로 여럿이라 여기로 모았다. ⚠ **OAuth 복귀 파라미터(`code`·`error`·`error_code`·`error_description`·`state`)는 실을 때 걷는다**(슬라이스 내부 `withoutAuthReturnParams` — 나머지 쿼리는 그대로). `next` 안에 감싸인 `code`는 분석의 `code` 걷어내기를 피해 가고, 로그인 뒤 끝난 복귀를 화면이 다시 읽는다. `safeNextPath`도 돌려줄 때 같은 함수로 한 번 더 걷는다 — 파라미터 목록을 호출부에 다시 적지 않는다. ⚠ 액션 컨트롤에서 이걸로 **직접 이동하지 않는다** — `SignInDialog`가 안내를 끼고 그 안에서 부른다(예외는 라벨이 "로그인"인 컨트롤).
+- **`withoutAuthReturnParams(path)`** — 경로 + 쿼리에서 OAuth 복귀 파라미터만 걷는다(나머지 표기는 그대로). `withNext`·`safeNextPath`와 공유 주소(`widgets/sub-header`의 `shareUrl`)가 같은 판정을 쓴다 — 파라미터 목록을 호출부에 다시 적지 않는다.
 - **`safeNextPath(next, origin)`** — `?next=` 값을 앱 내부 경로로만 통과시킨다. **직접 문자열 검사를 짜지 말 것** — `startsWith("/") && !startsWith("//")`로는 `/\evil.com`도 `/..//evil.com`도 못 막는다(둘 다 실제로 뚫렸다).
 - **`OAUTH_PROVIDERS` / `OAUTH_PROVIDER_LABEL`** — 지원 소셜 프로바이더의 단일 소스. `supabase/config.toml`의 `[auth.external.*]`와 갈리면 안 된다. ⚠ `shared`에 있는 이유는 로그인(`features/sign-in`)과 계정 연결(`features/link-identity`)이 같은 목록을 써야 하는데 features끼리는 import할 수 없어서다.
 - **`avatarUrl(path)` / `AVATAR_BUCKET`** — 아바타 **경로** → 공개 URL. ⚠ DB에는 전체 URL이 아니라 경로만 저장한다(호스트가 환경마다 다르다: 로컬 `127.0.0.1:64321` ↔ 원격 `*.supabase.co`). 조립은 이 함수 한 곳에서만. 버킷명 문자열도 여기서 가져다 쓴다(`features/update-profile`이 선례).
 - **`publicStorageUrl(bucket, path)`**(`shared/config/storage.ts` — 배럴에 없다) — 공개 버킷 경로 → URL 조립의 **단일 소스**. 새 공개 버킷이 생기면 이 함수를 감싸는 버킷별 함수를 `shared/config`에 두고 그것을 배럴로 노출한다(`avatarUrl`이 선례). 호출부가 버킷 URL을 직접 조립하지 않는다.
 - **`OG_IMAGE` / `OG_SITE` / `NOT_FOUND_TITLE` / `absoluteUrl(path)`** — 세그먼트가 `openGraph`를 채울 때 함께 싣는 이미지·사이트 공통 값(`siteName`·`locale`), 없는 리소스의 메타데이터 제목(404 화면과 같아야 한다), 그리고 앱 경로 → 절대 URL. ⚠ `new URL(path, env.siteUrl)`을 호출부가 각자 짜지 말 것 — 사이트맵·`robots.txt`·`og:url` 셋이 **같은 URL**을 가리켜야 검색엔진·공유 플랫폼이 한 주소를 대표로 본다(canonical과도 같은 경로여야 한다).
-- **`env`** — `NEXT_PUBLIC_*` 환경변수의 단일 소스(`supabaseUrl`·`supabaseAnonKey`·`siteUrl`·`googleSiteVerification`·`naverSiteVerification`·`gaId`·`vapidPublicKey`). **`process.env`를 호출부에서 다시 읽지 말 것** — `proxy.ts`가 화면·훅과 같은 supabase 인스턴스를 봐야 세션 쿠키가 어긋나지 않는다.
+- **`env`** — `NEXT_PUBLIC_*` 환경변수의 단일 소스(`supabaseUrl`·`supabaseAnonKey`·`siteUrl`·`googleSiteVerification`·`naverSiteVerification`·`gaId`·`vapidPublicKey`·`kakaoJsKey`). **`process.env`를 호출부에서 다시 읽지 말 것** — `proxy.ts`가 화면·훅과 같은 supabase 인스턴스를 봐야 세션 쿠키가 어긋나지 않는다.
   - `siteUrl`은 `og:image`를 절대 URL로 만드는 `metadataBase`(루트 layout)용이다. `NEXT_PUBLIC_SITE_URL` → Vercel 주소(운영 배포는 `VERCEL_PROJECT_PRODUCTION_URL`, 프리뷰는 `VERCEL_URL`) → `localhost:3000` 순으로 폴백한다. ⚠ 운영에서 `VERCEL_URL`로 떨어뜨리지 않는다 — 배포마다 바뀌는 주소라 canonical·사이트맵이 배포마다 다른 URL을 가리킨다.
   - `gaId`는 GA4 측정 ID다 — 형식(`G-…`)이 아니면 빈 값으로 접힌다(깨진 스크립트를 싣느니 측정을 끈다).
+  - `kakaoJsKey`는 카카오 **JavaScript 키**다(공유 버튼의 "카카오톡으로 공유") — 비어 있으면 그 항목을 그리지 않는다. ⚠ 소셜 로그인의 REST API 키와 다른 키이고, 카카오 개발자 콘솔에 등록한 사이트 도메인에서만 동작한다.
   - `vapidPublicKey`는 웹 푸시의 **공개키**다 — 비어 있으면 화면이 알림 자리를 그리지 않는다. ⚠ 짝이 되는 비밀키를 여기 두지 않는다(이 모듈은 클라이언트 번들에 실린다 — 발송 스크립트의 환경에만 있다).
 - **`TOKEN_COLORS`** — 디자인 토큰과 같은 값의 JS 색 상수. **CSS를 읽지 못하는 자리 전용**이다(딜 공유 카드 이미지 · 웹 앱 매니페스트). 화면 컴포넌트의 `style`에 쓰지 않는다. 단일 소스는 `globals.css`의 `@theme`이고 이건 그 사본이다 — 토큰 값을 바꾸면 함께 고친다.
 - **`isSupabaseConfigured()`** — env가 채워졌는지. 값이 비어도 빌드는 성공해야 하므로 `env`는 throw하지 않는다 → **가드는 호출부의 책임**이고, 그 가드를 각자 짜지 말고 이걸 쓴다(`proxy.ts`가 선례).
@@ -294,7 +296,10 @@
   - 탭 목록은 이적시장(`ROUTES.transferList`, 아이콘 `ArrowLeftRight`)·프로필 순이다.
   - ⚠ **로그인해야 열리는 탭을 추가하면 `signInAction` 문구를 함께 적는다.** 그 값이 있는 탭만 비로그인의 이동을 가로채 `SignInDialog`를 띄운다 — 앵커는 그대로 두고 `preventDefault`만 한다. 빠뜨리면 그 탭은 안내 없이 이동했다가 `AuthRequired`에 막혀 로그인 화면으로 떨궈진다.
   - ⚠ 그 다이얼로그는 `<nav>`의 **형제**여야 한다. 탭바가 `absolute`라 자기 안의 `Dialog`에게 컨테이닝 블록이 되어, 안에 두면 알약 한가운데에 뜬다.
-- `SubHeader` — 상세 화면 상단(뒤로가기 + 공유).
+- `SubHeader` — 상세 화면 상단(뒤로가기 + 공유). 공유는 카카오 키(`env.kakaoJsKey`)가 있으면 시트(카카오톡 · 링크 복사 · OS 공유 시트가 있으면 "다른 앱으로")를 열고, 없으면 곧바로 OS 공유(없으면 복사)로 간다.
+  - ⚠ **공유하는 주소에는 UTM을 붙인다**(`model/share-url`의 `shareUrl` — `utm_medium=share` + 경로별 `utm_source`) — GA4가 공유로 들어온 방문을 채널로 센다. 이미 붙은 UTM·OAuth 복귀 파라미터는 걷고 다시 붙인다. 공유 주소를 만드는 자리가 새로 생기면 이 함수를 쓴다.
+  - ⚠ 카카오 SDK는 **시트를 열 때 미리 받는다**(`model/kakao-share`의 `preloadKakao` — 버전·SRI 고정). 누른 뒤에 받으면 데스크톱의 공유 창이 팝업 차단에 걸린다. 버전을 올리면 무결성 해시도 함께 바꾼다.
+  - ⚠ 시트는 도구 줄의 **형제**로 렌더한다 — 도구 줄이 `sticky`라 안에 두면 시트의 기준이 그 줄이 된다.
 - `TabScrollArea` — 목록 스크롤 영역(`<main>` 제공 + 스크롤 복원).
 - `AuthShell` — 인증 화면의 공통 껍데기.
 - `AuthStatus` — **비로그인일 때의 로그인 링크**만 그린다(로그인 상태에서는 `null`). ⚠ 라벨이 "로그인"이라 `SignInDialog`를 거치지 않고 곧바로 이동한다 — 목적지가 라벨에 적혀 있어 한 단계 더 묻는 것이 방해다.

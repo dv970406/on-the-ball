@@ -48,7 +48,24 @@ export const env = {
    * ⚠ 키를 바꾸면 기존 구독은 전부 무효가 된다(브라우저 구독이 옛 키에 묶여 있다) — 사용자가 다시 켜야 한다.
    */
   vapidPublicKey: resolveVapidPublicKey(),
+  /**
+   * 카카오 **JavaScript 키** — 공유 버튼의 "카카오톡으로 공유"(카카오 JS SDK)가 쓴다. 비어 있으면 그 항목을 그리지 않고
+   * 공유 버튼은 OS 공유 시트·링크 복사만 한다.
+   * ⚠ 소셜 로그인의 키(REST API 키 — Supabase가 서버에서 쓴다)와 **다른 키다**(같은 카카오 앱의 "앱 키"에 함께 있다).
+   *   JavaScript 키는 브라우저에 내려가는 공개 키라 `NEXT_PUBLIC_*`이어도 된다 — 대신 카카오 개발자 콘솔의
+   *   "플랫폼 > Web > 사이트 도메인"에 등록한 도메인에서만 동작한다(로컬 확인은 그 주소도 등록해야 한다).
+   */
+  kakaoJsKey: resolveKakaoJsKey(),
 };
+
+/** 형식(16진수 32자)이 맞을 때만 받는다 — 깨진 키로 SDK를 초기화하면 누를 때마다 영문 예외만 남는다 */
+function resolveKakaoJsKey(): string {
+  const raw = (process.env.NEXT_PUBLIC_KAKAO_JS_KEY ?? "").trim();
+  if (!raw) return "";
+  if (/^[0-9a-f]{32}$/.test(raw)) return raw;
+  console.error("[env] NEXT_PUBLIC_KAKAO_JS_KEY가 카카오 JavaScript 키 형식이 아니에요 — 카카오톡 공유를 끕니다.");
+  return "";
+}
 
 /** 형식(P-256 공개키 65바이트의 base64url = 87자)이 맞을 때만 받는다 — 깨진 키로 구독을 시도하면 영문 예외만 남는다 */
 function resolveVapidPublicKey(): string {

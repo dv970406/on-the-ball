@@ -24,8 +24,8 @@ export interface AnalyticsEvents {
   comment_vote: { deal_id: number; value: number };
   /** 딜 성사를 예측했다(`will_happen` — true 성사 · false 불발). 같은 창에서 고른 것을 바꿔도 센다 */
   deal_predict: { deal_id: number; will_happen: boolean };
-  /** 링크를 공유했다(GA4 권장 이벤트) — `method`는 OS 공유 시트(`sheet`) 또는 복사(`clipboard`) */
-  share: { method: "sheet" | "clipboard"; content_type: string };
+  /** 링크를 공유했다(GA4 권장 이벤트) — `method`는 OS 공유 시트(`sheet`) · 복사(`clipboard`) · 카카오톡(`kakao` — 카카오 창을 연 순간에 센다) */
+  share: { method: "sheet" | "clipboard" | "kakao"; content_type: string };
   /** 알림을 켰다 — `source`는 켠 자리(프로필 · 딜 상세의 안내) */
   push_enable: { source: "profile" | "deal" };
   /** 알림을 껐다 */

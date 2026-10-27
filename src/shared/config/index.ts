@@ -7,6 +7,8 @@ export {
   signInWithNext,
   withNext,
   safeNextPath,
+  // 공유 주소도 같은 판정으로 OAuth 복귀 파라미터를 걷는다(파라미터 목록을 호출부에 다시 적지 않는다)
+  withoutAuthReturnParams,
 } from "./routes";
 export { OG_IMAGE, OG_SITE, NOT_FOUND_TITLE, absoluteUrl } from "./metadata";
 // 토큰과 같은 값의 JS 색 — CSS를 읽지 못하는 자리(공유 카드 이미지·매니페스트) 전용

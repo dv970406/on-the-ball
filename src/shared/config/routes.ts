@@ -120,11 +120,12 @@ const AUTH_RETURN_PARAMS = ["code", "error", "error_code", "error_description", 
  *   - 로그인 뒤 그 주소로 돌아오면 끝난 복귀(`?code=`·`?error=`)를 화면이 다시 읽는다 — 이미 쓴 코드로
  *     교환을 시도하고, 지난 실패 배너가 다시 뜬다.
  * ⚠ 판정은 이 함수 하나가 갖는다 — `withNext`가 실을 때 걷고 `safeNextPath`가 돌려줄 때 한 번 더 걷는다
- *   (주소창에 손으로 넣은 `next`도 같은 판정을 지난다). 호출부가 파라미터 목록을 다시 적지 않는다.
+ *   (주소창에 손으로 넣은 `next`도 같은 판정을 지난다). 공유 주소(`widgets/sub-header`의 `shareUrl`)도 이것으로 걷는다 —
+ *   복귀 화면에서 공유하면 끝난 교환 코드가 남의 단톡방에 실린다. 호출부가 파라미터 목록을 다시 적지 않는다.
  * ⚠ 걷을 것이 없으면 입력을 **그대로** 돌려준다 — 다시 조립하면 한글 쿼리(`?league=라리가`)의 표기가 바뀐다.
  * ⚠ 조각(`#access_token=…`)은 implicit 흐름의 복귀 값이라 그런 조각이면 통째로 버린다(이 앱은 PKCE라 오지 않는다).
  */
-function withoutAuthReturnParams(path: string): string {
+export function withoutAuthReturnParams(path: string): string {
   const hashAt = path.indexOf("#");
   const beforeHash = hashAt === -1 ? path : path.slice(0, hashAt);
   let hash = hashAt === -1 ? "" : path.slice(hashAt);
