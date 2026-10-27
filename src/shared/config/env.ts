@@ -56,6 +56,11 @@ export const env = {
    *   "플랫폼 > Web > 사이트 도메인"에 등록한 도메인에서만 동작한다(로컬 확인은 그 주소도 등록해야 한다).
    */
   kakaoJsKey: resolveKakaoJsKey(),
+  /**
+   * 엠블럼 폴더의 내용 지문 — `next.config.ts`가 빌드 시점에 계산해 넣는다(`crestVersion`). 엠블럼 주소의 `?v=`다(`TransferCrest`).
+   * 비어 있으면(빌드 밖) 붙이지 않는다.
+   */
+  crestVersion: process.env.NEXT_PUBLIC_CREST_VERSION ?? "",
 };
 
 /** 형식(16진수 32자)이 맞을 때만 받는다 — 깨진 키로 SDK를 초기화하면 누를 때마다 영문 예외만 남는다 */

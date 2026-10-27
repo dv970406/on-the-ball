@@ -1,3 +1,4 @@
+import { env } from "@/shared/config";
 import { Crest } from "@/shared/ui";
 import type { TransferClub } from "../model/types";
 
@@ -9,6 +10,11 @@ import type { TransferClub } from "../model/types";
  * ⚠ `code`는 DB CHECK(`^[a-z0-9-]{1,60}$`)가 슬러그로 강제해 인코딩이 필요 없다.
  */
 const CREST_DIR = "/crests";
+/**
+ * 엠블럼 폴더의 지문(`env.crestVersion`) — 엠블럼을 더하거나 바꾸면 주소가 바뀐다. 엠블럼 응답의 30일 캐시가 404에도 붙어, 없던
+ * 파일을 나중에 넣어도 한 번 404를 받은 브라우저는 옛 404를 쓰고 모노그램을 그렸다(`next.config.ts`의 `crestVersion`).
+ */
+const CREST_QUERY = env.crestVersion ? `?v=${env.crestVersion}` : "";
 
 interface TransferCrestProps {
   /** `null`이면 방향을 못 읽은 자리다 — 라벨 `—`인 모노그램을 그린다 */
@@ -28,7 +34,7 @@ export function TransferCrest({ club, size, priority, className }: TransferCrest
   if (club === null) return <Crest src={null} label="—" size={size} className={className} />;
   return (
     <Crest
-      src={`${CREST_DIR}/${club.code}.png`}
+      src={`${CREST_DIR}/${club.code}.png${CREST_QUERY}`}
       label={club.shortName}
       size={size}
       priority={priority}
