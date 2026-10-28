@@ -121,6 +121,7 @@ const CREST_CODE_ALIASES = {
   "Standard Liege": ["standard-liege", "standard"],
   "AZ Alkmaar": ["az"],
   "PEC Zwolle": ["zwolle"],
+  "Twente": ["fc-twente"],
   "Vitória SC": ["vitoria-guimaraes", "vitoria-de-guimaraes"],
   "Başakşehir": ["istanbul-basaksehir"],
   "Kasımpaşa": ["kasimpasa"],
