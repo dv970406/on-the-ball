@@ -26,6 +26,11 @@ export interface AnalyticsEvents {
   deal_predict: { deal_id: number; will_happen: boolean };
   /** 링크를 공유했다(GA4 권장 이벤트) — `method`는 OS 공유 시트(`sheet`) · 복사(`clipboard`) · 카카오톡(`kakao` — 카카오 창을 연 순간에 센다) */
   share: { method: "sheet" | "clipboard" | "kakao"; content_type: string };
+  /**
+   * 공유 링크로 처음 온 비로그인 방문자에게 딜 상세의 담기 안내가 보였다(`shown`) / 닫기 버튼으로 닫았다(`dismissed`).
+   * ⚠ 관심 토글을 눌러 걷힌 것은 세지 않는다 — 그다음 걸음은 `sign_in_start`·`login`·`watch_toggle`이 센다.
+   */
+  share_welcome: { deal_id: number; action: "shown" | "dismissed" };
   /** 알림을 켰다 — `source`는 켠 자리(프로필 · 딜 상세의 안내) */
   push_enable: { source: "profile" | "deal" };
   /** 알림을 껐다 */

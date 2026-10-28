@@ -30,12 +30,14 @@ import { cn, formatCount, formatRelativeTime, useNowMs } from "@/shared/lib";
 import { Dialog, EmptyState, SignInDialog, Skeleton, StaleBanner, chipClassName } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
 import { useCommentDeletion } from "../model/use-comment-deletion";
+import { useShareWelcome } from "../model/use-share-welcome";
 import { useTransferDetail } from "../model/use-transfer-detail";
 import { CommentSection } from "./comment-section";
 import { DetailTabs, detailPanelId, detailTabId, type DetailTabKey } from "./detail-tabs";
 import { FeeCard } from "./fee-card";
 import { ReportTimeline } from "./report-timeline";
 import { RouteHero } from "./route-hero";
+import { ShareWelcome } from "./share-welcome";
 import { useWideLayout } from "./use-wide-layout";
 
 interface TransferDetailViewProps {
@@ -85,7 +87,8 @@ const wideCard = "lg:rounded-xl lg:border lg:border-hairline lg:bg-canvas lg:p-6
  * 하단 탭바를 렌더하지 않는다(서브헤더 화면이다). 공유는 `SubHeader`가 갖는다.
  * 모델이 계산한 확률 카드·원화 환산은 두지 않는다(확률은 보류이고, 하드코딩 환율은 거짓 숫자다) — 대신 팬의 성사
  * 예측(`PredictionCard`)이 그 자리를 채운다. 팬 의견이라 사실처럼 읽히지 않는다. 알림 안내는 관심 목록에 담은
- * 직후에만 뜬다(`usePushNudge`).
+ * 직후에만 뜬다(`usePushNudge`). 공유 링크로 처음 온 비로그인 방문자에게는 같은 자리에 담기 안내가 한 번 뜬다
+ * (`useShareWelcome` — 둘이 겹치면 알림 안내가 이긴다).
  *
  * **폭마다 배치가 다르다**(구성 요소는 같다):
  * - `<768px` — 한 열. 이름 · 경로 카드 · 이적료 카드 · 성사 예측 · 탭(댓글 | 보도 타임라인) · 하단 고정 관심 바.
@@ -159,6 +162,18 @@ export function TransferDetailView({
   const [tab, setTab] = useState<DetailTabKey>("comments");
   /** 방금 담은 사람에게만 알림 안내를 낸다 — 판정(토스트가 걷힌 뒤 · 알림이 꺼져 있을 때)은 훅이 갖는다 */
   const nudge = usePushNudge({ dealId, watched: deal?.isWatched === true, userId: session.userId });
+  /**
+   * 공유 링크로 처음 온 비로그인 방문자에게 한 번 — 판정(주소·세션·처음인가)과 "봤다" 기록은 훅이 갖는다.
+   * ⚠ 하이드레이션 뒤에만 참이 된다(서버 HTML에는 없다). 알림 안내와 같은 자리라 둘이 겹치면 알림 안내가 이긴다 —
+   *   실제로는 겹치지 않는다(이건 비로그인, 그건 방금 담은 로그인 사용자).
+   */
+  const welcome = useShareWelcome({
+    dealId,
+    dealShown: Boolean(deal),
+    watched: deal?.isWatched === true,
+    status: session.status,
+  });
+  const showWelcome = welcome.show && !nudge.show;
   // ⚠ **서버 시각이 우선이다** — `useNowMs()`는 세션당 한 번 고정된다(`data-and-state.md`).
   //   ⚠ `??`는 단축평가라 훅을 뒤에 두면 조건부 호출이 된다 → 먼저 무조건 부른다.
   const clientNowMs = useNowMs();
@@ -175,7 +190,11 @@ export function TransferDetailView({
     <WatchToggle
       dealId={deal.id}
       watched={deal.isWatched}
-      onSignInRequired={() => setSignInAction("관심 목록에 담으려면")}
+      onSignInRequired={() => {
+        // 공유 담기 안내가 권하던 바로 그 동작이다 — 그 안내는 걷고 로그인 안내가 이어받는다
+        welcome.hide();
+        setSignInAction("관심 목록에 담으려면");
+      }}
       onWatched={nudge.onWatched}
     />
   );
@@ -210,10 +229,13 @@ export function TransferDetailView({
           // `lg:[container-type:size]` — 곁 칸의 높이 상한(`100cqh`)이 이 스크롤 영역의 높이를 잰다(아래 곁 칸 주석).
           //   높이는 flex가 정하므로(`flex-1 min-h-0`) 크기 봉쇄가 배치를 바꾸지 않는다
           "no-scrollbar min-h-0 flex-1 overflow-y-auto px-5 lg:bg-canvas-soft lg:px-8 lg:pb-12 lg:[container-type:size]",
-          // 알림 안내가 뜨면 하단 바가 그만큼 높아진다 — 본문 끝이 바에 가려지지 않게 함께 늘린다
+          // 알림 안내·공유 담기 안내가 뜨면 하단 바가 그만큼 높아진다 — 본문 끝이 바에 가려지지 않게 함께 늘린다.
+          // 담기 안내는 두 줄이 기본이고 좁은 폰(360px 아래)에서 세 줄로 접힌다 — 세 줄 높이로 잡는다(남는 여백은 무해하다)
           nudge.show
             ? "pb-[calc(142px+env(safe-area-inset-bottom))]"
-            : "pb-[calc(96px+env(safe-area-inset-bottom))]",
+            : showWelcome
+              ? "pb-[calc(164px+env(safe-area-inset-bottom))]"
+              : "pb-[calc(96px+env(safe-area-inset-bottom))]",
         )}
       >
         <div className="md:mx-auto md:max-w-[720px] lg:max-w-[1240px]">
@@ -485,11 +507,13 @@ export function TransferDetailView({
                     {/*
                       안내 문구는 지금 상태의 말이어야 한다. ⚠ "담으면 알려 드려요"라고 단정하지 않는다 — 알림은 그 기기에서 알림을
                       켜 둔 사람에게만 간다(`nextjs.md` 웹 푸시 절). 방금 담아 알림 안내(`PushNudge`)가 뜨면 그 물음이 이 자리를
-                      대신한다(같은 약속을 두 번 하지 않는다). 알림 상태를 이 문구 하나 때문에 조회하지 않는다 — 조회는 안내를
-                      낼 때만 연다(`usePushNudge`)
+                      대신한다(같은 약속을 두 번 하지 않는다). 공유 담기 안내(`ShareWelcome`)도 같은 약속을 품고 있어 뜨는 동안
+                      이 문구를 대신한다. 알림 상태를 이 문구 하나 때문에 조회하지 않는다 — 조회는 안내를 낼 때만 연다(`usePushNudge`)
                     */}
                     {nudge.show ? (
                       <PushNudge className="mt-3 border-t border-hairline-cool pt-3" blocked={nudge.blocked} />
+                    ) : showWelcome ? (
+                      <ShareWelcome className="mt-3 border-t border-hairline-cool pt-3" onDismiss={welcome.dismiss} />
                     ) : (
                       <p className="mt-2.5 text-center text-[12px] text-ink-mute">
                         {deal.isWatched
@@ -529,10 +553,15 @@ export function TransferDetailView({
         ⚠ 넓은 화면에서는 걷는다 — 같은 토글이 곁 칸에 있다(둘 다 마운트되고 보이는 쪽 하나만 누를 수 있다).
       */}
       {deal && (
-        <footer className="absolute inset-x-0 bottom-0 z-[60] border-t border-hairline-cool bg-canvas px-4 pb-[max(30px,env(safe-area-inset-bottom))] pt-2.5 lg:hidden">
+        <footer
+          // 안내 줄로 바가 높아진 동안 토스트가 그 위로 뜨게 하는 표지(`ToastViewport` 주석)
+          data-bottom-bar={nudge.show || showWelcome ? "tall" : undefined}
+          className="absolute inset-x-0 bottom-0 z-[60] border-t border-hairline-cool bg-canvas px-4 pb-[max(30px,env(safe-area-inset-bottom))] pt-2.5 lg:hidden">
           <div className="md:mx-auto md:max-w-[720px]">
             {/* 방금 담은 사람에게만 — 알림이 꺼져 있거나 켤 수 없는 이유를 알려야 할 때(`usePushNudge` 주석) */}
             {nudge.show && <PushNudge blocked={nudge.blocked} />}
+            {/* 공유 링크로 처음 온 비로그인 방문자에게 한 번(`useShareWelcome` 주석) — 토글 위, 알림 안내와 같은 자리 */}
+            {showWelcome && <ShareWelcome className="mb-2.5" onDismiss={welcome.dismiss} />}
             {watchToggle}
           </div>
         </footer>
