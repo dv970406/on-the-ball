@@ -308,5 +308,135 @@
     "position": "DM",
     "birthYear": 1995,
     "nationality": "DEN"
+  },
+  "david otorbi": {
+    "ko": "다비드 오토르비",
+    "nationality": "ESP"
+  },
+  "aleksey batrakov": {
+    "ko": "알렉세이 바트라코프",
+    "position": "AM",
+    "birthYear": 2005,
+    "nationality": "RUS"
+  },
+  "daniel banjaqui": {
+    "ko": "다니엘 반자키",
+    "position": "RB",
+    "nationality": "POR"
+  },
+  "younes ebnoutalib": {
+    "ko": "유네스 에브누탈리브",
+    "nationality": "GER"
+  },
+  "mathis albert": {
+    "ko": "마티스 알베르트"
+  },
+  "darryl bakola": {
+    "ko": "다릴 바콜라"
+  },
+  "bartosz mazurek": {
+    "ko": "바르토시 마주레크",
+    "position": "AM",
+    "nationality": "POL"
+  },
+  "andrija bulatovic": {
+    "ko": "안드리야 불라토비치",
+    "nationality": "MNE"
+  },
+  "deniz donmezer": {
+    "ko": "데니즈 된메제르",
+    "position": "GK",
+    "nationality": "TUR"
+  },
+  "arthur dias": {
+    "ko": "아르투르 디아스",
+    "position": "CB",
+    "nationality": "BRA"
+  },
+  "lorenzo palmisani": {
+    "ko": "로렌초 팔미사니",
+    "position": "GK",
+    "nationality": "ITA"
+  },
+  "aaron bouwman": {
+    "ko": "아론 바우만",
+    "nationality": "NED"
+  },
+  "owen emeka": {
+    "ko": "오웬 에메카"
+  },
+  "tiago gabriel": {
+    "ko": "티아구 가브리엘",
+    "position": "CB",
+    "nationality": "POR"
+  },
+  "gleison bremer": {
+    "ko": "글레이송 브레메르",
+    "position": "CB",
+    "birthYear": 1997,
+    "nationality": "BRA"
+  },
+  "kenan yildiz": {
+    "ko": "케난 일디즈",
+    "position": "LW/AM",
+    "birthYear": 2005,
+    "nationality": "TUR"
+  },
+  "nico raskin": {
+    "ko": "니콜라 라스킨",
+    "position": "CM",
+    "birthYear": 2001,
+    "nationality": "BEL"
+  },
+  "oguz aydin": {
+    "ko": "오우즈 아이딘",
+    "position": "LW/RW",
+    "birthYear": 2000,
+    "nationality": "TUR"
+  },
+  "niko ilicevic": {
+    "ko": "니코 일리체비치",
+    "position": "AM",
+    "birthYear": 2010
+  },
+  "lorenz hutchinson": {
+    "ko": "로렌츠 허친슨"
+  },
+  "angegabriel kokora": {
+    "ko": "앙주가브리엘 코코라",
+    "nationality": "BEL"
+  },
+  "breno sales": {
+    "ko": "브레누 살리스",
+    "position": "CB",
+    "nationality": "BRA"
+  },
+  "federico chiesa": {
+    "ko": "페데리코 키에사",
+    "position": "RW/LW",
+    "birthYear": 1997,
+    "nationality": "ITA"
+  },
+  "pierre kalulu": {
+    "ko": "피에르 칼룰루",
+    "position": "CB/RB",
+    "birthYear": 2000,
+    "nationality": "FRA"
+  },
+  "can uzun": {
+    "ko": "잔 우준",
+    "position": "AM",
+    "birthYear": 2005,
+    "nationality": "TUR"
+  },
+  "benjamin nygren": {
+    "ko": "벤야민 뉘그렌",
+    "birthYear": 2001,
+    "nationality": "SWE"
+  },
+  "william gomes": {
+    "ko": "윌리엄 고메스",
+    "birthYear": 2006,
+    "nationality": "BRA"
   }
 }

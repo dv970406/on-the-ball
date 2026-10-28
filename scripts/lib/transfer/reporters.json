@@ -559,6 +559,169 @@
     },
     "johncross": {
       "ko": "존 크로스"
+    },
+    "ekremkonur": {
+      "ko": "에크렘 코누르",
+      "unrated": true
+    },
+    "gianlucadimarzo": {
+      "ko": "잔루카 디 마르지오"
+    },
+    "bbcsport": {
+      "ko": "BBC",
+      "credibility": 4
+    },
+    "skysportsingermany": {
+      "ko": "스카이스포츠 독일",
+      "credibility": 4
+    },
+    "beinsports": {
+      "ko": "비인스포츠",
+      "unrated": true
+    },
+    "abola": {
+      "ko": "아 볼라",
+      "unrated": true
+    },
+    "sportwitness": {
+      "ko": "스포츠 위트니스",
+      "unrated": true
+    },
+    "metro": {
+      "ko": "메트로",
+      "unrated": true
+    },
+    "ilmessaggero": {
+      "ko": "일 메사제로",
+      "unrated": true
+    },
+    "elporvenir": {
+      "ko": "엘 포르베니르",
+      "unrated": true
+    },
+    "dailybriefing": {
+      "ko": "데일리 브리핑",
+      "unrated": true
+    },
+    "fussballnews": {
+      "ko": "푸스발 뉴스",
+      "unrated": true
+    },
+    "pressandjournal": {
+      "ko": "프레스 앤드 저널",
+      "credibility": 2
+    },
+    "express": {
+      "ko": "익스프레스",
+      "unrated": true
+    },
+    "dailyexpress": {
+      "ko": "익스프레스",
+      "unrated": true
+    },
+    "i": {
+      "ko": "디 아이 페이퍼",
+      "unrated": true
+    },
+    "inews": {
+      "ko": "디 아이 페이퍼",
+      "unrated": true
+    },
+    "inewspaper": {
+      "ko": "디 아이 페이퍼",
+      "unrated": true
+    },
+    "ipaper": {
+      "ko": "디 아이 페이퍼",
+      "unrated": true
+    },
+    "independent": {
+      "ko": "인디펜던트",
+      "unrated": true
+    },
+    "mailonsunday": {
+      "ko": "메일 온 선데이",
+      "credibility": 2
+    },
+    "sundaymirror": {
+      "ko": "선데이 미러",
+      "credibility": 2
+    },
+    "transfermarkt": {
+      "ko": "트랜스퍼마르크트",
+      "unrated": true
+    },
+    "belfasttelegrah": {
+      "ko": "벨파스트 텔레그래프",
+      "unrated": true
+    },
+    "belfasttelegraph": {
+      "ko": "벨파스트 텔레그래프",
+      "unrated": true
+    },
+    "eldeportivo": {
+      "ko": "엘 데포르티보",
+      "unrated": true
+    },
+    "football365": {
+      "ko": "풋볼365",
+      "unrated": true
+    },
+    "hetnieuwsblad": {
+      "ko": "헤트 니우스블라트",
+      "unrated": true
+    },
+    "larepubblica": {
+      "ko": "라 레푸블리카",
+      "unrated": true
+    },
+    "tntsportsbrazil": {
+      "ko": "TNT 스포츠 브라질",
+      "unrated": true
+    },
+    "tribunadeportiva": {
+      "ko": "트리부나 데포르티바",
+      "unrated": true
+    },
+    "expressandstar": {
+      "ko": "익스프레스 앤드 스타",
+      "unrated": true
+    },
+    "hulldailymail": {
+      "ko": "헐 데일리 메일",
+      "unrated": true
+    },
+    "northernecho": {
+      "ko": "노던 에코",
+      "unrated": true
+    },
+    "reuters": {
+      "ko": "로이터",
+      "unrated": true
+    },
+    "scottishsunonsunday": {
+      "ko": "스코티시 선 온 선데이",
+      "credibility": 2
+    },
+    "sundaystar": {
+      "ko": "선데이 스타",
+      "credibility": 1
+    },
+    "sunonsunday": {
+      "ko": "더 선 온 선데이",
+      "credibility": 2
+    },
+    "alannixononpatreon": {
+      "ko": "앨런 닉슨",
+      "unrated": true
+    },
+    "aberdeenlive": {
+      "ko": "애버딘 라이브",
+      "unrated": true
+    },
+    "boltonnews": {
+      "ko": "볼턴 뉴스",
+      "unrated": true
     }
   }
 }
