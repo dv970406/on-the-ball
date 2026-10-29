@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 // ⚠ 직접 경로 — 이 파일은 서버 page가 import한다(`"use client"`를 담은 배럴을 거치지 않는다)
 import { type KstDay, kstDateKey, parseKstDateKey } from "@/shared/lib/date-key";
+import { DEAD_STAGES } from "../lib/stage";
 import type { TransferDay, TransferDaySummary } from "../model/types";
 import {
   CLUB_LIST_SELECT,
@@ -58,6 +59,9 @@ export const RELATED_DEAL_LIMIT = 6;
 /**
  * 같은 구단(출발·행선지)이 걸린 다른 딜 — 최신 보도순. 상세가 다른 딜로 가는 크롤 경로가 된다.
  *
+ * ⚠ 결렬·부인 딜은 싣지 않는다 — "다른 딜"은 지금 살아 있는 이적시장으로 잇는 자리다. 화면에서 거르지 않고 조건으로 건다
+ *   (상한 안에 죽은 딜이 섞이면 카드가 그만큼 비고, 서버 HTML에도 실린다).
+ *
  * ⚠ 구단 코드를 `.or()` 문자열에 싣는다 — 코드는 파생이 slugify로 만든 값(영소문자·숫자·하이픈)이지만,
  *   필터 문법을 깨는 글자(`,`·`(`·`)`)가 섞이면 조건이 바뀌므로 그 형식만 통과시킨다.
  * ⚠ 관심 구단 자리(`transfer_deal_suitor`)로는 찾지 않는다 — 임베딩 필터는 부모 행을 거르지 않아(`!inner` 없이) 조건이 되지 않는다.
@@ -74,6 +78,7 @@ export function buildRelatedDealsQuery(
     .from("transfer_deal")
     .select(DEAL_LIST_SELECT)
     .neq("id", dealId)
+    .not("stage", "in", `(${DEAD_STAGES.join(",")})`)
     .or(`from_club_code.in.(${codes}),to_club_code.in.(${codes})`)
     .order("latest_reported_at", { ascending: false })
     .order("published_at", { ascending: false, referencedTable: "latest" })

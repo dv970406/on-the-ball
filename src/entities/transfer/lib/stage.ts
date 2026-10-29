@@ -79,6 +79,9 @@ export function isDeadStage(stage: TransferStage): boolean {
   return STAGE_GROUP[stage] === "dead";
 }
 
+/** 죽은 단계 전부 — 조회 조건(`not.in`)에 싣는 자리용이다. 판정은 `isDeadStage`와 같은 `STAGE_GROUP`에서 나온다 */
+export const DEAD_STAGES = (Object.keys(STAGE_GROUP) as TransferStage[]).filter(isDeadStage);
+
 /**
  * 결과가 나온 딜인가(합의 완료·오피셜) — 성사 예측 카드가 이때 투표를 닫는다.
  * ⚠ DB의 `settled_at` CHECK(`transfer_deal_settled_stage`)·예측 트리거가 투표를 막는 단계와 같은 판정이다 — 단계를 더하면 함께 고친다.
