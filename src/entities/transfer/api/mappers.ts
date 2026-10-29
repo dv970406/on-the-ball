@@ -380,12 +380,14 @@ export function buildTransferDay(
   const kept = truncated ? rows.slice(0, TRANSFER_DAY_REPORT_LIMIT) : rows;
   const byDeal = new Map<number, TransferDayEntry>();
   let reportCount = 0;
-  for (const row of kept) {
-    if (!row.deal || !(Date.parse(row.published_at) <= nowMs)) continue;
+  const dealRows = kept.flatMap((row) =>
+    row.deal && Date.parse(row.published_at) <= nowMs ? [{ row, deal: row.deal }] : [],
+  );
+  for (const { row, deal } of dealRows) {
     reportCount += 1;
-    const entry = byDeal.get(row.deal.id);
+    const entry = byDeal.get(deal.id);
     if (entry) entry.reports.push(buildReport(row));
-    else byDeal.set(row.deal.id, { deal: buildDayDeal(row.deal), reports: [buildReport(row)] });
+    else byDeal.set(deal.id, { deal: buildDayDeal(deal), reports: [buildReport(row)] });
   }
   return {
     dateKey,
@@ -407,17 +409,19 @@ export function buildDaySummaries(
   { nowMs, truncated }: { nowMs: number; truncated: boolean },
 ): TransferDaySummary[] {
   const days = new Map<string, { reports: number; deals: Set<number>; latestMs: number; latestAt: string }>();
-  for (const row of rows) {
+  const stamped = rows.flatMap((row) => {
     const ms = Date.parse(row.published_at);
-    if (row.deal_id === null || !(ms <= nowMs)) continue;
+    return row.deal_id !== null && ms <= nowMs ? [{ ms, dealId: row.deal_id, at: row.published_at }] : [];
+  });
+  for (const { ms, dealId, at } of stamped) {
     const key = kstDateKey(ms);
     const day = days.get(key);
     if (day) {
       day.reports += 1;
-      day.deals.add(row.deal_id);
-      if (ms > day.latestMs) Object.assign(day, { latestMs: ms, latestAt: row.published_at });
+      day.deals.add(dealId);
+      if (ms > day.latestMs) Object.assign(day, { latestMs: ms, latestAt: at });
     } else {
-      days.set(key, { reports: 1, deals: new Set([row.deal_id]), latestMs: ms, latestAt: row.published_at });
+      days.set(key, { reports: 1, deals: new Set([dealId]), latestMs: ms, latestAt: at });
     }
   }
   // 키가 `YYYY-MM-DD`라 문자열 순서가 곧 날짜 순서다

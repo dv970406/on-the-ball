@@ -19,17 +19,18 @@ export function buildCommentThreads(comments: Comment[]): CommentThread[] {
   const byId = new Map<Comment["id"], CommentThread>();
 
   // 1차: 루트를 순서대로 자리잡는다
-  for (const comment of comments) {
-    if (comment.parentId !== null) continue;
+  for (const comment of comments.filter((c) => c.parentId === null)) {
     const thread: CommentThread = { comment, replies: [] };
     threads.push(thread);
     byId.set(comment.id, thread);
   }
 
   // 2차: 답글을 부모에 붙인다. 부모가 없으면 루트로 승격(위 주석 참고).
-  for (const comment of comments) {
-    if (comment.parentId === null) continue;
-    const parent = byId.get(comment.parentId);
+  const replies = comments.flatMap((comment) =>
+    comment.parentId === null ? [] : [{ comment, parentId: comment.parentId }],
+  );
+  for (const { comment, parentId } of replies) {
+    const parent = byId.get(parentId);
     if (parent) parent.replies.push(comment);
     else threads.push({ comment, replies: [] });
   }

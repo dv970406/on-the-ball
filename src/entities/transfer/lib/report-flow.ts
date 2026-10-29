@@ -99,9 +99,10 @@ export function reportFlow(
   }));
   for (const { r, day } of stamped) {
     const slot = days[day - start];
-    if (!slot) continue;
-    if (isTopCredibility(credibilityOf(r))) slot.top += 1;
-    else slot.other += 1;
+    if (slot) {
+      if (isTopCredibility(credibilityOf(r))) slot.top += 1;
+      else slot.other += 1;
+    }
   }
 
   let total = 0;

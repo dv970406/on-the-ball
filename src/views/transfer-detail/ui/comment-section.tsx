@@ -292,8 +292,7 @@ interface ThreadRowProps {
  */
 function sameThreadRow(prev: ThreadRowProps, next: ThreadRowProps) {
   for (const key of Object.keys(next) as (keyof ThreadRowProps)[]) {
-    if (key === "replies") continue;
-    if (!Object.is(prev[key], next[key])) return false;
+    if (key !== "replies" && !Object.is(prev[key], next[key])) return false;
   }
   return (
     prev.replies.length === next.replies.length &&

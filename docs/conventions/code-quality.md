@@ -94,6 +94,23 @@ onRetry={() => refetch()}                                     // ✅
 ⚠ 검증은 `pnpm check:conventions`가 한다(`banned-api`). 타입 자리의 `void`와 갈라 보므로
 목록을 손으로 관리하지 않는다.
 
+## `continue`를 쓰지 않는다
+
+반복문 안에서 `continue`로 건너뛰지 않는다. 읽는 사람이 루프 본문 전체를 "여기까지 오는 항목"으로 다시 좁혀
+읽어야 하고, 건너뛰는 조건이 본문 중간에 숨는다. **무엇을 도는지가 루프 머리에 드러나게** 쓴다.
+
+```ts
+for (const c of clubs.filter((c) => c !== null)) { … }                       // ✅ 거를 것은 머리에서
+const side = isDeadStage(deal.stage) ? null : clubDealSide(deal, code);   // ✅ 값으로 접는다
+if (slot) { … }                                                           // ✅ 조건 블록
+```
+
+- 거른 뒤 **타입이 좁혀져야 하면** `flatMap`으로 좁힌 값을 함께 꺼낸다(`row.deal`처럼 속성이 null일 수 있는 경우 —
+  `filter`는 원소 타입만 좁히고 속성은 좁히지 못한다).
+- `scripts/`(Node 운영 스크립트)는 대상이 아니다 — 검사가 `src/`·`app/`만 본다.
+
+⚠ 검증은 `pnpm check:conventions`가 한다(`banned-api`).
+
 ## ARIA는 두 경우에만 쓴다
 
 접근성 속성은 많이 붙일수록 좋아지지 않는다 — **틀린 ARIA는 없는 것보다 나쁘다.** 아래 둘에만 쓰고 그 밖에는 붙이지 않는다.

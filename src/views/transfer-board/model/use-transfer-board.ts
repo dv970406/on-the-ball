@@ -162,8 +162,7 @@ export function useTransferBoard({
       //   지금 임대로 뛰는 구단(`loanClub` — 경로 밖)도 같은 이유로 응원 구단일 때만 센다.
       const suitors = deal.suitors.filter((c) => followed.has(c.code));
       const loanClub = deal.loanClub && followed.has(deal.loanClub.code) ? [deal.loanClub] : [];
-      for (const c of [deal.fromClub, deal.toClub, ...suitors, ...loanClub]) {
-        if (c === null) continue;
+      for (const c of [deal.fromClub, deal.toClub, ...suitors, ...loanClub].filter((c) => c !== null)) {
         const prev = seen.get(c.code);
         if (prev) prev.count += 1;
         else seen.set(c.code, { code: c.code, label: c.shortName, count: 1, followed: followed.has(c.code) });

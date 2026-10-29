@@ -444,6 +444,9 @@ for (const f of files) {
   // 뒤에 `;`·`>`·`,`·`)`가 오므로 이 패턴에 걸리지 않는다.
   if (/\bvoid\s+[A-Za-z_$(]/.test(c))
     fail("banned-api", `${r}: 연산자 \`void\` — 붙여도 실패를 잡아주지 않는다(code-quality.md)`);
+  // `continue;`·`continue label;` — 문장으로만 잡는다(주석은 걷어낸 소스라 설명문에 걸리지 않는다)
+  if (/\bcontinue\s*(?:[A-Za-z_$][\w$]*\s*)?;/.test(c))
+    fail("banned-api", `${r}: \`continue\` — 건너뛸 항목은 filter·flatMap이나 조건으로 거른다(code-quality.md)`);
 }
 
 const routeFiles = files.map(rel).filter((r) => /^app\/.*\/route\.tsx?$/.test(r));
