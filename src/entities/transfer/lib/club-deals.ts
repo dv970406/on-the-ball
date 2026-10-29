@@ -1,5 +1,6 @@
 import type { TransferDeal } from "../model/types";
 import { groupDeals, sortDeals } from "./sort";
+import { isDeadStage } from "./stage";
 
 /** 구단 화면에서 딜이 놓이는 자리 — 그 구단이 데려오려는 선수 · 내보내는 선수 · 지금 임대로 데리고 있는 선수 */
 export type ClubDealSide = "in" | "out" | "loan";
@@ -49,7 +50,9 @@ export interface ClubDealGroup<T> {
 
 /**
  * 구단 하나의 딜을 영입 · 방출 · 임대 선수로 가른다 — **빈 구역은 뺀다.** 구역 안은 보드의 구간 순서(오피셜 → 합의 완료 →
- * 진행 중 → 루머 → 결렬·부인)이고, 같은 구간 안은 최신 보도순이다(`sortDeals` → `groupDeals`를 그대로 쓴다 — 보드와 같은 순서).
+ * 진행 중 → 루머)이고, 같은 구간 안은 최신 보도순이다(`sortDeals` → `groupDeals`를 그대로 쓴다 — 보드와 같은 순서).
+ * ⚠ 결렬·부인 딜은 싣지 않는다 — 부인된 이적설이 "영입" 아래 서면 그 구단이 데려오는 선수로 읽힌다. 구단 화면의 설명(건수·대표 선수)도
+ *   이 결과로 만들어 함께 빠진다. 죽은 딜은 보드의 "결렬·부인" 구간(구단 필터)이 갖는다.
  * ⚠ 원본 배열을 바꾸지 않는다 — 쿼리 캐시의 배열이 그대로 들어온다.
  */
 export function splitClubDeals<T extends ClubDealFields & Pick<TransferDeal, "stage" | "latestReportedAt" | "feeAmount">>(
@@ -58,7 +61,7 @@ export function splitClubDeals<T extends ClubDealFields & Pick<TransferDeal, "st
 ): ClubDealGroup<T>[] {
   const buckets = new Map<ClubDealSide, T[]>(CLUB_DEAL_SIDES.map((side) => [side, []]));
   for (const deal of deals) {
-    const side = clubDealSide(deal, code);
+    const side = isDeadStage(deal.stage) ? null : clubDealSide(deal, code);
     if (side) buckets.get(side)?.push(deal);
   }
   return CLUB_DEAL_SIDES.flatMap((side) => {

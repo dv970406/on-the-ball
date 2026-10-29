@@ -1,5 +1,6 @@
 import { RUMOR_CAROUSEL_WINDOW_MS } from "../api/mappers";
 import { credibilityOf, isTopCredibility } from "./credibility";
+import { isDeadStage } from "./stage";
 import type { TransferDealListItem } from "../model/types";
 
 /**
@@ -11,7 +12,7 @@ import type { TransferDealListItem } from "../model/types";
  *   제거하지 않는다. 다만 최신 보도의 출처 등급이 낮으면 그 딜은 빠진다(그 앞의 믿을 만한 보도는 목록에
  *   실리지 않으므로). "3일 안의 믿을 만한 보도가 하나라도 있으면"으로 넓히려면 딜마다 보도
  *   전체를 실어야 한다 — 목록 응답을 그만큼 부풀릴 가치가 없다(의도한 트레이드오프).
- * ⚠ 결렬 딜도 포함한다 — 결렬도 3일 내 믿을 만한 소식이다.
+ * ⚠ 결렬·부인 딜은 싣지 않는다 — 캐러셀은 살아 있는 이적설을 띄우는 자리이고, 죽은 딜은 보드의 "결렬·부인" 구간이 갖는다.
  * ⚠ 화면의 출처 뱃지(`CredibilityBadge`)와 **같은 등급**으로 고른다 — 표시와 채택 기준이 둘로 갈리지 않는다.
  * ⚠ **`nowMs`를 인자로 받는다**(`formatRelativeTime`·`openTransferWindow`와 같은 형태·같은 이유). 서버 시각이 있으면 그 값을
  *   넘긴다 — 렌더 중 시계를 읽으면 서버·클라 출력이 갈린다.
@@ -25,6 +26,7 @@ export function pickRecentRumors(
     .filter((deal) => {
       const report = deal.latestReport;
       return (
+        !isDeadStage(deal.stage) &&
         report !== null &&
         isTopCredibility(credibilityOf(report)) &&
         new Date(report.publishedAt).getTime() >= since
