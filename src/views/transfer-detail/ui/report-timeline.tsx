@@ -28,6 +28,11 @@ const SORT_OPTIONS: { key: ReportSort; label: string }[] = [
  *   (어느 정렬에서든 같은 보도가 잉크다).
  * - 정렬은 받아 온 목록에서 이 컴포넌트가 한다(`sortReports`) — 쿼리 키에 넣으면 서버 프리페치와 키가 갈린다
  *   (댓글 정렬과 같은 이유). 공신력이 같으면 최신순이다. 보도가 하나뿐이면 정렬이 아무 일도 하지 않으므로 그리지 않는다.
+ * - `lg` 이상에서는 목록만 카드 안에서 스크롤한다(높이 상한 — 정렬 줄은 그 위에 남는다). 댓글 카드와 나란히 서는 폭이라
+ *   보도가 많은 딜에서 타임라인 카드 하나가 화면을 끝없이 늘이지 않게 한다. 좁은 화면은 그대로 페이지가 스크롤한다 —
+ *   페이지 안에 터치 스크롤을 하나 더 두면 갇히고, 그 폭은 스크롤바를 숨겨(`no-scrollbar`) 더 있다는 신호도 없다.
+ *   ⚠ 스크롤바를 숨기지 않는다(보드의 오른쪽 판과 같은 판단). `overscroll-contain`을 걸지 않는다 — 목록 끝에서 휠이
+ *   페이지로 이어져야 아래 섹션에 닿는다.
  *
  * ⚠ **제목 줄이 없다** — 좁은 화면에서는 탭이, 넓은 화면에서는 뷰가 단 제목이 제목과 건수를 대신한다.
  *   패널의 접근성 이름도 탭이 준다(`aria-labelledby` — 뷰가 패널을 감싼다).
@@ -88,7 +93,8 @@ export function ReportTimeline({ reports, error, onRetry, nowMs }: ReportTimelin
       )}
 
       {sorted !== undefined && sorted.length > 0 && (
-        <ol>
+        // lg 높이 상한 — 스크롤 영역(`<main>`, lg에서 크기 컨테이너)의 70%라 박스가 늘 한 화면 안에 든다
+        <ol className="lg:max-h-[70cqh] lg:overflow-y-auto">
           {sorted.map((report) => (
             <ReportItem key={report.id} report={report} latest={report.id === latestId} nowMs={nowMs} />
           ))}
