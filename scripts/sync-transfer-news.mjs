@@ -278,7 +278,7 @@ function reportJudgeMetrics(r) {
 async function score() {
   try {
     const s = await runScoring(supabase, { log: console });
-    if (s.predictions) console.log(`  예측 채점: 표 ${s.predictions} · 랭킹 ${s.users}명(갱신 ${s.written} · 제외 ${s.removed})`);
+    if (s.predictions) console.log(`  예측 채점: 표 ${s.predictions} · 랭킹 ${s.users}명(갱신 ${s.written} · 제외 ${s.removed})${s.frozen ? ` · 회차 결과 굳힘 ${s.frozen}` : ""}`);
   } catch (e) {
     console.error(`✗ 예측 채점 실패: ${e instanceof Error ? e.message : String(e)}`);
     process.exitCode = 1;

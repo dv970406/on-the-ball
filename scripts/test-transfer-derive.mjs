@@ -7,7 +7,7 @@
  */
 import { createNameBook } from "./lib/transfer/names-ko.mjs";
 import { isRoundup } from "./lib/transfer/story.mjs";
-import { CARRIED_DAILY_ATTEMPTS, JUDGE_TIER, boardScopeStartMs, clubRecord, createExtractMemo, dealKey, dedupeRows, deriveDeals, derivationStartMs, hasRawVerdict, holdStage, judgeMode, normalizePlayer, orderJudgeNeeds, retryDelayMs, windowSpan, isSettledFormChange } from "./lib/transfer/derive-deals.mjs";
+import { CARRIED_DAILY_ATTEMPTS, JUDGE_TIER, boardScopeStartMs, clubRecord, createExtractMemo, dealKey, dedupeRows, deriveDeals, derivationStartMs, hasRawVerdict, holdStage, judgeMode, normalizePlayer, orderJudgeNeeds, retryDelayMs, windowSpan, isSettledFormChange, writeDeals } from "./lib/transfer/derive-deals.mjs";
 
 const NOW = Date.parse("2026-09-25T00:00:00Z");
 const WINDOWS = [
@@ -916,6 +916,113 @@ const LOAN = {
 };
 const loanPick = (d) => d && pick(d, ["stage", "form", "from_club_code", "to_club_code", "loan_club_code", "loan_clause", "fee_amount", "fee_kind", "loan_fee_text", "settled_at", "report_count", "contextOnly"]);
 
+// ── 이름 병합 뒤의 표시 이름·딜 키 ─────────────────────────────────────────
+// 줄여 쓴 이름("Van Dijk")·첫 토큰("Estevao")이 풀네임 묶음에 합쳐진 뒤 풀네임 보도가 전부 "이동 아님"이면 남은 행은 키와 다른
+// 표기뿐이다 — 전에는 표시 이름을 고르다 예외를 던져 파생 전체가 멈췄다(딜 저장·채점·알림이 매시 빠졌다).
+const MERGE_DICT = { ...DICT, "virgil van dijk": { ko: "버질 반 다이크" }, estevao: { ko: "에스테방", position: "RW" } };
+const mergeRow = (id, published_at, players, body, verdict) => ({
+  id, source_id: `tg:merge${id}`, stage: "rumour", players, relevance: 0.9, published_at, body,
+  verdict_at: published_at, verdict_raw: "{}", summary_ko: verdict.verdict === "move" ? "요약" : null, ...verdict,
+});
+const mergeDerive = (rows, existing) => {
+  try {
+    return deriveDeals(rows, { nowMs: NOW, windows: WINDOWS, names: createNameBook({ players: MERGE_DICT }), requireVerified: true, requireVerdict: true, existingKeys: new Set(existing) });
+  } catch (e) {
+    return { deals: [], assignments: new Map(), threw: e.message };
+  }
+};
+const VAN_DIJK = [
+  mergeRow(9601, "2026-09-10T00:00:00Z", ["Virgil van Dijk"], "Virgil van Dijk agrees new Liverpool contract until 2028.", { verdict: "not_move", verdict_player: "virgil van dijk" }),
+  mergeRow(9602, "2026-09-12T00:00:00Z", ["Van Dijk"], "Real Madrid interested in Van Dijk from Liverpool.", { verdict: "move", verdict_player: "virgil van dijk", verdict_player_name: "Virgil van Dijk", verdict_stage: "rumour", verdict_from: "Liverpool", verdict_to: "Real Madrid" }),
+];
+const ESTEVAO = [
+  mergeRow(9611, "2026-09-10T00:00:00Z", ["Estevao"], "Real Madrid want Estevao from Chelsea.", { verdict: "move", verdict_player: "estevao", verdict_player_name: "Estevao", verdict_stage: "rumour", verdict_from: "Chelsea", verdict_to: "Real Madrid" }),
+  mergeRow(9612, "2026-09-12T00:00:00Z", ["Estevao Willian"], "Real Madrid keep tracking Estevao Willian at Chelsea.", { verdict: "move", verdict_player: "estevao willian", verdict_player_name: "Estevao Willian", verdict_stage: "rumour", verdict_from: "Chelsea", verdict_to: "Real Madrid" }),
+];
+const NAME_MERGE = {
+  vanDijk: mergeDerive(VAN_DIJK, []),
+  estevaoStored: mergeDerive(ESTEVAO, [dealKey("estevao")]),
+  estevaoNew: mergeDerive(ESTEVAO, []),
+  estevaoBoth: mergeDerive(ESTEVAO, [dealKey("estevao"), dealKey("estevao willian")]),
+};
+
+// ── 저장 실패한 딜은 배정 해제·빈 딜 정리에서 빠진다(writeDeals) ───────────────────
+// 아주 작은 가짜 supabase — writeDeals가 쓰는 호출(select·in·eq·gt·order·limit·upsert·update·delete·insert)만 흉내 낸다
+function fakeWriteDb(tables, failUpsert) {
+  let nextId = 1000;
+  class Query {
+    constructor(table) { this.table = table; this.op = "select"; this.filters = []; this.lim = null; this.ord = null; }
+    select(cols) { if (this.op === "select") this.cols = cols; return this; }
+    in(c, v) { this.filters.push((r) => v.includes(r[c])); return this; }
+    eq(c, v) { this.filters.push((r) => r[c] === v); return this; }
+    gt(c, v) { this.filters.push((r) => r[c] > v); return this; }
+    order(c) { this.ord = c; return this; }
+    limit(n, o) { if (!o) this.lim = n; return this; }
+    upsert(rows, options) { this.op = "upsert"; this.rows = rows; this.options = options; return this; }
+    update(v) { this.op = "update"; this.values = v; return this; }
+    delete() { this.op = "delete"; return this; }
+    insert(rows) { this.op = "insert"; this.rows = rows; return this; }
+    then(res, rej) { try { res(this.run()); } catch (e) { rej(e); } }
+    run() {
+      const t = (tables[this.table] ??= []);
+      const hit = () => t.filter((r) => this.filters.every((f) => f(r)));
+      if (this.op === "select") {
+        let out = hit();
+        if (this.ord) out = [...out].sort((a, b) => (a[this.ord] > b[this.ord] ? 1 : -1));
+        if (this.lim != null) out = out.slice(0, this.lim);
+        if (this.table === "transfer_deal" && /refs:/.test(this.cols)) {
+          out = out.map((d) => ({ ...d, refs: (tables.transfer_news ?? []).filter((r) => r.deal_id === d.id).slice(0, 1), comments: [], predictions: [] }));
+        }
+        return { data: out, error: null };
+      }
+      if (this.op === "upsert") {
+        const err = this.rows.map((r) => failUpsert(this.table, r)).find(Boolean);
+        if (err) return { data: null, error: err, status: 400 };
+        for (const r of this.rows) {
+          const i = t.findIndex((x) => x[this.options.onConflict] === r[this.options.onConflict]);
+          if (i >= 0) t[i] = { ...t[i], ...r };
+          else t.push({ id: nextId++, ...r });
+        }
+        return { data: null, error: null, status: 201 };
+      }
+      if (this.op === "update") { for (const r of hit()) Object.assign(r, this.values); return { data: null, error: null }; }
+      if (this.op === "delete") { const gone = new Set(hit()); tables[this.table] = t.filter((r) => !gone.has(r)); return { data: null, error: null }; }
+      t.push(...this.rows);
+      return { data: null, error: null };
+    }
+  }
+  return { from: (table) => new Query(table), tables };
+}
+const WRITE_BASE = {
+  player_ko: null, position: null, birth_year: null, nationality: null, from_club_code: "chelsea", to_club_code: null, fee_amount: null, fee_currency: null,
+  fee_text: null, fee_kind: null, prev_fee_amount: null, fee_low_amount: null, fee_high_amount: null, add_on_amount: null, contract_text: null, wage_text: null,
+  is_free_agent: false, form: null, loan_club_code: null, loan_clause: null, loan_fee_text: null, settled_at: null,
+  first_reported_at: "2026-09-01T00:00:00.000Z", latest_reported_at: "2026-09-02T00:00:00.000Z", report_count: 1,
+};
+async function writeWithOneFailure() {
+  const tables = {
+    transfer_club: [{ code: "chelsea", canonical: "Chelsea", name: "첼시", short_name: "첼시", league: "프리미어리그" }],
+    // 저장된 딜 둘 — A는 그대로, B는 이번에 단계가 바뀌는데 저장이 행 단위로 실패한다(CHECK 위반을 흉내)
+    transfer_deal: [
+      { id: 1, deal_key: "aaaaaaaaaaaaaaaa", player: "A", stage: "rumour", ...WRITE_BASE },
+      { id: 2, deal_key: "bbbbbbbbbbbbbbbb", player: "B", stage: "rumour", ...WRITE_BASE },
+    ],
+    transfer_news: [{ id: 10, deal_id: 1 }, { id: 20, deal_id: 2 }],
+  };
+  const db = fakeWriteDb(tables, (table, r) => (table === "transfer_deal" && r.deal_key === "bbbbbbbbbbbbbbbb" ? { code: "23514", message: "violates check constraint" } : null));
+  const derived = {
+    clubs: [tables.transfer_club[0]],
+    deals: [
+      { deal_key: "aaaaaaaaaaaaaaaa", player: "A", stage: "rumour", ...WRITE_BASE, rowIds: [10], suitorCodes: [], contextOnly: false },
+      { deal_key: "bbbbbbbbbbbbbbbb", player: "B", stage: "talks", ...WRITE_BASE, rowIds: [20], suitorCodes: [], contextOnly: false },
+    ],
+  };
+  const quiet = { log() {}, warn() {}, error() {} };
+  const stats = await writeDeals(db, derived, [{ id: 10, deal_id: 1 }, { id: 20, deal_id: 2 }], { log: quiet });
+  return { failed: stats.failed, unlinked: stats.unlinked, deleted: stats.deleted, deals: db.tables.transfer_deal.map((d) => d.id), news: db.tables.transfer_news.map((r) => [r.id, r.deal_id]) };
+}
+const WRITE_FAIL = await writeWithOneFailure();
+
 const UNIT = [
   {
     name: "임대 — 진행 중 임대의 설명만 남은 기존 딜은 임대 오피셜 · 의무 조항 금액 · 결과 시각 없음 · 알림 대상 아님(가르나초)",
@@ -1177,6 +1284,31 @@ const UNIT = [
       return flat(first) === flat(deriveDeals(rows, opts)) && flat(second) === flat(first);
     })(),
     want: true,
+  },
+  {
+    name: "이름 병합 — 풀네임 보도가 전부 '이동 아님'이어도 파생이 멈추지 않고 표시 이름은 풀네임이다(Van Dijk ⊂ Virgil van Dijk)",
+    got: { threw: NAME_MERGE.vanDijk.threw ?? null, deals: NAME_MERGE.vanDijk.deals.map((d) => [d.deal_key === dealKey("virgil van dijk"), d.player, d.to_club_code]) },
+    want: { threw: null, deals: [[true, "Virgil van Dijk", "real-madrid"]] },
+  },
+  {
+    name: "이름 병합 — 합쳐진 키의 딜이 저장돼 있으면 그 딜을 잇는다(새 키로 갈아타 옛 딜이 지워지지 않게 · 표기는 합쳐진 키의 사전 표기)",
+    got: NAME_MERGE.estevaoStored.deals.map((d) => [d.deal_key === dealKey("estevao"), d.player_ko, d.position, d.report_count, [...NAME_MERGE.estevaoStored.assignments.values()].every((k) => k === dealKey("estevao"))]),
+    want: [[true, "에스테방", "RW", 2, true]],
+  },
+  {
+    name: "이름 병합 — 저장된 딜이 없으면 지금처럼 묶음 키다(확인되지 않은 긴 이름은 새 딜로 열지 않는다)",
+    got: NAME_MERGE.estevaoNew.deals.length,
+    want: 0,
+  },
+  {
+    name: "이름 병합 — 묶음 키의 딜도 저장돼 있으면 그쪽이 먼저다",
+    got: NAME_MERGE.estevaoBoth.deals.map((d) => d.deal_key === dealKey("estevao willian")),
+    want: [true],
+  },
+  {
+    name: "저장 실패 — 행 단위로 저장하지 못한 기존 딜은 배정이 풀리지 않고 빈 딜로 지워지지 않는다(관심 cascade 방지)",
+    got: WRITE_FAIL,
+    want: { failed: 1, unlinked: 0, deleted: 0, deals: [1, 2], news: [[10, 1], [20, 2]] },
   },
 ];
 

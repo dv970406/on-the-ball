@@ -325,6 +325,7 @@ function isSoftCandidate(r, startMs) {
  *   사람 사전에 있는 한 토큰 이름("Estevao")은 **첫 토큰**이 같은 두 토큰 이름("Estevao Willian")과도 합친다 —
  *   브라질식 한 이름 선수는 매체마다 성을 붙였다 뗐다 한다. 두 토큰 이름끼리는 합치지 않는다(동성이인).
  *   같은 토큰을 가진 두 토큰 이름이 여럿이면 어느 쪽인지 알 수 없어 합치지 않는다.
+ * @returns {{ groups: Map<string, object[]>, aliases: Map<string, Set<string>> }} `aliases`는 묶음 키 → 그 묶음에 합쳐진 다른 키들
  */
 function groupByPlayer(rows, names) {
   const groups = new Map();
@@ -341,11 +342,17 @@ function groupByPlayer(rows, names) {
   const rowClubs = (r) => [...(r.clubs ?? []), r.verdict_from, r.verdict_to, ...(r.verdict_suitors ?? [])].filter(Boolean);
   const clubSets = new Map([...groups].map(([k, rs]) => [k, new Set(rs.flatMap(rowClubs))]));
   const sharesClub = (a, b) => { const x = clubSets.get(a), y = clubSets.get(b); return !x.size || !y.size || [...x].some((c) => y.has(c)); };
+  // 합쳐진 키 — 묶음 키 → 그 묶음으로 흡수된 다른 키들(딜 키를 고를 때 저장된 딜을 찾는다 — `deriveDeals`)
+  const aliases = new Map();
   const merge = (from, into) => {
     groups.get(into).push(...groups.get(from));
     for (const c of clubSets.get(from)) clubSets.get(into).add(c);
+    const absorbed = aliases.get(into) ?? aliases.set(into, new Set()).get(into);
+    absorbed.add(from);
+    for (const a of aliases.get(from) ?? []) absorbed.add(a);
     groups.delete(from);
     clubSets.delete(from);
+    aliases.delete(from);
   };
   // 여러 토큰 이름을 마지막 토큰·첫 토큰으로 찾는 색인 — 한 토큰 이름마다 전체를 훑지 않는다
   const byToken = (pick) => {
@@ -381,19 +388,27 @@ function groupByPlayer(rows, names) {
     merge(k, owners[0]);
   }
   for (const list of groups.values()) list.sort((a, b) => ts(a) - ts(b) || a.id - b.id);
-  return groups;
+  return { groups, aliases };
 }
 
-/** 표시할 영문명 — 가장 자주 쓰인 표기, 동률이면 긴 쪽(성만 쓴 행보다 풀네임) */
-function displayName(rows, key) {
-  const count = new Map();
-  for (const r of rows) {
-    for (const p of playersOf(r)) {
-      const n = normalizePlayer(p);
-      if (n === key || (tokens(n).length === 1 && tokens(key).at(-1) === n)) count.set(p, (count.get(p) ?? 0) + 1);
+/**
+ * 표시할 영문명 — 가장 자주 쓰인 표기, 동률이면 긴 쪽(성만 쓴 행보다 풀네임).
+ * ⚠ `rows`에 그 키의 표기가 하나도 없을 수 있다 — 줄여 쓴 이름("Van Dijk")·첫 토큰("Estevao")이 합쳐진 묶음에서 풀네임 보도가
+ *   전부 "이동 아님"으로 빠지면 남은 행은 키와 다른 표기뿐이다. 그때 예외를 던지면 파생 전체가 멈춰 딜 저장·채점·알림이 매시 빠졌다 →
+ *   거르기 전의 묶음(`fallbackRows` — 그 키를 낳은 행이 반드시 있다)에서 고르고, 그래도 없으면 키 자체를 쓴다.
+ */
+function displayName(rows, key, fallbackRows = rows) {
+  const pick = (list) => {
+    const count = new Map();
+    for (const r of list) {
+      for (const p of playersOf(r)) {
+        const n = normalizePlayer(p);
+        if (n === key || (tokens(n).length === 1 && tokens(key).at(-1) === n)) count.set(p, (count.get(p) ?? 0) + 1);
+      }
     }
-  }
-  return [...count.entries()].sort((a, b) => b[1] - a[1] || tokens(normalizePlayer(b[0])).length - tokens(normalizePlayer(a[0])).length || b[0].length - a[0].length)[0][0];
+    return [...count.entries()].sort((a, b) => b[1] - a[1] || tokens(normalizePlayer(b[0])).length - tokens(normalizePlayer(a[0])).length || b[0].length - a[0].length)[0]?.[0] ?? null;
+  };
+  return pick(rows) ?? pick(fallbackRows) ?? key;
 }
 
 /**
@@ -1172,7 +1187,16 @@ export function deriveDeals(rows, opts) {
     } else skip("선수 없음");
   }
 
-  for (const [key, grouped] of groupByPlayer(named, names)) {
+  const { groups: byPlayer, aliases } = groupByPlayer(named, names);
+  for (const [key, grouped] of byPlayer) {
+    /*
+     * 딜 키 — 묶음 키의 것이 기본이다. ⚠ 묶음이 **다른 키를 흡수했고 그 키의 딜이 저장돼 있으면** 그 딜을 잇는다(묶음 키의 딜이
+     *   이미 있으면 그쪽이 먼저다). 사전의 "Estevao" 딜에 "Estevao Willian" 보도가 한 건 들어오면 묶음 키가 긴 이름이 되는데, 그대로
+     *   새 키를 쓰면 옛 딜은 보도가 끊겨 지워지고(관심은 cascade) 새 딜이 "새 이적설"로 다시 알려졌다. 판정은 여전히 묶음 키로 찾는다.
+     */
+    const absorbed = [...(aliases.get(key) ?? [])].sort();
+    const ownKey = existing.has(dealKey(key)) ? key : (absorbed.find((k) => existing.has(dealKey(k))) ?? key);
+    const groupDealKey = dealKey(ownKey);
     // LLM이 "이 선수의 이동이 아니다"라고 한 보도는 딜에서 뺀다 — 단계·이적료·방향에도 들어가지 않는다
     let group = grouped;
     if (opts.requireVerdict) {
@@ -1187,12 +1211,12 @@ export function deriveDeals(rows, opts) {
         const mentioned = mentionedClubs(memo.sentences(r));
         if (!mode || ![...mentioned].some(isTopLeague)) continue;
         groupedName ??= displayName(grouped, key);
-        judgeNeeds.push(judgeNeed(r, { playerKey: key, player: groupedName, clubs: [...mentioned], mode, tier: existing.has(dealKey(key)) ? JUDGE_TIER.existing : JUDGE_TIER.newDeal }));
+        judgeNeeds.push(judgeNeed(r, { playerKey: key, player: groupedName, clubs: [...mentioned], mode, tier: existing.has(groupDealKey) ? JUDGE_TIER.existing : JUDGE_TIER.newDeal }));
       }
       for (let i = group.length; i < grouped.length; i++) skip("이동 아님(LLM 판정)");
       if (!group.length) continue;
     }
-    const player = displayName(group, key);
+    const player = displayName(group, key, grouped);
     const surname = tokens(key).at(-1);
     const first = tokens(key)[0];
     // 풀네임 + 성(짧은 성 ≤2는 뺀다 — 다른 단어에 너무 자주 나온다) + 사람 사전에 있는 한 이름(브라질식 "Estevao")
@@ -1248,7 +1272,7 @@ export function deriveDeals(rows, opts) {
     const context = items.filter((it) => it.context);
     const events = items.filter((it) => !it.context);
     const contextOnly = !events.length;
-    const stored = storedDeal(dealKey(key));
+    const stored = storedDeal(groupDealKey);
     /*
      * 문맥 보도만 판정됐는데 **판정을 기다리는 사건 보도**가 남은 기존 딜은 그 판정이 올 때까지 저장된 단계·결과 시각·형태·조항을 그대로 둔다
      * (양방향 동결). 문맥뿐으로 보면 그 사건(제3구단 루머)이 있는 딜에 오피셜을 지어내고, 판정 전 보도의 규칙 단계로 정하면 규칙이 읽은
@@ -1348,8 +1372,9 @@ export function deriveDeals(rows, opts) {
     let toClub = dir.to ? clubRecord(dir.to, names) : null;
     if (fromClub && toClub && fromClub.code === toClub.code) toClub = null; // CHECK from <> to
 
-    const playerKo = names.playerKo(key);
-    const info = names.playerInfo(key);
+    // 표기·선수 정보는 묶음 키로 찾고, 없으면 합쳐진 키로 — 사전의 한 이름("Estevao")에 성을 붙인 묶음이 영문으로 떨어지지 않게
+    const playerKo = names.playerKo(key) ?? absorbed.map((k) => names.playerKo(k)).find(Boolean) ?? null;
+    const info = names.playerInfo(key) ?? absorbed.map((k) => names.playerInfo(k)).find(Boolean) ?? null;
     nameNeeds.push({ player, playerKey: key, fromCanonical: fromClub ? dir.from : null, toCanonical: toClub ? dir.to : null, suitorCanonicals });
     /*
      * 확인된 선수 관문 — 추출은 규칙이라 처음 보는 문형에서 틀린다("South American star", 감독 이름). 이름 조회는 이 뒤에
@@ -1358,7 +1383,7 @@ export function deriveDeals(rows, opts) {
      */
     // 이 딜의 보도 중 지금 물어야 할 것 — 아래 두 관문(미확인 선수 · 판정)이 함께 쓴다
     const askJudge = () => {
-      const tier = existing.has(dealKey(key)) ? JUDGE_TIER.existing : JUDGE_TIER.newDeal;
+      const tier = existing.has(groupDealKey) ? JUDGE_TIER.existing : JUDGE_TIER.newDeal;
       for (const it of reportedAll) {
         const mode = judgeMode(it.row, key, opts.nowMs, modeOpts);
         if (mode) judgeNeeds.push(judgeNeed(it.row, { playerKey: key, player, clubs: [...mentioned], mode, tier }));
@@ -1368,7 +1393,7 @@ export function deriveDeals(rows, opts) {
       // 확인되지 않은 선수도 판정은 받는다 — 완료·확정이거나 출처 두 곳이 이동이라 하면 연다(`canOpenUnverified`)
       // 이미 저장된 딜은 남긴다 — 판정이 없는 기존 딜을 남기는 규칙과 같은 정신이다. 같은 보도 접기(`foldEchoes`)로 출처 수가 줄어
       // 한 번 열린 딜이 다음 실행에 사라지면 보드·관심 목록에서 딜이 깜빡인다. 새 딜만 접은 뒤의 출처 수로 연다
-      const open = opts.requireVerdict && (existing.has(dealKey(key)) || canOpenUnverified(items, key));
+      const open = opts.requireVerdict && (existing.has(groupDealKey) || canOpenUnverified(items, key));
       if (!open) {
         if (opts.requireVerdict && tokens(key).length >= 2) askJudge();
         unverified.push({ player, stage });
@@ -1393,7 +1418,7 @@ export function deriveDeals(rows, opts) {
     if (opts.requireVerdict) {
       askJudge();
       const confirmed = items.some((it) => verdictOf(it.row, key) === "move");
-      if (!confirmed && !existing.has(dealKey(key))) {
+      if (!confirmed && !existing.has(groupDealKey)) {
         unconfirmed.push(player);
         skip("판정 대기(LLM)");
         continue;
@@ -1401,7 +1426,7 @@ export function deriveDeals(rows, opts) {
     }
     // 문맥 보도만으로는 새 딜을 열지 않는다 — 진행 중인 임대의 설명은 소식이 아니다(판정자는 지울 수만 있다). 이미 있는 딜은 남긴다.
     // 판정을 기다리는 사건 보도가 있어도 같다 — 새 딜은 "이동" 판정을 받은 사건 보도가 있어야 연다
-    if (!events.length && !existing.has(dealKey(key))) {
+    if (!events.length && !existing.has(groupDealKey)) {
       skip("진행 중 임대 문맥만");
       continue;
     }
@@ -1441,7 +1466,7 @@ export function deriveDeals(rows, opts) {
 
     const times = [...reported.map((it) => ts(it.row)), ...echoTimes];
     deals.push({
-      deal_key: dealKey(key),
+      deal_key: groupDealKey,
       player: clampCp(player, 120),
       player_ko: playerKo,
       position: info?.position ?? null,
@@ -1479,7 +1504,7 @@ export function deriveDeals(rows, opts) {
       // 단계가 문맥 보도만으로 정해졌는가 — 알림이 이 변화를 보내지 않는다(컬럼이 아니다)
       contextOnly,
     });
-    for (const it of reported) assignments.set(it.row.id, dealKey(key));
+    for (const it of reported) assignments.set(it.row.id, groupDealKey);
   }
 
   if (unconfirmed.length) warnings.push(`이동 판정(LLM)을 받지 못한 새 딜 ${unconfirmed.length}건 — 보드에 올리지 않았다: ${unconfirmed.join(", ")}`);
@@ -1692,6 +1717,8 @@ export async function writeDeals(supabase, derived, rows, opts = {}) {
   // 이번 파생이 DB에 있다고 보증하는 딜 = 바뀌지 않은 딜 + 이번에 저장한 딜(저장 실패한 딜은 빠진다)
   const changedKeys = new Set(changedDeals.map((d) => d.deal_key));
   const savedKeys = new Set([...dealRows.filter((d) => !changedKeys.has(d.deal_key)).map((d) => d.deal_key), ...dealUp.saved.map((d) => d.deal_key)]);
+  // 이번에 저장하지 못한 딜(행 단위 실패) — 저장된 옛 딜이 있으면 그대로 둔다(아래 배정·빈 딜 정리 둘 다 이 딜을 건드리지 않는다)
+  const unsavedKeys = new Set([...changedKeys].filter((k) => !savedKeys.has(k)));
 
   // deal_key → id. 바뀌지 않은 딜은 위에서 읽은 값을 쓰고, 이번에 저장한 딜만 다시 읽는다
   // (upsert는 id를 돌려주지 않는다 — 배치·행 단위 폴백 어느 경로로 저장됐든 여기서 한 번에 읽는다)
@@ -1777,8 +1804,10 @@ export async function writeDeals(supabase, derived, rows, opts = {}) {
     const current = new Map(rows.map((r) => [r.id, r.deal_id ?? null]));
     for (const deal of derived.deals) {
       const id = idByKey.get(deal.deal_key);
-      if (id == null) continue; // 저장 실패한 딜 — 행은 옛 배정을 유지한다
+      // 저장 실패한 딜 — 행은 옛 배정을 유지한다. ⚠ 배정한 것으로 센다 — 안 세면 아래 해제가 그 행들의 `deal_id`를 비우고,
+      //   보도가 끊긴 옛 딜을 빈 딜 정리가 지웠다(관심은 cascade로 사라지고, 다음 실행에 새 id로 다시 생겨 "새 이적설"로 알려졌다)
       for (const rowId of deal.rowIds) assigned.add(rowId);
+      if (id == null) continue;
       const changed = deal.rowIds.filter((rowId) => current.get(rowId) !== id);
       for (const ids of chunks(changed)) {
         const { error } = await supabase.from(NEWS).update({ deal_id: id }).in("id", ids);
@@ -1795,7 +1824,7 @@ export async function writeDeals(supabase, derived, rows, opts = {}) {
     }
 
     // 어떤 보도 행도 가리키지 않는 딜만 지운다(관심은 cascade, 댓글·예측이 걸린 딜은 남긴다 — findOrphanDeals 주석)
-    const { orphans, kept } = await findOrphanDeals(supabase, savedKeys);
+    const { orphans, kept } = await findOrphanDeals(supabase, new Set([...savedKeys, ...unsavedKeys]));
     for (const d of kept) log.warn(`⚠ 보도가 끊겼지만 댓글·예측이 있어 남긴 딜: ${d.player} (${d.deal_key})`);
     for (const d of orphans) {
       const { error: delErr } = await supabase.from(DEALS).delete().eq("id", d.id);

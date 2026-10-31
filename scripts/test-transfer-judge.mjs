@@ -263,6 +263,13 @@ check("구단 언급 — 원문에 없으면 null, 있으면 다듬은 표기", 
   const loan = await resolveClubs({ from: "Man Utd", to: null, suitors: [], loanOwner: "Man Utd", loanClub: "Sturm Graz" }, book, { lookup, cacheRows: rows, nowMs: Date.parse("2026-09-28T00:00:00Z") });
   check("구단 — 임대 상태(보유 구단·임대 구단)도 같은 정규화·확인을 지난다", loan.loanOwner === "Manchester United" && loan.loanClub === "Sturm Graz");
   check("구단 — 임대 상태가 없는 호출은 둘 다 null이다", (await resolveClubs({ from: null, to: null, suitors: [] }, book, { lookup, cacheRows: rows })).loanOwner === null);
+  // 일반어와 철자가 같아 별칭이 풀네임뿐인 프리셋 구단 — 정규명 그대로 적으면 그 구단이다(전에는 매칭도 위키데이터 확인도 건너뛰어 버렸다)
+  const before = lookups.length;
+  const ligue1 = await resolveClubs({ from: "Chelsea", to: "Lens", suitors: ["Nice", "Angers", "RC Lens"], loanOwner: "Nice", loanClub: "Angers" }, book, { lookup, cacheRows: rows, nowMs: Date.parse("2026-09-28T00:00:00Z") });
+  check("구단 — 리그 1의 Lens·Nice·Angers(정규명)를 받는다 · 같은 구단의 별칭(RC Lens)은 하나로 접힌다 · 위키데이터를 부르지 않는다",
+    eq([ligue1.to, ligue1.suitors, ligue1.loanOwner, ligue1.loanClub], ["Lens", ["Nice", "Angers"], "Nice", "Angers"]) && lookups.length === before,
+    JSON.stringify(ligue1));
+  check("구단 — 정규명은 철자 그대로만 받는다(소문자 'lens'는 사전의 정규명이 아니다)", !(await resolveClubs({ from: null, to: "lens", suitors: [] }, book, { lookup: async () => ({ nameKo: null, wikidataId: null }), cacheRows: [], nowMs: Date.parse("2026-09-28T00:00:00Z") })).to);
 }
 
 // ── 요약 검증 ─────────────────────────────────────────────────────────

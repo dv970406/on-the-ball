@@ -29,7 +29,7 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import * as cheerio from "cheerio";
-import { detectClubs, isClubName } from "./clubs.mjs";
+import { detectClubs, isClubName, isKnownClub } from "./clubs.mjs";
 import { FROM, collectVotes } from "./direction.mjs";
 import { personName } from "./extract.mjs";
 import { NAME_TABLE, cacheLlmNames, formatNewNameLog, loadGlossary, renameInSummary, shortKoClubName } from "./names-ko.mjs";
@@ -635,7 +635,10 @@ export async function resolveClubs(m, book, { lookup = lookupKo, cacheRows = [],
     // 같은 실행에서 이미 찾아본 이름은 다시 찾지 않는다 — 두 번 쌓인 같은 키가 일괄 저장을 통째로 실패시킨다
     const seen = cacheRows.find((c) => c.kind === "club" && c.key === raw);
     if (seen) { memo.set(raw, seen.wikidata_id ? raw : null); return memo.get(raw); }
-    let out = detectClubs(raw)[0] ?? null;
+    // 사전의 정규명 그대로 적은 이름은 그 구단이다 — 일반어와 철자가 같아 별칭이 풀네임뿐인 프리셋 구단("Lens"·"Nice"·"Angers" —
+    // `clubs.mjs`)은 매칭으로 잡히지 않는데, 프리셋이라 아래 위키데이터 확인도 건너뛰어 "축구 클럽이 아니다"로 버려졌다(리그 1 딜의
+    // 출발·행선지가 비었다). 원문 대조(`mentionIn`)는 이미 지난 이름이다
+    let out = detectClubs(raw)[0] ?? (isKnownClub(raw) ? raw : null);
     if (!out) {
       if (book.isVerifiedClub(raw)) out = raw;
       else if (!book.needsLookup("club", raw, nowMs)) out = null; // 최근에 찾아봤지만 축구 클럽이 아니었다

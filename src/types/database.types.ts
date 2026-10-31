@@ -451,6 +451,42 @@ export type Database = {
           },
         ]
       }
+      transfer_deal_round_result: {
+        Row: {
+          deal_id: number
+          decided_at: string
+          round_key: string
+          settled_at: string | null
+        }
+        Insert: {
+          deal_id: number
+          decided_at?: string
+          round_key: string
+          settled_at?: string | null
+        }
+        Update: {
+          deal_id?: number
+          decided_at?: string
+          round_key?: string
+          settled_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transfer_deal_round_result_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "transfer_deal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transfer_deal_round_result_round_key_fkey"
+            columns: ["round_key"]
+            isOneToOne: false
+            referencedRelation: "transfer_window"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
       transfer_deal_suitor: {
         Row: {
           club_code: string

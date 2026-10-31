@@ -61,9 +61,11 @@ const AUTH_ERROR_MESSAGE: Record<string, string> = {
  *   화면에는 영어 원문이 나갔다. 표는 하나로 두고 입구만 둘로 연다.
  * ⚠ `null`을 돌려주는 것이 계약이다 — 호출부가 자기 맥락에 맞는 폴백을 갖는다
  *   (로그인은 "로그인하지 못했어요", 연결은 "계정을 연결하지 못했어요").
+ * ⚠ **표의 자기 키만 본다**(`Object.hasOwn`). 코드는 URL에서 온다 — 그냥 인덱싱하면 `?error_code=__proto__`가
+ *   `Object.prototype`(객체)을, `constructor`·`toString`이 함수를 돌려줘 문구 자리에 렌더되고 로그인 화면이 통째로 깨진다.
  */
 export function authErrorMessageFor(code: string | null | undefined): string | null {
-  return (code && AUTH_ERROR_MESSAGE[code]) || null;
+  return code && Object.hasOwn(AUTH_ERROR_MESSAGE, code) ? AUTH_ERROR_MESSAGE[code] : null;
 }
 
 export function toAuthErrorMessage(error: unknown): string {

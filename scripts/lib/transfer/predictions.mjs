@@ -14,6 +14,9 @@
  *
  * ⚠ **채점은 매번 처음부터 다시 한다**(누적하지 않는다) — 탈퇴로 표가 사라져 집계가 바뀌어도, 규칙을 고쳐도 다음 실행에 맞는다.
  *   점수 표는 결과의 사본이고 바뀐 행만 쓴다.
+ * ⚠ **다만 판정이 끝난 회차의 결과는 한 번 굳힌다**(`transfer_deal_round_result` — `freezeRoundResults`). 딜은 선수당 하나라
+ *   다음 창의 보도로 다시 파생되면 `settled_at`이 지워진다 — 지금의 값으로 지난 회차를 다시 읽으면 "성사" 적중이 소급해 불발이 됐다.
+ *   굳힌 뒤에는 그 값으로 채점하고(표의 판정·점수 계산은 지금처럼 매번 처음부터다), 굳히기 전에는 지금의 값이다.
  * ⚠ 창 일정은 `windows.json`이 단일 소스다 — 채점도 DB 사본이 아니라 같은 JSON을 읽는다(사본은 트리거가 회차를 정하는 데만 쓴다).
  */
 import { upsertRows } from "../sync-db.mjs";
@@ -23,10 +26,18 @@ import { chunks, DAY_MS } from "./util.mjs";
 /** 창 마감 뒤 결과를 기다리는 유예 — 마감일에 등록된 이적은 발표가 하루 이틀 늦게 나온다 */
 export const SETTLE_GRACE_MS = 2 * DAY_MS;
 
+/**
+ * 판정 시각 뒤 결과를 굳히기까지 기다리는 시간 — 판정 시각 직전에 게시된 오피셜 보도가 판정(LLM)을 늦게 받아도 결과 시각이 잡히게.
+ * ⚠ **다음 창의 파생 범위가 시작되기 전**이어야 한다(그 범위의 보도로 딜이 다시 파생되면 `settled_at`이 지워진다) — 창 사이 간격이
+ *   몇 달이라 넉넉하고, `test-transfer-predictions.mjs`가 `windows.json`의 창마다 대조한다.
+ */
+export const RESULT_FREEZE_MS = 7 * DAY_MS;
+
 const WINDOWS = "transfer_window";
 const PREDICTIONS = "transfer_deal_prediction";
 const TALLIES = "transfer_deal_prediction_tally";
 const SCORES = "transfer_prediction_score";
+const RESULTS = "transfer_deal_round_result";
 const DEALS = "transfer_deal";
 const PAGE = 500;
 
@@ -76,21 +87,50 @@ export function hitPoints(willHappen, tally) {
 }
 
 /**
+ * 굳힐 회차 결과 — 표가 있는 (딜, 회차) 중 판정 시각 + `RESULT_FREEZE_MS`가 지났고 아직 굳히지 않은 것. **순수 함수**.
+ * 값은 지금의 `settled_at`이 그 회차의 판정 시각 이전이면 그 시각, 아니면 `null`(불발)이다 — `judgeVote`가 읽는 것과 같은 갈림이다.
+ * @param {{ predictions: object[], deals: { id: number, settled_at: string | null }[], results: { deal_id: number, round_key: string }[],
+ *   windows: { key: string, closesAt: string }[], nowMs: number }} input
+ * @returns {{ deal_id: number, round_key: string, settled_at: string | null }[]} (딜, 회차) 순
+ */
+export function freezeRoundResults({ predictions, deals, results, windows, nowMs }) {
+  const settledById = new Map(deals.map((d) => [d.id, d.settled_at ?? null]));
+  const decideAt = new Map(windows.map((w) => [w.key, Date.parse(w.closesAt) + SETTLE_GRACE_MS]));
+  const frozen = new Set(results.map((r) => `${r.deal_id}:${r.round_key}`));
+  const out = new Map();
+  for (const v of predictions) {
+    const key = `${v.deal_id}:${v.round_key}`;
+    const decide = decideAt.get(v.round_key);
+    if (frozen.has(key) || out.has(key) || !settledById.has(v.deal_id) || decide === undefined || nowMs < decide + RESULT_FREEZE_MS) continue;
+    const settled = settledById.get(v.deal_id);
+    out.set(key, { deal_id: v.deal_id, round_key: v.round_key, settled_at: settled && Date.parse(settled) <= decide ? settled : null });
+  }
+  return [...out.values()].sort((a, b) => a.deal_id - b.deal_id || a.round_key.localeCompare(b.round_key));
+}
+
+/**
  * 모든 예측을 채점한다 — **순수 함수**(테스트가 DB 없이 돈다).
+ * `results`(굳힌 회차 결과)가 있는 (딜, 회차)는 그 값으로, 없으면 지금의 딜 `settled_at`으로 판정한다.
  * @param {{ predictions: object[], deals: { id: number, settled_at: string | null }[], tallies: object[],
+ *   results?: { deal_id: number, round_key: string, settled_at: string | null }[],
  *   windows: { key: string, closesAt: string }[], nowMs: number }} input
  * @returns {{ user_id: string, points: number, hits: number, scored: number, rank: number }[]} 채점된 표가 한 건 이상인 사람만, 순위순
  */
-export function scorePredictions({ predictions, deals, tallies, windows, nowMs }) {
+export function scorePredictions({ predictions, deals, tallies, results = [], windows, nowMs }) {
   const settledById = new Map(deals.map((d) => [d.id, d.settled_at ?? null]));
   const decideAt = new Map(windows.map((w) => [w.key, Date.parse(w.closesAt) + SETTLE_GRACE_MS]));
   const tallyOf = new Map(tallies.map((t) => [`${t.deal_id}:${t.round_key}`, t]));
+  const resultOf = new Map(results.map((r) => [`${r.deal_id}:${r.round_key}`, r.settled_at ?? null]));
+  const settledFor = (v) => {
+    const key = `${v.deal_id}:${v.round_key}`;
+    return resultOf.has(key) ? resultOf.get(key) : settledById.get(v.deal_id);
+  };
 
   const byUser = new Map();
   for (const v of predictions) {
     // 딜이 사라졌거나(restrict라 없어야 한다) 모르는 회차면 채점하지 않는다
     if (!settledById.has(v.deal_id) || !decideAt.has(v.round_key)) continue;
-    const verdict = judgeVote(v, settledById.get(v.deal_id), decideAt.get(v.round_key), nowMs);
+    const verdict = judgeVote(v, settledFor(v), decideAt.get(v.round_key), nowMs);
     if (verdict !== "hit" && verdict !== "miss") continue;
     const s = byUser.get(v.user_id) ?? { user_id: v.user_id, points: 0, hits: 0, scored: 0 };
     s.scored += 1;
@@ -154,8 +194,8 @@ async function readScores(supabase) {
 }
 
 /**
- * 채점 → 점수 표에 쓴다(바뀐 행만 upsert, 더는 대상이 아닌 사람은 지운다).
- * @returns {Promise<{ predictions: number, users: number, written: number, removed: number }>}
+ * 판정이 끝난 회차의 결과를 굳히고 → 채점 → 점수 표에 쓴다(바뀐 행만 upsert, 더는 대상이 아닌 사람은 지운다).
+ * @returns {Promise<{ predictions: number, users: number, written: number, removed: number, frozen: number }>}
  */
 export async function runScoring(supabase, { nowMs = Date.now(), log = console } = {}) {
   const predictions = await readPredictions(supabase);
@@ -163,23 +203,34 @@ export async function runScoring(supabase, { nowMs = Date.now(), log = console }
 
   const deals = [];
   const tallies = [];
+  const results = [];
   for (const ids of chunks(dealIds)) {
-    const [d, t] = await Promise.all([
+    const [d, t, r] = await Promise.all([
       supabase.from(DEALS).select("id, settled_at").in("id", ids),
       // 딜 하나에 회차가 몇 개뿐이라 한 덩어리가 max_rows에 닿지 않는다
       supabase.from(TALLIES).select("deal_id, round_key, yes_count, no_count").in("deal_id", ids),
+      supabase.from(RESULTS).select("deal_id, round_key, settled_at").in("deal_id", ids),
     ]);
     if (d.error) throw new Error(`딜 결과 조회 실패: ${d.error.message}`);
     if (t.error) throw new Error(`예측 집계 조회 실패: ${t.error.message}`);
+    if (r.error) throw new Error(`회차 결과 조회 실패: ${r.error.message}`);
     deals.push(...d.data);
     tallies.push(...t.data);
+    results.push(...r.data);
   }
 
-  const scores = scorePredictions({ predictions, deals, tallies, windows: loadWindows(), nowMs });
+  const windows = loadWindows();
+  // 판정이 끝난 회차의 결과를 굳힌다 — 한 번 적은 행은 고치지 않는다(충돌은 무시 — 다른 실행이 먼저 적었으면 그 값이 남는다)
+  const toFreeze = freezeRoundResults({ predictions, deals, results, windows, nowMs });
+  const now = new Date(nowMs).toISOString();
+  const frozenUp = await upsertRows(supabase, RESULTS, toFreeze.map((r) => ({ ...r, decided_at: now })), { onConflict: "deal_id,round_key", ignoreDuplicates: true }, { log });
+  if (frozenUp.failed.length) throw new Error(`회차 결과 저장 실패 ${frozenUp.failed.length}건: ${frozenUp.failed[0].message}`);
+  results.push(...toFreeze);
+
+  const scores = scorePredictions({ predictions, deals, tallies, results, windows, nowMs });
   const stored = new Map((await readScores(supabase)).map((s) => [s.user_id, s]));
   const same = (a, b) => a.points === b.points && a.hits === b.hits && a.scored === b.scored && a.rank === b.rank;
   const changed = scores.filter((s) => !stored.has(s.user_id) || !same(stored.get(s.user_id), s));
-  const now = new Date(nowMs).toISOString();
   const up = await upsertRows(supabase, SCORES, changed.map((s) => ({ ...s, updated_at: now })), { onConflict: "user_id" }, { log });
   if (up.failed.length) throw new Error(`점수 저장 실패 ${up.failed.length}건: ${up.failed[0].message}`);
 
@@ -190,5 +241,5 @@ export async function runScoring(supabase, { nowMs = Date.now(), log = console }
     const { error } = await supabase.from(SCORES).delete().in("user_id", ids);
     if (error) throw new Error(`점수 정리 실패: ${error.message}`);
   }
-  return { predictions: predictions.length, users: scores.length, written: up.saved.length, removed: gone.length };
+  return { predictions: predictions.length, users: scores.length, written: up.saved.length, removed: gone.length, frozen: toFreeze.length };
 }

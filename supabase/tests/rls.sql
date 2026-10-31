@@ -2404,6 +2404,33 @@ insert into public.transfer_prediction_score (user_id, points, hits, scored, ran
 select count(*) from public.transfer_prediction_score where user_id = :'alice';
 rollback to s;
 
+\echo ''
+\echo '-- 42e. 회차별 딜 결과 — 채점 스크립트만 쓴다(20261031000001) --'
+
+savepoint s; :login_alice
+\echo '[❌차단] 지난 회차의 결과를 직접 넣는다 — 넣을 수 있으면 불발을 성사로 바꿔 내 점수를 올린다'
+insert into public.transfer_deal_round_result (deal_id, round_key, settled_at) values (:rd1, '2098-summer', now());
+rollback to s;
+
+savepoint s;
+insert into public.transfer_deal_round_result (deal_id, round_key, settled_at) values (:rd1, '2098-summer', null);
+:login_alice
+\echo '[❌차단] 굳은 결과를 고친다 — 쓰기 grant가 없다(42501)'
+update public.transfer_deal_round_result set settled_at = now() where deal_id = :rd1;
+rollback to s;
+
+savepoint s;
+\echo '[❌차단] 없는 회차의 결과 — FK(transfer_window)'
+insert into public.transfer_deal_round_result (deal_id, round_key) values (:rd1, '2096-summer');
+rollback to s;
+
+savepoint s;
+insert into public.transfer_deal_round_result (deal_id, round_key, settled_at) values (:rd1, '2098-summer', null);
+:login_anon
+\echo '[1 기대] 회차 결과는 비로그인도 읽는다(딜의 settled_at·창 일정으로 누구나 계산할 수 있는 값)'
+select count(*) from public.transfer_deal_round_result where deal_id = :rd1;
+rollback to s;
+
 rollback to s42;
 
 rollback;

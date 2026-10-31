@@ -88,6 +88,7 @@
   ⚠ **로그아웃 후 이동을 호출부에서 하지 말 것** — 성공 콜백은 화면이 먼저 언마운트되어 실행되지 않고, `mutate` 직전 `router.replace`는 가드의 이동과 순서 보장이 없다(나중 이동이 앞 이동을 취소한다). 목적지는 가드가 소유하고 호출부는 신호만 남긴다.
   ⚠ **신호는 전역이고 가드는 여럿이다** — 가드가 쓰지 않을 때도 읽어서 버리고, "이 화면에서 세션이 사라졌는가"를 함께 본다. 안 그러면 남은 신호를 다른 가드가 먹어 비로그인 사용자가 로그인 화면 대신 목록으로 되튕긴다.
 - `toAuthErrorMessage` / `authErrorMessageFor` — supabase `AuthError` → 한국어. **`toDbErrorMessage`와 합치지 않는다**(데이터가 다르다).
+  ⚠ `authErrorMessageFor`는 URL의 `error_code`를 받는다 — 표는 **자기 키만** 찾는다(`Object.hasOwn`). 그냥 인덱싱하면 `?error_code=__proto__`가 `Object.prototype`을 돌려줘 로그인 화면 렌더가 깨졌다. URL 값으로 객체 표를 찾는 자리를 새로 만들면 같은 판정을 쓴다.
   ⚠ 새 인증 흐름을 붙이면 **여기 커버리지부터 확인한다** — identity 코드를 빠뜨렸더니 "이미 다른 계정에 연결됨"처럼 재시도로 절대 안 풀리는 실패가 "잠시 후 다시 시도"로 접혔다.
 - **`useLinkedIdentitiesQuery(userId)` / `identityKeys`** — 연결된 로그인 수단 조회. 조회는 여기, 쓰기(연결·해제)는 `features/link-identity`다(`entities/transfer` ↔ `features/watch-transfer`와 같은 분업). ⚠ 키를 **userId로 스코프**한다 — 계정 전환 시 이전 사용자의 목록이 노출되지 않게.
 
