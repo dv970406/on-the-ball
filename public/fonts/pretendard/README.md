@@ -19,16 +19,19 @@ Google Fonts의 Noto Sans KR도 동일하게 100+ 조각으로 서빙하고, `ne
   - CSS: `pretendardvariable-dynamic-subset.css`
   - woff2: `woff2-dynamic-subset/PretendardVariable.subset.{0..91}.woff2`
 - 라이선스: **SIL Open Font License 1.1** (© 2021 Kil Hyung-jin, Reserved Font Name Pretendard).
-  OFL 고지는 `src/app/styles/pretendard-subset.css` 상단 원본 주석에 유지되어 있다.
+  OFL 고지는 `pretendard-1.3.9.css`(이 폴더) 상단 원본 주석에 유지되어 있다.
 
 ## 연관 파일 (여기만 보지 말 것)
 
 | 파일 | 역할 |
 |---|---|
-| `src/app/styles/pretendard-subset.css` | 92개 `@font-face`(unicode-range) + CLS 방지 fallback face. url을 `/fonts/pretendard/`로 재작성 |
-| `src/app/styles/globals.css` | `@import`로 위 CSS 로드, `--font-sans` 토큰이 `"Pretendard Variable"`을 가리킴 |
-| `app/layout.tsx` | 최빈 조각 `[91]`(라틴·숫자·최빈 한글) / `[90]`(차상위 최빈 한글) `<link rel="preload">` |
-| `next.config.ts` | `/fonts/pretendard/*`에 `Cache-Control: public, max-age=31536000, immutable` |
+| `pretendard-1.3.9.css`(이 폴더) | 92개 `@font-face`(unicode-range). url을 `/fonts/pretendard/`로 재작성. **번들이 아니다** — 아래 두 자리가 `<link>`로 붙인다 |
+| `src/app/fonts.ts` | 그 CSS의 주소·늦게 붙이는 이유(첫 방문 모바일의 하이드레이션이 폰트 때문에 두 배로 늦었다)·재방문용 머리 스크립트 |
+| `src/app/use-deferred-pretendard.ts` | 첫 방문 — 하이드레이션 뒤에 붙이고, 본문 조각이 도착하면 재방문 표식(localStorage)을 남긴다 |
+| `app/layout.tsx` | 재방문 — 표식이 있으면 머리의 인라인 스크립트가 첫 페인트 전에 붙인다. 조각을 `preload`하지 않는다 |
+| `src/app/styles/pretendard-fallback.css` | CLS 방지 fallback face(번들) — 폰트 CSS가 붙기 전의 글자를 Pretendard 라인박스로 그린다 |
+| `src/app/styles/globals.css` | `@import`로 위 fallback 로드, `--font-sans` 토큰이 `"Pretendard Variable"`을 가리킴 |
+| `next.config.ts` | `/fonts/pretendard/*`에 `Cache-Control: public, max-age=31536000, immutable` — 그래서 CSS 이름에 버전을 넣는다 |
 
 ## 재생성 / 버전 업그레이드
 
@@ -43,12 +46,12 @@ seq 0 91 | xargs -P 8 -I {} \
   curl -sSL "$BASE/woff2-dynamic-subset/PretendardVariable.subset.{}.woff2" \
   -o "PretendardVariable.subset.{}.woff2"
 
-# 2) 동적 서브셋 CSS를 받아 url 경로를 자체 호스팅 경로로 치환 → pretendard-subset.css 로 저장
-#    (파일 상단 한국어 주석 헤더와 하단 CLS fallback face 블록은 수동 유지)
+# 2) 동적 서브셋 CSS를 받아 url 경로를 자체 호스팅 경로로 치환 → pretendard-${VER}.css 로 저장
+#    (파일 상단 한국어 주석 헤더는 수동 유지. CLS fallback face는 src/app/styles/pretendard-fallback.css에 있다)
+#    ⚠ 파일 이름이 바뀌므로 src/app/fonts.ts의 PRETENDARD_CSS도 함께 바꾼다 — 1년 불변 캐시라 같은 이름으로 덮으면 옛 CSS가 남는다
 curl -sSL "$BASE/pretendardvariable-dynamic-subset.css" \
   | sed 's#url(\./woff2-dynamic-subset/#url(/fonts/pretendard/#g' \
-  > /tmp/pretendard-subset.body.css
-#    → 위 결과의 @font-face 블록을 src/app/styles/pretendard-subset.css 본문으로 반영
+  > "pretendard-${VER}.css"
 ```
 
 > CLS fallback face의 `ascent-override: 95.21%` / `descent-override: 24.12%`는

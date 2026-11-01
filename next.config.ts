@@ -64,7 +64,7 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // 자체 호스팅 Pretendard 서브셋 — 파일명이 버전 고정이라 불변 캐시 안전
+        // 자체 호스팅 Pretendard 서브셋 — 불변 캐시라 내용을 바꾸면 이름을 바꾼다(CSS는 `pretendard-<버전>.css`, `src/app/fonts.ts`)
         source: "/fonts/pretendard/:file*",
         headers: [
           {

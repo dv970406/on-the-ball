@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { GoogleAnalytics } from "@next/third-parties/google";
-import { jetbrainsMono } from "@/app/fonts";
+import { PRETENDARD_EARLY_SCRIPT, jetbrainsMono } from "@/app/fonts";
 import { AppProviders } from "@/app/providers";
 import { TOKEN_COLORS, env } from "@/shared/config";
 import { TopBar } from "@/widgets/top-bar";
@@ -60,24 +60,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ko" className={jetbrainsMono.variable}>
       <head>
         {/*
-          Pretendard 동적 서브셋 중 최빈 조각만 preload — swap 깜빡임/CLS 최소화.
-          [91]=라틴·숫자·문장부호·최빈 한글(가·이·다·하 등), [90]=차상위 최빈 한글(는·을·에·한 등).
-          나머지 조각은 화면에 해당 글자가 나올 때 브라우저가 알아서 로드한다(전부 preload 금지).
+          Pretendard — 이 브라우저가 폰트를 받아 둔 적이 있으면 첫 페인트 전에 폰트 CSS를 붙인다(재방문).
+          첫 방문은 하이드레이션 뒤에 붙는다(`useDeferredPretendard`) — 조각들이 JS와 대역폭을 다투면 하이드레이션이 두 배로 늦었다(`src/app/fonts.ts`).
         */}
-        <link
-          rel="preload"
-          as="font"
-          type="font/woff2"
-          href="/fonts/pretendard/PretendardVariable.subset.91.woff2"
-          crossOrigin="anonymous"
-        />
-        <link
-          rel="preload"
-          as="font"
-          type="font/woff2"
-          href="/fonts/pretendard/PretendardVariable.subset.90.woff2"
-          crossOrigin="anonymous"
-        />
+        <script dangerouslySetInnerHTML={{ __html: PRETENDARD_EARLY_SCRIPT }} />
       </head>
       <body>
         <AppProviders>

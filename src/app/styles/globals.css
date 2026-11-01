@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "./pretendard-subset.css";
+@import "./pretendard-fallback.css";
 
 /* =========================================================
    Tifo 디자인 토큰.
@@ -50,7 +50,7 @@
 }
 
 /* 폰트 패밀리 연결
-   - sans: 자체 호스팅 동적 서브셋(pretendard-subset.css의 "Pretendard Variable")
+   - sans: 자체 호스팅 동적 서브셋("Pretendard Variable" — 번들 밖 CSS를 늦게 붙인다, src/app/fonts.ts)
            → CLS 보정 fallback("Pretendard Fallback") → 시스템 한글 순
    - mono: JetBrains Mono는 next/font/local 변수(--font-jetbrains-mono) 유지 */
 @theme inline {

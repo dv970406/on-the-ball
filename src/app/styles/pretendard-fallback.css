@@ -1,0 +1,23 @@
+/* =========================================================
+   Pretendard — 번들에 남는 것은 이 크기 보정 대체 면 하나다.
+   92개 동적 서브셋 @font-face는 public/fonts/pretendard/pretendard-1.3.9.css로 옮겼다 — 첫 방문은 하이드레이션 뒤에 붙인다
+   (src/app/fonts.ts). 그 전까지 글자는 아래 대체 면(시스템 한글 폰트를 Pretendard 라인박스에 맞춘 것)으로 그려진다.
+   ========================================================= */
+
+/* =========================================================
+   CLS 방지 fallback face — next/font가 자동 생성하던 size-adjust 보정의 수동판.
+   Pretendard 실측 메트릭(em=2048, hhea asc=1950, desc=-494, gap=0)에서 산출:
+     ascent  1950/2048 = 95.21%
+     descent  494/2048 = 24.12%
+   시스템 한글 폰트(Apple SD Gothic Neo 등)를 Pretendard의 라인박스에 맞춰,
+   웹폰트 로드 전/스왑 시 세로 점프(레이아웃 시프트)를 억제한다.
+   ========================================================= */
+@font-face {
+	font-family: 'Pretendard Fallback';
+	src: local('Apple SD Gothic Neo'), local('AppleSDGothicNeo-Regular'),
+		local('Malgun Gothic'), local('Noto Sans KR');
+	ascent-override: 95.21%;
+	descent-override: 24.12%;
+	line-gap-override: 0%;
+	size-adjust: 100%;
+}
