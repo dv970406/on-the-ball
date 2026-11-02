@@ -22,15 +22,17 @@ export function parseTransferSort(value: string | undefined): TransferSort {
 }
 
 /**
- * 리그 필터 — **출발 또는 도착** 구단의 리그가 일치하면 포함. `null`은 전체.
- * ⚠ 구단이 `null`(미확인)이거나 5대 리그 밖(`league` null)이면 그 쪽으로는 일치하지 않는다.
+ * 리그 필터 — 출발·행선지·관심 구단·**지금 임대로 뛰는 구단** 어느 자리든 그 리그의 구단이 있으면 포함. `null`은 전체.
+ * ⚠ 걸리는 자리는 구단 필터(`dealHasClub`)와 같다 — 관심 구단만 있는 루머(행선지 미정)를 출발·행선지만 보고 걸렀더니 리그를 고르면
+ *   그 리그 구단들이 노리는 딜이 사라졌다. 구단 칩은 리그 안의 딜에서 만들므로 두 판정이 갈리면 칩을 눌러도 딜이 나오지 않는다.
+ * ⚠ 구단이 `null`(미확인)이거나 5대 리그 밖(`league` null)이면 그 자리로는 일치하지 않는다.
  */
 export function dealInLeague(
-  deal: Pick<TransferDeal, "fromClub" | "toClub">,
+  deal: Pick<TransferDeal, "fromClub" | "toClub" | "suitors" | "loanClub">,
   league: TransferLeague | null,
 ): boolean {
   if (league === null) return true;
-  return deal.fromClub?.league === league || deal.toClub?.league === league;
+  return [deal.fromClub, deal.toClub, deal.loanClub, ...deal.suitors].some((c) => c?.league === league);
 }
 
 /** 구단 코드의 형식 — `transfer_club.code`(엠블럼 파일명과 같은 slug) */

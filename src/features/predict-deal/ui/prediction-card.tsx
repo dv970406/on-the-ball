@@ -94,6 +94,11 @@ export function PredictionCard({
   useEffect(() => {
     requestedRef.current = null;
   }, [pick]);
+  // 요청이 끝나도 다시 캐시를 믿는다 — 캐시에 데이터가 없어 낙관적 갱신이 아무것도 고치지 못했으면(다른 탭에서 로그인한 새 키)
+  // `pick`이 그대로라 위 effect가 돌지 않고, 같은 버튼이 "이미 골랐다"로 삼켜졌다
+  useEffect(() => {
+    if (!predict.isPending) requestedRef.current = null;
+  }, [predict.isPending]);
 
   if (!round) return null;
 

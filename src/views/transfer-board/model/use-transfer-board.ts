@@ -145,8 +145,9 @@ export function useTransferBoard({
   }, [deals, nowMs]);
 
   /*
-   * 구단 칩 — 리그 필터 안의 딜에서 출발·행선지 구단을 세어 많은 순(관심 구단만인 자리는 이름이 없어 칩이 되지 않지만
-   * 필터에는 걸린다 — `dealHasClub`). URL의 구단이 여기 없으면 전체로 폴백한다(창이 지나 사라진 구단의 공유 링크).
+   * 구단 칩 — 리그 필터 안의 딜에서 출발·행선지 구단을 세어 많은 순(관심 구단만인 자리는 칩이 되지 않지만 필터에는 걸린다 —
+   * `dealHasClub`. 주소가 고른 구단은 그 자리로만 걸려도 칩이 된다). 리그 안의 어느 딜에도 없는 구단이면 전체로 폴백한다
+   * (창이 지나 사라진 구단의 공유 링크).
    * ⚠ **내 응원 구단은 딜 수와 무관하게 맨 앞이다** — 팬이 보드를 열면 자기 구단 칩이 첫 자리에 있다. 다만 보드에 딜이
    *   하나도 없는 응원 구단은 칩을 만들지 않는다(누르면 빈 보드다). 출발·행선지가 아니라 관심 구단으로만 걸린 딜도
    *   "있는" 것으로 센다(아래).
@@ -156,7 +157,8 @@ export function useTransferBoard({
   const clubOptions = useMemo<ClubOption[]>(() => {
     const followed = new Set((followedClubs ?? []).map((c) => c.code));
     const seen = new Map<string, ClubOption>();
-    for (const deal of (deals ?? []).filter((d) => dealInLeague(d, league))) {
+    const inLeague = (deals ?? []).filter((d) => dealInLeague(d, league));
+    for (const deal of inLeague) {
       // ⚠ 응원 구단은 **관심 구단으로만 걸린 딜**도 센다 — 필터(`dealHasClub`)는 그 자리도 잡으므로 칩을 누르면 딜이
       //   나온다. 그 밖의 구단까지 관심 구단으로 세면 루머마다 붙는 빅클럽이 칩 레일을 채운다.
       //   지금 임대로 뛰는 구단(`loanClub` — 경로 밖)도 같은 이유로 응원 구단일 때만 센다.
@@ -168,11 +170,20 @@ export function useTransferBoard({
         else seen.set(c.code, { code: c.code, label: c.shortName, count: 1, followed: followed.has(c.code) });
       }
     }
+    // 주소의 구단이 관심 구단·임대 구단으로만 걸려 있어도 칩으로 세운다 — 구단 화면의 "보드에서 보기"가 그 구단을 싣는데, 위 셈에
+    // 없다고 전체로 폴백하면 링크가 가리킨 구단의 목록이 아니라 보드 전체가 떴다. 필터(`dealHasClub`)와 같은 자리로 센다
+    if (club !== null && !seen.has(club)) {
+      const hits = inLeague.filter((d) => dealHasClub(d, club));
+      const found = hits
+        .flatMap((d) => [d.fromClub, d.toClub, d.loanClub, ...d.suitors])
+        .find((c) => c?.code === club);
+      if (found) seen.set(club, { code: club, label: found.shortName, count: hits.length, followed: followed.has(club) });
+    }
     return [...seen.values()].sort(
       (a, b) =>
         Number(b.followed) - Number(a.followed) || b.count - a.count || a.label.localeCompare(b.label, "ko"),
     );
-  }, [deals, league, followedClubs]);
+  }, [deals, league, followedClubs, club]);
   const effectiveClub = club !== null && clubOptions.some((o) => o.code === club) ? club : null;
 
   /**

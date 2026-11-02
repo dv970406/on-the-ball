@@ -99,6 +99,20 @@ const ALABA = { ...NO_FIX, player: "David Alaba" };
   check("재계약 — 근거가 재계약이고 행선지 없는 '합의'는 이동 아님(재계약)", r.kind === "not_move" && r.renewal === true);
   check("재계약 — 같은 근거라도 부인으로 읽은 판정은 그대로(복귀설을 끝내는 보도)", parseJudgement(J({ move: true, stage: "denied", from: "Bayern", suitors: ["Tottenham"], evidence: "Kane is now on the verge of agreeing a new contract to extend his time with Bayern", summary_ko: "요약." }), KANE, opt).kind === "move");
   check("재계약 — 행선지가 있으면 가드가 걸리지 않는다(이적하며 새 계약)", parseJudgement(J({ move: true, stage: "agreement", to: "Tottenham", evidence: "rumours of a potential return to Tottenham come to an end", summary_ko: "요약." }), KANE, opt).kind === "move");
+  const COLE = "Leeds midfielder Tom Cole has rejected a new contract. Bids from Everton and Fulham have been submitted.";
+  const coleOpt = { ...NO_FIX, player: "Tom Cole" };
+  check("재계약 — 관심 구단이 여럿인 제안은 근거가 그 구단을 말하면 이동이다(재계약 거절 + 제안)",
+    parseJudgement(J({ move: true, stage: "offer", from: "Leeds", suitors: ["Everton", "Fulham"], evidence: "Leeds midfielder Tom Cole has rejected a new contract. Bids from Everton and Fulham have been submitted.", summary_ko: "요약." }), COLE, coleOpt).kind === "move");
+  const KANE_INT = "Harry Kane is on the verge of agreeing a new contract with Bayern despite interest from Tottenham and Arsenal.";
+  check("재계약 — 관심 구단만 있는 '합의'는 여전히 재계약이다(상대가 하나여야 합의다)",
+    parseJudgement(J({ move: true, stage: "agreement", suitors: ["Tottenham", "Arsenal"], evidence: KANE_INT, summary_ko: "요약." }), KANE_INT, opt).renewal === true);
+  const KANE_BENCH = "Kane is now on the verge of agreeing a new contract to extend his time with Bayern, which would see rumours of a potential return to Tottenham come to an end. Tottenham hold matching rights on any offer, and Arsenal are monitoring.";
+  check("재계약 — 재계약 문장 안에서만 말한 구단은 관심 구단으로 세지 않는다(끝난 복귀설)",
+    parseJudgement(J({ move: true, stage: "offer", from: "Bayern", suitors: ["Tottenham", "Arsenal"], evidence: "Kane is now on the verge of agreeing a new contract to extend his time with Bayern, which would see rumours of a potential return to Tottenham come to an end.", summary_ko: "요약." }), KANE_BENCH, opt).renewal === true);
+  check("재계약 — 협상은 관심 구단을 따로 말해도 재계약으로 접는다(재계약 협상과 가를 수 없다 — 벤치의 케인 기사)",
+    parseJudgement(J({ move: true, stage: "talks", from: "Bayern", suitors: ["Tottenham", "Arsenal"], evidence: KANE_BENCH, summary_ko: "요약." }), KANE_BENCH, opt).renewal === true);
+  check("재계약 — 근거가 관심 구단을 말하지 않는 제안은 재계약이다",
+    parseJudgement(J({ move: true, stage: "offer", from: "Leeds", suitors: ["Everton", "Fulham"], evidence: "Leeds midfielder Tom Cole has rejected a new contract.", summary_ko: "요약." }), COLE, coleOpt).renewal === true);
 }
 
 // ── 임대 ────────────────────────────────────────────────────────────────

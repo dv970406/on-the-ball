@@ -1109,7 +1109,10 @@ function currentEvent(events, key) {
   const formed = events.filter((it) => formOf(it.row, key)).sort((a, b) => ts(a.row) - ts(b.row));
   if (!formed.length) return null;
   const form = formOf(formed.at(-1).row, key);
-  const lastOther = formed.findLast((it) => formOf(it.row, key) !== form);
+  // 경계는 지금 형태의 마지막 보도보다 **먼저** 나온 다른 형태의 보도다 — 같은 시각에 다른 형태로 나온 보도는 순서를 말할 수 없어
+  // 새 구간에 함께 둔다. 같은 시각의 보도를 경계로 삼으면 새 구간이 비어, 딜에 쓸 보도가 없어 기존 딜이 통째로 사라졌다
+  const lastTs = ts(formed.at(-1).row);
+  const lastOther = formed.findLast((it) => formOf(it.row, key) !== form && ts(it.row) < lastTs);
   if (!lastOther) return null;
   const cut = ts(lastOther.row);
   const before = events.filter((it) => ts(it.row) <= cut);

@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { SIGN_IN_REQUIRED_MESSAGE, requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
 import { track, useToast } from "@/shared/lib";
-import { applyPick, myPickOf, predictionKeys, type DealPrediction } from "@/entities/prediction";
+import { applyPick, myPickOf, predictionKeys, recordSettledPick, type DealPrediction } from "@/entities/prediction";
 import { useSessionStore } from "@/entities/session";
 import { transferKeys } from "@/entities/transfer";
 
@@ -46,6 +46,9 @@ const needsResync = new Set<number>();
  *   보장되지 않는다. 낙관적 갱신은 줄을 서지 않고 곧바로 돈다.
  * ⚠ **가드도 `disabled`도 두지 않는다** — 낙관적 UI이고, 연타해도 행은 PK 하나다(관심 토글과 같은 판단).
  * ⚠ 성공 토스트를 내지 않는다 — 고르는 순간 버튼이 눌리고 비율이 열리는 것이 곧 확인이다.
+ *
+ * ⚠ **조회를 취소하지 않는다** — 데이터가 없는 첫 조회를 되돌리며 취소하면 카드가 데이터 없이 멈춘다. 표가 날아가는 동안의
+ *   조회가 표를 되돌리는 것은 조회 쪽 덮어 넣기(`applyPendingPicks`)가 막는다(댓글 표와 같은 장치).
  *
  * 재동기화는 실패했을 때만, **줄의 마지막 요청이 끝날 때** 한 번이다 — 성공한 요청마다 다시 받지 않는다(화면이 이미
  * 정답을 그렸다). 남의 표로 바뀐 집계는 다음 마운트에 따라온다(stale 표시).
@@ -102,7 +105,9 @@ export function usePredictDeal(dealId: number) {
       return { prevPick };
     },
 
-    onSuccess: (_data, { next }) => {
+    onSuccess: (_data, { userId, roundKey, next }) => {
+      // 이 표보다 먼저 시작해 뒤에 도착하는 조회가 표를 되돌리지 않게 기억해 둔다(조회가 `applyPendingPicks`로 다시 입힌다)
+      recordSettledPick(dealId, { userId, roundKey, next });
       track("deal_predict", { deal_id: dealId, will_happen: next });
     },
 

@@ -63,7 +63,10 @@ const CURRENCY_SYMBOL: Record<string, string> = { EUR: "€", GBP: "£", USD: "$
  *   헤드라인 금액과 범위, 변동폭이 서로 다른 말을 한다. 저장값이 소수 둘째 자리까지라(`numeric(…, 2)`) 이 표기는 금액마다
  *   하나로 정해지고, 서로 다른 금액이 같은 글자가 되지 않는다.
  */
-function scaleOf(amount: number): { value: string; unit: "M" | "K" } {
+function scaleOf(raw: number): { value: string; unit: "M" | "K" } {
+  // 저장 정밀도(소수 둘째 자리)로 먼저 맞춘다 — 뺄셈 결과는 부동소수 오차를 품어(`16.4 - 15.4` = 0.9999…) 백만 미만으로 떨어지고
+  // `€1000K`로 그려졌다
+  const amount = Math.round(raw * 100) / 100;
   if (amount < 1) return { value: String(Math.round(amount * 1000)), unit: "K" };
   const fixed = amount.toFixed(2);
   return { value: fixed.replace(/0+$/, "").replace(/\.$/, ""), unit: "M" };
@@ -127,7 +130,8 @@ export function feeDelta(
   deal: Pick<TransferDeal, "feeAmount" | "prevFeeAmount" | "feeCurrency">,
 ): FeeDeltaValue | null {
   if (deal.feeAmount === null || deal.prevFeeAmount === null) return null;
-  const diff = deal.feeAmount - deal.prevFeeAmount;
+  // 저장 정밀도로 맞춘 차이 — 부동소수 오차가 "같은 금액"을 0이 아닌 차이로 만들지 않게
+  const diff = Math.round((deal.feeAmount - deal.prevFeeAmount) * 100) / 100;
   if (diff === 0) return null;
   const text = formatFee({ amount: Math.abs(diff), currency: deal.feeCurrency });
   if (text === null) return null;

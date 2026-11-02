@@ -80,7 +80,7 @@ export interface TransferClub {
   name: TransferClubRow["name"];
   /** 약칭 — 목록 행·미니 카드·경로 블록이 쓴다. 정식명은 상세의 경로 카드만 */
   shortName: TransferClubRow["short_name"];
-  /** 5대 리그 밖은 `null` — 리그 필터는 출발 **또는** 도착이 일치하면 통과시킨다 */
+  /** 5대 리그 밖은 `null` — 리그 필터는 출발·행선지·관심 구단·임대 구단 중 하나가 일치하면 통과시킨다(`dealInLeague`) */
   league: TransferLeague | null;
 }
 

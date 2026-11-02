@@ -899,6 +899,14 @@ const LOAN = {
     ...[1, 2, 3].map((i) => row(`Outlet ${i}: Chelsea recall John Doe from his loan at Aston Villa.`, { stage: "official", ...L("loan_recall", { verdict_stage: "official", verdict_from: "Aston Villa", verdict_to: "Chelsea", verdict_loan_owner: "Chelsea", verdict_loan_club: "Aston Villa" }) })),
     row("Napoli agree deal to sign John Doe from Chelsea.", { stage: "agreement", ...L("permanent", { verdict_from: "Chelsea", verdict_to: "Napoli" }) }),
   ]),
+  // 임대 오피셜 뒤 **같은 시각**에 다른 형태로 나온 두 보도(완전 이적 · 완전 영입 전환) — 구간이 비어 딜이 사라지지 않는다
+  sameTimeForms: (() => {
+    const loanRow = row("Napoli sign John Doe on loan from Chelsea.", { stage: "official", ...L("loan", { verdict_stage: "official", verdict_from: "Chelsea", verdict_to: "Napoli" }) });
+    const a = row("Arsenal want John Doe from Chelsea.", { stage: "rumour", ...L("permanent", { verdict_stage: "rumour", verdict_from: "Chelsea", verdict_to: "Arsenal" }) });
+    const b = row("Napoli could make John Doe's loan permanent.", { stage: "rumour", ...L("loan_convert", { verdict_stage: "rumour", verdict_from: "Chelsea", verdict_to: "Napoli" }) });
+    b.published_at = a.published_at;
+    return withStored([loanRow, a, b], new Map([[JOHN, { stage: "official", settled_at: loanRow.published_at, form: "loan", loan_clause: null }]]));
+  })(),
   // 협상 뒤 다른 형태로 읽힌 결렬 한 건 — 죽은 단계를 버리지 않는다
   talksThenCollapse: judged([
     ...[1, 2, 3].map((i) => row(`Outlet ${i}: Napoli in talks for John Doe from Chelsea.`, { stage: "talks", ...L("permanent", { verdict_stage: "talks", verdict_from: "Chelsea", verdict_to: "Napoli" }) })),
@@ -1054,6 +1062,7 @@ const UNIT = [
     ],
     want: [true, false, false, false, false],
   },
+  { name: "사건 전환 — 같은 시각에 다른 형태로 나온 보도들은 새 구간에 함께 둔다(빈 구간을 골라 딜이 사라지지 않는다)", got: pick(LOAN.sameTimeForms.deals[0] ?? {}, ["stage"]), want: { stage: "rumour" } },
   { name: "사건 전환 — 다른 형태로 읽힌 결렬 한 건도 죽은 단계로 반영한다", got: LOAN.talksThenCollapse.deals[0]?.stage, want: "collapsed" },
   {
     name: "임대 — 조기 복귀 오피셜 뒤의 완전 이적 합의는 합의 단계이고 옛 임대 구단을 남기지 않는다",

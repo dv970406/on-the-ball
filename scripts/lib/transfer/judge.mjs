@@ -521,8 +521,15 @@ export function parseJudgement(raw, sentText, { corrections, player = null, name
   // 이적설 부인·루머로 읽은 판정(rumour·denied·collapsed)은 그대로 둔다 — 재계약이 복귀설을 끝낸다는 보도는 부인이 맞다.
   // 진행 중인 임대를 설명할 뿐인 글은 단계가 없다 — 모델이 단계를 적어도 버린다(파생이 그 보도로 딜의 단계를 움직이지 않는다)
   const stage = loan.form === "loan_standing" ? null : JUDGE_STAGES.includes(obj.stage) ? obj.stage : null;
-  // 임대 연장은 "extension"을 말해도 재계약이 아니다
-  if (!to && stage && !DEAD.includes(stage) && stage !== "rumour" && loan.form !== "loan_extend" && RENEWAL.test(evidence)) {
+  // 임대 연장은 "extension"을 말해도 재계약이 아니다.
+  // 관심 구단이 여럿인 이적설(행선지는 비어 있다)의 **제안**도 재계약이 아니다 — 근거 가운데 재계약 낱말이 없는 문장이 그 구단을 말하면
+  // 제안은 그 구단의 것이다("rejected a new contract. Bids from Everton and Fulham"이 이동 아님으로 굳었다).
+  // ⚠ 재계약 문장 안의 구단은 세지 않는다 — "new contract … rumours of a potential return to Tottenham come to an end"의 토트넘은
+  //   관심 구단이 아니라 끝난 복귀설이다(케인 기사를 협상으로 되살렸다 — 벤치 재생). 협상·합의는 재계약 협상·합의와 가를 수 없어
+  //   그대로 접는다(진짜 이적설 하나가 숨는 편이 없는 이적을 만드는 것보다 낫다)
+  const suitorBid = stage === "offer" && evidence.split(/(?<=[.!?])\s+/u).some((sentence) =>
+    !RENEWAL.test(sentence) && suitors.some((c) => quotedIn(sentence, c) || detectClubs(sentence).includes(c)));
+  if (!to && !suitorBid && stage && !DEAD.includes(stage) && stage !== "rumour" && loan.form !== "loan_extend" && RENEWAL.test(evidence)) {
     return { kind: "not_move", evidence: clampCp(evidence, EVIDENCE_MAX_CHARS), renewal: true };
   }
   const s = judgeSummary(obj.summary_ko, corrections);

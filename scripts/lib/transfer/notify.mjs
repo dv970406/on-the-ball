@@ -71,6 +71,8 @@ export const FORM_NOUN = {
 
 /** 응원 구단 팬에게도 알리는 **상태 변화** — 새 딜은 상태와 무관하게 알린다 */
 const FOLLOWER_STATUSES = new Set(["imminent", "hwg", "official"]);
+/** 죽은 톤 — 결렬·부인 */
+const DEAD_STATUSES = new Set(["dead", "denied"]);
 
 /** 이보다 오래된 보도로 생긴 변화는 알리지 않는다 — 수집이 며칠 멎었다 돌아온 뒤의 밀린 소식은 "지금"이 아니다 */
 export const NOTICE_MAX_AGE_MS = 48 * HOUR_MS;
@@ -170,6 +172,9 @@ export function planNotices(changes, { nowMs }) {
     const status = STATUS_OF_STAGE[c.stage] ?? null;
     if (status === null) continue;
     const isNew = c.prevStage == null;
+    // 처음부터 결렬·부인으로 열린 딜은 알리지 않는다 — 담은 사람이 아직 없고, 결렬·부인은 구단 팬에게 보내지 않는 소식이다
+    // (아래 `toFollowers`). "새 이적설"로 보내면 열자마자 끝난 루머가 구단 팬에게 간다
+    if (isNew && DEAD_STATUSES.has(status)) continue;
     // 같은 톤 안의 이동은 알리지 않는다 — 단 결과가 난 딜의 형태가 바뀐 것(임대 → 완전 영입 전환)은 새 소식이다(`writeDeals`의 `formChanged`)
     if (!isNew && STATUS_OF_STAGE[c.prevStage] === status && !c.formChanged) continue;
     const reportedMs = Date.parse(c.latestReportedAt);

@@ -1,11 +1,12 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
 import type { DealPrediction, PredictionScore } from "../model/types";
 import { predictionKeys } from "./keys";
 import { buildMyPredictionsQuery, buildRankingQuery, buildScoreQuery, buildTallyQuery } from "./list-query";
 import { buildDealPrediction, buildPredictionScore } from "./mappers";
+import { applyPendingPicks } from "./pending-picks";
 
 interface UseDealPredictionQueryArgs {
   dealId: number;
@@ -25,6 +26,8 @@ interface UseDealPredictionQueryArgs {
 /**
  * 한 딜의 예측 — 회차별 집계(공개)와 내 표("내 행만"). 두 조회를 함께 보낸다(비로그인 키는 집계 하나만).
  * ⚠ 조립은 `buildTallyQuery`·`buildMyPredictionsQuery`·`buildDealPrediction`이 단독으로 소유한다 — SSR이 같은 함수를 부른다.
+ * ⚠ 받은 결과에 **아직 끝나지 않은(또는 이 조회 뒤 커밋된) 내 표**를 입혀서 돌려준다(`applyPendingPicks`) — 표가 날아가는
+ *   동안의 조회가 방금 누른 표를 되돌리지 않게.
  */
 export function useDealPredictionQuery({
   dealId,
@@ -34,6 +37,7 @@ export function useDealPredictionQuery({
   initialDataUpdatedAt,
   placeholderData,
 }: UseDealPredictionQueryArgs) {
+  const queryClient = useQueryClient();
   return useQuery<DealPrediction, Error>({
     initialData,
     initialDataUpdatedAt,
@@ -41,6 +45,8 @@ export function useDealPredictionQuery({
     queryKey: predictionKeys.deal(dealId, userId),
     queryFn: async () => {
       const supabase = requireBrowserSupabase();
+      // ⚠ 단조 시계 — 이 뒤에 커밋된 표는 응답에 빠져 있을 수 있다(`applyPendingPicks`)
+      const startedAt = performance.now();
       const [tally, mine] = await Promise.all([
         buildTallyQuery(supabase, dealId),
         // 비로그인 키(`userId` 없음)는 내 표를 묻지 않는다 — 정책상 늘 빈 배열이다(SSR도 같은 판정으로 접는다)
@@ -51,7 +57,7 @@ export function useDealPredictionQuery({
         console.error("[prediction] 딜 예측 조회 실패:", error);
         throw new Error(toDbErrorMessage(error));
       }
-      return buildDealPrediction(tally.data ?? [], mine.data ?? []);
+      return applyPendingPicks(buildDealPrediction(tally.data ?? [], mine.data ?? []), queryClient, dealId, userId, startedAt);
     },
     enabled: enabled && Number.isSafeInteger(dealId) && dealId > 0,
   });

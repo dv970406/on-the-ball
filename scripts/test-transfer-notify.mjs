@@ -97,6 +97,7 @@ check("결렬·부인은 관심 등록자에게만 알린다", eq(plan(change({ 
   check("새 딜 — 구단 팬에게만 간다(담은 사람이 아직 없다) · 새 루머의 제목은 '새 이적설'", n && eq([n.isNew, n.toWatchers, n.toFollowers, n.title], [true, false, true, "새 이적설 · 얀쿠바 민테"]), JSON.stringify(n));
   const [official] = plan(change({ prevStage: null, stage: "official" }));
   check("새 딜 — 곧바로 오피셜로 열린 딜은 그 상태로 알린다", official?.title === "오피셜 · 얀쿠바 민테" && official.toFollowers);
+  check("새 딜 — 처음부터 결렬·부인으로 열린 딜은 알리지 않는다(구단 팬에게 보내지 않는 소식이다)", plan(change({ prevStage: null, stage: "collapsed" }), change({ prevStage: null, stage: "denied" })).length === 0);
 }
 check("오래된 보도로 생긴 변화는 알리지 않는다(수집이 멎었다 돌아온 뒤의 밀린 소식)", plan(change({ latestReportedAt: new Date(NOW - NOTICE_MAX_AGE_MS - 1).toISOString() })).length === 0 && plan(change({ latestReportedAt: new Date(NOW - NOTICE_MAX_AGE_MS + 60_000).toISOString() })).length === 1);
 check("시각을 읽지 못한 변화는 버린다", plan(change({ latestReportedAt: "어제" })).length === 0);

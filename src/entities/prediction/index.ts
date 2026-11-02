@@ -4,6 +4,8 @@ export { predictionKeys } from "./api/keys";
 // 결과가 다른 사용자로 그려졌을 때의 자리 표시(내 표만 지운다) — `useTransferDetail`
 export { withoutMyPredictions } from "./api/mappers";
 export { useDealPredictionQuery, useMyScoreQuery, useRankingQuery } from "./api/queries";
+// 커밋된 내 표를 기억해 그보다 먼저 시작한 조회에 다시 입힌다 — 예측 훅의 `onSuccess`가 부른다
+export { recordSettledPick } from "./api/pending-picks";
 // 집계 읽기·낙관적 갱신이 **같은 계산**을 쓴다
 export {
   applyPick,

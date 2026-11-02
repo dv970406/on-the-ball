@@ -8,7 +8,7 @@ import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
 import { buildClubListQuery, daySummaryStartKey, queryDaySummaries } from "@/entities/transfer/api/list-query";
 import { buildClubList } from "@/entities/transfer/api/mappers";
 import { clubDealSide } from "@/entities/transfer/lib/club-deals";
-import type { TransferDaySummary } from "@/entities/transfer/model/types";
+import type { TransferDaySummary, TransferDeal } from "@/entities/transfer/model/types";
 
 /**
  * 사이트맵.
@@ -48,6 +48,8 @@ const DEAL_URL_LIMIT = URL_LIMIT - URL_RESERVED;
 interface DealRow {
   id: number;
   latest_reported_at: string;
+  /** 결렬·부인된 딜은 구단 화면에 없다 — 그 화면의 lastModified에서 뺀다(`clubDealSide`) */
+  stage: TransferDeal["stage"];
   /** 구단 화면의 lastModified를 세는 데 쓴다 — 그 화면이 딜을 고르는 판정(`clubDealSide`)에 그대로 넘긴다 */
   from_club_code: string | null;
   to_club_code: string | null;
@@ -66,7 +68,7 @@ async function fetchDealPages(
       .from("transfer_deal")
       // 상세도 보드도 `latest_reported_at`(최신 보도 시각)이 lastModified다 — 아래 주석 참고.
       // ⚠ 범위 필터를 걸지 않는다 — 상세 URL은 창이 지나도 살아 있다(`/transfers/[id]`).
-      .select("id, latest_reported_at, from_club_code, to_club_code, loan_club_code, transfer_deal_suitor(club_code)")
+      .select("id, latest_reported_at, stage, from_club_code, to_club_code, loan_club_code, transfer_deal_suitor(club_code)")
       .order("id", { ascending: false })
       .range(from, to);
     if (error) throw error;
@@ -103,7 +105,7 @@ function staticEntries(transfers: Date | undefined, days: Date | undefined): Met
 }
 
 /**
- * 구단 화면 — 5대 리그 구단 전부. lastModified는 **그 화면에 실리는 딜**(보드 범위 안 · 그 구단이 출발·행선지·관심 구단·임대 구단)의
+ * 구단 화면 — 5대 리그 구단 전부. lastModified는 **그 화면에 실리는 딜**(보드 범위 안 · 결렬·부인이 아니고 · 그 구단이 출발·행선지·관심 구단·임대 구단)의
  * 최신 보도 시각이고, 그런 딜이 없으면 생략한다(요청 시각으로 채우지 않는다).
  * ⚠ 구단 화면이 범위를 `boardScopeStartMs`로 자른다 — 같은 기준으로 세야 화면과 lastmod가 같은 딜을 본다.
  */
@@ -115,6 +117,7 @@ function clubEntries(codes: string[], deals: DealRow[], nowMs: number): Metadata
     const ms = Date.parse(deal.latest_reported_at);
     if (ms < scopeStartMs || ms > nowMs) return [];
     const slots = {
+      stage: deal.stage,
       fromClub: ref(deal.from_club_code),
       toClub: ref(deal.to_club_code),
       loanClub: ref(deal.loan_club_code),

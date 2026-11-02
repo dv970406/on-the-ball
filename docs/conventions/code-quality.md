@@ -101,7 +101,7 @@ onRetry={() => refetch()}                                     // ✅
 
 ```ts
 for (const c of clubs.filter((c) => c !== null)) { … }                       // ✅ 거를 것은 머리에서
-const side = isDeadStage(deal.stage) ? null : clubDealSide(deal, code);   // ✅ 값으로 접는다
+const side = isDeadStage(deal.stage) ? null : sideOf(deal);              // ✅ 값으로 접는다
 if (slot) { … }                                                           // ✅ 조건 블록
 ```
 
