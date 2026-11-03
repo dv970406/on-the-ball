@@ -62,7 +62,7 @@ shared ← entities ← features ← widgets ← views
   - `@/shared/ui`도 같다 — 배럴이 클라이언트 컴포넌트를 담으므로, 서버 page가 **렌더가 아니라 값으로** 써야 하는 서버 안전 모듈이 생기면 직접 경로로 가져가고 그 경로를 `check:conventions`의 `DEEP_IMPORT_ALLOWED`에 함께 적는다.
   - ⚠ **`"use client"`를 붙이지 않은 `shared/ui` 컴포넌트도 서버 소비자다.** 배럴을 거치면 서버 렌더 여지를 잃는다 — `empty-state`·`avatar`·`pill`·`skeleton`과 클래스 함수들(`button-class`·`chip-class`)이 `@/shared/lib/cn` 직접 경로를 쓰는 이유다(사유는 `empty-state.tsx` 주석에).
 - `@/entities/profile` — `"use client"` 쿼리 훅 포함. **서버는 `model/types`·`api/mappers`·`api/keys`를 직접 import**(이 세 접미사는 모든 엔티티에 공통으로 열려 있다).
-- `@/entities/transfer` — `"use client"` 쿼리 훅·UI 포함. **서버는 `model/types`·`api/mappers`·`api/keys`·`api/list-query`·`lib/stage`·`lib/route-label`·`lib/player-name`·`lib/fee`·`lib/deal-form`·`lib/deal-meta`·`lib/league`·`lib/club-deals`를 직접 import** — 구단 화면(`app/transfers/club/[code]/page.tsx`)은 코드 판정(`lib/league`의 `parseTransferClub` — 보드의 `?club=`과 같은 판정)과 설명의 영입·방출 건수(`lib/club-deals`)를 화면과 같은 함수로 만든다. 딜의 `<title>`·og description·카드 이미지는 `lib/deal-meta`가 상태 뱃지 라벨(`lib/stage`)·경로 문구(`lib/route-label`)·선수 표시명(`lib/player-name`)·형태의 말(`lib/deal-form`)로 만들어 `app/transfers/[id]/page.tsx`와 보드의 `?deal=` 공유(`app/transfers/page.tsx`)가 함께 쓰고, 같은 폴더의 `opengraph-image.tsx`(딜 공유 카드)가 거기에 이적료 표기(`lib/fee`)·형태 표지(`lib/deal-form`)를 더해 화면과 같은 말을 그린다.
+- `@/entities/transfer` — `"use client"` 쿼리 훅·UI 포함. **서버는 `model/types`·`api/mappers`·`api/keys`·`api/list-query`·`lib/stage`·`lib/route-label`·`lib/player-name`·`lib/fee`·`lib/deal-form`·`lib/deal-meta`·`lib/league`·`lib/club-deals`를 직접 import** — 각 모듈을 어느 서버 라우트가 무엇에 쓰는지는 `reuse.md`의 `@/entities/transfer` 절과 `nextjs.md`의 메타데이터·딜 카드 절이 갖는다. 원칙은 하나다: 서버가 만드는 제목·설명·카드·건수는 **화면과 같은 함수**로 만든다.
   ⚠ 직접 경로는 **서버 소비자의 것이다.** 훅(`memo`·`useMemo` 포함)을 쓰는 화면 조각은 서버에서 렌더되지 않으므로 `"use client"`를 달고 배럴로 가져온다 — 지시어 없이 직접 경로를 쓰면 클라이언트 모듈인데도 `check:conventions`의 `deep-import-client`를 비켜 간다. 필요한 값이 배럴에 없으면 배럴로 올린다(이적 보드의 지수 띠가 상태 톤·라벨을 그렇게 쓴다).
 - `@/entities/prediction` — `"use client"` 쿼리 훅 포함. **서버는 `model/types`·`api/mappers`·`api/list-query`를 직접 import** — `app/transfers/[id]/page.tsx`가 성사 예측(집계 + 내 표)을, `app/ranking/page.tsx`가 랭킹을 클라이언트 훅과 같은 조립으로 프리페치한다.
 - `@/entities/comment` — `"use client"` 쿼리 훅 포함. **서버는 `model/types`·`api/mappers`·`api/list-query`를 직접 import** — `app/transfers/[id]/page.tsx`가 댓글을 클라이언트 훅과 같은 조립(`buildCommentListQuery`)·자르기(`buildCommentList`)로 프리페치한다.
@@ -70,14 +70,6 @@ shared ← entities ← features ← widgets ← views
 - `@/entities/session` — 배럴이 zustand 스토어·Provider·가드를 재export(전부 클라이언트). 순수 함수 `toAuthErrorMessage`는 `lib/auth-error-message`에, 쿼리 키는 `api/keys`에 따로 있다.
 - `@/features/sign-in` — 배럴이 `"use client"` 훅(`useOAuthSignIn`)을 포함한다. **서버가 쓰는 순수 함수 `hasPkceVerifier`는 `@/features/sign-in/lib/pkce-verifier` 직접 경로**로 가져간다(`app/(auth)/sign-in/page.tsx`가 선례). features 레이어에도 같은 예외가 성립한다는 뜻이다 — 배럴이 클라이언트 훅을 담고 있으면 서버 소비자는 직접 경로를 쓴다.
 - 선례: `app/transfers/[id]/page.tsx`는 **`"use client"`를 담은 배럴을 하나도 거치지 않는다.** 서버 안전 모듈은 전부 직접 경로로 가져오고, 배럴을 쓰는 곳은 순수 상수만 담은 `@/shared/config`와 서버가 **렌더**하는 뷰(`@/views/transfer-detail`)뿐이다(렌더는 합법 — 아래 절 참고).
-
-### 요청당 1회 — 서버 조회는 React `cache()`로 감싼다
-
-`generateMetadata`와 `Page`가 같은 데이터를 필요로 하면 조회가 **요청당 2번** 나간다. `cache()`로 감싸 한 번만 돌게 한다.
-
-- 선례: `app/transfers/[id]/page.tsx`의 `fetchDealHead` — 제목(메타데이터)과 존재 여부(404 판정)를 한 번의 조회로 함께 얻는다.
-- ⚠ **`notFound()`는 반드시 `Page`(세그먼트 렌더)에서 부른다.** `generateMetadata`에서 부르면 메타데이터 생성만 중단되고 응답은 200으로 나간다.
-- ⚠ 조회 실패("unknown")와 리소스 없음("missing")을 구분한다. 일시 장애로 멀쩡한 리소스를 404로 단정하면 안 된다.
 
 ### `"use client"` 모듈의 값은 서버에서 호출할 수 없다
 

@@ -29,7 +29,8 @@
   그때는 항목 쪽에 "이 순서를 범위가 쓴다"를 주석으로 남긴다.
   항목에 적으면 같은 문자열이 항목 수만큼 HTML에 실리고, 그 규칙을 쓰지 않는 모바일도 그 무게를 받는다. 범위 밖에 둔 항목에는
   규칙이 걸리지 않으므로 그 항목 컴포넌트가 "범위 안에서만 그린다"를 주석으로 진다.
-- ⚠ **`overflow-x-auto`만 주면 세로도 `auto`가 된다** — 스크롤바가 보이는 환경에서 내용이 1px만 넘쳐도 세로 스크롤바 토막이 선다.
+- ⚠ **`overflow-x-auto`만 주면 세로도 `auto`가 된다**(`overflow-x`가 `visible`이 아니면 `overflow-y`도 `auto`로 계산된다) —
+  스크롤바가 보이는 환경에서 밑줄의 `-mb-px`처럼 1px만 넘쳐도 세로 스크롤바 토막이 선다.
   가로로만 흐르는 줄(칩 레일·탭 줄)은 `overflow-y-hidden`을 함께 준다.
 - **좁은 칸의 한국어 이름은 낱말 단위로 꺾는다**(`break-keep`) — 기본 줄바꿈은 한글을 글자 사이에서 꺾어 "토트/넘"이 된다.
   여러 줄로 흘리는 이름 칸(`line-clamp-*`)에 건다. 모바일 결과를 바꾸지 않아야 하는 자리면 넓은 폭 접두어로만 준다.
@@ -241,7 +242,7 @@ function cardClassName(peek: boolean) {
 | 이적시장 **상태 뱃지**·**관심 표시 원**·**결렬 X 원·부인 빗금 원**·**보도 타임라인 점** | 누르는 컨트롤이 아니라 상태·경로·시간순을 그리는 표시 요소다 | `entities/transfer/ui/status-badge.tsx` · `watch-mark.tsx` · `club-route.tsx` · `report-item.tsx` |
 
 ⚠ 위의 알약 예외 표와 이 "대상이 아닌 것" 표는 **`pnpm check:conventions`가 대조한다** — 목록에 없는 `rounded-full`이 생기면 검사가 실패한다. 그림자·`backdrop-blur` 예외도 같다.
-⚠ 다만 검사가 대조하는 것은 **파일 경로**이고 행 수가 아니다. 여기에 "세 목록"·"4곳" 같은 **개수를 적지 않는다** — 표에 행을 더하면 그 개수가 곧바로 거짓이 된다.
+⚠ 다만 검사가 대조하는 것은 **파일 경로**이고 행 수가 아니다 — 개수는 적지 않는다(`AGENTS.md`).
 
 경계가 헷갈리는 대비 선례:
 
@@ -316,7 +317,7 @@ resting 상태의 카드·목록·헤더는 **여전히 flat + 1px 헤어라인*
 
 ### 넓은 화면 — 크롬과 오버레이
 
-폭 구간은 `md`(768px)·`lg`(1024px)와 rem으로 쓴 arbitrary variant(`min-[90rem]:` — 1440px · 딜 표의 7열만 `min-[105rem]:` — 1680px, 위 className 절)다 — 브레이크포인트 토큰을 더하지 않는다(`@theme` 동결).
+폭 구간은 `md`(768px)·`lg`(1024px)와 rem으로 쓴 arbitrary variant(`min-[90rem]:` — 1440px · 딜 표의 7열만 `min-[105rem]:` — 1680px, 위 className 절)다.
 
 - **768px 미만의 결과를 바꾸지 않는다.** 넓은 화면용 스타일은 `md:`·`lg:` 접두어로만 더한다.
 - **`lg`부터 크롬이 위로 올라간다** — 데스크톱 상단 바(`TopBar`, 높이 `calc(56px + env(safe-area-inset-top))`)가 앱바·하단 탭바를 대신하고, 둘은 `lg:hidden`이다.
@@ -332,9 +333,6 @@ resting 상태의 카드·목록·헤더는 **여전히 flat + 1px 헤어라인*
     흐림은 `mask-image`다 — 내용의 끝을 지우는 것이지 배경 그라데이션(금지)이 아니다.
   - 넘침이 생겼다 사라지는 세로 스크롤 영역(스켈레톤 ↔ 내용, 창 높이)은 `md:[scrollbar-gutter:stable]`로 스크롤바 자리를
     늘 잡아 둔다 — 안 잡으면 가운데 열이 스크롤바 폭만큼 옆으로 흔들린다(`views/profile`·`views/ranking`·`AuthShell`).
-  - ⚠ **가로 레일(`overflow-x-auto`)은 세로도 스크롤 영역이 된다**(`overflow-x`가 `visible`이 아니면 `overflow-y`도 `auto`로
-    계산된다). 밑줄의 `-mb-px`처럼 1px만 아래로 넘쳐도 레일 옆에 **세로 스크롤바**가 생긴다 → 가로 레일에는 `overflow-y-hidden`을
-    함께 준다.
 - 상단 바의 활성 내비는 **잉크 밑줄**이다 — 크롬의 선택 상태라 에메랄드 자리 표에 들어가지 않는다.
 - **떠 있는 레이어는 화면 끝까지 늘어나지 않는다** — `Dialog`·`Sheet`·`BottomTabBar`는 넓은 프레임에서 가운데 최대폭으로 묶는다.
   ⚠ 가운데 정렬은 `inset-x-*` + `max-w-*` + `mx-auto`로 한다. `Dialog`·`Sheet`는 transform 키프레임·`[transform:…]`을 쓰는

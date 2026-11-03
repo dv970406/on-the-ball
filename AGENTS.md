@@ -18,6 +18,8 @@ Before any Next.js work, find and read the relevant doc in `node_modules/next/di
 @docs/conventions/reuse.md
 @docs/conventions/code-quality.md
 
+- **이적 파이프라인**(`scripts/sync-transfer-news.mjs` · `scripts/lib/transfer/**` · `scripts/test-transfer-*.mjs` · `scripts/eval-transfer.mjs` · `scripts/bench-transfer-judge.mjs`)을 만지기 전에는 **`docs/conventions/transfer-pipeline.md`를 읽는다.** 위처럼 @import하지 않는 이유는 그 규칙이 앱 작업에 쓰이지 않아 매 세션 실을 필요가 없어서다 — 앱이 읽는 파생 데이터의 계약은 `api-and-db.md`에 있다.
+
 ### 규약 문서의 "목록"은 손으로 세지 않는다
 
 위 문서들은 원칙만이 아니라 **목록**을 담고 있다(예외 화이트리스트 · 재사용 헬퍼 · 현역/미사용 UI · deep import 허용 경로). 목록은 코드가 움직이면 조용히 틀려진다 — 손으로 세면 반드시 갈린다.
