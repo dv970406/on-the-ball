@@ -45,6 +45,11 @@ export const metadata: Metadata = {
       ? { "naver-site-verification": env.naverSiteVerification }
       : {},
   },
+  /**
+   * 애드센스 사이트 소유권 확인(`<meta name="google-adsense-account">`) — 콘솔의 "메타 태그" 방식이다.
+   * 게시자 ID가 없으면 내보내지 않는다. 광고 스크립트는 여기서 싣지 않는다 — 광고 자리가 있는 화면만 받는다(`AdSlot`).
+   */
+  ...(env.adsenseClient ? { other: { "google-adsense-account": env.adsenseClient } } : {}),
 };
 
 export const viewport: Viewport = {

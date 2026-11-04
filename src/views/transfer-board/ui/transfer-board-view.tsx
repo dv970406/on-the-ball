@@ -10,7 +10,7 @@ import {
 } from "@/entities/transfer";
 import { ROUTES, openTransferWindow, trackedTransferWindow } from "@/shared/config";
 import { RETURN_PATH_ATTR, cn, formatCount, useNowMs } from "@/shared/lib";
-import { EmptyState, SignInDialog, StaleBanner } from "@/shared/ui";
+import { EmptyState, SignInDialog, SiteInfoLinks, StaleBanner } from "@/shared/ui";
 import { AppBar } from "@/widgets/app-bar";
 import { AuthStatus } from "@/widgets/auth-status";
 import { BottomTabBar } from "@/widgets/bottom-tab-bar";
@@ -385,7 +385,7 @@ export function TransferBoardView({
                     둘러보기 — 구단별·날짜별 화면으로 가는 길. 그 화면들은 검색 착지점이라 크롤러가 보드에서 찾아 들어갈 앵커가 있어야 한다
                     (사이트맵만으로 두지 않는다). 프리페치를 끈다 — 동적 라우트라 뷰포트 프리페치가 받아 오는 것이 없다(`DealRow`와 같은 판단).
                   */}
-                  <nav aria-label="이적시장 둘러보기" className="flex flex-wrap gap-x-5 px-5 pt-6 lg:pb-8">
+                  <nav aria-label="이적시장 둘러보기" className="flex flex-wrap gap-x-5 px-5 pt-6">
                     <Link
                       href={ROUTES.transferClubs}
                       prefetch={false}
@@ -401,6 +401,10 @@ export function TransferBoardView({
                       날짜별 소식
                     </Link>
                   </nav>
+                  {/*
+                    사이트 정보 — 비로그인이 개인정보처리방침에 닿는 자리다(`SiteInfoLinks` 주석). 보드가 첫 화면이라 여기 둔다.
+                  */}
+                  <SiteInfoLinks className="mt-2 border-t border-hairline px-5 pt-2 lg:pb-8" />
                 </div>
               </div>
 

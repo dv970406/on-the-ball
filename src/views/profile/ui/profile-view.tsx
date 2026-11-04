@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Camera, LogOut } from "lucide-react";
 import { ROUTES, avatarUrl } from "@/shared/config";
-import { Avatar, Button, EmptyState, Icon, Skeleton, StaleBanner, TextField } from "@/shared/ui";
+import { Avatar, Button, EmptyState, Icon, SiteInfoLinks, Skeleton, StaleBanner, TextField } from "@/shared/ui";
 import { BottomTabBar } from "@/widgets/bottom-tab-bar";
 import { SubHeader } from "@/widgets/sub-header";
 import { useProfileQuery } from "@/entities/profile";
@@ -270,6 +270,9 @@ export function ProfileView({
               {signOut.isPending ? "로그아웃 중…" : "로그아웃"}
             </Button>
           </ProfileSection>
+
+          {/* 내 정보를 다루는 화면이라 개인정보처리방침으로 가는 길을 둔다(열람·정정·삭제 방법이 거기 있다) */}
+          <SiteInfoLinks className="mt-8" />
         </div>
       </main>
       {tabBar}

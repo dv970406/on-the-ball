@@ -84,13 +84,14 @@ export const config = {
   // ⚠ **서비스 워커와 매니페스트도 제외한다**(`sw.js`·`manifest.webmanifest`). 브라우저는 워커가 깔린 사이트를
   //   열 때마다 워커 스크립트가 바뀌었는지 다시 받아 보는데, 그 요청이 proxy를 타면 **로그인 사용자의 화면 이동마다
   //   세션 확인이 하나씩** 붙는다(만료가 가까우면 refresh 왕복까지). 둘 다 사용자와 무관한 정적 응답이다.
+  //   애드센스 판매자 목록(`ads.txt` — 광고 크롤러가 주기적으로 읽는다)도 같은 이유로 뺀다.
   // ⚠ 헤더 이름은 Next 내부 상수다(`next/dist/client/components/app-router-headers.js`의
   //   `NEXT_ROUTER_PREFETCH_HEADER = 'next-router-prefetch'`). 버전이 올라 이름이 바뀌면
   //   제외가 조용히 무효가 되는데, 그때의 대가는 예전 동작(왕복이 도로 붙는다)이라 안전한 방향이다.
   matcher: [
     {
       source:
-        "/((?!api/|api$|_next/static|_next/image|favicon.ico|sw\\.js$|manifest\\.webmanifest$|.*\\.(?:svg|png|jpg|jpeg|gif|ico|woff2?)$).*)",
+        "/((?!api/|api$|_next/static|_next/image|favicon.ico|sw\\.js$|manifest\\.webmanifest$|ads\\.txt$|.*\\.(?:svg|png|jpg|jpeg|gif|ico|woff2?)$).*)",
       missing: [{ type: "header", key: "next-router-prefetch" }],
     },
   ],

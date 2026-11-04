@@ -57,6 +57,27 @@ export const env = {
    */
   kakaoJsKey: resolveKakaoJsKey(),
   /**
+   * 구글 애드센스 게시자 ID(`ca-pub-` + 16자리). 루트 layout이 소유권 확인 메타(`google-adsense-account`)로 내보내고,
+   * 광고 자리(`AdSlot` — `@/shared/ui`)가 애드센스 스크립트 주소에 싣는다. 비우면 둘 다 나가지 않는다.
+   * ⚠ 운영 빌드에만 넣는다 — 로컬·프리뷰에서 광고가 채워지면 개발 중의 노출·클릭이 무효 트래픽으로 잡힌다.
+   * ⚠ 형식이 아니면 비운 것으로 다룬다(`gaId`와 같은 이유 — 깨진 주소의 스크립트를 모든 광고 화면에 싣지 않는다).
+   */
+  adsenseClient: resolveAdsenseClient(),
+  /**
+   * 운영자 연락처(이메일) — 개인정보처리방침의 개인정보 보호책임자 연락처와 서비스 소개의 문의처로 화면에 그대로 나간다.
+   * ⚠ **공개 페이지에 실리는 주소다** — 개인 메일 대신 서비스용 주소를 쓴다. 비우면 두 화면이 연락처 줄 대신 "준비 중"을 그린다
+   *   (개인정보처리방침은 연락처가 법정 기재 사항이라 운영 빌드에는 반드시 채운다).
+   */
+  contactEmail: resolveContactEmail(),
+  /**
+   * 광고 단위 ID(애드센스 콘솔의 `data-ad-slot` — 숫자). 자리마다 하나다.
+   * ⚠ **비어 있는 자리는 아무것도 그리지 않는다** — 승인 전(광고 단위를 아직 못 만든다)에 빈 상자가 생기지 않고,
+   *   자리별로 하나씩 켜고 끌 수 있다.
+   */
+  adsenseSlots: {
+    dealDetail: resolveAdsenseSlot("NEXT_PUBLIC_ADSENSE_SLOT_DEAL_DETAIL", process.env.NEXT_PUBLIC_ADSENSE_SLOT_DEAL_DETAIL),
+  },
+  /**
    * 엠블럼 폴더의 내용 지문 — `next.config.ts`가 빌드 시점에 계산해 넣는다(`crestVersion`). 엠블럼 주소의 `?v=`다(`TransferCrest`).
    * 비어 있으면(빌드 밖) 붙이지 않는다.
    */
@@ -69,6 +90,37 @@ function resolveKakaoJsKey(): string {
   if (!raw) return "";
   if (/^[0-9a-f]{32}$/.test(raw)) return raw;
   console.error("[env] NEXT_PUBLIC_KAKAO_JS_KEY가 카카오 JavaScript 키 형식이 아니에요 — 카카오톡 공유를 끕니다.");
+  return "";
+}
+
+/** 이메일 꼴일 때만 받는다 — 화면에 `mailto:` 링크로 그대로 실린다 */
+function resolveContactEmail(): string {
+  const raw = (process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "").trim();
+  if (!raw) return "";
+  if (/^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(raw)) return raw;
+  console.error(`[env] NEXT_PUBLIC_CONTACT_EMAIL이 이메일 형식이 아니에요: ${JSON.stringify(raw)} — 연락처를 비웁니다.`);
+  return "";
+}
+
+/** 형식(`ca-pub-` + 숫자 16자리)이 맞을 때만 받는다 — 아니면 로그를 남기고 광고를 끈다 */
+function resolveAdsenseClient(): string {
+  const raw = (process.env.NEXT_PUBLIC_ADSENSE_CLIENT ?? "").trim();
+  if (!raw) return "";
+  if (/^ca-pub-\d{16}$/.test(raw)) return raw;
+  console.error(`[env] NEXT_PUBLIC_ADSENSE_CLIENT가 애드센스 게시자 ID 형식이 아니에요: ${JSON.stringify(raw)} — 광고를 끕니다.`);
+  return "";
+}
+
+/**
+ * 숫자일 때만 받는다 — 아니면 그 자리만 끈다.
+ * ⚠ 자릿수를 고정하지 않는다 — 흔히 10자리지만 애드센스가 자릿수를 약속하지 않아, 고정하면 맞는 ID가 조용히 꺼질 수 있다.
+ * ⚠ `process.env[name]`으로 읽지 않는다 — `NEXT_PUBLIC_*`는 **리터럴 접근만** 빌드 시점에 인라인된다(값을 호출부가 넘긴다).
+ */
+function resolveAdsenseSlot(name: string, value: string | undefined): string {
+  const raw = (value ?? "").trim();
+  if (!raw) return "";
+  if (/^\d{6,20}$/.test(raw)) return raw;
+  console.error(`[env] ${name}가 애드센스 광고 단위 ID 형식이 아니에요: ${JSON.stringify(raw)} — 그 자리를 끕니다.`);
   return "";
 }
 

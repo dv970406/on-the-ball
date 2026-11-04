@@ -101,6 +101,9 @@ function staticEntries(transfers: Date | undefined, days: Date | undefined): Met
     { url: absoluteUrl(ROUTES.transferClubs) },
     // 날짜 목록 — 가장 최근 날의 가장 늦은 보도 시각(그 목록에 실리는 항목의 최신 시각)
     withLastModified(absoluteUrl(ROUTES.transferDays), days),
+    // 서비스 소개 · 개인정보처리방침 — 정적 문서라 말할 수 있는 행 시각이 없다 → 생략한다
+    { url: absoluteUrl(ROUTES.about) },
+    { url: absoluteUrl(ROUTES.privacy) },
   ];
 }
 

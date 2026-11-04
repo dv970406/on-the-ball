@@ -23,11 +23,11 @@ import {
 import { PredictionCard } from "@/features/predict-deal";
 import { PushNudge, usePushNudge } from "@/features/push-notification";
 import { WatchToggle } from "@/features/watch-transfer";
-import { ROUTES } from "@/shared/config";
+import { ROUTES, env } from "@/shared/config";
 import type { CommentList } from "@/entities/comment";
 import type { DealPrediction } from "@/entities/prediction";
 import { cn, formatCount, formatRelativeTime, useNowMs } from "@/shared/lib";
-import { Dialog, EmptyState, SignInDialog, Skeleton, StaleBanner, chipClassName } from "@/shared/ui";
+import { AdSlot, Dialog, EmptyState, SignInDialog, Skeleton, StaleBanner, chipClassName } from "@/shared/ui";
 import { SubHeader } from "@/widgets/sub-header";
 import { useCommentDeletion } from "../model/use-comment-deletion";
 import { useShareWelcome } from "../model/use-share-welcome";
@@ -339,6 +339,11 @@ export function TransferDetailView({
 
               {/* ── 본문 — 넓은 화면의 왼쪽 열. DOM에서 곁 칸보다 **앞**이다(위 컴포넌트 주석의 읽는 순서) ── */}
               <div className="lg:col-start-1 lg:row-start-2 lg:min-w-0">
+                {/*
+                  광고 — 히어로(경로·이적료) 아래, 본문 앞. 모든 폭에서 보이는 자리다 — 아래 탭 패널은 좁은 화면에서 CSS로 가려져
+                  광고를 둘 수 없다(`AdSlot` 주석). 관심 토글·예측 버튼과는 카드 하나 이상 떨어져 있다.
+                */}
+                <AdSlot slot={env.adsenseSlots.dealDetail} className="mt-6 lg:mb-6 lg:mt-0" />
                 {/* 보도 흐름 — 넓은 화면에만 둔다(좁은 화면은 지금 배치를 바꾸지 않는다) */}
                 <section className={cn("hidden lg:block", wideCard)}>
                   <ReportFlowChart

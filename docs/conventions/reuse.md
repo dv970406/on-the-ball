@@ -228,6 +228,7 @@
 ## `@/shared/config`
 - `ROUTES` — 경로 헬퍼. **경로 문자열 하드코딩 금지**(`"/transfers"` ❌ → `ROUTES.transferList`).
   ⚠ 구단별·날짜별 화면은 `ROUTES.transferClubs`(`/transfers/club`) · `ROUTES.transferClub(code)` · `ROUTES.transferDays`(`/transfers/daily`) · `ROUTES.transferDay(dateKey)`다 — 정적 세그먼트(`club`·`daily`)를 끼워 딜 상세(`/transfers/[id]`)와 같은 깊이에 슬러그를 두지 않는다. 서브헤더 화면이라 탭바가 없다(`activeTabHref`가 세지 않는다).
+  ⚠ 서비스 소개·개인정보처리방침은 `ROUTES.about`(`/about`)·`ROUTES.privacy`(`/privacy`)다 — 조회 없는 정적 문서 화면(서브헤더 화면, 탭바 없음)이다. 개인정보처리방침은 **실제로 수집하는 항목만** 적는다 — 수집 항목·외부 서비스(위탁사)가 바뀌는 작업을 하면 그 문서(`views/privacy`)도 함께 고치고 시행일을 올린다.
   ⚠ 예측 랭킹은 `ROUTES.ranking`(`/ranking`)이다 — 탭이 아니라 서브헤더 화면이라 `activeTabHref`·`hasBottomBar`에 없다(데스크톱 상단 바의 내비에는 있다 — `activeNavHref`).
   ⚠ 이적시장은 **`ROUTES.transferList`**(`/transfers`) · `ROUTES.transfer(id)`(`/transfers/[id]`)다. 상세에는 탭바가 없다 — `activeTabHref`가 목록 경로만 센다.
   ⚠ `ROUTES.home`(`/`)은 화면이 아니라 이적시장으로의 리다이렉트다(`app/page.tsx`) — 링크 목적지로 쓰지 말고 실제 화면 경로를 쓴다.
@@ -243,9 +244,10 @@
 - **`avatarUrl(path)` / `AVATAR_BUCKET`** — 아바타 **경로** → 공개 URL. ⚠ DB에는 전체 URL이 아니라 경로만 저장한다(호스트가 환경마다 다르다: 로컬 `127.0.0.1:64321` ↔ 원격 `*.supabase.co`). 조립은 이 함수 한 곳에서만. 버킷명 문자열도 여기서 가져다 쓴다(`features/update-profile`이 선례).
 - **`publicStorageUrl(bucket, path)`**(`shared/config/storage.ts` — 배럴에 없다) — 공개 버킷 경로 → URL 조립의 **단일 소스**. 새 공개 버킷이 생기면 이 함수를 감싸는 버킷별 함수를 `shared/config`에 두고 그것을 배럴로 노출한다(`avatarUrl`이 선례). 호출부가 버킷 URL을 직접 조립하지 않는다.
 - **`OG_IMAGE` / `OG_SITE` / `NOT_FOUND_TITLE` / `absoluteUrl(path)`** — 세그먼트가 `openGraph`를 채울 때 함께 싣는 이미지·사이트 공통 값(`siteName`·`locale`), 없는 리소스의 메타데이터 제목(404 화면과 같아야 한다), 그리고 앱 경로 → 절대 URL. ⚠ `new URL(path, env.siteUrl)`을 호출부가 각자 짜지 말 것 — 사이트맵·`robots.txt`·`og:url` 셋이 **같은 URL**을 가리켜야 검색엔진·공유 플랫폼이 한 주소를 대표로 본다(canonical과도 같은 경로여야 한다).
-- **`env`** — `NEXT_PUBLIC_*` 환경변수의 단일 소스(`supabaseUrl`·`supabaseAnonKey`·`siteUrl`·`googleSiteVerification`·`naverSiteVerification`·`gaId`·`vapidPublicKey`·`kakaoJsKey`). **`process.env`를 호출부에서 다시 읽지 말 것** — `proxy.ts`가 화면·훅과 같은 supabase 인스턴스를 봐야 세션 쿠키가 어긋나지 않는다.
+- **`env`** — `NEXT_PUBLIC_*` 환경변수의 단일 소스(`supabaseUrl`·`supabaseAnonKey`·`siteUrl`·`googleSiteVerification`·`naverSiteVerification`·`gaId`·`vapidPublicKey`·`kakaoJsKey`·`adsenseClient`·`adsenseSlots`·`contactEmail`). **`process.env`를 호출부에서 다시 읽지 말 것** — `proxy.ts`가 화면·훅과 같은 supabase 인스턴스를 봐야 세션 쿠키가 어긋나지 않는다.
   - `siteUrl`은 `og:image`를 절대 URL로 만드는 `metadataBase`(루트 layout)용이다. `NEXT_PUBLIC_SITE_URL` → Vercel 주소(운영 배포는 `VERCEL_PROJECT_PRODUCTION_URL`, 프리뷰는 `VERCEL_URL`) → `localhost:3000` 순으로 폴백한다. ⚠ 운영에서 `VERCEL_URL`로 떨어뜨리지 않는다 — 배포마다 바뀌는 주소라 canonical·사이트맵이 배포마다 다른 URL을 가리킨다.
   - `gaId`는 GA4 측정 ID다 — 형식(`G-…`)이 아니면 빈 값으로 접힌다(깨진 스크립트를 싣느니 측정을 끈다).
+  - `contactEmail`은 운영자 연락처다 — 개인정보처리방침(보호책임자 연락처)과 서비스 소개(문의처)에 그대로 실린다. 법정 기재 사항이라 운영 빌드에는 반드시 채운다(비면 두 화면이 "준비 중"을 그린다).
   - `kakaoJsKey`는 카카오 **JavaScript 키**다(공유 버튼의 "카카오톡으로 공유") — 비어 있으면 그 항목을 그리지 않는다. ⚠ 소셜 로그인의 REST API 키와 다른 키이고, 카카오 개발자 콘솔에 등록한 사이트 도메인에서만 동작한다.
   - `vapidPublicKey`는 웹 푸시의 **공개키**다 — 비어 있으면 화면이 알림 자리를 그리지 않는다. ⚠ 짝이 되는 비밀키를 여기 두지 않는다(이 모듈은 클라이언트 번들에 실린다 — 발송 스크립트의 환경에만 있다).
 - **`TOKEN_COLORS`** — 디자인 토큰과 같은 값의 JS 색 상수. **CSS를 읽지 못하는 자리 전용**이다(딜 공유 카드 이미지 · 웹 앱 매니페스트). 화면 컴포넌트의 `style`에 쓰지 않는다. 단일 소스는 `globals.css`의 `@theme`이고 이건 그 사본이다 — 토큰 값을 바꾸면 함께 고친다.
@@ -253,7 +255,7 @@
 
 ## `@/shared/ui`
 **현역(지금 화면이 실제로 쓰는 것)** — 새로 만들기 전 여기부터 확인:
-`Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·`chipClassName`·`Dialog`·`SignInDialog`·`SignInLink`·`Sheet`·`SheetItem`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`·`StaleBanner`·`Crest`
+`Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·`chipClassName`·`Dialog`·`SignInDialog`·`SignInLink`·`Sheet`·`SheetItem`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`·`StaleBanner`·`Crest`·`AdSlot`·`SiteInfoLinks`
 
 **현재 미사용인 자산은 두지 않는다** — 호출부가 0인 export는 `pnpm check:conventions`가 막는다. 남겨야 할 이유가 있으면 사유와 함께 `scripts/check-conventions.mjs`의 `DOCUMENTED_UNUSED`에 적는다.
 
@@ -261,6 +263,8 @@
 > **이 문서의 존재 이유가 "새로 만들기 전 확인"이라 목록이 틀리면 문서가 없느니만 못하다.** UI를 추가·제거하면 여기부터 고친다.
 
 - **`Crest`** — 엠블럼류 이미지 + 하이드레이션 전 실패 감지 + 모노그램 폴백의 **공통 메커니즘**. `entities/transfer`의 `TransferCrest`가 이걸 감싼다(도메인 지식은 호출부가 `src`·`label`로 넘긴다). `"use client"` — 실패 감지가 `useEffect` + `onError`를 함께 쓴다. ⚠ `onError`만으로는 부족하다 — SSR HTML의 `<img>`는 **하이드레이션 전에** 실패할 수 있고 그러면 이벤트가 지나가 버린다(마운트 시 `complete && naturalWidth === 0`을 함께 확인하는 이유). `next/image`가 아니라 `<img>`다(`avatar.tsx`와 같은 판단 — 자산이 이미 목표 크기라 최적화 파이프라인이 줄 이득이 없다). ⚠ `Avatar`로 대신하지 말 것 — `rounded-full` + `object-cover`라 방패 모양 엠블럼의 모서리가 잘린다.
+- **`AdSlot({ slot })`** — 애드센스 수동 광고 자리 하나("광고" 라벨 + 높이 예약 + 스크립트 로드). `slot`은 `env.adsenseSlots`의 값이고, 게시자 ID나 `slot`이 비면 아무것도 그리지 않는다. ⚠ 광고 스크립트를 직접 싣거나 `adsbygoogle.push`를 호출부가 다시 짜지 말 것 — 경로가 바뀔 때 새 요소를 만드는 것과 이중 요청 방어가 이 컴포넌트에 있다. 둘 곳·두지 않을 곳은 `nextjs.md` 광고 절.
+- **`SiteInfoLinks`** — 화면 끝의 사이트 정보 링크(서비스 소개 · 개인정보처리방침). 사이트 공통 푸터가 없어 화면마다 자기 스크롤 영역 끝에 둔다(보드 · 프로필 · 두 문서 화면, 로그인 화면은 처리 고지 한 줄이 대신한다). ⚠ 개인정보처리방침은 **비로그인도 닿는 자리**에서 링크해야 한다(개인정보 보호법 제30조 · 애드센스 심사) — 보드에서 걷어내려면 비로그인이 닿는 다른 자리를 먼저 만든다.
 - `chipClassName(selected)` — 칩의 클래스만. **`rounded-sm`(6px)** 이다 — 칩이라고 알약이 아니다(`styling.md`). 이동이면 링크(`<Link>`, 이적 보드 필터는 `BoardLink`)에, 선택이면 `button`에 이 클래스를 입힌다(앵커 안에 `button`을 넣지 않는다). 분리 사유는 `Button`↔`buttonClassName`과 같다.
 - `Dialog` / `Sheet`(+`SheetItem`) — 확인 대화상자 / 하단 시트. 포커스 가둠은 `@/shared/lib`의 `useFocusTrap`.
   - `Sheet`는 화면 하단에 붙는 **edge-to-edge** 시트다(`styling.md`). "닫기" 행을 두지 않는다. 넓은 프레임(768px~)에서는 하단 가운데 최대폭 패널이 된다(`Dialog`도 가운데 최대폭 카드).

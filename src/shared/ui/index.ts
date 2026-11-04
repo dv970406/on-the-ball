@@ -24,3 +24,7 @@ export { SignInDialog } from "./sign-in-dialog";
 export { SignInLink } from "./sign-in-link";
 // 토스트의 상태(useToast·useToastStore)는 @/shared/lib에 있다 — ui는 뷰포트만 노출한다
 export { ToastViewport } from "./toast";
+// 애드센스 수동 광고 자리 — ID가 비면 그리지 않는다(둘 곳·두지 않을 곳은 ad-slot.tsx 주석)
+export { AdSlot } from "./ad-slot";
+// 화면 끝의 사이트 정보 링크(서비스 소개 · 개인정보처리방침) — 비로그인도 닿는 자리에 둔다(사유는 site-info-links.tsx 주석)
+export { SiteInfoLinks } from "./site-info-links";

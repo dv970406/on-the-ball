@@ -8,7 +8,7 @@
 
 - `app` — FSD app 레이어: `providers`(QueryClient + AuthProvider), `fonts`, `styles/globals.css`
 - `views` — 화면 조립. ⚠ **`pages` 금지** (Next Pages Router로 오감지됨 → 반드시 `views`)
-  sign-in / profile / transfer-board / transfer-detail / transfer-club-list / transfer-club / transfer-day-list / transfer-day / ranking
+  sign-in / profile / transfer-board / transfer-detail / transfer-club-list / transfer-club / transfer-day-list / transfer-day / ranking / about / privacy
 - `widgets` — top-bar / app-bar / bottom-tab-bar / sub-header / tab-scroll-area / auth-shell / auth-status / deal-panel
 - `features` — 사용자 액션 1개 = 슬라이스 1개
   sign-in(소셜 OAuth) / sign-out / link-identity / update-profile / watch-transfer /

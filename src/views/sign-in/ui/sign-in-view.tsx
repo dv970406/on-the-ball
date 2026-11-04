@@ -58,6 +58,21 @@ export function SignInView({
           >
             먼저 둘러볼게요
           </Link>
+          {/*
+            처리 고지 — 로그인하면 소셜 로그인 정보를 받는다. 무엇을 받는지는 개인정보처리방침이 갖는다(이 화면은 목적 하나만 드러낸다 —
+            안내는 한 줄로 둔다).
+          */}
+          <p className="mt-6 break-keep text-[12px] leading-[1.6] text-ink-mute">
+            로그인하면{" "}
+            <Link
+              href={ROUTES.privacy}
+              prefetch={false}
+              className="font-semibold text-ink-secondary underline decoration-hairline-strong underline-offset-[3px]"
+            >
+              개인정보처리방침
+            </Link>
+            에 따라 개인정보를 처리해요.
+          </p>
         </div>
       }
     >
