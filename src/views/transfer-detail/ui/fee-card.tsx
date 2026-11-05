@@ -1,6 +1,5 @@
-// ⚠ `"use client"`가 없다 — 상호작용이 없는 렌더러라 서버 렌더 여지를 남긴다(`architecture.md`).
-//    그래서 순수 함수는 배럴이 아니라 직접 경로로 가져온다(`credibility-badge.tsx`와 같은 이유).
-import { FeeDelta, FeeValue, type TransferDeal, clauseNote, feeKindLabel, formatFee, formatFeeRange, isLoanForm } from "@/entities/transfer";
+// ⚠ `"use client"`가 없다 — 상호작용이 없는 렌더러라 지시어를 달 이유가 없다. 지금 소비자는 클라이언트 뷰라 배럴로 가져온다.
+import { FeeDelta, FeeValue, type TransferDeal, addOnTerms, clauseNote, feeKindLabel, formatFee, formatFeeRange } from "@/entities/transfer";
 import { cn } from "@/shared/lib/cn";
 
 /** 값이 없는 칸 — 전부 같은 글자(`—`)로 말한다 */
@@ -26,13 +25,7 @@ interface FeeCardProps {
  */
 export function FeeCard({ deal, className }: FeeCardProps) {
   const fee = formatFee({ amount: deal.feeAmount, currency: deal.feeCurrency });
-  const addOn =
-    deal.feeAmount !== null && deal.addOnAmount !== null
-      ? {
-          add: formatFee({ amount: deal.addOnAmount, currency: deal.feeCurrency }),
-          max: formatFee({ amount: deal.feeAmount + deal.addOnAmount, currency: deal.feeCurrency }),
-        }
-      : null;
+  const addOn = addOnTerms(deal);
 
   const hasFee = fee !== null;
   const condition = hasFee ? clauseNote(deal) : null;
@@ -72,16 +65,16 @@ export function FeeCard({ deal, className }: FeeCardProps) {
             )}
           </p>
         )}
-        {/* 임대 계열 딜에는 "옵션 없음"을 그리지 않는다 — "완전 이적 옵션이 없다"로 읽힌다(조항은 조건 문구가 말한다) */}
-        {fee !== null && condition === null && !isLoanForm(deal.form) && (
+        {/* 조항 문구가 있으면 조항이 말한다 — 옵션 줄의 판정은 `addOnTerms` 하나다 */}
+        {addOn !== null && (
           <p className="mt-1.5 text-[12px] text-ink-mute">
-            {addOn !== null && addOn.add !== null && addOn.max !== null ? (
+            {addOn === "none" ? (
+              "옵션 없음"
+            ) : (
               <>
                 옵션 +<span className="font-mono tabular-nums">{addOn.add}</span> · 최대{" "}
                 <span className="font-mono tabular-nums">{addOn.max}</span>
               </>
-            ) : (
-              "옵션 없음"
             )}
           </p>
         )}

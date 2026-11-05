@@ -1,15 +1,10 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-
-/**
- * 넓은 화면 배치(`lg`)가 서 있는가를 가르는 쿼리 — Tailwind `lg`와 **단위까지** 같아야 한다(`64rem`).
- * ⚠ px로 쓰면 브라우저 글꼴을 키운 사용자에게 CSS(rem)와 판정이 갈린다 — 화면은 좁은 배치인데 역할만 넓은 배치가 된다.
- */
-const WIDE_QUERY = "(min-width: 64rem)";
+import { LG_MEDIA_QUERY } from "@/shared/config";
 
 const subscribe = (onChange: () => void) => {
-  const list = window.matchMedia(WIDE_QUERY);
+  const list = window.matchMedia(LG_MEDIA_QUERY);
   list.addEventListener("change", onChange);
   return () => list.removeEventListener("change", onChange);
 };
@@ -24,7 +19,7 @@ const subscribe = (onChange: () => void) => {
 export function useWideLayout(): boolean {
   return useSyncExternalStore(
     subscribe,
-    () => window.matchMedia(WIDE_QUERY).matches,
+    () => window.matchMedia(LG_MEDIA_QUERY).matches,
     () => false,
   );
 }

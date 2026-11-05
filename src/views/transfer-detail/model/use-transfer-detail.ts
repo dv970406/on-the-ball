@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { serverToClientTime } from "@/shared/lib";
+import { serverUpdatedAt } from "@/shared/lib";
 import {
   type TransferDeal,
   type TransferReport,
@@ -14,7 +14,7 @@ import {
   useDealPredictionQuery,
   withoutMyPredictions,
 } from "@/entities/prediction";
-import { useSessionStore } from "@/entities/session";
+import { useQueryScope } from "@/entities/session";
 
 interface UseTransferDetailArgs {
   dealId: number;
@@ -50,16 +50,13 @@ export function useTransferDetail({
   initialUserId,
   serverNowMs,
 }: UseTransferDetailArgs) {
-  const sessionStatus = useSessionStore((s) => s.status);
-  const storeUserId = useSessionStore((s) => s.user?.id);
   // 세션 복원 전에는 **서버가 알려준 사용자**를 키로 쓴다 — `transferKeys.detail`이 userId로
   // 스코프돼 있어(관심 임베딩이 "내 행만") 키가 갈리면 서버가 채운 캐시에 닿지 못한다.
-  const userId = sessionStatus === "loading" ? initialUserId : storeUserId;
+  const { status: sessionStatus, userId, ownsPrefetch } = useQueryScope(initialUserId);
 
   // 서버 시각을 기기 시계로 옮겨 넣는다 — 기기 시계와 빼서 신선도를 재기 때문이다(`serverToClientTime`).
   // ⚠ 모든 조회가 같은 값을 쓴다 — 뒤로가기가 되살린 옛 서버 페이로드를 신선한 것으로 앉히지 않는다
-  const initialDataUpdatedAt = () =>
-    serverNowMs === undefined ? undefined : serverToClientTime(serverNowMs);
+  const initialDataUpdatedAt = serverUpdatedAt(serverNowMs);
 
   /**
    * ⚠ 딜 단건은 `ownsPrefetch`로 가르지 않는다 — 개인화 값이 `isWatched` 하나뿐이고 그 값을 그리는
@@ -95,7 +92,6 @@ export function useTransferDetail({
    *   initialData로 넣으면 그 사람의 👍가 조회 왕복 동안 "내 표"로 남았다(QA 실측). 그때는 내 표를 지운
    *   사본을 자리 표시로만 쓰고 새로 받는다.
    */
-  const ownsPrefetch = userId === initialUserId;
   const commentsPlaceholder = useMemo(
     () => (!ownsPrefetch && initialComments ? withoutMyVotes(initialComments) : undefined),
     [ownsPrefetch, initialComments],
@@ -142,7 +138,7 @@ export function useTransferDetail({
      * ⚠ **`undefined`와 `[]`를 접지 않는다.** `undefined`는 "아직 조회하지 않았다 / 실패했다",
      *   `[]`는 "받았는데 보도가 없다"(재파생이 `deal_id`를 되돌린 창)로 뜻이 다르다.
      */
-    reports: { list: reportsQuery.data, error: reportsQuery.error },
+    reports: { list: reportsQuery.data, error: reportsQuery.error, refetch: reportsQuery.refetch },
     /** 댓글 목록 — 타임라인과 같은 곁다리 규약이다 */
     comments: {
       list: commentsQuery.data,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { type ReportSort, type TransferReport, ReportItem, sortReports } from "@/entities/transfer";
+import { type ReportSort, type TransferReport, ReportItem, sortReports, newestReportId } from "@/entities/transfer";
 import { cn } from "@/shared/lib";
 import { Skeleton, StaleBanner } from "@/shared/ui";
 
@@ -41,7 +41,7 @@ export function ReportTimeline({ reports, error, onRetry, nowMs }: ReportTimelin
   const [sort, setSort] = useState<ReportSort>("credibility");
   const sorted = useMemo(() => (reports ? sortReports(reports, sort) : undefined), [reports, sort]);
   // 레일의 잉크 점 — 정렬과 무관하게 가장 최근 보도 하나(서버가 최신순으로 주지만 순서에 기대지 않는다)
-  const latestId = useMemo(() => (reports ? sortReports(reports, "latest")[0]?.id : undefined), [reports]);
+  const latestId = useMemo(() => newestReportId(reports), [reports]);
 
   return (
     // ⚠ 첫 항목 위에는 선이 없다 — 탭 바의 아래 선이 그 자리를 맡는다(두 줄이 겹쳐 굵어 보인다)
@@ -57,7 +57,7 @@ export function ReportTimeline({ reports, error, onRetry, nowMs }: ReportTimelin
       {reports === undefined && error !== null && (
         <p className="py-3 text-[12px] text-ink-mute">
           보도를 불러오지 못했어요.{" "}
-          <button type="button" onClick={onRetry} className="underline underline-offset-2">
+          <button type="button" onClick={onRetry} className="hit-area underline underline-offset-2">
             다시 시도
           </button>
         </p>

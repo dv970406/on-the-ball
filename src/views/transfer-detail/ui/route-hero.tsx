@@ -7,6 +7,7 @@ import {
   destinationClubs,
   loanNote,
   routeLabels,
+  isLikelyDestination,
 } from "@/entities/transfer";
 import { cn } from "@/shared/lib/cn";
 import { Icon } from "@/shared/ui";
@@ -52,7 +53,7 @@ export function RouteHero({ deal, className }: { deal: TransferDeal; className?:
         <Icon as={ArrowRight} size={20} />
       </span>
       <HeroClub
-        label={deal.toClub === null && first !== null ? "TO · 유력" : "TO"}
+        label={isLikelyDestination(deal) ? "TO · 유력" : "TO"}
         club={first}
         text={first ? first.name : labels.to}
         note={rest > 0 ? `외 ${rest}곳` : (first?.league ?? undefined)}

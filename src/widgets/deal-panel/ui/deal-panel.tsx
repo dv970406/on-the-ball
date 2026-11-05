@@ -5,27 +5,26 @@ import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import {
   ContractTerms,
-  DealFormMark,
   DealInfoLine,
   DealRouteCard,
   FeeHighlight,
   ReportFlowChart,
   ReportItem,
-  StatusBadge,
   SuitorList,
   type TransferDealListItem,
   headlineReports,
   isSettledStage,
   playerName,
-  sortReports,
   useTransferReportsQuery,
+  newestReportId,
+  DealStatusLine,
 } from "@/entities/transfer";
 import { useDealPredictionQuery } from "@/entities/prediction";
 import { PredictionCard } from "@/features/predict-deal";
 import { PushNudge, usePushNudge } from "@/features/push-notification";
 import { WatchToggle } from "@/features/watch-transfer";
 import { ROUTES } from "@/shared/config";
-import { cn, formatCount, formatRelativeTime } from "@/shared/lib";
+import { cn, formatCount, } from "@/shared/lib";
 import { Icon, Skeleton, StaleBanner, buttonClassName } from "@/shared/ui";
 import { useDwell } from "./use-dwell";
 
@@ -93,25 +92,13 @@ export function DealPanel({ deal, userId, nowMs, active, onSignInRequired }: Dea
     [reports.data],
   );
   // 레일의 잉크 점은 **가장 최근 보도** 하나다(`ReportItem`) — 위 목록이 요약 있는 보도만 골랐으면 첫 항목이 최신이 아닐 수 있다
-  const newestId = useMemo(() => (reports.data ? sortReports(reports.data, "latest")[0]?.id : undefined), [reports.data]);
+  const newestId = useMemo(() => newestReportId(reports.data), [reports.data]);
 
   return (
     <section aria-labelledby={titleId} className="flex h-full min-h-0 flex-col bg-canvas">
       <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-8 pt-5">
         <header>
-          <div className="flex items-center gap-2">
-            <StatusBadge stage={deal.stage} />
-            {/* 형태 표지(임대) — 진전과 다른 축이라 뱃지 옆에 따로 선다. 완전 이적·모름은 그리지 않는다 */}
-            <DealFormMark deal={deal} />
-            {/* nowrap + flex-none — 뱃지가 길어져도 시각이 줄 바꿈되지 않는다 */}
-            <span className="ml-auto flex-none whitespace-nowrap text-[11px] text-ink-mute-2">
-              업데이트{" "}
-              <time dateTime={deal.latestReportedAt} className="font-mono tabular-nums">
-                {formatRelativeTime(deal.latestReportedAt, nowMs)}
-              </time>
-              {" · "}보도 <span className="font-mono tabular-nums">{formatCount(deal.reportCount)}</span>건
-            </span>
-          </div>
+          <DealStatusLine deal={deal} nowMs={nowMs} />
           <h2
             id={titleId}
             className="mt-3 text-pretty text-[26px] font-semibold leading-[1.2] tracking-[-0.8px] text-ink"
