@@ -1,16 +1,15 @@
 "use client";
 
 import { useMemo } from "react";
-import { serverToClientTime } from "@/shared/lib";
-import { useSessionStore } from "@/entities/session";
+import { serverUpdatedAt } from "@/shared/lib";
+import { useQueryScope } from "@/entities/session";
 import {
   TRANSFER_DEAL_LIMIT,
   type TransferClub,
   type TransferDealListItem,
   splitClubDeals,
   useTransferClubListQuery,
-  useTransferDealListQuery,
-  withoutWatches,
+  useSeededDealListQuery,
 } from "@/entities/transfer";
 
 interface UseClubBoardArgs {
@@ -42,26 +41,18 @@ export function useClubBoard({
   scopeStartIso,
   serverNowMs,
 }: UseClubBoardArgs) {
-  const sessionStatus = useSessionStore((s) => s.status);
-  const storeUserId = useSessionStore((s) => s.user?.id);
-  const userId = sessionStatus === "loading" ? initialUserId : storeUserId;
-  const initialDataUpdatedAt = () => (serverNowMs === undefined ? undefined : serverToClientTime(serverNowMs));
+  const { status: sessionStatus, userId, ownsPrefetch } = useQueryScope(initialUserId);
+  const initialDataUpdatedAt = serverUpdatedAt(serverNowMs);
 
   const clubsQuery = useTransferClubListQuery({ initialData: initialClubs, initialDataUpdatedAt });
 
-  const ownsPrefetch = userId === initialUserId;
-  const dealsPlaceholder = useMemo(
-    () => (!ownsPrefetch && initialDeals ? withoutWatches(initialDeals) : undefined),
-    [ownsPrefetch, initialDeals],
-  );
-  const dealsQuery = useTransferDealListQuery({
+  const dealsQuery = useSeededDealListQuery({
     userId,
     scopeStartIso,
-    // ⚠ 프리페치가 있으면 복원을 기다리지 않는다 — 기다리면 서버가 그린 HTML을 스켈레톤이 덮는다
-    enabled: initialDeals !== undefined || sessionStatus !== "loading",
-    initialData: ownsPrefetch ? initialDeals : undefined,
-    initialDataUpdatedAt,
-    placeholderData: dealsPlaceholder,
+    sessionRestored: sessionStatus !== "loading",
+    ownsPrefetch,
+    initialDeals,
+    initialDataUpdatedAt: serverUpdatedAt(serverNowMs),
   });
 
   const club = clubsQuery.data?.find((c) => c.code === code) ?? null;

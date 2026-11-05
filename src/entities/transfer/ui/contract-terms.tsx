@@ -1,8 +1,8 @@
 // ⚠ `"use client"`가 없다 — 상호작용이 없는 렌더러라 서버 렌더 여지를 남긴다(`architecture.md`)
 import type { ReactNode } from "react";
 import { cn } from "@/shared/lib/cn";
-import { dealFormLabel, isLoanForm } from "../lib/deal-form";
-import { feeKindLabel, formatFee } from "../lib/fee";
+import { dealFormLabel, } from "../lib/deal-form";
+import { addOnTerms, feeKindLabel, formatFee } from "../lib/fee";
 import type { TransferDeal } from "../model/types";
 
 /** 값이 없는 칸 — 전부 같은 글자(`—`)로 말한다 */
@@ -31,14 +31,11 @@ export function ContractTerms({ deal, className }: ContractTermsProps) {
   if (form !== null) rows.push({ label: "형태", value: <span className="font-sans">{form}</span> });
   if (deal.feeAmount !== null) {
     rows.push({ label: "이적료 성격", value: <span className="font-sans">{feeKindLabel(deal.feeKind, deal.loanClause)}</span> });
-    // 추가 지급(add-on) 줄 — 임대 계열 딜에는 두지 않는다. "옵션 없음"이 "완전 이적 옵션이 없다"로 읽혀 형태 줄의 조항과 부딪힌다
-    // (임대의 조항은 형태·금액 성격 줄이 말한다 — 대표 금액이 임대료여도 같다)
-    if (!isLoanForm(deal.form) && deal.feeKind !== "buy_clause") {
-      const add = fee(deal.addOnAmount);
-      const max = deal.addOnAmount === null ? null : fee(deal.feeAmount + deal.addOnAmount);
+    const addOn = addOnTerms(deal);
+    if (addOn !== null) {
       rows.push({
         label: "옵션",
-        value: add !== null && max !== null ? `+${add} · 최대 ${max}` : <span className="font-sans">없음</span>,
+        value: addOn === "none" ? <span className="font-sans">없음</span> : `+${addOn.add} · 최대 ${addOn.max}`,
       });
     }
   }

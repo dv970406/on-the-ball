@@ -1,8 +1,7 @@
 import { Heart, X } from "lucide-react";
-import type { TransferLeague, TransferSort, TransferTypeFilter } from "@/entities/transfer";
 import { cn } from "@/shared/lib";
 import { chipClassName, Icon } from "@/shared/ui";
-import { boardHref } from "../lib/board-href";
+import { type BoardQuery, boardHref } from "../lib/board-href";
 import type { ClubOption } from "../model/use-transfer-board";
 import { BoardLink } from "./board-link";
 
@@ -36,12 +35,8 @@ function FollowedClubMark() {
 
 interface ClubChipProps {
   option: ClubOption;
-  /** 지금 걸린 구단 필터(`?club=`) — 이 칩의 구단이면 켜진 칩이고, 누르면 풀린다 */
-  club: string | null;
-  league: TransferLeague | null;
-  sort: TransferSort;
-  watch: boolean;
-  type: TransferTypeFilter | null;
+  /** 지금 필터 — 이 칩의 구단이 걸려 있으면 켜진 칩이고, 누르면 풀린다 */
+  query: BoardQuery;
   /** 칩 크기 — 줄마다 다르다(칩 줄은 기본 칩, 레일은 작은 칩) */
   className?: string;
   /** 구단 이름 뒤에 딜 수를 붙인다(레일) */
@@ -49,11 +44,11 @@ interface ClubChipProps {
 }
 
 /** 구단 필터 칩 하나 — 누르면 그 구단으로 거르고, 켜진 칩을 다시 누르면 푼다. 다른 필터(리그·정렬·관심·형태)는 그대로 싣는다 */
-export function ClubChip({ option, club, league, sort, watch, type, className, showCount = false }: ClubChipProps) {
-  const on = club === option.code;
+export function ClubChip({ option, query, className, showCount = false }: ClubChipProps) {
+  const on = query.club === option.code;
   return (
     <BoardLink
-      href={boardHref({ league, sort, club: on ? null : option.code, watch, type })}
+      href={boardHref({ ...query, club: on ? null : option.code })}
       aria-current={on ? "page" : undefined}
       className={chipClassName(on, cn("inline-flex items-center gap-1 whitespace-nowrap", className))}
     >

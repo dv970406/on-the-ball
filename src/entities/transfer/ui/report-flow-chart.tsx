@@ -91,7 +91,7 @@ export function ReportFlowChart({ title, reports, error, onRetry, nowMs, classNa
       {reports === undefined && error !== null && (
         <p className="mt-3 text-[12px] text-ink-mute">
           보도를 불러오지 못했어요.{" "}
-          <button type="button" onClick={onRetry} className="underline underline-offset-2">
+          <button type="button" onClick={onRetry} className="hit-area underline underline-offset-2">
             다시 시도
           </button>
         </p>

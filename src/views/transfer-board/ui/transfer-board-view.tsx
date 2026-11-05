@@ -1,27 +1,27 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   TRANSFER_DEAL_LIMIT,
   type TransferClub,
   type TransferDealListItem,
   type TransferLeague,
 } from "@/entities/transfer";
-import { ROUTES, openTransferWindow, trackedTransferWindow } from "@/shared/config";
-import { RETURN_PATH_ATTR, cn, formatCount, useNowMs } from "@/shared/lib";
+import { LG_MEDIA_QUERY, ROUTES, openTransferWindow, trackedTransferWindow } from "@/shared/config";
+import { cn, formatCount, useReferenceNowMs } from "@/shared/lib";
 import { EmptyState, SignInDialog, SiteInfoLinks, StaleBanner } from "@/shared/ui";
 import { AppBar } from "@/widgets/app-bar";
 import { AuthStatus } from "@/widgets/auth-status";
 import { BottomTabBar } from "@/widgets/bottom-tab-bar";
-import { DealPanel } from "@/widgets/deal-panel";
 import { TabScrollArea } from "@/widgets/tab-scroll-area";
-import { boardHref } from "../lib/board-href";
-import { groupLayout } from "../lib/screen-order";
-import { keepBoardEntryOnSameUrlLink, navigateBoard, useBoardFilters } from "../model/use-board-filters";
+import { boardHref, withLeague } from "../lib/board-href";
+import { useBoardSignIn } from "../model/use-board-sign-in";
+import { navigateBoard, useBoardFilters } from "../model/use-board-filters";
 import { useDealSelection } from "../model/use-deal-selection";
 import { useTransferBoard } from "../model/use-transfer-board";
 import { BoardHeader } from "./board-header";
+import { BoardBrowseLinks, BoardEmpty } from "./board-list-parts";
+import { BoardPanelSlot } from "./board-panel-slot";
 import { BoardRail } from "./board-rail";
 import { BoardSections } from "./board-sections";
 import { FilterRail } from "./filter-rail";
@@ -32,7 +32,7 @@ import { LeagueSheet } from "./league-sheet";
 import { RumorCarousel } from "./rumor-carousel";
 import { SortLinks } from "./sort-links";
 import { TransferBoardSkeleton } from "./transfer-board-skeleton";
-import { SPLIT_QUERY, useDealSelect } from "./use-deal-select";
+import { useDealSelect } from "./use-deal-select";
 import { useGroupJump } from "./use-group-jump";
 import { useMediaQuery } from "./use-media-query";
 
@@ -51,13 +51,6 @@ interface TransferBoardViewProps {
   serverNowMs?: number;
   /** 보드 범위 시작(분 단위 ISO) — 서버가 쿼리 키·조회 조건에 쓴 값 그대로다 */
   scopeStartIso: string;
-}
-
-/** 로그인 안내 한 벌의 내용 — 문구(`~하려면`)와 로그인 뒤 돌아올 곳 */
-interface SignInPrompt {
-  action: string;
-  /** 없으면 지금 화면으로 돌아온다(`SignInDialog`) */
-  next?: string;
 }
 
 /**
@@ -101,65 +94,43 @@ export function TransferBoardView({
   scopeStartIso,
 }: TransferBoardViewProps) {
   // 필터(`?league=`·`?sort=`·`?club=`·`?watch=`·`?type=`)와 고른 딜(상세 경로 또는 `?deal=`)은 **주소가 소유한다** — SSR 첫 렌더부터 화면 안 이동까지 소스가 하나다
-  const { league, sort, club: requestedClub, watch, type, deal: requestedDeal } = useBoardFilters();
+  const { deal: requestedDeal, ...requested } = useBoardFilters();
+  const nowMs = useReferenceNowMs(serverNowMs);
 
-  // ⚠ **서버 시각이 우선이다** — `useNowMs()`는 세션당 한 번 고정되므로 클라 값을 앞에 두면
-  //   낡은 시계가 갓 받은 서버 시각을 이긴다(`data-and-state.md`). `??`가 단축평가라 훅은
-  //   먼저 무조건 부른다.
-  const clientNowMs = useNowMs();
-  const nowMs = serverNowMs ?? clientNowMs;
-
-  // 조회·대기 판정·파생(캐러셀·구간·건수)은 `model/use-transfer-board`가 소유한다
-  const { deals, rumors, groups, counts, filter, userId } = useTransferBoard({
+  // 조회·대기 판정·파생(캐러셀·구간·건수·필터 판정)은 `model/use-transfer-board`가 소유한다
+  const { deals, rumors, board, filter, userId } = useTransferBoard({
     initialDeals,
     initialFollowedClubs,
     initialUserId,
     scopeStartIso,
-    league,
-    sort,
-    club: requestedClub,
-    watch,
-    type,
+    requested,
     nowMs,
     serverNowMs,
   });
-  const { clubChips, club, watchedCount, loanCount, isGuest } = filter;
+  const { groups, layouts, counts, reportScale } = board;
+  const { clubChips, query, watchedCount, inLeagueCount, loanCount, showLoanFilter, showClubFilter, isGuest } = filter;
   const allDeals = deals.data;
-
-  // 구간마다의 화면 배치(소구간·열기 순) — 그리는 쪽과 판의 기본 선택이 **같은 결과**를 본다(`groupLayout`)
-  const layouts = useMemo(() => groups.map((group) => groupLayout(group, nowMs, sort)), [groups, nowMs, sort]);
 
   /**
    * 2분할이 서 있는가 — 서버·첫 렌더는 늘 `false`다. 판 자체는 이 값과 무관하게 그린다(아래) — 이 값은 판이 조회를 열어도
    * 되는가(`active`)와 선택 표시(`aria-current`·막대)·주소 정리만 가른다. 모바일에는 "고른 딜"이라는 상태가 없다.
    */
-  const split = useMediaQuery(SPLIT_QUERY);
-  const { selectedDeal, select } = useDealSelection({
+  const split = useMediaQuery(LG_MEDIA_QUERY);
+  const { selectedDeal, selectedId, railSelectedId, select } = useDealSelection({
     deals: allDeals,
     layouts,
     requested: requestedDeal,
-    league,
-    sort,
-    club,
-    watch,
-    type,
+    query,
     enabled: split,
   });
-  const selectedId = split ? (selectedDeal?.id ?? null) : null;
+  const signIn = useBoardSignIn({ query, selectedId });
 
   const [leagueSheetOpen, setLeagueSheetOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
-  // ⚠ 닫아도 내용은 남긴다 — 닫히는 애니메이션 동안 문구가 비면 글자가 깜빡인다
-  const [signInPrompt, setSignInPrompt] = useState<SignInPrompt>({ action: "" });
-  const [signInOpen, setSignInOpen] = useState(false);
-  // ⚠ 메모된 레일(`BoardRail`·`FilterRail`)에 내려가는 콜백은 `useCallback`으로 참조를 고정한다 — 행을 고를 때마다(J/K)
-  //   새 함수가 내려가면 `memo`가 헛돈다
-  const promptSignIn = useCallback((prompt: SignInPrompt) => {
-    setSignInPrompt(prompt);
-    setSignInOpen(true);
-  }, []);
+  // ⚠ 메모된 레일·띠에 내려가는 값은 참조를 고정한다 — 행을 고를 때마다(J/K) 새 값이 내려가면 `memo`가 헛돈다
   const openLeagueSheet = useCallback(() => setLeagueSheetOpen(true), []);
   const openGuide = useCallback(() => setGuideOpen(true), []);
+  const guideButton = useMemo(() => <GuideButton onClick={openGuide} />, [openGuide]);
   // 구간 점프·활성 칩 판정(DOM 메커니즘)은 `use-group-jump`가 소유한다
   const {
     panelRef,
@@ -176,43 +147,11 @@ export function TransferBoardView({
     onSelect: select,
   });
 
-  /** 보도 수 막대의 기준 — 지금 보이는 목록의 최댓값 */
-  const reportScale = useMemo(
-    () => groups.reduce((max, g) => g.deals.reduce((m, d) => Math.max(m, d.reportCount), max), 0),
-    [groups],
-  );
-
-  /** 리그는 URL이 소유한다 — `replace`라 뒤로가기 스택에 리그 변경이 쌓이지 않는다. 리그를 바꾸면 구단 필터는 푼다(다른 리그의 구단이다) */
+  /** 리그는 URL이 소유한다 — `replace`라 뒤로가기 스택에 리그 변경이 쌓이지 않는다 */
   const handleLeagueSelect = (next: TransferLeague | null) => {
     setLeagueSheetOpen(false);
-    if (next !== league) navigateBoard(boardHref({ league: next, sort, club: null, watch, type }), "replace");
+    if (next !== query.league) navigateBoard(boardHref(withLeague(query, next)), "replace");
   };
-  /**
-   * 판에 열린 딜(2분할일 때만) — 누르는 순간에 읽는다. 렌더 값을 콜백이 잡으면 행을 고를 때마다 콜백이 바뀌어 메모된 레일이
-   * 다시 그려진다 → 커밋 뒤에 ref로 옮겨 두고 클릭 핸들러에서만 읽는다(렌더 중에는 읽지 않는다).
-   */
-  // 왼쪽 레일에는 **관심 딜을 골랐을 때만** 고른 id를 내린다 — 레일이 표시하는 것은 관심 딜 목록 안의 선택뿐이라, 그 밖의 딜을
-  // 고를 때마다 바뀌는 값을 넘기면 메모된 레일이 J/K마다 다시 그려진다
-  const railSelectedId =
-    selectedId !== null && allDeals?.some((d) => d.id === selectedId && d.isWatched) ? selectedId : null;
-  const selectedIdRef = useRef(selectedId);
-  useEffect(() => {
-    selectedIdRef.current = selectedId;
-  }, [selectedId]);
-  /**
-   * 관심 딜 모아 보기의 로그인 안내.
-   * ⚠ `next`를 준다 — 누른 것이 "관심 딜만 보기"라, 로그인하고 돌아오면 그 필터가 걸려 있어야 다시 누르지 않는다.
-   * ⚠ 돌아올 주소에는 **판에 열린 딜**까지 싣는다(모바일에는 고른 딜이 없다). 기본값(`/transfers`)으로 두면 로그인하고
-   *   돌아왔을 때 필터가 풀리고 판이 첫 딜을 연다 — 주소에 딜이 없던 기본 선택도 id를 싣는다(로그인 뒤 목록이 달라져도 같은 딜이 열리게).
-   */
-  const promptWatchSignIn = useCallback(
-    () =>
-      promptSignIn({
-        action: "관심 딜을 모아 보려면",
-        next: boardHref({ league, sort, club, watch: true, type }, selectedIdRef.current),
-      }),
-    [promptSignIn, league, sort, club, type],
-  );
 
   // ⚠ `nowMs`가 `null`인 것은 서버 시각 없이 마운트된 하이드레이션 전 한 프레임뿐이다(이 앱의
   //   page는 늘 내려준다). 그 프레임은 첫 창 이름을 그리고 카운트다운을 미룬다.
@@ -272,7 +211,7 @@ export function TransferBoardView({
               openWindow={openWindow}
               totalCount={allDeals.length}
               serverNowMs={serverNowMs ?? null}
-              guide={<GuideButton onClick={openGuide} />}
+              guide={guideButton}
             />
 
             {/*
@@ -287,14 +226,14 @@ export function TransferBoardView({
                 <BoardRail
                   deals={allDeals}
                   clubs={clubChips}
-                  league={league}
-                  sort={sort}
-                  club={club}
-                  watch={watch}
-                  type={type}
+                  query={query}
+                  inLeagueCount={inLeagueCount}
+                  loanCount={loanCount}
+                  showLoanFilter={showLoanFilter}
+                  showClubFilter={showClubFilter}
                   isGuest={isGuest}
                   selectedId={railSelectedId}
-                  onWatchSignInRequired={promptWatchSignIn}
+                  onWatchSignInRequired={signIn.promptWatchSignIn}
                 />
               </div>
 
@@ -309,7 +248,7 @@ export function TransferBoardView({
                   windowLabel={trackedWindow.label}
                   openWindow={openWindow}
                   serverNowMs={serverNowMs ?? null}
-                  guide={<GuideButton onClick={openGuide} />}
+                  guide={guideButton}
                 />
 
                 {/* 카드 0장이면 섹션 자체를 그리지 않는다 — 빈 캡션이 첫 화면 세로 공간을 먹지 않게 */}
@@ -325,37 +264,20 @@ export function TransferBoardView({
                     counts={counts}
                     active={activeGroup}
                     onJump={jump}
-                    trailing={<SortLinks league={league} sort={sort} club={club} watch={watch} type={type} />}
+                    trailing={<SortLinks query={query} />}
                   />
                   <FilterRail
                     clubs={clubChips}
-                    club={club}
-                    league={league}
-                    sort={sort}
-                    watch={watch}
-                    type={type}
-                    loanCount={loanCount}
+                    query={query}
+                    showLoanFilter={showLoanFilter}
+                    showClubFilter={showClubFilter}
                     isGuest={isGuest}
                     onOpenLeague={openLeagueSheet}
-                    onWatchSignInRequired={promptWatchSignIn}
+                    onWatchSignInRequired={signIn.promptWatchSignIn}
                   />
 
                   {groups.length === 0 ? (
-                    // 관심 필터가 켜져 있고 담은 딜이 하나도 없으면 "조건에 안 맞는다"가 아니라 "아직 담지 않았다"다 —
-                    // 어디서 담는지를 함께 말한다. 담는 버튼은 딜 상세에도, 넓은 화면의 오른쪽 판에도 있어 "딜을 열고"로
-                    // 쓴다(폭과 무관하게 맞는 문구). 담은 딜은 있는데 리그·구단 조건에 걸러진 것이면 아래 문구다.
-                    watch && watchedCount === 0 ? (
-                      <EmptyState
-                        title="관심 목록이 비어 있어요"
-                        description={
-                          isGuest
-                            ? "로그인하고 딜을 열어 관심 목록에 담으면 여기에 모여요."
-                            : "딜을 열고 ‘관심 목록에 담기’를 누르면 여기에 모여요."
-                        }
-                      />
-                    ) : (
-                      <EmptyState title="조건에 맞는 딜이 없어요" />
-                    )
+                    <BoardEmpty watch={query.watch} watchedCount={watchedCount} isGuest={isGuest} />
                   ) : (
                     // J/K는 포커스가 이 목록 안에 있을 때만 듣는다(`useDealSelect`). 상자를 만들지 않아(`contents`) 구간의
                     // sticky 머리는 그대로 바깥 패널을 기준으로 붙는다
@@ -363,8 +285,8 @@ export function TransferBoardView({
                       <BoardSections
                         layouts={layouts}
                         nowMs={nowMs}
-                        sort={sort}
-                        expanded={watch || type !== null}
+                        sort={query.sort}
+                        expanded={query.watch || query.type !== null}
                         reportScale={reportScale}
                         selectedId={selectedId}
                       />
@@ -381,26 +303,7 @@ export function TransferBoardView({
                     </p>
                   )}
 
-                  {/*
-                    둘러보기 — 구단별·날짜별 화면으로 가는 길. 그 화면들은 검색 착지점이라 크롤러가 보드에서 찾아 들어갈 앵커가 있어야 한다
-                    (사이트맵만으로 두지 않는다). 프리페치를 끈다 — 동적 라우트라 뷰포트 프리페치가 받아 오는 것이 없다(`DealRow`와 같은 판단).
-                  */}
-                  <nav aria-label="이적시장 둘러보기" className="flex flex-wrap gap-x-5 px-5 pt-6">
-                    <Link
-                      href={ROUTES.transferClubs}
-                      prefetch={false}
-                      className="inline-flex min-h-11 items-center text-[13px] font-medium text-ink underline decoration-hairline-strong underline-offset-[3px] hover:decoration-ink"
-                    >
-                      구단별 이적시장
-                    </Link>
-                    <Link
-                      href={ROUTES.transferDays}
-                      prefetch={false}
-                      className="inline-flex min-h-11 items-center text-[13px] font-medium text-ink underline decoration-hairline-strong underline-offset-[3px] hover:decoration-ink"
-                    >
-                      날짜별 소식
-                    </Link>
-                  </nav>
+                  <BoardBrowseLinks />
                   {/*
                     사이트 정보 — 비로그인이 개인정보처리방침에 닿는 자리다(`SiteInfoLinks` 주석). 보드가 첫 화면이라 여기 둔다.
                   */}
@@ -421,31 +324,14 @@ export function TransferBoardView({
                 판에 딜이 열려 있는 동안 **로그인 뒤 돌아올 주소**를 단다(`RETURN_PATH_ATTR`) — 주소가 그 딜의 상세 경로라, 상단 바
                 "로그인"이 지금 주소로 돌아오면 보드가 아니라 상세가 뜬다. 판의 로그인 안내와 같은 보드 주소(`?deal=`)다.
               */}
-              <div
-                {...{ [RETURN_PATH_ATTR]: selectedId === null ? undefined : boardHref({ league, sort, club, watch, type }, selectedId) }}
-                onClickCapture={keepBoardEntryOnSameUrlLink}
-                className="hidden border-l border-hairline-cool lg:sticky lg:top-0 lg:block lg:h-[calc(100dvh-56px-env(safe-area-inset-top))] lg:self-start"
-              >
-                {selectedDeal ? (
-                  <DealPanel
-                    key={selectedDeal.id}
-                    deal={selectedDeal}
-                    userId={userId}
-                    nowMs={nowMs}
-                    active={split}
-                    onSignInRequired={(action) =>
-                      promptSignIn({ action, next: boardHref({ league, sort, club, watch, type }, selectedDeal.id) })
-                    }
-                  />
-                ) : (
-                  // 고를 딜이 없다(필터 결과 0건) — 빈 판 대신 이유를 한 줄로
-                  <EmptyState
-                    title="열어 볼 딜이 없어요"
-                    description="조건을 바꾸면 목록의 딜이 여기에 열려요."
-                    className="h-full"
-                  />
-                )}
-              </div>
+              <BoardPanelSlot
+                deal={selectedDeal}
+                returnPath={signIn.returnPath}
+                userId={userId}
+                nowMs={nowMs}
+                active={split}
+                onSignInRequired={signIn.promptPanelSignIn}
+              />
             </div>
           </div>
         )}
@@ -459,7 +345,7 @@ export function TransferBoardView({
       */}
       <LeagueSheet
         open={leagueSheetOpen}
-        league={league}
+        league={query.league}
         onSelect={handleLeagueSelect}
         onClose={() => setLeagueSheetOpen(false)}
       />
@@ -467,12 +353,7 @@ export function TransferBoardView({
       <GuideSheet open={guideOpen} onClose={() => setGuideOpen(false)} />
 
       {/* 로그인 안내 — 프레임 직속 자리에 한 벌(`Dialog`가 `absolute`다). 문구·돌아올 곳만 자리마다 다르다 */}
-      <SignInDialog
-        open={signInOpen}
-        onClose={() => setSignInOpen(false)}
-        action={signInPrompt.action}
-        next={signInPrompt.next}
-      />
+      <SignInDialog {...signIn.dialog} />
     </>
   );
 }

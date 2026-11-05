@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { TransferGroupKey } from "@/entities/transfer";
 import { preferredScrollBehavior } from "@/shared/lib";
+import { stickyBar, stickyBarHeight } from "../lib/scroll-area";
 
 /**
  * 구간 섹션의 id 규칙(`section#tm-g-{key}`) — `BoardSections`가 붙이고 여기가 찾는다.
@@ -62,7 +63,7 @@ export function useGroupJump(groupKeys: readonly TransferGroupKey[]) {
     });
     if (sections.length === 0) return;
 
-    const header = main.querySelector<HTMLElement>(":scope > header");
+    const header = stickyBar(main);
     let barHeight = -1;
     /** 띠(앱바 아래 ~ 스크롤 영역 위에서 40%)에 1px 이상 걸쳤는가 — 판정하는 순간의 좌표로 잰다 */
     const inBand = (el: HTMLElement) => {
@@ -146,7 +147,7 @@ export function useGroupJump(groupKeys: readonly TransferGroupKey[]) {
     const target = panel?.querySelector<HTMLElement>(`#${groupSectionId(key)}`);
     if (!panel || !main || !target) return;
 
-    const barHeight = main.querySelector<HTMLElement>(":scope > header")?.offsetHeight ?? 0;
+    const barHeight = stickyBarHeight(main);
     const top =
       target.getBoundingClientRect().top - main.getBoundingClientRect().top + main.scrollTop - barHeight;
 

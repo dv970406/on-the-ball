@@ -1,5 +1,6 @@
 import type { Database } from "@/types/database.types";
 import type { TransferDeal, TransferLoanClause } from "../model/types";
+import { isLoanForm } from "./deal-form";
 
 type TransferFeeKind = Database["public"]["Enums"]["transfer_fee_kind"];
 
@@ -156,4 +157,18 @@ export function formatFeeRange(
   return from.unit === to.unit
     ? `${symbol}${from.value}–${to.value}${to.unit}`
     : `${symbol}${from.value}${from.unit}–${to.value}${to.unit}`;
+}
+
+/**
+ * 추가 지급(옵션) 줄 — 이적료 카드와 계약 조건이 같은 판정을 쓴다. `null`이면 줄을 두지 않고, `"none"`이면 "없음"이다.
+ * ⚠ 임대 계열·조항 금액 딜에는 두지 않는다 — "옵션 없음"이 "완전 이적 옵션이 없다"로 읽혀 조항과 부딪힌다(조항은 형태·금액 성격이 말한다).
+ */
+export function addOnTerms(
+  deal: Pick<TransferDeal, "form" | "feeKind" | "feeAmount" | "feeCurrency" | "addOnAmount">,
+): { add: string; max: string } | "none" | null {
+  if (deal.feeAmount === null || isLoanForm(deal.form) || deal.feeKind === "buy_clause") return null;
+  if (deal.addOnAmount === null) return "none";
+  const add = formatFee({ amount: deal.addOnAmount, currency: deal.feeCurrency });
+  const max = formatFee({ amount: deal.feeAmount + deal.addOnAmount, currency: deal.feeCurrency });
+  return add !== null && max !== null ? { add, max } : "none";
 }

@@ -72,3 +72,10 @@ export function sortReports<
   const rank = new Map(reports.map((r) => [r, credibilityRank(credibilityOf(r))]));
   return reports.slice().sort((a, b) => (rank.get(b) ?? 0) - (rank.get(a) ?? 0) || latestFirst(a, b));
 }
+
+/** 가장 최근 보도의 id — 레일의 잉크 점은 정렬과 무관하게 이 보도 하나다(`ReportItem`). 상세와 판이 같은 보도에 점을 찍는다 */
+export function newestReportId<T extends Pick<TransferReport, "id" | "publishedAt" | "sourceId" | "attribution" | "attributedTo">>(
+  reports: readonly T[] | undefined,
+): T["id"] | undefined {
+  return reports ? sortReports(reports, "latest")[0]?.id : undefined;
+}

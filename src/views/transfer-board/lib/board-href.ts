@@ -40,6 +40,11 @@ export function boardHref(query: BoardQuery, deal: number | null = null): string
   return withFilters(ROUTES.transferList, query, deal);
 }
 
+/** 리그를 바꾼 보드 — 구단 필터는 푼다(다른 리그의 구단이다). 시트·레일이 같은 판정을 쓴다 */
+export function withLeague(query: BoardQuery, league: BoardQuery["league"]): BoardQuery {
+  return { ...query, league, club: null };
+}
+
 /**
  * 2분할(lg+)에서 판에 딜을 연 보드의 주소 — **그 딜의 상세 경로**(`/transfers/<id>`) + 지금 필터.
  *

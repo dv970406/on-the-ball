@@ -1,13 +1,9 @@
 "use client";
 
 import { useEffect, useRef, type MouseEvent, type RefObject } from "react";
-
-/**
- * 목록·상세 2분할이 서는 폭 — 이 폭부터 딜 링크의 일반 클릭이 이동이 아니라 선택이다.
- * ⚠ **rem이다** — CSS의 `lg:`(64rem)와 같은 단위여야 한다. px로 두면 브라우저 글꼴 크기를 키운 사용자에게서 둘이 갈려,
- *   판이 CSS로 숨겨진 폭인데 클릭은 선택으로 가로채져 상세로 갈 길이 없어진다.
- */
-export const SPLIT_QUERY = "(min-width: 64rem)";
+import { isPlainClick } from "@/shared/lib";
+import { LG_MEDIA_QUERY } from "@/shared/config";
+import { stickyBarHeight } from "../lib/scroll-area";
 
 /** 딜 링크의 표지 — `DealRow`·`DealMiniCard`·`RumorCard`·왼쪽 레일의 관심 딜이 링크에 단다 */
 const DEAL_LINK = "a[data-deal-id]";
@@ -38,7 +34,6 @@ let initialRowScrolled = false;
 const dealIdOf = (el: HTMLElement) => Number(el.dataset.dealId);
 const isShown = (el: Element) => el.getClientRects().length > 0;
 /** 스크롤 영역 위쪽에 붙은 sticky 바(모바일 앱바)의 높이 — 그 아래부터가 보이는 자리다 */
-const stickyBarHeight = (main: HTMLElement) => main.querySelector<HTMLElement>(":scope > header")?.offsetHeight ?? 0;
 
 /**
  * 행을 스크롤 영역(`main`) 안에 들인다 — 이미 보이면 그대로, 위로 벗어났으면 위에, 아래로 벗어났으면 아래에 붙인다.
@@ -102,11 +97,11 @@ function pickNext(all: HTMLAnchorElement[], selectedId: number | null, step: 1 |
  */
 export function useDealSelect({ enabled, selectedId, listRef, requestedId, onSelect }: UseDealSelectArgs) {
   const handleClickCapture = (e: MouseEvent<HTMLElement>) => {
-    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (!isPlainClick(e)) return;
     if (!(e.target instanceof Element)) return;
     const link = e.target.closest<HTMLAnchorElement>(DEAL_LINK);
     if (!link || !e.currentTarget.contains(link)) return;
-    if (!window.matchMedia(SPLIT_QUERY).matches) return;
+    if (!window.matchMedia(LG_MEDIA_QUERY).matches) return;
     const id = dealIdOf(link);
     if (!Number.isSafeInteger(id)) return;
     e.preventDefault();

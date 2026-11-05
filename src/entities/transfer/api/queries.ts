@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { SIGN_IN_REQUIRED_MESSAGE, requireBrowserSupabase, toDbErrorMessage } from "@/shared/api";
 import { parseKstDateKey } from "@/shared/lib";
@@ -25,6 +26,7 @@ import {
   buildClubList,
   buildDeal,
   buildDealListItem,
+  withoutWatches,
   buildFollowedClubs,
   buildReport,
 } from "./mappers";
@@ -88,6 +90,39 @@ export function useTransferDealListQuery({
       return (data ?? []).map(buildDealListItem);
     },
     enabled,
+  });
+}
+
+interface UseSeededDealListQueryArgs {
+  userId: string | undefined;
+  scopeStartIso: string;
+  /** 세션 복원이 끝났는가 — 프리페치가 없으면 끝난 뒤에 연다 */
+  sessionRestored: boolean;
+  /** 서버가 본 사용자와 지금 사용자가 같은가(`useQueryScope`) */
+  ownsPrefetch: boolean;
+  initialDeals?: TransferDealListItem[];
+  initialDataUpdatedAt?: () => number | undefined;
+}
+
+/**
+ * 서버 프리페치로 시드한 딜 목록 — 보드와 구단 화면이 같은 키를 쓰므로 시드 규칙도 하나다.
+ *
+ * ⚠ 서버가 다른 사용자로 읽은 목록은 캐시에 넣지 않고 관심 표시를 지운 사본을 자리 표시로만 쓴다 — 넣으면 옛 사용자의 관심 표시가 새 키에 앉아
+ *   **두 화면이 함께** 오염된다(`nextjs.md` 서버 프리페치 절).
+ * ⚠ 프리페치가 있으면 복원을 기다리지 않는다 — 기다리면 서버가 그린 HTML을 스켈레톤이 덮는다.
+ */
+export function useSeededDealListQuery({ userId, scopeStartIso, sessionRestored, ownsPrefetch, initialDeals, initialDataUpdatedAt }: UseSeededDealListQueryArgs) {
+  const placeholderData = useMemo(
+    () => (!ownsPrefetch && initialDeals ? withoutWatches(initialDeals) : undefined),
+    [ownsPrefetch, initialDeals],
+  );
+  return useTransferDealListQuery({
+    userId,
+    scopeStartIso,
+    enabled: initialDeals !== undefined || sessionRestored,
+    initialData: ownsPrefetch ? initialDeals : undefined,
+    initialDataUpdatedAt,
+    placeholderData,
   });
 }
 
@@ -172,7 +207,7 @@ const CLUB_LIST_STALE_MS = 60 * 60_000;
  */
 interface UseTransferClubListQueryArgs extends PrefetchFreshness {
   enabled?: boolean;
-  /** 서버 프리페치 — 구단별 화면이 익명으로 받아 내린다("나"와 무관하다) */
+/** 서버 프리페치 — 구단별 화면이 익명으로 받아 내린다("나"와 무관하다) */
   initialData?: TransferClub[];
 }
 

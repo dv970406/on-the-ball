@@ -27,12 +27,20 @@ export function parseTransferSort(value: string | undefined): TransferSort {
  *   그 리그 구단들이 노리는 딜이 사라졌다. 구단 칩은 리그 안의 딜에서 만들므로 두 판정이 갈리면 칩을 눌러도 딜이 나오지 않는다.
  * ⚠ 구단이 `null`(미확인)이거나 5대 리그 밖(`league` null)이면 그 자리로는 일치하지 않는다.
  */
+/**
+ * 딜에 걸린 구단 전부 — 출발·행선지·지금 임대로 뛰는 구단·관심 구단. 리그 필터·구단 필터·구단 칩·구단 화면이 **같은 자리**를 봐야 한다 —
+ * 갈리면 칩을 눌러도 딜이 나오지 않는다. 자리마다 뜻이 다른 판정(`clubDealSide`)은 이 함수의 대상이 아니다.
+ */
+export function dealClubs(deal: Pick<TransferDeal, "fromClub" | "toClub" | "suitors" | "loanClub">) {
+  return [deal.fromClub, deal.toClub, deal.loanClub, ...deal.suitors].filter((c) => c !== null);
+}
+
 export function dealInLeague(
   deal: Pick<TransferDeal, "fromClub" | "toClub" | "suitors" | "loanClub">,
   league: TransferLeague | null,
 ): boolean {
   if (league === null) return true;
-  return [deal.fromClub, deal.toClub, deal.loanClub, ...deal.suitors].some((c) => c?.league === league);
+  return dealClubs(deal).some((c) => c.league === league);
 }
 
 /** 구단 코드의 형식 — `transfer_club.code`(엠블럼 파일명과 같은 slug) */
@@ -68,5 +76,5 @@ export function dealHasClub(
   club: string | null,
 ): boolean {
   if (club === null) return true;
-  return deal.fromClub?.code === club || deal.toClub?.code === club || deal.loanClub?.code === club || deal.suitors.some((c) => c.code === club);
+  return dealClubs(deal).some((c) => c.code === club);
 }

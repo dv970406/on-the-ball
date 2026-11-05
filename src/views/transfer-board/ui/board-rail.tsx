@@ -8,15 +8,12 @@ import {
   FeeValue,
   playerName,
   StatusBadge,
-  isLoanForm,
   type TransferDealListItem,
-  type TransferLeague,
-  type TransferSort,
   type TransferTypeFilter,
 } from "@/entities/transfer";
 import { ROUTES } from "@/shared/config";
 import { cn, formatCount } from "@/shared/lib";
-import { boardHref } from "../lib/board-href";
+import { type BoardQuery, boardHref, withLeague } from "../lib/board-href";
 import { LEAGUE_OPTIONS } from "../lib/league-options";
 import type { ClubOption } from "../model/use-transfer-board";
 import { BoardLink } from "./board-link";
@@ -26,16 +23,45 @@ import { ClearFilterMark, ClubChip } from "./chip-marks";
 const RAIL_ON =
   "bg-canvas-soft after:absolute after:inset-y-0 after:left-0 after:w-[2px] after:bg-ink after:content-['']";
 
+/** 레일의 절 제목 */
+const RAIL_HEADING = "text-[12px] font-medium text-ink-mute";
+
+/** 레일의 선택 목록 한 벌(리그·형태) — 라벨 · 건수, 고르면 주소만 바꾼다(`BoardLink`) */
+function RailOptionList({ options }: { options: { label: string; count: number; on: boolean; href: string }[] }) {
+  return (
+    <ul>
+      {options.map(({ label, count, on, href }) => (
+        <li key={label} className={cn("relative", on && RAIL_ON)}>
+          <BoardLink
+            href={href}
+            aria-current={on ? "page" : undefined}
+            className={cn(
+              "flex items-center justify-between px-4 py-[7px] text-[13.5px] transition-colors duration-150 ease-otb hover:bg-canvas-soft",
+              on ? "font-medium text-ink" : "text-ink-secondary",
+            )}
+          >
+            {label}
+            <span className="font-mono text-[12px] tabular-nums text-ink-mute-2">{formatCount(count)}</span>
+          </BoardLink>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 interface BoardRailProps {
   /** 보드 전체(필터 무관) — 리그 건수·관심 딜이 이 목록에서 나온다 */
   deals: readonly TransferDealListItem[];
   /** 칩으로 그릴 구단 — 응원 구단이 앞, 그 뒤는 딜 수 순. 고르는 판정은 `useTransferBoard`가 갖는다(`FilterRail`과 같은 결과) */
   clubs: readonly ClubOption[];
-  league: TransferLeague | null;
-  sort: TransferSort;
-  club: string | null;
-  watch: boolean;
-  type: TransferTypeFilter | null;
+  /** 지금 필터 — URL이 소유하고, 구단은 보드에 실제로 있는 구단만 온다(`useTransferBoard`) */
+  query: BoardQuery;
+  /** 형태 절의 건수와 노출 — 판정은 모델이 갖는다(`FilterRail`의 임대 칩과 같은 판정) */
+  inLeagueCount: number;
+  loanCount: number;
+  showLoanFilter: boolean;
+  /** 구단 절을 그리는가 — 위와 같다 */
+  showClubFilter: boolean;
   isGuest: boolean;
   /** 오른쪽 판에 열린 딜 — 관심 딜 목록에서 같은 딜을 표시한다 */
   selectedId: number | null;
@@ -64,15 +90,16 @@ interface BoardRailProps {
 export const BoardRail = memo(function BoardRail({
   deals,
   clubs,
-  league,
-  sort,
-  club,
-  watch,
-  type,
+  query,
+  inLeagueCount,
+  loanCount,
+  showLoanFilter,
+  showClubFilter,
   isGuest,
   selectedId,
   onWatchSignInRequired,
 }: BoardRailProps) {
+  const { league, watch, type } = query;
   const watched = useMemo(() => deals.filter((d) => d.isWatched), [deals]);
   // 리그별 건수 — 행을 고를 때마다 레일도 다시 그려지므로 보드가 바뀔 때만 센다
   const leagueCounts = useMemo(
@@ -82,14 +109,9 @@ export const BoardRail = memo(function BoardRail({
       ),
     [deals],
   );
-  // 형태 건수는 고른 리그 안에서 센다 — 가로 칩 줄(`FilterRail`)과 같은 기준이다(리그 안에 임대가 없으면 항목을 그리지 않는다 — 누르면 빈 보드다)
-  const { inLeague, loanCount } = useMemo(() => {
-    const scoped = deals.filter((d) => dealInLeague(d, league));
-    return { inLeague: scoped.length, loanCount: scoped.filter((d) => isLoanForm(d.form)).length };
-  }, [deals, league]);
   // 형태 목록 — 리그 목록과 같은 모양(값 · 라벨 · 건수)
   const typeOptions: { value: TransferTypeFilter | null; label: string; count: number }[] = [
-    { value: null, label: "전체", count: inLeague },
+    { value: null, label: "전체", count: inLeagueCount },
     { value: "loan", label: "임대", count: loanCount },
   ];
 
@@ -97,7 +119,7 @@ export const BoardRail = memo(function BoardRail({
     <aside aria-label="관심 딜·필터" className="py-4">
       <section aria-labelledby="tm-rail-watch" className="pb-[18px]">
         <div className="flex items-baseline justify-between px-4 pb-2">
-          <h2 id="tm-rail-watch" className="text-[12px] font-medium text-ink-mute">
+          <h2 id="tm-rail-watch" className={RAIL_HEADING}>
             관심 딜
             {!isGuest && (
               <span className="ml-1.5 font-mono text-[11px] tabular-nums text-ink-mute-2">{watched.length}</span>
@@ -105,7 +127,7 @@ export const BoardRail = memo(function BoardRail({
           </h2>
           {(!isGuest || watch) && (
             <BoardLink
-              href={boardHref({ league, sort, club, watch: !watch, type })}
+              href={boardHref({ ...query, watch: !watch })}
               aria-current={watch ? "page" : undefined}
               className={cn(
                 "inline-flex items-center gap-0.5 text-[11.5px] transition-colors duration-150 ease-otb",
@@ -168,64 +190,39 @@ export const BoardRail = memo(function BoardRail({
       </section>
 
       <section aria-labelledby="tm-rail-league" className="pb-[18px]">
-        <h2 id="tm-rail-league" className="px-4 pb-2 text-[12px] font-medium text-ink-mute">
+        <h2 id="tm-rail-league" className={cn(RAIL_HEADING, "px-4 pb-2")}>
           리그
         </h2>
-        <ul>
-          {LEAGUE_OPTIONS.map(({ value, label }, i) => {
-            const on = value === league;
-            const count = leagueCounts[i];
-            return (
-              <li key={label} className={cn("relative", on && RAIL_ON)}>
-                <BoardLink
-                  href={boardHref({ league: value, sort, club: null, watch, type })}
-                  aria-current={on ? "page" : undefined}
-                  className={cn(
-                    "flex items-center justify-between px-4 py-[7px] text-[13.5px] transition-colors duration-150 ease-otb hover:bg-canvas-soft",
-                    on ? "font-medium text-ink" : "text-ink-secondary",
-                  )}
-                >
-                  {label}
-                  <span className="font-mono text-[12px] tabular-nums text-ink-mute-2">{formatCount(count)}</span>
-                </BoardLink>
-              </li>
-            );
-          })}
-        </ul>
+        <RailOptionList
+          options={LEAGUE_OPTIONS.map(({ value, label }, i) => ({
+            label,
+            count: leagueCounts[i],
+            on: value === league,
+            href: boardHref(withLeague(query, value)),
+          }))}
+        />
       </section>
 
-      {(loanCount > 0 || type !== null) && (
+      {showLoanFilter && (
         <section aria-labelledby="tm-rail-type" className="pb-[18px]">
-          <h2 id="tm-rail-type" className="px-4 pb-2 text-[12px] font-medium text-ink-mute">
+          <h2 id="tm-rail-type" className={cn(RAIL_HEADING, "px-4 pb-2")}>
             형태
           </h2>
-          <ul>
-            {typeOptions.map(({ value, label, count }) => {
-              const on = value === type;
-              return (
-                <li key={label} className={cn("relative", on && RAIL_ON)}>
-                  <BoardLink
-                    href={boardHref({ league, sort, club, watch, type: value })}
-                    aria-current={on ? "page" : undefined}
-                    className={cn(
-                      "flex items-center justify-between px-4 py-[7px] text-[13.5px] transition-colors duration-150 ease-otb hover:bg-canvas-soft",
-                      on ? "font-medium text-ink" : "text-ink-secondary",
-                    )}
-                  >
-                    {label}
-                    <span className="font-mono text-[12px] tabular-nums text-ink-mute-2">{formatCount(count)}</span>
-                  </BoardLink>
-                </li>
-              );
-            })}
-          </ul>
+          <RailOptionList
+            options={typeOptions.map(({ value, label, count }) => ({
+              label,
+              count,
+              on: value === type,
+              href: boardHref({ ...query, type: value }),
+            }))}
+          />
         </section>
       )}
 
-      {(clubs.length >= 2 || club !== null) && (
+      {showClubFilter && (
         <section aria-labelledby="tm-rail-club">
           <div className="flex items-baseline justify-between px-4 pb-2">
-            <h2 id="tm-rail-club" className="text-[12px] font-medium text-ink-mute">
+            <h2 id="tm-rail-club" className={RAIL_HEADING}>
               구단
             </h2>
             {clubs.some((o) => o.followed) && (
@@ -237,11 +234,7 @@ export const BoardRail = memo(function BoardRail({
               <ClubChip
                 key={o.code}
                 option={o}
-                club={club}
-                league={league}
-                sort={sort}
-                watch={watch}
-                type={type}
+                query={query}
                 className="px-[9px] py-[7px] text-[12.5px]"
                 showCount
               />

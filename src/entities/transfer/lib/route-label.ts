@@ -1,10 +1,19 @@
 import type { TransferClub, TransferDeal } from "../model/types";
+import { isDeadStage, isSettledStage } from "./stage";
 
 /**
  * 이름을 적는 구단 수의 상한 — 그 뒤는 `외 N`으로 센다. `CrestStack`이 겹치는 엠블럼 수도 이 값이라
  * 엠블럼 세 개와 이름 세 개가 **같은 구단**을 가리키고 `+N`과 `외 N`이 같은 수다.
  */
 export const ROUTE_CLUB_LIMIT = 3;
+
+/**
+ * 행선지 자리의 구단을 "유력"이라 말할 수 있는가 — 확실한 행선지 없이 관심 구단만 있는 **살아 있는** 루머뿐이다.
+ * 결렬·부인은 유력하지 않고, 결과가 난 딜은 "유력"이 아니다. 목록 행과 상세 히어로가 같은 딜에 다른 말을 하지 않게 이 판정 하나를 쓴다.
+ */
+export function isLikelyDestination(deal: Pick<TransferDeal, "toClub" | "suitors" | "stage">): boolean {
+  return deal.toClub === null && deal.suitors.length > 0 && !isDeadStage(deal.stage) && !isSettledStage(deal.stage);
+}
 
 /**
  * 행선지 자리에 놓을 구단들 — 확실한 행선지가 있으면 그것을 앞에, 그 밖의 관심 구단을 뒤에. 관심 구단만 있는 루머는 그 전부.

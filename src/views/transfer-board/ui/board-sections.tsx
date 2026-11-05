@@ -88,7 +88,7 @@ export function BoardSections({ layouts, nowMs, sort, expanded, reportScale, sel
               <span className="font-mono text-[12px] tabular-nums text-ink-mute">{group.deals.length}</span>
             </h2>
             {carousel && (
-              <ul className="no-scrollbar flex snap-x snap-mandatory gap-2.5 overflow-x-auto scroll-px-5 px-5 pb-1 pt-3 md:hidden">
+              <ul className="no-scrollbar flex snap-x snap-mandatory gap-2.5 overflow-x-auto overflow-y-hidden scroll-px-5 px-5 pb-1 pt-3 md:hidden">
                 {group.deals.map((deal) => (
                   <DealMiniCard key={deal.id} deal={deal} nowMs={nowMs} />
                 ))}

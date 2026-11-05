@@ -2,10 +2,9 @@
 
 import { Bell, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { memo, type MouseEvent } from "react";
-import type { TransferLeague, TransferSort, TransferTypeFilter } from "@/entities/transfer";
 import { cn } from "@/shared/lib";
 import { chipClassName, Icon } from "@/shared/ui";
-import { boardHref } from "../lib/board-href";
+import { type BoardQuery, boardHref } from "../lib/board-href";
 import { leagueLabel } from "../lib/league-options";
 import type { ClubOption } from "../model/use-transfer-board";
 import { BoardLink } from "./board-link";
@@ -15,16 +14,12 @@ import { useRailOverflow } from "./use-rail-overflow";
 interface FilterRailProps {
   /** 칩으로 그릴 구단 — 내 응원 구단이 앞, 그 뒤는 딜 수 많은 순. 고르는 판정(상한·선택된 구단)은 `useTransferBoard`가 갖는다 */
   clubs: readonly ClubOption[];
-  /** 선택된 구단 코드 — URL이 소유한다(`?club=`). `null`은 전체 */
-  club: string | null;
-  league: TransferLeague | null;
-  sort: TransferSort;
-  /** 관심 딜만 보는가 — URL이 소유한다(`?watch=1`) */
-  watch: boolean;
-  /** 형태 필터 — URL이 소유한다(`?type=loan`). `null`은 전부 */
-  type: TransferTypeFilter | null;
-  /** 리그 안의 임대 딜 수 — 0이면 임대 칩을 그리지 않는다(누르면 빈 보드다). 켜져 있으면 풀 길이 있어야 하므로 그린다 */
-  loanCount: number;
+  /** 지금 필터 — URL이 소유하고, 구단은 보드에 실제로 있는 구단만 온다(`useTransferBoard`) */
+  query: BoardQuery;
+  /** 임대 칩을 그리는가 — 판정은 모델이 갖는다(왼쪽 레일과 같은 판정) */
+  showLoanFilter: boolean;
+  /** 구단 칩을 그리는가 — 위와 같다 */
+  showClubFilter: boolean;
   /** 비로그인인가(복원 전에는 서버가 본 사용자로 판정한다 — `useTransferBoard`) — 관심 칩이 필터 대신 로그인 안내를 연다 */
   isGuest: boolean;
   onOpenLeague: () => void;
@@ -90,18 +85,14 @@ const PAGER =
  */
 export const FilterRail = memo(function FilterRail({
   clubs,
-  club,
-  league,
-  sort,
-  watch,
-  type,
-  loanCount,
+  query,
+  showLoanFilter,
+  showClubFilter,
   isGuest,
   onOpenLeague,
   onWatchSignInRequired,
 }: FilterRailProps) {
-  // `club`은 보드에 실제로 있는 구단만 온다(`useTransferBoard`) — 그래서 선택이 있으면 칩 목록에도 있다
-  const showClubChips = clubs.length >= 2 || club !== null;
+  const { league, watch, type } = query;
   const { ref: railRef, back, forward, page } = useRailOverflow<HTMLElement>();
   const fade = back && forward ? RAIL_FADE.both : back ? RAIL_FADE.back : forward ? RAIL_FADE.forward : null;
 
@@ -124,7 +115,7 @@ export const FilterRail = memo(function FilterRail({
       <button
         type="button"
         onClick={onOpenLeague}
-        className="inline-flex h-[33px] flex-none items-center gap-1 whitespace-nowrap rounded-sm border border-hairline-strong bg-canvas pl-3 pr-2.5 text-[13px] font-medium text-ink transition-colors duration-150 ease-otb active:bg-canvas-soft"
+        className="hit-area inline-flex h-[33px] flex-none items-center gap-1 whitespace-nowrap rounded-sm border border-hairline-strong bg-canvas pl-3 pr-2.5 text-[13px] font-medium text-ink transition-colors duration-150 ease-otb active:bg-canvas-soft"
       >
         {leagueLabel(league)}
         <Icon as={ChevronDown} size={14} />
@@ -135,13 +126,14 @@ export const FilterRail = memo(function FilterRail({
       {/* 칩 줄 + 넘기기 버튼(md+)의 자리 — 버튼이 줄 양 끝에 겹친다 */}
       <div className="relative -mr-5 flex min-w-0">
         {/* ⚠ `overflow-y-hidden` — `overflow-x-auto`만 주면 세로도 auto가 되어, 스크롤바가 보이는 폭에서 1px 넘침에 세로 스크롤바 토막이 선다 */}
+        {/* ⚠ `py-[5.5px] -my-[5.5px]` — 그 `overflow-y-hidden`이 칩의 `hit-area`(44px)를 자르지 않게 잘림 경계를 44px까지 넓힌다(겉 위치는 그대로) */}
         <nav
           ref={railRef}
           aria-label="관심·구단 필터"
           className={cn(
             // md+의 `scroll-px-10`: Tab으로 칩을 옮기면 브라우저가 그 칩을 보이는 끝까지만 끌어오는데, 그 자리가 양 끝의 흐림(40px)과
             // 넘기기 버튼 밑이라 포커스 링이 가려진다 — 끌어올 때 그만큼 안쪽에 세운다
-            "no-scrollbar flex min-w-0 gap-1.5 overflow-x-auto overflow-y-hidden pr-5 md:scroll-px-10 md:[scrollbar-width:none] md:[&::-webkit-scrollbar]:hidden",
+            "no-scrollbar -my-[5.5px] flex min-w-0 gap-1.5 overflow-x-auto overflow-y-hidden py-[5.5px] pr-5 md:scroll-px-10 md:[scrollbar-width:none] md:[&::-webkit-scrollbar]:hidden",
             fade,
           )}
         >
@@ -157,7 +149,7 @@ export const FilterRail = memo(function FilterRail({
             </button>
           ) : (
             <BoardLink
-              href={boardHref({ league, sort, club, watch: !watch, type })}
+              href={boardHref({ ...query, watch: !watch })}
               aria-current={watch ? "page" : undefined}
               className={chipClassName(watch, CHIP_LAYOUT)}
             >
@@ -165,9 +157,9 @@ export const FilterRail = memo(function FilterRail({
             </BoardLink>
           )}
 
-          {(loanCount > 0 || type !== null) && (
+          {showLoanFilter && (
             <BoardLink
-              href={boardHref({ league, sort, club, watch, type: type === null ? "loan" : null })}
+              href={boardHref({ ...query, type: type === null ? "loan" : null })}
               aria-current={type !== null ? "page" : undefined}
               className={chipClassName(type !== null, CHIP_LAYOUT)}
             >
@@ -176,8 +168,7 @@ export const FilterRail = memo(function FilterRail({
             </BoardLink>
           )}
 
-          {showClubChips &&
-            clubs.map((o) => <ClubChip key={o.code} option={o} club={club} league={league} sort={sort} watch={watch} type={type} />)}
+          {showClubFilter && clubs.map((o) => <ClubChip key={o.code} option={o} query={query} />)}
         </nav>
         {back && (
           <button type="button" tabIndex={-1} aria-hidden onMouseDown={keepFocus} onClick={() => page(-1)} className={cn(PAGER, "left-0")}>

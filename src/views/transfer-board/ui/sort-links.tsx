@@ -1,8 +1,8 @@
 // ⚠ `"use client"`가 없다 — 상호작용이 없는 렌더러라 서버 렌더 여지를 남긴다(`architecture.md`).
 //    그래서 순수 함수는 배럴이 아니라 직접 경로로 가져온다(`credibility-badge.tsx`와 같은 이유).
-import type { TransferLeague, TransferSort, TransferTypeFilter } from "@/entities/transfer";
+import type { TransferSort, } from "@/entities/transfer";
 import { cn } from "@/shared/lib/cn";
-import { boardHref } from "../lib/board-href";
+import { type BoardQuery, boardHref } from "../lib/board-href";
 import { BoardLink } from "./board-link";
 
 /** 정렬 링크의 순서 — `as const satisfies`가 없는 값을, 아래 가드가 빠뜨린 값을 막는다 */
@@ -14,14 +14,8 @@ const _SORTS_EXHAUSTIVE: Exclude<TransferSort, (typeof SORTS)[number]> extends n
 const SORT_LABEL: Record<TransferSort, string> = { latest: "최신", fee: "이적료" };
 
 interface SortLinksProps {
-  league: TransferLeague | null;
-  sort: TransferSort;
-  /** 구단 필터 — 정렬 링크가 이 값을 유지한다(정렬을 바꿨는데 구단이 풀리면 안 된다) */
-  club: string | null;
-  /** 관심 필터 — 구단과 같은 이유로 유지한다 */
-  watch: boolean;
-  /** 형태 필터 — 구단과 같은 이유로 유지한다 */
-  type: TransferTypeFilter | null;
+  /** 지금 필터 — 정렬 링크가 나머지 필터를 유지한다(정렬을 바꿨는데 구단이 풀리면 안 된다) */
+  query: BoardQuery;
 }
 
 /**
@@ -33,7 +27,7 @@ interface SortLinksProps {
  * ⚠ 자리가 규약이다 — 한때 두 칩 줄 사이에 끼어 있어 컨트롤로 보이지 않았다. 필터 레일은 가로 스크롤이라
  *   오른쪽 고정이 안 되고, 헤더 부제 줄은 마감 카운트다운이 쓰는 기간이 있어 탭 스트립 끝이 남는 자리다.
  */
-export function SortLinks({ league, sort, club, watch, type }: SortLinksProps) {
+export function SortLinks({ query }: SortLinksProps) {
   return (
     // gap 20 — 넓힌 누르는 영역(`hit-area` — 두 글자 "최신"은 좌우로 12px 가까이)이 서로 겹치지 않는 간격.
     //   16이면 "이적료"의 영역과 2px 겹쳐 "최신"의 오른쪽 끝을 누르면 이적료순이 된다(실측)
@@ -41,11 +35,11 @@ export function SortLinks({ league, sort, club, watch, type }: SortLinksProps) {
       {SORTS.map((item) => (
         <BoardLink
           key={item}
-          href={boardHref({ league, sort: item, club, watch, type })}
-          aria-current={sort === item ? "page" : undefined}
+          href={boardHref({ ...query, sort: item })}
+          aria-current={query.sort === item ? "page" : undefined}
           className={cn(
             "hit-area py-1.5 text-[12px] transition-colors duration-150 ease-otb",
-            sort === item ? "font-medium text-ink" : "text-ink-mute-2",
+            query.sort === item ? "font-medium text-ink" : "text-ink-mute-2",
           )}
         >
           {SORT_LABEL[item]}

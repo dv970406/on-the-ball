@@ -3,8 +3,8 @@ import { ArrowRight, Slash, X } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
 import { Icon } from "@/shared/ui";
 import { loanNote } from "../lib/deal-form";
-import { destinationClubs, routeLabels } from "../lib/route-label";
-import { isDeadStage, isSettledStage } from "../lib/stage";
+import { destinationClubs, routeLabels, isLikelyDestination } from "../lib/route-label";
+import { isDeadStage } from "../lib/stage";
 import type { TransferDeal } from "../model/types";
 import { CrestStack } from "./crest-stack";
 import { DealFormMark } from "./deal-form-mark";
@@ -49,7 +49,7 @@ export function ClubRoute({ deal, size, className, "data-col": dataCol }: ClubRo
   const destinations = destinationClubs(deal);
   const stacked = destinations.length > 1;
   const lead = destinations[0] ?? null;
-  const likely = deal.toClub === null && lead !== null && !dead && !isSettledStage(deal.stage);
+  const likely = isLikelyDestination(deal);
   // 표(md+) 전용 — 기본은 숨고 범위(`DealTable`)가 md+에서 보인다(위 주석)
   const likelyMark = likely && (
     <span data-route-likely="" className="hidden shrink-0 text-[11px] font-normal text-ink-mute">

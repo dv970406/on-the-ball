@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { ROUTES, trackedTransferWindow } from "@/shared/config";
-import { cn, formatCount, useNowMs, useScrollRestore } from "@/shared/lib";
-import { EmptyState, Skeleton, StaleBanner, chipClassName } from "@/shared/ui";
-import { SubHeader } from "@/widgets/sub-header";
+import { cn, formatCount, useReferenceNowMs } from "@/shared/lib";
+import { EmptyState, Skeleton, StaleBanner, chipClassName, textLinkClassName } from "@/shared/ui";
+import { SubHeader, RestoringSubScrollArea } from "@/widgets/sub-header";
 import {
   DealRow,
   DealTable,
@@ -53,12 +53,8 @@ export function TransferClubView({
   const { club } = clubs;
 
   // ⚠ 서버 시각이 먼저다(`data-and-state.md`) — 훅은 무조건 먼저 부른다
-  const clientNowMs = useNowMs();
-  const nowMs = serverNowMs ?? clientNowMs;
+  const nowMs = useReferenceNowMs(serverNowMs);
   const windowLabel = nowMs === null ? null : trackedTransferWindow(nowMs).label;
-
-  const scrollRef = useRef<HTMLElement>(null);
-  useScrollRestore(scrollRef);
 
   const groups = deals.groups;
   const total = groups?.reduce((sum, g) => sum + g.deals.length, 0) ?? 0;
@@ -75,10 +71,7 @@ export function TransferClubView({
         ⚠ `relative` — 행 안의 `sr-only`(position:absolute)가 프레임까지 새지 않게 한다(`TabScrollArea` 주석과 같은 사정).
         넓은 화면에서는 안쪽을 가운데 열로 모은다 — 스크롤 영역은 전체 폭으로 둬야 열 밖에서도 휠이 먹는다(`styling.md`).
       */}
-      <main
-        ref={scrollRef}
-        className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-[calc(32px+env(safe-area-inset-bottom))] md:[scrollbar-gutter:stable]"
-      >
+      <RestoringSubScrollArea className="overflow-x-hidden px-0">
         <div className="md:mx-auto md:max-w-[960px] md:pt-4">
           {clubs.isLoading ? (
             <div aria-hidden className="flex items-center gap-3.5 px-5 pt-5">
@@ -209,7 +202,7 @@ export function TransferClubView({
                 <Link
                   href={{ pathname: ROUTES.transferList, query: { club: code } }}
                   prefetch={false}
-                  className="inline-flex min-h-11 items-center text-[13px] font-medium text-ink underline decoration-hairline-strong underline-offset-[3px] hover:decoration-ink"
+                  className={textLinkClassName()}
                 >
                   이적시장 보드에서 {club.shortName}만 보기
                 </Link>
@@ -245,7 +238,7 @@ export function TransferClubView({
             </>
           )}
         </div>
-      </main>
+      </RestoringSubScrollArea>
     </>
   );
 }

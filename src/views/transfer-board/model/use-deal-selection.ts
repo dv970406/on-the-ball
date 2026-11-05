@@ -2,11 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ROUTES } from "@/shared/config";
+import { LG_MEDIA_QUERY, ROUTES } from "@/shared/config";
 import { parsePostId } from "@/shared/lib";
-import type { TransferDealListItem, TransferLeague, TransferSort, TransferTypeFilter } from "@/entities/transfer";
-import { boardDealHref, dealIdOfBoardPath } from "../lib/board-href";
-import { SPLIT_QUERY } from "../ui/use-deal-select";
+import type { TransferDealListItem } from "@/entities/transfer";
+import { type BoardQuery, boardDealHref, boardHref, dealIdOfBoardPath } from "../lib/board-href";
 import type { GroupLayout } from "../lib/screen-order";
 import { navigateBoard } from "./use-board-filters";
 
@@ -17,11 +16,8 @@ interface UseDealSelectionArgs {
   layouts: readonly GroupLayout[];
   /** 주소의 고른 딜(상세 경로 또는 `?deal=`) — `useBoardFilters`가 `parsePostId`로 읽은 값 */
   requested: number | null;
-  league: TransferLeague | null;
-  sort: TransferSort;
-  club: string | null;
-  watch: boolean;
-  type: TransferTypeFilter | null;
+  /** 지금 필터 — 필터가 그대로인 동안만 보고 있던 딜을 붙든다 */
+  query: BoardQuery;
   /** 2분할이 실제로 서 있는가 — 주소 정리(아래 effect)가 이 값으로 갈린다 */
   enabled: boolean;
 }
@@ -77,14 +73,11 @@ export function useDealSelection({
   deals,
   layouts,
   requested,
-  league,
-  sort,
-  club,
-  watch,
-  type,
+  query,
   enabled,
 }: UseDealSelectionArgs) {
-  const filterKey = `${league ?? ""}|${sort}|${club ?? ""}|${watch ? 1 : 0}|${type ?? ""}`;
+  // 필터 전체의 주소 표기 — 새 필터가 생겨도 여기서 빠뜨릴 수 없다(`boardHref`가 빠짐없이 싣는다)
+  const filterKey = boardHref(query);
   const [held, setHeld] = useState<Held | null>(null);
 
   const selectedDeal = useMemo<TransferDealListItem | null>(() => {
@@ -132,15 +125,21 @@ export function useDealSelection({
   useEffect(() => {
     if (firstBoardMountSeen) return;
     firstBoardMountSeen = true;
-    if (window.matchMedia(SPLIT_QUERY).matches) return;
+    if (window.matchMedia(LG_MEDIA_QUERY).matches) return;
     const id = parsePostId(new URLSearchParams(window.location.search).get("deal") ?? "");
     if (id !== null) router.replace(ROUTES.transfer(id));
   }, [router]);
 
   const select = useCallback(
-    (id: number) => navigateBoard(boardDealHref(id, { league, sort, club, watch, type }), "replace"),
-    [league, sort, club, watch, type],
+    (id: number) => navigateBoard(boardDealHref(id, query), "replace"),
+    [query],
   );
 
-  return { selectedDeal, select };
+  // 화면의 선택 표시·J/K의 기준 — 모바일에는 "고른 딜"이라는 상태가 없다
+  const selectedId = enabled ? (selectedDeal?.id ?? null) : null;
+  // 왼쪽 레일에는 **관심 딜을 골랐을 때만** 고른 id를 내린다 — 레일이 표시하는 것은 관심 딜 목록 안의 선택뿐이라, 그 밖의 딜을
+  // 고를 때마다 바뀌는 값을 넘기면 메모된 레일이 J/K마다 다시 그려진다
+  const railSelectedId = selectedId !== null && selectedDeal?.isWatched ? selectedId : null;
+
+  return { selectedDeal, selectedId, railSelectedId, select };
 }

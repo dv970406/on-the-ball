@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { serverToClientTime } from "@/shared/lib";
-import { useSessionStore } from "@/entities/session";
+import { serverUpdatedAt } from "@/shared/lib";
+import { useQueryScope } from "@/entities/session";
 import {
   dealHasClub,
   dealInLeague,
@@ -15,13 +15,12 @@ import {
   type TransferClub,
   type TransferDealListItem,
   type TransferGroupKey,
-  type TransferLeague,
-  type TransferSort,
-  type TransferTypeFilter,
   useFollowedClubsQuery,
-  useTransferDealListQuery,
-  withoutWatches,
+  useSeededDealListQuery,
+  dealClubs,
 } from "@/entities/transfer";
+import { type BoardQuery } from "../lib/board-href";
+import { groupLayout } from "../lib/screen-order";
 
 interface UseTransferBoardArgs {
   initialDeals?: TransferDealListItem[];
@@ -29,14 +28,8 @@ interface UseTransferBoardArgs {
   initialFollowedClubs?: TransferClub[];
   initialUserId?: string;
   scopeStartIso: string;
-  league: TransferLeague | null;
-  sort: TransferSort;
-  /** 구단 필터(코드) — URL이 소유한다. 보드에 없는 구단이면 전체로 폴백한다 */
-  club: string | null;
-  /** 관심 딜만 보는가 — URL이 소유한다(`?watch=1`) */
-  watch: boolean;
-  /** 형태 필터 — URL이 소유한다(`?type=loan`). `null`은 전부 */
-  type: TransferTypeFilter | null;
+  /** 주소의 필터 — URL이 소유한다. 구단이 보드에 없으면 전체로 폴백한다(돌려주는 `filter.query`가 그 결과다) */
+  requested: BoardQuery;
   /** `serverNowMs ?? useNowMs()` — 순서는 뷰가 지킨다. `null`이면 캐러셀 판정을 미룬다 */
   nowMs: number | null;
   /** 서버가 그 목록을 읽은 시각 — 뒤로가기가 되살린 옛 페이로드를 stale로 보게 한다 */
@@ -84,19 +77,14 @@ export function useTransferBoard({
   initialFollowedClubs,
   initialUserId,
   scopeStartIso,
-  league,
-  sort,
-  club,
-  watch,
-  type,
+  requested,
   nowMs,
   serverNowMs,
 }: UseTransferBoardArgs) {
-  const sessionStatus = useSessionStore((s) => s.status);
-  const storeUserId = useSessionStore((s) => s.user?.id);
-  // 세션 복원 전에는 **서버가 알려준 사용자**를 키로 쓴다 — 키가 갈리면 서버가 채운
+  const { league, sort, club, watch, type } = requested;
+    // 세션 복원 전에는 **서버가 알려준 사용자**를 키로 쓴다 — 키가 갈리면 서버가 채운
   // 캐시에 닿지 못하고 화면이 스켈레톤으로 되돌아간다.
-  const userId = sessionStatus === "loading" ? initialUserId : storeUserId;
+  const { status: sessionStatus, userId, ownsPrefetch } = useQueryScope(initialUserId);
 
   /**
    * ⚠ **서버가 본 사용자와 지금 사용자가 다르면 서버 목록을 캐시에 넣지 않는다.** 행마다 관심 표시가
@@ -104,21 +92,13 @@ export function useTransferBoard({
    *   관심 표시가 "신선한" 데이터로 앉는다 — 그때는 관심을 지운 사본을 자리 표시로만 쓰고 새로 받는다
    *   (`nextjs.md` 서버 프리페치 절 · 상세 댓글의 `ownsPrefetch`와 같은 규약).
    */
-  const ownsPrefetch = userId === initialUserId;
-  const dealsPlaceholder = useMemo(
-    () => (!ownsPrefetch && initialDeals ? withoutWatches(initialDeals) : undefined),
-    [ownsPrefetch, initialDeals],
-  );
-  const dealsQuery = useTransferDealListQuery({
+  const dealsQuery = useSeededDealListQuery({
     userId,
     scopeStartIso,
-    // ⚠ 프리페치가 있으면 복원을 기다리지 않는다 — 기다리면 서버가 그린 HTML을 스켈레톤이 덮는다
-    enabled: initialDeals !== undefined || sessionStatus !== "loading",
-    initialData: ownsPrefetch ? initialDeals : undefined,
-    // 서버 시각을 기기 시계로 옮겨 넣는다 — 기기 시계와 빼서 신선도를 재기 때문이다(`serverToClientTime`)
-    initialDataUpdatedAt: () =>
-      serverNowMs === undefined ? undefined : serverToClientTime(serverNowMs),
-    placeholderData: dealsPlaceholder,
+    sessionRestored: sessionStatus !== "loading",
+    ownsPrefetch,
+    initialDeals,
+    initialDataUpdatedAt: serverUpdatedAt(serverNowMs),
   });
 
   const deals = dealsQuery.data;
@@ -132,8 +112,7 @@ export function useTransferBoard({
     userId,
     enabled: initialFollowedClubs !== undefined || sessionStatus !== "loading",
     initialData: ownsPrefetch ? initialFollowedClubs : undefined,
-    initialDataUpdatedAt: () =>
-      serverNowMs === undefined ? undefined : serverToClientTime(serverNowMs),
+    initialDataUpdatedAt: serverUpdatedAt(serverNowMs),
   });
   const followedClubs = followsQuery.data;
 
@@ -175,8 +154,8 @@ export function useTransferBoard({
     if (club !== null && !seen.has(club)) {
       const hits = inLeague.filter((d) => dealHasClub(d, club));
       const found = hits
-        .flatMap((d) => [d.fromClub, d.toClub, d.loanClub, ...d.suitors])
-        .find((c) => c?.code === club);
+        .flatMap((d) => dealClubs(d))
+        .find((c) => c.code === club);
       if (found) seen.set(club, { code: club, label: found.shortName, count: hits.length, followed: followed.has(club) });
     }
     return [...seen.values()].sort(
@@ -185,6 +164,14 @@ export function useTransferBoard({
     );
   }, [deals, league, followedClubs, club]);
   const effectiveClub = club !== null && clubOptions.some((o) => o.code === club) ? club : null;
+  /**
+   * 화면이 쓰는 필터 — 주소의 값에서 구단만 보드에 실제로 있는 것으로 좁혔다. 칩·레일·링크·선택이 이 한 객체를 받는다.
+   * 행을 고를 때마다 보드가 다시 그려지므로 메모해 두 레일(`memo`)에 같은 참조로 넘긴다.
+   */
+  const query = useMemo<BoardQuery>(
+    () => ({ league, sort, club: effectiveClub, watch, type }),
+    [league, sort, effectiveClub, watch, type],
+  );
 
   /**
    * 칩으로 그릴 구단 — 응원 구단 전부 + 그 밖의 구단 상위 `MAX_OTHER_CHIPS` + (밀려났으면) 선택된 구단.
@@ -216,11 +203,17 @@ export function useTransferBoard({
     [deals, sort, league, effectiveClub, watch, type],
   );
 
-  /** 리그 안의 임대 딜 수 — 0이면 임대 칩을 그리지 않는다(누르면 빈 보드다). 구단 칩처럼 리그 필터 안에서 센다 */
-  const loanCount = useMemo(
-    () => (deals ?? []).filter((d) => dealInLeague(d, league) && isLoanForm(d.form)).length,
-    [deals, league],
-  );
+  /**
+   * 리그 안의 딜 수와 임대 딜 수 — 두 레일이 같은 값을 그린다.
+   * 임대가 0이면 임대 필터를 그리지 않는다(누르면 빈 보드다) — 단 켜져 있으면 풀 길이 있어야 하므로 그린다.
+   */
+  const { inLeagueCount, loanCount } = useMemo(() => {
+    const scoped = (deals ?? []).filter((d) => dealInLeague(d, league));
+    return { inLeagueCount: scoped.length, loanCount: scoped.filter((d) => isLoanForm(d.form)).length };
+  }, [deals, league]);
+  const showLoanFilter = loanCount > 0 || type !== null;
+  // 고를 구단이 둘 미만이면 구단 필터를 그리지 않는다 — 단 선택된 구단이 있으면 풀 길이 있어야 하므로 그린다(선택은 보드에 있는 구단뿐이라 칩 목록에도 있다)
+  const showClubFilter = clubChips.length >= 2 || effectiveClub !== null;
 
   /** 내가 담은 딜 수(필터 무관) — 관심 필터의 빈 화면이 "담은 것이 없다"와 "조건에 안 맞는다"를 가르는 데 쓴다 */
   const watchedCount = useMemo(() => (deals ?? []).filter((d) => d.isWatched).length, [deals]);
@@ -244,6 +237,14 @@ export function useTransferBoard({
     return next;
   }, [groups]);
 
+  // 구간마다의 화면 배치(소구간·열기 순) — 그리는 쪽과 판의 기본 선택이 **같은 결과**를 본다(`groupLayout`)
+  const layouts = useMemo(() => groups.map((group) => groupLayout(group, nowMs, sort)), [groups, nowMs, sort]);
+  /** 보도 수 막대의 기준 — 지금 보이는 목록의 최댓값 */
+  const reportScale = useMemo(
+    () => groups.reduce((max, g) => g.deals.reduce((m, d) => Math.max(m, d.reportCount), max), 0),
+    [groups],
+  );
+
   return {
     deals: {
       data: deals,
@@ -254,13 +255,13 @@ export function useTransferBoard({
       refetch: dealsQuery.refetch,
     },
     rumors,
-    groups,
-    counts,
+    /** 구간들과 그 화면 배치·건수·보도 수 막대의 기준 */
+    board: { groups, layouts, counts, reportScale },
     /**
-     * 필터 레일·왼쪽 레일이 읽는 값 — 칩으로 그릴 구단(`clubChips`)과 URL의 구단 중 보드에 실제로 있는 것(칩·링크가 이 값을
-     * 선택 상태로 쓴다), 관심 필터의 빈 화면 문구·로그인 안내 판정
+     * 필터 레일·왼쪽 레일이 읽는 값 — 칩으로 그릴 구단(`clubChips`)과 화면의 필터(`query`), 두 레일이 함께 쓰는 건수·노출 판정,
+     * 관심 필터의 빈 화면 문구·로그인 안내 판정
      */
-    filter: { clubChips, club: effectiveClub, watchedCount, loanCount, isGuest },
+    filter: { clubChips, query, watchedCount, inLeagueCount, loanCount, showLoanFilter, showClubFilter, isGuest },
     /**
      * 이 보드의 쿼리 스코프(복원 전에는 서버가 본 사용자) — 같은 스코프의 쿼리를 갖는 하위(오른쪽 딜 판)까지 흘려보낸다.
      * 판이 다른 키로 같은 딜을 찾으면 첫 렌더에 같은 데이터를 한 번 더 받는다(`nextjs.md` 서버 프리페치 절).

@@ -4,6 +4,7 @@ import { CircleHelp } from "lucide-react";
 import { CredibilityMark, DealFormMark, StatusBadge } from "@/entities/transfer";
 import { cn } from "@/shared/lib";
 import { Icon, Sheet } from "@/shared/ui";
+import { type ReactNode } from "react";
 
 /**
  * 상태 뱃지 범례 — 위에서 아래로 진전 순서다. 뱃지는 목록이 그리는 것과 같은 컴포넌트라 모양이 어긋나지 않는다.
@@ -33,6 +34,16 @@ const FORM_GUIDE = [
 
 /** 달 5단계 — 차오를수록 믿을 만하다(낮은 쪽부터 읽는다) */
 const MOON_LEVELS = [1, 2, 3, 4, 5] as const;
+
+/** 범례 한 줄 — 표지 폭이 제각각이라 칸을 고정한다(설명 글이 한 줄로 정렬된다) */
+function GuideRow({ mark, markClassName = "pt-px", children }: { mark: ReactNode; markClassName?: string; children: ReactNode }) {
+  return (
+    <li className="flex items-start gap-3">
+      <span className={cn("flex w-[72px] shrink-0 justify-start", markClassName)}>{mark}</span>
+      <p className="min-w-0 flex-1 text-[13px] leading-[1.5] text-ink-secondary">{children}</p>
+    </li>
+  );
+}
 
 interface GuideButtonProps {
   onClick: () => void;
@@ -80,25 +91,18 @@ export function GuideSheet({ open, onClose }: GuideSheetProps) {
         <h3 className="mt-5 text-[13px] font-medium text-ink">단계</h3>
         <ul className="mt-2.5 flex flex-col gap-3">
           {STAGE_GUIDE.map(({ stage, text }) => (
-            <li key={stage} className="flex items-start gap-3">
-              {/* 뱃지 폭이 제각각이라 칸을 고정한다 — 설명 글이 한 줄로 정렬된다 */}
-              <span className="flex w-[72px] shrink-0 justify-start pt-px">
-                <StatusBadge stage={stage} />
-              </span>
-              <p className="min-w-0 flex-1 text-[13px] leading-[1.5] text-ink-secondary">{text}</p>
-            </li>
+            <GuideRow key={stage} mark={<StatusBadge stage={stage} />}>
+              {text}
+            </GuideRow>
           ))}
         </ul>
 
         <h3 className="mt-5 text-[13px] font-medium text-ink">형태</h3>
         <ul className="mt-2.5 flex flex-col gap-3">
           {FORM_GUIDE.map(({ form, loanClause, text }) => (
-            <li key={`${form}-${loanClause ?? ""}`} className="flex items-start gap-3">
-              <span className="flex w-[72px] shrink-0 justify-start pt-px">
-                <DealFormMark deal={{ form, loanClause }} />
-              </span>
-              <p className="min-w-0 flex-1 text-[13px] leading-[1.5] text-ink-secondary">{text}</p>
-            </li>
+            <GuideRow key={`${form}-${loanClause ?? ""}`} mark={<DealFormMark deal={{ form, loanClause }} />}>
+              {text}
+            </GuideRow>
           ))}
         </ul>
         <p className="mt-3 text-[13px] leading-[1.5] text-ink-mute">
@@ -107,25 +111,18 @@ export function GuideSheet({ open, onClose }: GuideSheetProps) {
 
         <h3 className="mt-5 text-[13px] font-medium text-ink">출처 공신력</h3>
         <ul className="mt-2.5 flex flex-col gap-3">
-          <li className="flex items-start gap-3">
-            <span className="flex w-[72px] shrink-0 justify-start">
-              <CredibilityMark value={{ kind: "medal" }} />
-            </span>
-            <p className="min-w-0 flex-1 text-[13px] leading-[1.5] text-ink-secondary">
-              오피셜에 가까울 만큼 믿을 만한 매체예요.
-            </p>
-          </li>
-          <li className="flex items-start gap-3">
-            <span className="flex w-[72px] shrink-0 items-center justify-start">
-              {/* 낮은 쪽부터 — 달이 차오르는 방향으로 읽힌다 */}
-              {MOON_LEVELS.map((level) => (
-                <CredibilityMark key={level} value={{ kind: "moon", level }} />
-              ))}
-            </span>
-            <p className="min-w-0 flex-1 text-[13px] leading-[1.5] text-ink-secondary">
-              달이 찰수록 믿을 만한 기자·매체예요. 표시가 없으면 아직 평가하지 않은 출처예요.
-            </p>
-          </li>
+          <GuideRow mark={<CredibilityMark value={{ kind: "medal" }} />} markClassName="">
+            오피셜에 가까울 만큼 믿을 만한 매체예요.
+          </GuideRow>
+          <GuideRow
+            mark={
+              // 낮은 쪽부터 — 달이 차오르는 방향으로 읽힌다
+              MOON_LEVELS.map((level) => <CredibilityMark key={level} value={{ kind: "moon", level }} />)
+            }
+            markClassName="items-center"
+          >
+            달이 찰수록 믿을 만한 기자·매체예요. 표시가 없으면 아직 평가하지 않은 출처예요.
+          </GuideRow>
         </ul>
       </div>
     </Sheet>

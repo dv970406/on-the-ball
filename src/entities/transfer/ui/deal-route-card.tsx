@@ -2,7 +2,7 @@
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
 import { Icon } from "@/shared/ui";
-import { dealFormLabel, loanNote } from "../lib/deal-form";
+import { dealFormLabel, isLoanForm, loanNote } from "../lib/deal-form";
 import { destinationClubs, routeLabels } from "../lib/route-label";
 import type { TransferClub, TransferDeal } from "../model/types";
 import { TransferCrest } from "./transfer-crest";
@@ -45,7 +45,7 @@ function RouteCell({
             >
               <TransferCrest club={c} size={24} priority className="shrink-0" />
               {/* 정식명이 좁은 칸에서 한 줄을 넘으면 자르지 않고 두 줄로 흘린다 — 잘린 구단 이름은 어느 구단인지 알 수 없다 */}
-              <span className="line-clamp-2">{c.name}</span>
+              <span className="line-clamp-2 break-keep">{c.name}</span>
             </li>
           ))}
         </ul>
@@ -81,7 +81,7 @@ interface DealRouteCardProps {
 export function DealRouteCard({ deal, className }: DealRouteCardProps) {
   const labels = routeLabels(deal, { full: true });
   const destinations = destinationClubs(deal);
-  const form = deal.form !== null && deal.form !== "permanent" ? dealFormLabel(deal) : null;
+  const form = isLoanForm(deal.form) ? dealFormLabel(deal) : null;
   return (
     <section
       aria-label="이적 경로"

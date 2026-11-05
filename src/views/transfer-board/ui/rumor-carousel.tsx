@@ -56,7 +56,7 @@ export const RumorCarousel = memo(function RumorCarousel({ rumors, nowMs }: Rumo
       <ul
         onScroll={handleScroll}
         className={cn(
-          "no-scrollbar flex snap-x snap-mandatory gap-2.5 overflow-x-auto scroll-px-5 px-5 pb-1 md:grid md:snap-none md:grid-cols-2 md:overflow-visible lg:grid-cols-3",
+          "no-scrollbar flex snap-x snap-mandatory gap-2.5 overflow-x-auto overflow-y-hidden scroll-px-5 px-5 pb-1 md:grid md:snap-none md:grid-cols-2 md:overflow-visible lg:grid-cols-3",
           GRID_CARD_SCOPE,
         )}
       >

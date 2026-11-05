@@ -2,6 +2,7 @@
 
 import type { ComponentProps, MouseEvent } from "react";
 import { navigateBoard } from "../model/use-board-filters";
+import { isPlainClick } from "@/shared/lib";
 
 interface BoardLinkProps extends Omit<ComponentProps<"a">, "href" | "onClick"> {
   /** 보드 URL — `boardHref`로 만든다 */
@@ -18,7 +19,7 @@ interface BoardLinkProps extends Omit<ComponentProps<"a">, "href" | "onClick"> {
  */
 export function BoardLink({ href, ...props }: BoardLinkProps) {
   const handleClick = (e: MouseEvent<HTMLAnchorElement>) => {
-    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (!isPlainClick(e)) return;
     e.preventDefault();
     navigateBoard(href);
   };

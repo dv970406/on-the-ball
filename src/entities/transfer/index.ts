@@ -1,4 +1,4 @@
-// ⚠ "use client" 모듈 포함 — 서버에서는 model/types·api/mappers·api/keys·api/list-query와
+// ⚠ "use client" 모듈 포함 — 서버에서는 model/types·api/mappers·api/list-query와
 //    lib/stage·lib/route-label·lib/player-name·lib/fee를 직접 import한다(허용 목록은 `check-conventions.mjs`).
 //
 // ⚠ **다른 레이어가 소비하지 않는 것은 올리지 않는다.** `TransferClubRow`·`TransferNewsRow`·
@@ -33,11 +33,10 @@ export { TRANSFER_DEAL_LIMIT } from "./api/mappers";
 // ⚠ 하루에 싣는 보도 상한 — 날짜별 소식 화면이 잘림을 말한다(상한은 서버 안전한 api/mappers에 있다)
 export { TRANSFER_DAY_REPORT_LIMIT } from "./api/mappers";
 // ⚠ 서버가 다른 사용자로 그린 목록의 자리 표시용 사본 — 관심 표시를 캐시에 사실처럼 앉히지 않는다
-export { withoutWatches } from "./api/mappers";
 // ⚠ 딜을 대표하는 보도(요약 있는 최신 → 없으면 최신) — 보드 오른쪽 판이 쓴다. 상세 page(서버)는 `api/mappers` 직접 경로로 같은 함수를 쓴다
 export { headlineReports } from "./api/mappers";
 export {
-  useTransferDealListQuery,
+  useSeededDealListQuery,
   useTransferDealQuery,
   useTransferReportsQuery,
   // 응원 구단 — 5대 리그 구단 목록과 내가 고른 구단. 쓰기는 `features/follow-club`
@@ -55,12 +54,13 @@ export { GROUP_LABEL, GROUP_ORDER } from "./lib/stage";
 //    서버 page(og description)는 배럴이 아니라 `lib/stage` 직접 경로로 쓴다(배럴이 클라이언트 모듈을 담는다)
 export { STAGE_STATUS, STATUS_LABEL } from "./lib/stage";
 // ⚠ 정렬 → 분류 순서다. 안정 정렬·빈 구간 제외 규칙을 이 둘이 단독으로 소유한다
-export { groupDeals, sortDeals, sortReports } from "./lib/sort";
+export { groupDeals, newestReportId, sortDeals, sortReports } from "./lib/sort";
 // ⚠ 캐러셀 판정(T1 · 3일 이내)의 단일 소스 — 서버 프리페치와 뷰가 같은 함수를 부른다
 export { pickRecentRumors } from "./lib/rumors";
 // ⚠ URL 파라미터 해석과 리그·구단 필터 — 링크가 만드는 주소와 보드가 읽는 주소가 같은 판정을 써야 한다
 export {
   dealHasClub,
+  dealClubs,
   dealInLeague,
   dealIsWatched,
   parseTransferClub,
@@ -81,9 +81,9 @@ export { splitHotRumors } from "./lib/rumor-heat";
 // ⚠ 진행 중 구간의 소구간(합의 임박·협상 중) — 뱃지 톤과 같은 갈림
 export { isSettledStage, splitProgress } from "./lib/stage";
 // ⚠ 이적료 표기·범위 — 상세의 이적료 카드가 쓴다(목록 UI는 같은 슬라이스라 상대 경로)
-export { feeKindLabel, formatFee, formatFeeRange } from "./lib/fee";
+export { addOnTerms, feeKindLabel, formatFee, formatFeeRange } from "./lib/fee";
 // ⚠ 경로 두 칸의 문구(FA·미확인·미정·외 N)의 단일 소스 — 상세 경로 카드와 목록 UI가 같은 말을 한다
-export { destinationClubs, routeLabels } from "./lib/route-label";
+export { destinationClubs, isLikelyDestination, routeLabels } from "./lib/route-label";
 // ⚠ 선수 표시명(`playerKo ?? player`)의 단일 소스 — 목록·카드·상세 제목·`<title>`이 같은 이름을 그린다
 export { playerName } from "./lib/player-name";
 // ⚠ 이적료 칸은 금액 · FA(확인된 자유계약) · 미공개 셋 중 하나다 — 빈 이적료를 FA로 추정하지 않는다
@@ -103,6 +103,7 @@ export { TransferCrest } from "./ui/transfer-crest";
 export { DealInfoLine } from "./ui/deal-info-line";
 export { DealRouteCard } from "./ui/deal-route-card";
 export { ReportItem } from "./ui/report-item";
+export { DealStatusLine } from "./ui/deal-status-line";
 export { FeeHighlight } from "./ui/fee-highlight";
 export { ContractTerms } from "./ui/contract-terms";
 export { SuitorList } from "./ui/suitor-list";

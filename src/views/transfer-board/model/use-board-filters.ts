@@ -2,30 +2,18 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo, type MouseEvent } from "react";
-import { parsePostId } from "@/shared/lib";
+import { parsePostId, isPlainClick } from "@/shared/lib";
 import {
   parseTransferClub,
   parseTransferLeague,
   parseTransferSort,
   parseTransferType,
   parseTransferWatch,
-  type TransferLeague,
-  type TransferSort,
-  type TransferTypeFilter,
 } from "@/entities/transfer";
-import { dealIdOfBoardPath } from "../lib/board-href";
+import { type BoardQuery, dealIdOfBoardPath } from "../lib/board-href";
 
-/** 보드 필터 — 리그·정렬·구단·관심·형태. **URL이 소유한다**(공유 링크·뒤로가기가 필터를 잃지 않게) */
-export interface BoardFilters {
-  /** `null` = 전체 리그 */
-  league: TransferLeague | null;
-  sort: TransferSort;
-  /** `null` = 전체 구단. 보드에 없는 구단이면 모델(`useTransferBoard`)이 전체로 폴백한다 */
-  club: string | null;
-  /** 관심 딜만 보는가(`?watch=1`) — 비로그인이면 담은 딜이 없어 빈 목록이 된다 */
-  watch: boolean;
-  /** 형태 필터(`?type=loan`) — 임대 계열 딜만. `null`은 전부 */
-  type: TransferTypeFilter | null;
+/** 보드 필터 — 리그·정렬·구단·관심·형태(`BoardQuery`) + 판에 연 딜. **URL이 소유한다**(공유 링크·뒤로가기가 필터를 잃지 않게) */
+export interface BoardFilters extends BoardQuery {
   /**
    * 목록·상세 2분할(lg+)에서 오른쪽 판에 연 딜 — `null`이면 화면 순서상 첫 딜이다.
    * 고르면 주소가 그 딜의 상세 경로(`/transfers/<id>` — `boardDealHref`)가 된다. 로그인 복귀 주소(`next`)와 옛 공유 링크는
@@ -61,7 +49,7 @@ export function navigateBoard(href: string, mode: "push" | "replace" = "push") {
  * ⚠ 일반 클릭만 본다 — 수정 키·가운데 버튼(새 탭)은 이 탭의 기록과 무관하다. 주소가 다르면(필터가 걸렸다) Next가 스스로 쌓는다.
  */
 export function keepBoardEntryOnSameUrlLink(e: MouseEvent<HTMLElement>) {
-  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  if (!isPlainClick(e)) return;
   // 더블클릭의 두 번째 클릭은 첫 클릭이 시작한 이동이 끝나기 전이라 주소가 아직 같다 — 복제가 두 번 되면 뒤로가기가 한 번 헛돈다
   if (e.detail > 1) return;
   if (!(e.target instanceof Element)) return;
