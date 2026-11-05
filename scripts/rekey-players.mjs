@@ -23,9 +23,8 @@
  */
 import { pathToFileURL } from "node:url";
 import { connectFromEnv, readRange } from "./lib/sync-db.mjs";
-import { dealKey } from "./lib/transfer/derive-deals.mjs";
 import { loadPlayerDictionary } from "./lib/transfer/names-ko.mjs";
-import { normalizePlayer } from "./lib/transfer/player-key.mjs";
+import { dealKey, normalizePlayer } from "./lib/transfer/player-key.mjs";
 
 /** 새 규칙이 옮기는 글자 — `player-key.mjs`의 `LATIN_FOLD`와 같은 집합 */
 /** 키가 선수 키인 이름 캐시 종류 — 선수 표기 · 현 소속 · 임대 중인 선수의 보유 구단 */

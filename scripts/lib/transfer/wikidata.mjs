@@ -10,6 +10,7 @@
  *   있으니 한국어"라고 믿은 채 영문을 그린다.
  * ⚠ 위키미디어 API 정책상 **연락처를 담은 User-Agent가 필수**다(없으면 차단될 수 있다).
  */
+import { foldLatin } from "./player-key.mjs";
 
 const API = "https://www.wikidata.org/w/api.php";
 const USER_AGENT = "on-the-ball-transfer-sync/1.0 (https://github.com/dv970406/on-the-ball)";
@@ -55,9 +56,7 @@ const sitelinkCount = (entity) => Object.keys(entity?.sitelinks ?? {}).length;
 
 /** 이름 비교용 정규형 — 악센트·대소문자·기호 차이를 접는다("João Pedro" = "Joao Pedro") */
 export function normalizeName(v) {
-  return String(v)
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
+  return foldLatin(String(v).normalize("NFD").replace(/\p{M}/gu, ""))
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();

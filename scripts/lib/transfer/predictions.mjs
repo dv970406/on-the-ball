@@ -20,8 +20,8 @@
  * ⚠ 창 일정은 `windows.json`이 단일 소스다 — 채점도 DB 사본이 아니라 같은 JSON을 읽는다(사본은 트리거가 회차를 정하는 데만 쓴다).
  */
 import { upsertRows } from "../sync-db.mjs";
-import { loadWindows } from "./derive-deals.mjs";
 import { chunks, DAY_MS } from "./util.mjs";
+import { loadWindows } from "./windows.mjs";
 
 /** 창 마감 뒤 결과를 기다리는 유예 — 마감일에 등록된 이적은 발표가 하루 이틀 늦게 나온다 */
 export const SETTLE_GRACE_MS = 2 * DAY_MS;

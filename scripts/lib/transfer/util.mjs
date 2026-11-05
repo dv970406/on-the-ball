@@ -56,3 +56,9 @@ export const sha1Hex = (s, length = 40) => createHash("sha1").update(s).digest("
 /** 시간 길이(ms) — `14 * DAY_MS`처럼 쓴다. 자릿수 리터럴(`86_400_000`)은 읽는 사람이 단위를 셈해야 한다 */
 export const HOUR_MS = 3_600_000;
 export const DAY_MS = 24 * HOUR_MS;
+
+/** 같은 금액인가(백만 단위 · 표기 반올림 허용) — 판정의 금액 대조와 파생의 금액 문장 찾기가 **같은 허용치**여야 "금액 문장 → 낸 구단"이 맞물린다 */
+export const sameAmount = (a, b) => Math.abs(a - b) < 0.011;
+
+/** 이적료로 믿을 수 있는 상한(백만 단위) — 규칙 추출과 판정 해석이 같은 값을 쓴다. 그 위는 구단 가치·지출 합계 같은 다른 수다 */
+export const MAX_FEE_M = 350;

@@ -7,7 +7,7 @@
  */
 import { createNameBook } from "./lib/transfer/names-ko.mjs";
 import { isRoundup } from "./lib/transfer/story.mjs";
-import { CARRIED_DAILY_ATTEMPTS, JUDGE_TIER, boardScopeStartMs, clubRecord, createExtractMemo, dealKey, dedupeRows, deriveDeals, derivationStartMs, hasRawVerdict, holdStage, judgeMode, normalizePlayer, orderJudgeNeeds, retryDelayMs, windowSpan, isSettledFormChange, writeDeals } from "./lib/transfer/derive-deals.mjs";
+import { CARRIED_DAILY_ATTEMPTS, JUDGE_TIER, boardScopeStartMs, clubRecord, createExtractMemo, dealKey, dedupeRows, deriveDeals, derivationStartMs, ROW_COLUMNS, hasRawVerdict, holdStage, judgeMode, normalizePlayer, orderJudgeNeeds, retryDelayMs, windowSpan, isSettledFormChange, writeDeals } from "./lib/transfer/derive-deals.mjs";
 
 const NOW = Date.parse("2026-09-25T00:00:00Z");
 const WINDOWS = [
@@ -1343,4 +1343,8 @@ for (const u of UNIT) {
 }
 const total = CASES.length + UNIT.length;
 console.log(`\n딜 파생 ${pass}/${total} 통과`);
-if (pass !== total) process.exit(1);
+// 운영 파생이 DB에서 읽는 열 — 픽스처에는 있는데 select에 빠지면 테스트만 통과하고 운영에서 규칙이 꺼진다(인용 귀속이 그랬다)
+const selected = new Set(ROW_COLUMNS.split(",").map((c) => c.trim()));
+const missingColumns = ["attribution", "attributed_to", "verdict_stage", "verdict_form", "summary_ko"].filter((c) => !selected.has(c));
+if (missingColumns.length) console.log(`❌ ROW_COLUMNS에 파생이 읽는 열이 없다: ${missingColumns.join(", ")}`);
+if (pass !== total || missingColumns.length) process.exit(1);

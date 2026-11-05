@@ -21,7 +21,7 @@
  */
 import fs from "node:fs";
 import { pathToFileURL } from "node:url";
-import { connectFromEnv, loadEnv, readAll } from "./lib/sync-db.mjs";
+import { connectFromEnv, flag, loadEnv, readAll } from "./lib/sync-db.mjs";
 import { extractTransfer } from "./lib/transfer/extract.mjs";
 import { deriveDeals, normalizePlayer } from "./lib/transfer/derive-deals.mjs";
 import { createNameBook, loadGlossary, loadNameCache, loadPlayerDictionary, missingNames } from "./lib/transfer/names-ko.mjs";
@@ -30,6 +30,7 @@ import { runJudgements } from "./lib/transfer/judge.mjs";
 import * as judgePrompt from "./lib/transfer/judge-prompt.mjs";
 import { canonicalClubName, detectClubs } from "./lib/transfer/clubs.mjs";
 import { DEAD, RANK } from "./lib/transfer/story.mjs";
+import { sameAmount } from "./lib/transfer/util.mjs";
 
 export const DIR = ".cache/transfer-eval";
 export const SNAPSHOT = `${DIR}/snapshot.json`;
@@ -156,7 +157,7 @@ export function scoreVerdict(score, g, v) {
     const amount = v.verdict_fee_amount == null ? null : Number(v.verdict_fee_amount);
     if (!g.fee) tick("feeNone", amount == null);
     else {
-      const hit = amount != null && Math.abs(amount - g.fee.amount) < 0.011;
+      const hit = amount != null && sameAmount(amount, g.fee.amount);
       tick("feeAmount", hit);
       if (hit) tick("feeCurrency", v.verdict_fee_currency === g.fee.currency);
       if (hit && g.fee.kind) tick("feeKind", v.verdict_fee_kind === g.fee.kind);
@@ -272,7 +273,11 @@ async function main(argv) {
       console.error("ANTHROPIC_API_KEY가 필요합니다");
       process.exit(1);
     }
-    const configArg = argv.includes("--config") ? argv[argv.indexOf("--config") + 1] : null;
+    const configArg = flag(argv, "config");
+    if (argv.includes("--config") && !configArg) {
+      console.error("--config 뒤에 설정 이름이 필요합니다 — 값이 없으면 운영 설정으로 묻게 된다");
+      process.exit(1);
+    }
     const config = judgeConfig(configArg);
     const needs = d.judgeNeeds;
     const v = await runJudgements(createFakeDb(), needs, { apiKey: env.ANTHROPIC_API_KEY, names: book(), limit: 1000, ...(config ? { config } : {}) });

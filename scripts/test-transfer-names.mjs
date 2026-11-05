@@ -3,7 +3,7 @@
  *
  *   node scripts/test-transfer-names.mjs
  */
-import { CLUB_RECHECK_MS, RECHECK_MS, cacheLlmNames, canonicalClubName, createNameBook, formatNewNameLog, lookupAndCache, lookupCurrentClubs, missingNames, overlayNameRows, pickConsensusKo, renameInSummary, shortClubName, shortKoClubName, syncDictionaryNames } from "./lib/transfer/names-ko.mjs";
+import { CLUB_RECHECK_MS, RECHECK_MS, cacheLlmNames, clubFromWikidataLabel, createNameBook, formatNewNameLog, lookupAndCache, lookupCurrentClubs, missingNames, overlayNameRows, pickConsensusKo, renameInSummary, shortClubName, shortKoClubName, syncDictionaryNames } from "./lib/transfer/names-ko.mjs";
 import { currentClubsOf, koLabel, lookupKo, lookupKoMany, normalizeName, pickCurrentClub, pickEntity, toHits } from "./lib/transfer/wikidata.mjs";
 
 let pass = 0;
@@ -163,6 +163,7 @@ check("선수 — 동명이인의 유명도가 비슷하면 비운다", eq(pickE
   );
 }
 check("normalizeName — 악센트·대소문자·기호를 접는다", normalizeName("João  Pedro-") === normalizeName("joao pedro"));
+check("normalizeName — NFD로 분해되지 않는 글자도 접는다(보도 Hojbjerg · 후보 표기 Højbjerg)", normalizeName("Pierre-Emile Højbjerg") === normalizeName("Pierre-Emile Hojbjerg"));
 check("koLabel — 한글이 있어야 한다", koLabel(ENT.Q3) === "페데리코 키에사" && koLabel(ENT.Q4) === null);
 
 // ── 구단 약칭 ──────────────────────────────────────────────────────────
@@ -247,7 +248,7 @@ check("현 소속 — 임대 중이면 시작이 더 늦은 임대 구단", pick
 check("현 소속 — 값 없는 종료일(somevalue)도 끝난 소속이다", pickCurrentClub({ claims: { P54: [p54("Q11", { start: "+2023-08-12T00:00:00Z", end: null })] } }, TEAMS) === null);
 check("현 소속 — 종료일 없는 클럽이 하나도 없으면 null(지어내지 않는다)", pickCurrentClub({ claims: { P54: [p54("Q10", { end: "+2023-08-12T00:00:00Z" })] } }, TEAMS) === null && pickCurrentClub({ claims: {} }, TEAMS) === null);
 check("현 소속 — 우선 순위(preferred)가 시작일보다 먼저다", pickCurrentClub({ claims: { P54: [p54("Q11", { start: "+2020-01-01T00:00:00Z", rank: "preferred" }), p54("Q13", { start: "+2026-01-10T00:00:00Z" })] } }, TEAMS)?.wikidataId === "Q11");
-check("정규명 — 위키데이터 레이블이 구단 사전 별칭으로 풀리면 정규명, 아니면 레이블 그대로", canonicalClubName("FC Bayern Munich") === "Bayern Munich" && canonicalClubName("Kolkheti 1913") === "Kolkheti 1913");
+check("정규명 — 위키데이터 레이블이 구단 사전 별칭으로 풀리면 정규명, 아니면 레이블 그대로", clubFromWikidataLabel("FC Bayern Munich") === "Bayern Munich" && clubFromWikidataLabel("Kolkheti 1913") === "Kolkheti 1913");
 const clubBook = createNameBook({ cache: [
   { kind: "player_club", key: "harry kane", name_en: "Bayern Munich", name_ko: null, wikidata_id: "Q11", checked_at: new Date(NOW - 86_400_000).toISOString() },
   { kind: "player_club", key: "finn jeltsch", name_en: "Finn Jeltsch", name_ko: null, wikidata_id: null, checked_at: new Date(NOW - 86_400_000).toISOString() },

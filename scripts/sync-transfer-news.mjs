@@ -65,7 +65,8 @@ if ([dryRun && !deriveOnly, reprocess, deriveOnly, argv.includes("--verify")].fi
   usage("--dry-run · --reprocess · --derive-only · --verify 는 함께 쓸 수 없습니다(--derive-only 와 --dry-run 만 예외)");
 }
 if (replay && (!deriveOnly || dryRun || rejudge)) usage("--replay 는 --derive-only 와 함께만 씁니다(--dry-run·--rejudge 와는 함께 쓸 수 없습니다)");
-if (rejudge && (!deriveOnly || dryRun)) usage("--rejudge 는 --derive-only 와 함께만 씁니다(--dry-run 과는 함께 쓸 수 없습니다)");
+// --dry-run과는 함께 쓸 수 있다 — 묻지 않고 대상 수만 찍는다(최대 1000건의 비용을 미리 본다)
+if (rejudge && !deriveOnly) usage("--rejudge 는 --derive-only 와 함께만 씁니다");
 // --dry-run과는 함께 쓸 수 있다 — 드라이런은 판정을 부르지 않고 다시 물을 대상 수만 찍는다(비용을 미리 본다)
 if (rejudgeStale && (!deriveOnly || rejudge || replay)) usage("--rejudge-stale 는 --derive-only 와 함께만 씁니다(--rejudge·--replay 와는 함께 쓸 수 없습니다)");
 if (loanOnly && !rejudgeStale) usage("--loan-only 는 --rejudge-stale 과 함께만 씁니다");
@@ -183,7 +184,14 @@ async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: rer
       ? async (needs, names) => {
           try {
             console.log(`\nLLM 판정 시작: ${Math.min(needs.length, limit)}건(대상 ${needs.length} — 한 건 3초 안팎, 끝날 때까지 결과는 찍히지 않는다)`);
-            return await judgeLib.runJudgements(supabase, needs, { apiKey, names, limit, log: console });
+            // ⚠ --rejudge는 시간 예산을 풀어 준다 — 5분 예산에 앞줄만 묻고 멈추면, 다시 돌려도 같은 앞줄을 또 과금하고 뒤쪽 행에는 닿지 못한다
+            const result = await judgeLib.runJudgements(supabase, needs, { apiKey, names, limit, log: console, ...(again ? { timeBudgetMs: Infinity } : {}) });
+            // 정기 실행은 다음 실행이 잇지만, --rejudge의 남은 행은 판정이 이미 있어 아무도 다시 묻지 않는다 — 실패로 끝낸다
+            if (again && result.halted) {
+              console.error("✗ --rejudge가 끝까지 돌지 못했다 — 남은 행은 옛 판정 그대로다(원인은 아래 경고). 다시 돌리면 앞줄부터 다시 과금된다");
+              process.exitCode = 1;
+            }
+            return result;
           } catch (e) {
             console.error(`✗ LLM 판정 실패: ${e instanceof Error ? e.message : String(e)}`);
             process.exitCode = 1;
@@ -211,7 +219,7 @@ async function derive({ dryRun: summaryOnly, rejudge: again = false, replay: rer
     if (skipped) console.log(`  건너뜀: ${skipped}`);
     if (r.lookup) console.log(`  이름 사전(위키데이터): 조회 ${r.lookup.tried} · 찾음 ${r.lookup.found} · 없음 ${r.lookup.notFound} · 실패 ${r.lookup.failed}`);
     if (r.clubLookup) console.log(`  현 소속(위키데이터 P54): 조회 ${r.clubLookup.tried} · 찾음 ${r.clubLookup.found} · 없음 ${r.clubLookup.notFound} · 실패 ${r.clubLookup.failed}`);
-    if (r.replayed) console.log(`  원출력 재생(API 호출 없음): 대상 ${r.replayed.read} · 달라져 다시 쓴 것 ${r.replayed.changed} · 기사를 못 받아 건너뜀 ${r.replayed.skipped} · 지금 해석으로 이동 ${r.replayed.move} · 아님 ${r.replayed.notMove}(회고 ${r.replayed.retrospective} · 제목뿐 ${r.replayed.titleOnly}) · 불가 ${r.replayed.invalid}`);
+    if (r.replayed) console.log(`  원출력 재생(API 호출 없음): 대상 ${r.replayed.read} · 달라져 다시 쓴 것 ${r.replayed.changed} · 기사를 못 받아 건너뜀 ${r.replayed.skipped} · 원문이 달라져 건너뜀 ${r.replayed.inputChanged} · 지금 해석으로 이동 ${r.replayed.move} · 아님 ${r.replayed.notMove}(회고 ${r.replayed.retrospective} · 제목뿐 ${r.replayed.titleOnly}) · 불가 ${r.replayed.invalid}`);
     if (r.nameSync?.synced) console.log(`  이름 사전 맞춤(사람 사전 → 캐시): 표기 ${r.nameSync.synced}건 · 요약 ${r.nameSync.summariesFixed}건`);
     const j = r.judged;
     if (j && "read" in j) {

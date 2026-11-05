@@ -220,6 +220,8 @@ const PLAYER_CASES = [
   { players: [], text: "Official: Tommaso Mancioppi extends contract with Milan Futuro By: Oliver Fisher" },
   { players: [], text: "Jamal Musiala confirms new deal talks with FC Bayern are advancing." },
   // 사람 사전에 있는 선수는 앵커 문형이 없어도 전체 이름으로 잡는다(지역지 제목) — 재계약·회고는 파생과 판정자가 거른다
+  // 사전 키는 접힌 표기(martin odegaard)다 — 원문의 ø도 같은 규칙으로 접어야 사전과 맞는다
+  { players: ["Martin Ødegaard"], text: "Rio Ferdinand takes firm stance over Arsenal and Martin Ødegaard - 'Can't be bullied'" },
   { players: ["Harry Kane"], text: "Rio Ferdinand takes firm stance over Bayern and Harry Kane - 'Can't be bullied'" },
   { players: ["Erling Haaland"], text: "Arsenal latest: clause comes to light as Erling Haaland's future clarified" },
   // 제목 끝의 이름과 다음 줄 첫머리의 이름은 한 덩어리가 아니다

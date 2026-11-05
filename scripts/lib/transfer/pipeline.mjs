@@ -5,7 +5,7 @@
  *   그 순간 쓸 수 없게 된다 → 저장은 `(source_id, external_id)` 충돌 시 무시다.
  * ⚠ **소스 하나가 죽어도 나머지는 계속 간다.** 소스는 언젠가 죽는다는 것이 이 기능의 상수다.
  */
-import { clampCp, isoOrNull, str, upsertRows } from "../sync-db.mjs";
+import { clampCp, isoOrNull, readAll, str, upsertRows } from "../sync-db.mjs";
 import { resolveAttribution, clusterKey } from "./attribution.mjs";
 import { extractTransfer } from "./extract.mjs";
 import { MAX_ITEM_AGE_DAYS, findSource } from "./registry.mjs";
@@ -426,14 +426,10 @@ export async function expandRoundups(supabase, opts = {}) {
   if (!columns.length) return stats;
 
   // 이미 나눈 칼럼 — 항목 행의 external_id 앞부분이 칼럼의 external_id다
-  const { data: done, error: e2 } = await supabase
-    .from(TABLE)
-    .select("source_id, external_id")
-    .in("source_id", ROUNDUP_SOURCES)
-    .gte("published_at", floorIso)
-    .like("external_id", `%${ITEM_MARK}%`)
-    .limit(10_000);
-  if (e2) throw new Error(`가십 항목 조회 실패: ${e2.message}`);
+  // ⚠ 끝까지 읽는다 — `max_rows`에서 조용히 잘리면 이미 나눈 칼럼이 안 나눈 칼럼으로 보여 다시 받는다
+  const done = await readAll(supabase, TABLE, "id, source_id, external_id", "id", (q) =>
+    q.in("source_id", ROUNDUP_SOURCES).gte("published_at", floorIso).like("external_id", `%${ITEM_MARK}%`),
+  );
   const expanded = new Set(done.map((r) => `${r.source_id}|${r.external_id.split(ITEM_MARK)[0]}`));
   // 최신 칼럼부터 — 상한에 걸리면 오래된 칼럼이 다음 실행으로 밀린다
   const todo = columns.filter((c) => !expanded.has(`${c.source_id}|${c.external_id}`));

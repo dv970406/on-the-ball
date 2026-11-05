@@ -36,34 +36,20 @@ import { DEST, FORMER, FROM, LEFT_FREE, SUITOR_FROM, addVotes, collectVotes, top
 import { extractTransfer } from "./extract.mjs";
 import { JUDGE_MAX_PER_RUN, JUDGE_RETRY_MS, LOAN_CUE, LOAN_FORMS, SUMMARY_RETRY_WINDOW_MS, moneyMentions, normalizeQuote, replayJudgements, wantsArticle } from "./judge.mjs";
 import { buildNameBook, createNameBook, loadGlossary, loadNameCache, loadPlayerDictionary, lookupAndCache, lookupCurrentClubs, missingNames, overlayNameRows, syncDictionaryNames } from "./names-ko.mjs";
+import { LOAN_FEE_KINDS } from "./judge-prompt.mjs";
 import { RANK, RENEWAL, cleanBody, isDead, isRoundup, isRoundupItem, mentionRe, sentencesOf } from "./story.mjs";
-import { normalizePlayer } from "./player-key.mjs";
+import { dealKey, normalizePlayer } from "./player-key.mjs";
+import { VERDICT_VALUE_COLUMNS } from "./verdict-columns.mjs";
 
 /** 이적 관련성 하한 — 그 아래는 경기 리뷰·부상 소식이 단계 규칙에 스친 것이다 */
 const MIN_RELEVANCE = 0.3;
-/** 보드 범위 시작보다 이만큼 앞선 보도까지 본다 — 창 직전의 "합의" 보도가 창 안의 오피셜과 한 이야기다 */
-const SCOPE_SLACK_MS = 14 * DAY_MS;
-
 // 창 일정 읽기는 windows.mjs가 갖는다(판정 요청도 쓴다) — 기존 소비자를 위해 다시 내보낸다
-import { chunks, DAY_MS, HOUR_MS, sha1Hex } from "./util.mjs";
-import { loadWindows, windowSpan } from "./windows.mjs";
-export { loadWindows, windowSpan };
+import { chunks, DAY_MS, HOUR_MS, sameAmount } from "./util.mjs";
+import { boardScopeStartMs, derivationStartMs, loadWindows, windowSpan } from "./windows.mjs";
+export { boardScopeStartMs, derivationStartMs, loadWindows, windowSpan };
 
-/**
- * 보드 범위의 시작 — `opensAt <= now`인 마지막 창의 개장 시각. 아직 아무 창도 열리지 않았으면 첫 창.
- * ⚠ 화면(`shared/config/transfer-window.ts`의 `boardScopeStartMs`)과 같은 판정이어야 한다 — 같은 JSON을 읽는다.
- */
-export function boardScopeStartMs(nowMs, windows) {
-  const sorted = [...windows].sort((a, b) => Date.parse(a.opensAt) - Date.parse(b.opensAt));
-  const opened = sorted.filter((w) => Date.parse(w.opensAt) <= nowMs);
-  return Date.parse((opened.at(-1) ?? sorted[0]).opensAt);
-}
-export const derivationStartMs = (nowMs, windows) => boardScopeStartMs(nowMs, windows) - SCOPE_SLACK_MS;
-
-// 선수 키의 정규형 — `player-key.mjs`가 단독으로 갖는다(judge와 공유). 여기서 다시 내보내 호출부의 경로를 유지한다
-export { normalizePlayer };
-/** ⚠ 16자리 소문자 hex — `transfer_deal.deal_key`의 CHECK와 한 쌍이다. 영구 계약(관심이 이 딜의 id를 본다) */
-export const dealKey = (normalized) => sha1Hex(normalized, 16);
+// 선수 키의 정규형·딜 키는 `player-key.mjs`가 단독으로 갖는다. 여기서 다시 내보내 호출부의 경로를 유지한다
+export { dealKey, normalizePlayer };
 
 const ts = (r) => Date.parse(r.published_at);
 const tokens = (normalized) => normalized.split(" ");
@@ -223,11 +209,7 @@ function carriedSlotDue(r, nowMs) {
 }
 
 /** 물을 때 함께 넘기는 그 행의 기존 판정(`judge.mjs`가 새 답이 실패하면 옛 판정을 지키는 데 쓴다) */
-const PREV_COLUMNS = [
-  "verdict", "verdict_player", "verdict_player_name", "verdict_evidence", "verdict_from", "verdict_to", "verdict_suitors", "verdict_stage",
-  "verdict_fee_amount", "verdict_fee_currency", "verdict_fee_kind", "verdict_form", "verdict_loan_owner", "verdict_loan_club", "verdict_loan_clause",
-  "verdict_at", "verdict_attempts",
-];
+const PREV_COLUMNS = [...VERDICT_VALUE_COLUMNS, "verdict_at", "verdict_attempts"];
 const prevVerdict = (r) => Object.fromEntries(PREV_COLUMNS.map((c) => [c, c === "verdict_attempts" ? Number(r[c]) || 0 : (r[c] ?? null)]));
 
 /** 우선순위 층 — 작을수록 먼저. 같은 층에서는 최신 보도가 먼저다 */
@@ -750,7 +732,6 @@ const BUYER_BOUND_KINDS = new Set(["fee", "bid", "loan_fee", "buy_clause"]);
  * ("joined on loan last summer with a £42.5m obligation"의 last summer가 금액을 지난 것으로 만들면 안 된다).
  * 낸 쪽(임대 구단)이 딜의 상대인지는 본다 — 임대 중인 선수의 제3구단 이적설에 보유 구단–임대 구단 사이의 조항 금액이 붙지 않게.
  */
-const LOAN_FEE_KINDS = new Set(["loan_fee", "buy_clause"]);
 /**
  * 딜 형태별로 대표 금액이 될 수 있는 성격 — 임대(새 임대·연장·조기 복귀)는 임대료·조항 금액만이다. 임대설 기사가 곁들이는 선수의
  * 평가액·요구액을 헤드라인에 걸면 임대가 그 금액의 이적처럼 읽힌다(엔드릭: 임대설인데 "€40M 평가액" — 운영).
@@ -783,7 +764,7 @@ const CLAUSE_KO = /[,，.;]|(?:으나|지만|는데)\s/u;
 
 /** 그 금액(같은 통화)이 적힌 문장 — 저장된 글과 판정 근거 구절에서 찾는다 */
 function feeSentences(r, fee, memo) {
-  const same = (m) => m.currency === fee.currency && Math.abs(m.amount - fee.amount) < 0.011;
+  const same = (m) => m.currency === fee.currency && sameAmount(m.amount, fee.amount);
   const pool = [...memo.sentences(r), ...(r.verdict_evidence ? [r.verdict_evidence] : [])];
   return pool.filter((s) => moneyMentions(s).some(same));
 }
@@ -881,7 +862,7 @@ function isAdnominal(word, minLength = 2) {
  */
 function pastCueOnAmountKo(clause, fee) {
   const words = wordsOf(clause);
-  const targets = koMoney(clause).filter((m) => m.currency === fee.currency && Math.abs(m.amount - fee.amount) < 0.011).map((m) => wordAt(words, m.index));
+  const targets = koMoney(clause).filter((m) => m.currency === fee.currency && sameAmount(m.amount, fee.amount)).map((m) => wordAt(words, m.index));
   if (!targets.length) return false;
   return [...clause.matchAll(PAST_TIME_KO)].some((m) => {
     const cueEnd = wordAt(words, m.index + m[0].length - 1);
@@ -898,7 +879,7 @@ function pastCueOnAmountKo(clause, fee) {
 function isPastFee(r, fee, sentences) {
   if (fee.kind === "fee" && ["official", "here_we_go", "agreement"].includes(r.verdict_stage)) return false;
   if (LOAN_FEE_KINDS.has(fee.kind)) return false;
-  const same = (m) => m.currency === fee.currency && Math.abs(m.amount - fee.amount) < 0.011;
+  const same = (m) => m.currency === fee.currency && sameAmount(m.amount, fee.amount);
   for (const s of sentences) for (const clause of s.split(CLAUSE_EN)) if (pastCueOnAmountEn(clause, same)) return true;
   if (r.summary_ko) for (const clause of r.summary_ko.split(CLAUSE_KO)) if (pastCueOnAmountKo(clause, fee)) return true;
   return false;
@@ -1559,8 +1540,12 @@ const SUITORS = "transfer_deal_suitor";
  * ⚠ **이미 딜에 묶인 행(`deal_id`)은 후보가 아니어도 함께 읽는다** — 재처리로 단계를 잃은 행의 배정을 푸는
  *   판정(`writeDeals`의 해제)이 이 행들을 봐야 한다. 빼면 그 행이 옛 딜을 계속 가리킨다.
  * ⚠ 걸러진 행은 `skipped`의 "단계 없음"·"관련성 미달" 집계에서도 빠진다(로그 숫자만 줄고 판정은 같다).
+ * ⚠ `attribution`·`attributed_to`는 판정 뒤 접기(`foldEchoes` — 같은 신문을 인용한 항목·원보도 우선)가 읽는다. 빠지면 테스트 픽스처에서만 돌고 운영에서는 조용히 꺼진다.
  */
-const ROW_COLUMNS = "id, source_id, external_id, url, stage, players, clubs, body, published_at, relevance, deal_id, verdict, verdict_player, verdict_player_name, verdict_evidence, verdict_at, verdict_from, verdict_to, verdict_suitors, verdict_stage, verdict_fee_amount, verdict_fee_currency, verdict_fee_kind, verdict_form, verdict_loan_owner, verdict_loan_club, verdict_loan_clause, verdict_model, verdict_prompt, verdict_input, verdict_article_chars, verdict_attempts, summary_ko";
+/** 파생이 저장된 딜에서 보는 값(`existingKeys`) — 운영 파생과 이름 정비(`names-todo`)가 같은 판단을 하게 한 곳에 둔다 */
+export const storedDealSnapshot = (d) => ({ stage: d.stage, settled_at: d.settled_at, form: d.form, loan_clause: d.loan_clause });
+
+export const ROW_COLUMNS = `id, source_id, external_id, url, stage, players, clubs, body, published_at, relevance, deal_id, attribution, attributed_to, ${VERDICT_VALUE_COLUMNS.join(", ")}, verdict_at, verdict_model, verdict_prompt, verdict_input, verdict_article_chars, verdict_attempts, summary_ko`;
 
 /**
  * @param {{ fullRaw?: boolean }} [opts] `fullRaw` — 원출력 값까지 읽는다(재생 `--replay`만 쓴다)
@@ -1895,9 +1880,9 @@ export async function runDerivation(supabase, opts = {}) {
     if (replayed.namesWritten) await reloadNames();
   }
   // 이미 저장된 딜 — 판정이 없어도 남기고(판정이 멎은 시간에 보드가 통째로 비지 않게), 판정이 덜 찬 딜은 저장된 단계·결과 시각을 지킨다.
-  // 같은 결과를 `writeDeals`가 대조에 다시 쓴다(`loadStoredDeals` — 딜 표는 실행당 한 번 읽는다)
+  // ⚠ `writeDeals`의 대조에는 넘기지 않는다 — 판정 단계 동안 낡는다(`loadStoredDeals` 주석)
   const storedDeals = await loadStoredDeals(supabase);
-  const existingKeys = new Map([...storedDeals].map(([k, d]) => [k, { stage: d.stage, settled_at: d.settled_at, form: d.form, loan_clause: d.loan_clause }]));
+  const existingKeys = new Map([...storedDeals].map(([k, d]) => [k, storedDealSnapshot(d)]));
   // 이름을 찾아 다시 파생할 때 추출을 되풀이하지 않도록 메모를 여러 번의 파생이 나눠 쓴다
   const memo = createExtractMemo();
   const derive = (rejudge = false) => deriveDeals(rows, {

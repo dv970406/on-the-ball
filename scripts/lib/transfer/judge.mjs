@@ -38,8 +38,9 @@ import { DEAD, RENEWAL, isRoundupItem } from "./story.mjs";
 import { lookupKo } from "./wikidata.mjs";
 import { clampCp } from "../sync-db.mjs";
 import { normalizePlayer } from "./player-key.mjs";
-import { DAY_MS, escapeRe, HOUR_MS, sha1Hex } from "./util.mjs";
-import { ARTICLE_MAX_CHARS, FEE_CURRENCIES, FEE_KINDS, JUDGE_CONFIG, JUDGE_STAGES, LOAN_CLAUSES, LOAN_FORMS, MOVE_FORMS, SUITORS_MAX, buildJudgeRequest, buildSystem, ellipsize, judgeFingerprint, prepareJudgeInput } from "./judge-prompt.mjs";
+import { DAY_MS, escapeRe, HOUR_MS, MAX_FEE_M, sameAmount, sha1Hex } from "./util.mjs";
+import { VERDICT_VALUE_COLUMNS } from "./verdict-columns.mjs";
+import { ARTICLE_MAX_CHARS, FEE_CURRENCIES, FEE_KINDS, JUDGE_CONFIG, JUDGE_STAGES, LOAN_CLAUSES, LOAN_FEE_KINDS, LOAN_FORMS, MOVE_FORMS, SUITORS_MAX, buildJudgeRequest, buildSystem, ellipsize, judgeFingerprint, prepareJudgeInput } from "./judge-prompt.mjs";
 
 // 요청 쪽(지시문·출력 형식·사용자 메시지)은 judge-prompt.mjs에 있다 — 기존 소비자가 이 파일에서 가져가던 이름을 그대로 내보낸다
 export * from "./judge-prompt.mjs";
@@ -90,7 +91,7 @@ export const SUMMARY_MAX_CHARS = 160;
 /** 원출력 상한 — DB CHECK(`transfer_news_verdict_raw_len`)와 같은 값 */
 const RAW_MAX_CHARS = 2_000;
 /** 단일 이적의 금액 상한(백만) — DB CHECK(`transfer_news_verdict_fee_amount_range`)와 같은 값 */
-const FEE_MAX_M = 350;
+const FEE_MAX_M = MAX_FEE_M;
 const ARTICLE_TIMEOUT_MS = 10_000;
 /**
  * 기사 본문을 일시 실패(시간 초과·연결 실패·429·5xx)로 못 받았을 때 한 번 더 받기 전에 기다리는 시간.
@@ -341,7 +342,7 @@ export function judgeFee(fee, sentText) {
   const amount = Math.round(Number(fee.amount) * 100) / 100;
   if (!Number.isFinite(amount) || amount <= 0 || amount > FEE_MAX_M) return null;
   if (!FEE_CURRENCIES.includes(fee.currency) || !FEE_KINDS.includes(fee.kind)) return null;
-  const same = (m) => m.currency === fee.currency && Math.abs(m.amount - amount) < 0.011;
+  const same = (m) => m.currency === fee.currency && sameAmount(m.amount, amount);
   // 모델이 옮긴 원문 표기(`text` — "£60m")가 원문에 그대로 있으면 그 표기로 대조한다 — 표기 읽기(`moneyMentions`)가 모르는 꼴
   // ("60 million pounds plus add-ons")도 받는다. 단 그 표기가 읽히는 금액과 어긋나면(표기 £60m인데 amount 65) 받지 않는다.
   const text = typeof fee.text === "string" ? fee.text.trim() : "";
@@ -362,7 +363,6 @@ export const LOAN_CUE = /\b(?:loan(?:s|ed|ee|ees)?|on-loan|recall(?:s|ed|ing)?|c
 /** 완전 이적 조항을 말하는 낱말 — 옵션·의무 표지는 이것이 원문에 있어야 받는다 */
 export const CLAUSE_CUE = /\b(?:option\s+to\s+(?:buy|sign|make)|(?:buy|purchase|buy-back|buyback)\s+option|option\s+(?:clause|of|worth|for|fee)|(?:with|an|the|includes?|including)\s+(?:an?\s+|the\s+)?option|obligat(?:ion|ory|ed)|mandatory|compulsory|buy(?:-|\s)?clause|purchase clause|permanent (?:deal|transfer|move|basis)|make (?:the|his|it|that) (?:move|deal|loan) permanent|made permanent|becomes? permanent)\b|옵션|의무/iu;
 /** 임대의 금액 — 임대 형태가 아닌 판정에서 이 성격의 금액은 받지 않는다 */
-const LOAN_FEE_KINDS = new Set(["loan_fee", "buy_clause"]);
 /** 조항(옵션·의무)이 붙을 수 있는 형태 — 조기 복귀에는 조항이 없다 */
 const CLAUSE_FORMS = new Set(["loan", "loan_convert", "loan_standing", "loan_extend"]);
 
@@ -895,7 +895,7 @@ async function flushNames(supabase, out, clubCache, nameRun, names) {
 }
 
 /** 저장된 판정과 재생한 판정이 같은가 — 재생은 달라진 행만 쓴다 */
-const REPLAY_COLUMNS = ["verdict", "verdict_player", "verdict_player_name", "verdict_evidence", "verdict_from", "verdict_to", "verdict_suitors", "verdict_stage", "verdict_fee_amount", "verdict_fee_currency", "verdict_fee_kind", "verdict_form", "verdict_loan_owner", "verdict_loan_club", "verdict_loan_clause", "summary_ko"];
+const REPLAY_COLUMNS = [...VERDICT_VALUE_COLUMNS, "summary_ko"];
 const sameVerdict = (a, b) => REPLAY_COLUMNS.every((c) => (c.includes("fee_amount") ? Number(a[c] ?? NaN) === Number(b[c] ?? NaN) || (a[c] == null && b[c] == null) : JSON.stringify(a[c] ?? null) === JSON.stringify(b[c] ?? null)));
 
 /**
@@ -917,10 +917,11 @@ export async function replayJudgements(supabase, rows, { names, fetchImpl = fetc
   for (const [i, r] of targets.entries()) {
     if (log && i > 0 && i % 100 === 0) log.log(`  재생 진행 ${i}/${targets.length}`);
     let article = "";
-    if (wantsArticle(r)) {
+    // 판정 때도 본문 없이 물었으면(`verdict_article_chars` 0) 받지 않고 저장된 글만으로 재생한다 — 지금은 본문이 받아져도 실으면
+    // 원문 지문이 갈려 해석 수정이 닿지 않는다. 같은 글인지는 아래 원문 지문 대조가 지킨다
+    if (wantsArticle(r) && r.verdict_article_chars !== 0) {
       article = await fetchArticleText(r.url, fetchImpl);
-      // 판정 때도 본문 없이 물었으면(`verdict_article_chars` 0) 저장된 글만으로 재생한다 — 같은 글인지는 아래 원문 지문 대조가 지킨다
-      if (!article && r.verdict_article_chars !== 0) { out.skipped += 1; continue; }
+      if (!article) { out.skipped += 1; continue; }
     }
     const input = prepareJudgeInput(r, article);
     if (r.verdict_input && r.verdict_input !== sourceFingerprint(input.numbered.text)) { out.inputChanged += 1; continue; }
@@ -1124,11 +1125,13 @@ export async function runJudgements(supabase, needs, { apiKey, names, limit = JU
   const halt = (why, left) => {
     if (stopped) return;
     stopped = true;
+    out.halted = true;
     passWarnings.push(`${why} — 남은 ${left}건은 다음 실행이 묻는다`);
   };
   const onStop = (r, left) => {
     if (stopped) return;
     stopped = true;
+    out.halted = true;
     passWarnings.push(r.stopWarning(left));
   };
   const first = await drain(batch, {

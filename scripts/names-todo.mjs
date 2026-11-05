@@ -20,9 +20,10 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { connectFromEnv, flag, readAll } from "./lib/sync-db.mjs";
-import { boardScopeStartMs, dealKey, deriveDeals, derivationStartMs, loadWindows, normalizePlayer } from "./lib/transfer/derive-deals.mjs";
-import { canonicalClubName, createNameBook, loadGlossary, loadNameCache, loadPlayerDictionary } from "./lib/transfer/names-ko.mjs";
+import { ROW_COLUMNS, boardScopeStartMs, dealKey, deriveDeals, derivationStartMs, loadWindows, normalizePlayer, storedDealSnapshot } from "./lib/transfer/derive-deals.mjs";
+import { createNameBook, loadGlossary, loadNameCache, loadPlayerDictionary } from "./lib/transfer/names-ko.mjs";
 import { clubDisplay } from "./lib/transfer/club-display.mjs";
+import { canonicalClubName } from "./lib/transfer/clubs.mjs";
 
 const HANGUL = /[가-힣]/u;
 
@@ -469,12 +470,10 @@ export function renderMarkdown(todo, meta = {}) {
 // ── DB 읽기 ────────────────────────────────────────────────────────────────
 
 /**
- * 파생이 읽는 열(`derive-deals.mjs`의 `loadRows`) + 인용 귀속. ⚠ `loadRows`의 필터는 걸지 않는다 — 걸러진 행은 파생의 판정에
- * 영향이 없고(`isCandidate`가 다시 거른다), 목록 4~6은 후보가 아닌 행(인용 항목·사전 키 대조)까지 봐야 한다.
- * ⚠ `loadRows`의 select 열이 늘면 여기도 더한다 — 빠지면 메모리 파생이 운영과 다른 답을 낸다.
+ * 파생이 읽는 열 그대로 + 원출력. ⚠ `loadRows`의 필터는 걸지 않는다 — 걸러진 행은 파생의 판정에 영향이 없고(`isCandidate`가 다시 거른다),
+ * 목록 4~6은 후보가 아닌 행(인용 항목·사전 키 대조)까지 봐야 한다.
  */
-const NEWS_COLUMNS =
-  "id, source_id, external_id, url, stage, players, clubs, body, published_at, relevance, deal_id, verdict, verdict_player, verdict_player_name, verdict_evidence, verdict_at, verdict_from, verdict_to, verdict_suitors, verdict_stage, verdict_fee_amount, verdict_fee_currency, verdict_fee_kind, verdict_form, verdict_loan_owner, verdict_loan_club, verdict_loan_clause, verdict_raw, verdict_model, verdict_prompt, verdict_input, verdict_article_chars, verdict_attempts, summary_ko, attribution, attributed_to";
+const NEWS_COLUMNS = `${ROW_COLUMNS}, verdict_raw`;
 
 async function main(argv) {
   const { supabase } = connectFromEnv(argv);
@@ -489,7 +488,7 @@ async function main(argv) {
   const [rows, cache, storedDeals] = await Promise.all([
     readAll(supabase, "transfer_news", NEWS_COLUMNS, "id", (q) => q.gte("published_at", rowStartIso)),
     loadNameCache(supabase),
-    readAll(supabase, "transfer_deal", "id, deal_key, player, stage, settled_at, latest_reported_at", "id"),
+    readAll(supabase, "transfer_deal", "id, deal_key, player, stage, settled_at, form, loan_clause, latest_reported_at", "id"),
   ]);
   const players = loadPlayerDictionary();
   const glossaryClubs = loadGlossary().clubs;
@@ -497,7 +496,7 @@ async function main(argv) {
 
   const names = createNameBook({ players, clubs: glossaryClubs, cache });
   // 운영 파생과 같게 저장된 딜 전부를 넘긴다(판정이 덜 찬 딜을 남기는 판단이 이 값을 본다)
-  const existingKeys = new Map(storedDeals.map((d) => [d.deal_key, { stage: d.stage, settled_at: d.settled_at }]));
+  const existingKeys = new Map(storedDeals.map((d) => [d.deal_key, storedDealSnapshot(d)]));
   const derived = deriveBoth(rows, { nowMs, windows, names, existingKeys });
   const boardDeals = storedDeals.filter((d) => Date.parse(d.latest_reported_at) >= boardStartMs);
 

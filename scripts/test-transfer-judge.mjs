@@ -631,6 +631,11 @@ const N = (o) => JSON.stringify({ evidence_ids: [], timing: "current", player: n
   const row = (id, extra) => ({ id, body: BODY, source_id: "rss:bbc", url: `https://example.com/${id}`, verdict_at: "2026-09-30T00:00:00.000Z", verdict_player: "david alaba", verdict_suitors: [], verdict_raw: raw, verdict: null, verdict_input: print, ...extra });
   const r = await replayJudgements(db, [row(1, { verdict_article_chars: 0 }), row(2, { verdict_article_chars: 1800 })], { names, corrections: {}, lookup: noLookup, fetchImpl: async () => ({ ok: false, status: 403, text: async () => "" }) });
   check("재생 — 본문 없이 판정한 행은 본문을 다시 못 받아도 저장된 글로 재생하고, 본문을 보고 판정한 행은 건드리지 않는다", eq(db.writes.map((w) => w.id), [1]) && r.skipped === 1, JSON.stringify([db.writes.map((w) => w.id), r.skipped]));
+  // 지금은 본문이 받아져도 싣지 않는다 — 실으면 원문 지문이 갈려 그 행의 재생이 영영 막힌다
+  const db2 = fakeDb();
+  let fetched = 0;
+  const r2 = await replayJudgements(db2, [row(3, { verdict_article_chars: 0 })], { names, corrections: {}, lookup: noLookup, fetchImpl: async () => { fetched += 1; return { ok: true, status: 200, text: async () => "<html><body><article><p>지금은 받아지는 본문이다.</p></article></body></html>" }; } });
+  check("재생 — 본문 없이 판정한 행은 지금 본문이 받아져도 받지 않고 재생한다", fetched === 0 && eq(db2.writes.map((w) => w.id), [3]) && r2.inputChanged === 0, JSON.stringify([fetched, db2.writes.map((w) => w.id), r2.inputChanged]));
 }
 
 // ── 일시 실패(시간 초과·연결·서버 오류)는 빠짐없이 다시 묻는다 ───────────────────────

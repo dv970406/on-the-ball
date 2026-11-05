@@ -23,6 +23,9 @@ export const FEE_KINDS = ["fee", "bid", "asking_price", "release_clause", "valua
  * 보도가 말하는 사건의 형태 — `transfer_move_form` enum과 같은 값.
  * `loan_standing`(새 움직임 없이 진행 중인 임대·조항을 설명하는 보도)은 딜의 단계를 움직이지 않는다(`derive-deals.mjs`의 문맥 보도).
  */
+/** 임대에 묶인 금액 성격 — 판정 수용(`judge.mjs`)과 파생의 대표 금액(`derive-deals.mjs`)이 같은 집합을 쓴다 */
+export const LOAN_FEE_KINDS = new Set(["loan_fee", "buy_clause"]);
+
 export const MOVE_FORMS = ["permanent", "loan", "loan_convert", "loan_standing", "loan_recall", "loan_extend"];
 /** 임대의 형태 — 완전 이적 말고 전부 */
 export const LOAN_FORMS = MOVE_FORMS.filter((f) => f !== "permanent");

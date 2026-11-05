@@ -15,11 +15,11 @@
  * ⚠ **찾는 대상은 딜에 오른 이름뿐이다**(`missingNames`). 보도에 스친 모든 이름을 찾지 않는다 — 화면과 요약에
  *   나오는 것은 딜의 선수·구단뿐이다.
  */
-import { readRange } from "../sync-db.mjs";
+import { clampCp, readRange } from "../sync-db.mjs";
 import { clubDisplay } from "./club-display.mjs";
 export { shortKoClubName } from "./club-display.mjs";
 import { detectClubs, isKnownClub } from "./clubs.mjs";
-import { DAY_MS, readJson as readJsonFile } from "./util.mjs";
+import { DAY_MS, escapeRe, readJson as readJsonFile } from "./util.mjs";
 import { currentClubsOf, lookupKoMany } from "./wikidata.mjs";
 
 export const NAME_TABLE = "transfer_name_ko";
@@ -246,7 +246,7 @@ export async function cacheLlmNames(supabase, entries, book) {
       continue;
     }
     if (prev?.name_ko && prev.name_ko !== pick.ko) renamed.push({ key, from: prev.name_ko, to: pick.ko });
-    rows.push({ kind: "player", key, name_en: list[0].name.slice(0, 120), name_ko: pick.ko, wikidata_id: prev?.wikidata_id ?? null, source: "llm", checked_at: prev?.checked_at ?? NEVER_CHECKED });
+    rows.push({ kind: "player", key, name_en: clampCp(list[0].name, 120), name_ko: pick.ko, wikidata_id: prev?.wikidata_id ?? null, source: "llm", checked_at: prev?.checked_at ?? NEVER_CHECKED });
     added.push({ key, ko: pick.ko, reference });
   }
   const warnings = [];
@@ -307,7 +307,7 @@ export function missingNames(deals, book, nowMs) {
 }
 
 /** 위키데이터 구단 레이블 → 구단 사전의 정규명(별칭이 하나로 풀리면), 아니면 레이블 그대로(사전 밖 구단 — LLM 경로와 같은 취급) */
-export function canonicalClubName(label) {
+export function clubFromWikidataLabel(label) {
   const hits = detectClubs(label);
   return hits.length === 1 ? hits[0] : label.trim();
 }
@@ -359,25 +359,25 @@ export async function lookupCurrentClubs(supabase, needs, { fetchImpl = fetch, l
     // 사전 밖 구단은 구단 캐시 행도 쓴다(화면이 한국어로 그린다)
     const clubRow = (canonical, c) => {
       if (!isKnownClub(canonical) && !clubDisplay(canonical).league && !book?.entry("club", canonical)?.wikidata_id && !rows.some((x) => x.kind === "club" && x.key === canonical)) {
-        rows.push({ kind: "club", key: canonical, name_en: canonical.slice(0, 120), name_ko: c.nameKo, wikidata_id: c.wikidataId, source: "wikidata", checked_at: now });
+        rows.push({ kind: "club", key: canonical, name_en: clampCp(canonical, 120), name_ko: c.nameKo, wikidata_id: c.wikidataId, source: "wikidata", checked_at: now });
       }
     };
     const owner = club?.nameEn && club.owner?.nameEn ? club.owner : null;
     if (club?.nameEn) {
-      const canonical = canonicalClubName(club.nameEn);
-      rows.push({ kind: "player_club", key: n.playerKey, name_en: canonical.slice(0, 120), name_ko: null, wikidata_id: club.wikidataId, source: "wikidata", checked_at: now });
+      const canonical = clubFromWikidataLabel(club.nameEn);
+      rows.push({ kind: "player_club", key: n.playerKey, name_en: clampCp(canonical, 120), name_ko: null, wikidata_id: club.wikidataId, source: "wikidata", checked_at: now });
       clubRow(canonical, club);
       out.found += 1;
     } else {
-      rows.push({ kind: "player_club", key: n.playerKey, name_en: n.player.slice(0, 120), name_ko: null, wikidata_id: null, source: "wikidata", checked_at: now });
+      rows.push({ kind: "player_club", key: n.playerKey, name_en: clampCp(n.player, 120), name_ko: null, wikidata_id: null, source: "wikidata", checked_at: now });
       out.notFound += 1;
     }
     if (owner) {
-      const canonical = canonicalClubName(owner.nameEn);
-      rows.push({ kind: "player_owner_club", key: n.playerKey, name_en: canonical.slice(0, 120), name_ko: null, wikidata_id: owner.wikidataId, source: "wikidata", checked_at: now });
+      const canonical = clubFromWikidataLabel(owner.nameEn);
+      rows.push({ kind: "player_owner_club", key: n.playerKey, name_en: clampCp(canonical, 120), name_ko: null, wikidata_id: owner.wikidataId, source: "wikidata", checked_at: now });
       clubRow(canonical, owner);
     } else {
-      rows.push({ kind: "player_owner_club", key: n.playerKey, name_en: n.player.slice(0, 120), name_ko: null, wikidata_id: null, source: "wikidata", checked_at: now });
+      rows.push({ kind: "player_owner_club", key: n.playerKey, name_en: clampCp(n.player, 120), name_ko: null, wikidata_id: null, source: "wikidata", checked_at: now });
     }
   }
   if (needs.length > limit) out.warnings.push(`현 소속 조회 상한(${limit}) — 남은 ${needs.length - limit}명은 다음 실행이 찾는다`);
@@ -416,7 +416,7 @@ export async function lookupAndCache(supabase, names, { fetchImpl = fetch, limit
     const r = res.value;
     const prev = book?.entry(n.kind, n.key);
     const keepLlm = prev?.source === "llm" && prev.name_ko;
-    rows.push({ kind: n.kind, key: n.key, name_en: n.name.slice(0, 120), name_ko: keepLlm ? prev.name_ko : r.nameKo, wikidata_id: r.wikidataId, source: keepLlm ? "llm" : "wikidata", checked_at: new Date().toISOString() });
+    rows.push({ kind: n.kind, key: n.key, name_en: clampCp(n.name, 120), name_ko: keepLlm ? prev.name_ko : r.nameKo, wikidata_id: r.wikidataId, source: keepLlm ? "llm" : "wikidata", checked_at: new Date().toISOString() });
     out[r.nameKo ? "found" : "notFound"] += 1;
     if (r.wikidataId) out.verified += 1;
   });
@@ -433,7 +433,6 @@ export async function lookupAndCache(supabase, names, { fetchImpl = fetch, limit
 }
 
 /** 정규식 이스케이프 */
-const reEscape = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** 이름 뒤에 붙는 조사 — 받침에 따라 모양이 바뀌는 것만 잡는다(바꿔 붙인다) */
 const JOSA_PAIR = { 이: ["이", "가"], 가: ["이", "가"], 은: ["은", "는"], 는: ["은", "는"], 을: ["을", "를"], 를: ["을", "를"], 과: ["과", "와"], 와: ["과", "와"] };
@@ -458,10 +457,10 @@ function josaFor(word, josa) {
  */
 function swapName(text, a, b, protect, short) {
   if (!a || !b || a === b) return text;
-  const guards = [...new Set(protect.filter((p) => p && p !== a && p.includes(a)))].sort((x, y) => y.length - x.length).map(reEscape);
+  const guards = [...new Set(protect.filter((p) => p && p !== a && p.includes(a)))].sort((x, y) => y.length - x.length).map(escapeRe);
   const head = short ? "(?<![\\p{L}\\p{N}])" : "";
   const tail = short ? WORD_END : "";
-  const name = `${head}${reEscape(a)}${JOSA}${tail}`;
+  const name = `${head}${escapeRe(a)}${JOSA}${tail}`;
   const re = new RegExp(guards.length ? `(${guards.join("|")})|${name}` : `()${name}`, "gu");
   return text.replace(re, (m, kept, josa) => (kept ? m : b + (josa ? josaFor(b, josa) : "")));
 }

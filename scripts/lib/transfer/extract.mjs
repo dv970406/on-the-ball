@@ -1,5 +1,6 @@
 import { detectClubs, isClubName } from "./clubs.mjs";
-import { readJson } from "./util.mjs";
+import { normalizePlayer } from "./player-key.mjs";
+import { MAX_FEE_M, readJson } from "./util.mjs";
 
 /**
  * 규칙 기반 구조화 추출 — 단계·선수·구단·이적료·주급·옵션·관련성.
@@ -171,7 +172,7 @@ const CURRENCY = { "€": "EUR", "£": "GBP", "$": "USD" };
  * 역대 최고 이적료는 네이마르의 €222m 다. 그 위는 단일 이적료가 아니라
  * 구단 가치·총지출·연간 매출 같은 다른 숫자일 확률이 압도적으로 높다.
  */
-const MAX_PLAUSIBLE_FEE_M = 350;
+const MAX_PLAUSIBLE_FEE_M = MAX_FEE_M;
 
 /**
  * 주급을 말하는 기간 표현 — "£250,000-a-week"·"€300k per week"·"£150k a week"·"£200k weekly".
@@ -477,7 +478,7 @@ function isKnownMononym(name) {
     dictKeys = Object.keys(dict).filter((k) => !k.startsWith("_"));
     mononyms = new Set(dictKeys.filter((k) => !k.includes(" ")));
   }
-  return mononyms.has(foldName(name));
+  return mononyms.has(normalizePlayer(name));
 }
 /** 사람 사전의 여러 토큰 이름(정규형 키) — `knownPlayersIn`이 쓴다 */
 let fullNames;
@@ -494,7 +495,7 @@ function knownPlayersIn(text) {
     for (let i = 0; i < tokens.length; i += 1) {
       for (let n = 2; i + n <= tokens.length; n += 1) {
         const sub = tokens.slice(i, i + n).join(" ").replace(/['’]s$/u, "");
-        if (fullNames.has(foldName(sub))) out.add(sub);
+        if (fullNames.has(normalizePlayer(sub))) out.add(sub);
       }
     }
   }
@@ -505,7 +506,6 @@ const isVocab = (t) => {
   const l = t.toLowerCase();
   return NEVER_NAME.has(l) || LEADING_NOISE.has(l) || DEMONYMS.has(l) || ROLE_NOUNS.has(l) || POSITIONS.includes(l) || NON_NAME_WORDS.has(l) || isClubName(t);
 };
-const foldName = (s) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim();
 const isCapital = (t) => /^\p{Lu}/u.test(t);
 
 /**

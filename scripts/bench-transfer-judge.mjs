@@ -23,7 +23,7 @@
 import fs from "node:fs";
 import Anthropic from "@anthropic-ai/sdk";
 import path from "node:path";
-import { loadEnv } from "./lib/sync-db.mjs";
+import { flag as flagValue, loadEnv } from "./lib/sync-db.mjs";
 import { extractTransfer } from "./lib/transfer/extract.mjs";
 import { normalizePlayer } from "./lib/transfer/derive-deals.mjs";
 import { createNameBook, loadGlossary, loadPlayerDictionary } from "./lib/transfer/names-ko.mjs";
@@ -49,7 +49,13 @@ const ASSUMED_OUTPUT = { off: 220, thinking: 1_000 };
 
 const argv = process.argv.slice(2);
 const flag = (name) => argv.includes(name);
-const opt = (name, fallback = null) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : fallback);
+const opt = (name, fallback = null) => flagValue(argv, name.slice(2)) ?? fallback;
+// ⚠ 비용 상한은 값이 틀리면 멈춘다 — NaN을 "상한 없음"으로 읽으면 `--budget 5$` 오타 하나에 상한이 조용히 풀린다
+const BUDGET = argv.includes("--budget") ? Number(opt("--budget")) : Infinity;
+if (argv.includes("--budget") && !(BUDGET > 0 && Number.isFinite(BUDGET))) {
+  console.error("--budget 뒤에는 0보다 큰 달러 숫자가 필요합니다(예: --budget 1)");
+  process.exit(1);
+}
 const readJson = (file, fallback) => (fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : fallback);
 const FIXTURE = opt("--fixture", DEFAULT_FIXTURE);
 
@@ -212,7 +218,7 @@ async function plan() {
   saveJson(ARTICLES, articles.cache);
   const fetchImpl = articleFetch(needs, articles.cache);
   const lookups = cachedLookup(true);
-  const client = budgeted(new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, timeout: 60_000, maxRetries: 1 }), config, Number(opt("--budget", "Infinity")));
+  const client = budgeted(new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, timeout: 60_000, maxRetries: 1 }), config, BUDGET);
 
   for (let rep = 1; rep <= reps; rep += 1) {
     const file = `${outDir}/${configKey}-r${rep}.json`;
