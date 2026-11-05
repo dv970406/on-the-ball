@@ -1,19 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ROUTES } from "@/shared/config";
-import {
-  formatCount,
-  kstDateKey,
-  kstDateLabel,
-  serverToClientTime,
-  useNowMs,
-  useScrollRestore,
-} from "@/shared/lib";
+import { formatCount, kstDateKey, kstDateLabel, serverUpdatedAt, useReferenceNowMs } from "@/shared/lib";
 import { EmptyState, Icon, Skeleton, StaleBanner } from "@/shared/ui";
-import { SubHeader } from "@/widgets/sub-header";
+import { SubHeader, RestoringSubScrollArea } from "@/widgets/sub-header";
 import {
   DayEntry,
   TRANSFER_DAY_REPORT_LIMIT,
@@ -44,13 +37,12 @@ export function TransferDayView({ dateKey, initialDay, serverNowMs }: TransferDa
   const query = useTransferDayQuery({
     dateKey,
     initialData: initialDay,
-    initialDataUpdatedAt: () => (serverNowMs === undefined ? undefined : serverToClientTime(serverNowMs)),
+    initialDataUpdatedAt: serverUpdatedAt(serverNowMs),
   });
   const day = query.data;
 
   // ⚠ 서버 시각이 먼저다(`data-and-state.md`) — 훅은 무조건 먼저 부른다
-  const clientNowMs = useNowMs();
-  const nowMs = serverNowMs ?? clientNowMs;
+  const nowMs = useReferenceNowMs(serverNowMs);
   const todayKey = nowMs === null ? null : kstDateKey(nowMs);
   // 키가 `YYYY-MM-DD`라 문자열 비교가 곧 날짜 비교다. 기준 시각을 모르면 다음 날을 잇지 않는다(미래일 수 있다)
   const nextKey = day?.nextKey && todayKey !== null && day.nextKey <= todayKey ? day.nextKey : null;
@@ -58,17 +50,10 @@ export function TransferDayView({ dateKey, initialDay, serverNowMs }: TransferDa
   const groups = useMemo(() => (day ? groupDayEntries(day.entries) : []), [day]);
   const label = kstDateLabel(dateKey);
 
-  const scrollRef = useRef<HTMLElement>(null);
-  useScrollRestore(scrollRef);
-
   return (
     <>
       <SubHeader title="날짜별 소식" fallbackHref={ROUTES.transferDays} />
-      {/* ⚠ `relative` — `sr-only`가 프레임까지 새지 않게(`TabScrollArea` 주석). 넓은 화면은 안쪽만 가운데 열로 모은다 */}
-      <main
-        ref={scrollRef}
-        className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(32px+env(safe-area-inset-bottom))] md:[scrollbar-gutter:stable]"
-      >
+      <RestoringSubScrollArea>
         <div className="md:mx-auto md:max-w-[720px] md:pt-4">
           <header className="pt-5">
             <h1 className="text-[22px] font-semibold leading-[1.3] tracking-[-0.6px] text-ink">
@@ -172,7 +157,7 @@ export function TransferDayView({ dateKey, initialDay, serverNowMs }: TransferDa
             </p>
           )}
         </div>
-      </main>
+      </RestoringSubScrollArea>
     </>
   );
 }

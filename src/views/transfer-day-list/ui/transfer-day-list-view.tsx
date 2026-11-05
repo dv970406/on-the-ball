@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { ROUTES } from "@/shared/config";
-import { formatCount, kstDateLabel, serverToClientTime } from "@/shared/lib";
+import { formatCount, kstDateLabel, serverUpdatedAt } from "@/shared/lib";
 import { EmptyState, Icon, Skeleton, StaleBanner } from "@/shared/ui";
-import { SubHeader } from "@/widgets/sub-header";
+import { SubHeader, RestoringSubScrollArea } from "@/widgets/sub-header";
 import { type TransferDaySummary, useTransferDayListQuery } from "@/entities/transfer";
 
 interface TransferDayListViewProps {
@@ -27,14 +27,13 @@ export function TransferDayListView({ startKey, initialDays, serverNowMs }: Tran
   const days = useTransferDayListQuery({
     startKey,
     initialData: initialDays,
-    initialDataUpdatedAt: () => (serverNowMs === undefined ? undefined : serverToClientTime(serverNowMs)),
+    initialDataUpdatedAt: serverUpdatedAt(serverNowMs),
   });
 
   return (
     <>
       <SubHeader title="날짜별 소식" fallbackHref={ROUTES.transferList} />
-      {/* ⚠ `relative` — `sr-only`가 프레임까지 새지 않게(`TabScrollArea` 주석). 넓은 화면은 안쪽만 가운데 열로 모은다 */}
-      <main className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(32px+env(safe-area-inset-bottom))] md:[scrollbar-gutter:stable]">
+      <RestoringSubScrollArea>
         <div className="md:mx-auto md:max-w-[720px] md:pt-4">
           <header className="pt-5">
             <h1 className="text-[22px] font-semibold tracking-[-0.6px] text-ink">날짜별 이적 소식</h1>
@@ -92,7 +91,7 @@ export function TransferDayListView({ startKey, initialDays, serverNowMs }: Tran
             </ol>
           )}
         </div>
-      </main>
+      </RestoringSubScrollArea>
     </>
   );
 }

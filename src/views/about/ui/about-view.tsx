@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { CredibilityMark, StatusBadge } from "@/entities/transfer";
 import { ROUTES, env } from "@/shared/config";
 import { SiteInfoLinks } from "@/shared/ui";
-import { SubHeader } from "@/widgets/sub-header";
+import { SubHeader, SubScrollArea } from "@/widgets/sub-header";
 
 /**
  * 서비스 소개 — 무엇을 모으고 어떻게 판정하는지(방법론)를 밝히는 문서 화면.
@@ -49,7 +49,7 @@ export function AboutView() {
   return (
     <>
       <SubHeader title="서비스 소개" fallbackHref={ROUTES.transferList} />
-      <main className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(32px+env(safe-area-inset-bottom))] md:[scrollbar-gutter:stable]">
+      <SubScrollArea>
         <article className="md:mx-auto md:max-w-[720px] md:pt-4">
           <header className="pt-5">
             <h1 className="text-[22px] font-semibold tracking-[-0.6px] text-ink">온더볼은 이런 서비스예요</h1>
@@ -183,7 +183,7 @@ export function AboutView() {
 
           <SiteInfoLinks className="mt-10 border-t border-hairline pt-2" />
         </article>
-      </main>
+      </SubScrollArea>
     </>
   );
 }

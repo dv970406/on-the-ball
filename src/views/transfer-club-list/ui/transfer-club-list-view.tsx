@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { ROUTES } from "@/shared/config";
-import { serverToClientTime } from "@/shared/lib";
+import { serverUpdatedAt } from "@/shared/lib";
 import { EmptyState, Skeleton, StaleBanner } from "@/shared/ui";
-import { SubHeader } from "@/widgets/sub-header";
+import { SubHeader, RestoringSubScrollArea } from "@/widgets/sub-header";
 import { TRANSFER_LEAGUES, type TransferClub, TransferCrest, useTransferClubListQuery } from "@/entities/transfer";
 
 interface TransferClubListViewProps {
@@ -24,7 +24,7 @@ interface TransferClubListViewProps {
 export function TransferClubListView({ initialClubs, serverNowMs }: TransferClubListViewProps) {
   const clubs = useTransferClubListQuery({
     initialData: initialClubs,
-    initialDataUpdatedAt: () => (serverNowMs === undefined ? undefined : serverToClientTime(serverNowMs)),
+    initialDataUpdatedAt: serverUpdatedAt(serverNowMs),
   });
   const leagues = useMemo(
     () =>
@@ -38,8 +38,7 @@ export function TransferClubListView({ initialClubs, serverNowMs }: TransferClub
   return (
     <>
       <SubHeader title="구단별 이적시장" fallbackHref={ROUTES.transferList} />
-      {/* ⚠ `relative` — `sr-only`가 프레임까지 새지 않게(`TabScrollArea` 주석). 넓은 화면은 안쪽만 가운데 열로 모은다 */}
-      <main className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(32px+env(safe-area-inset-bottom))] md:[scrollbar-gutter:stable]">
+      <RestoringSubScrollArea>
         <div className="md:mx-auto md:max-w-[960px] md:pt-4">
           <header className="pt-5">
             <h1 className="text-[22px] font-semibold tracking-[-0.6px] text-ink">구단별 이적시장</h1>
@@ -100,7 +99,7 @@ export function TransferClubListView({ initialClubs, serverNowMs }: TransferClub
             );
           })}
         </div>
-      </main>
+      </RestoringSubScrollArea>
     </>
   );
 }

@@ -1,11 +1,11 @@
 "use client";
 
 import { ROUTES, avatarUrl, predictionRound } from "@/shared/config";
-import { formatCount, serverToClientTime, useNowMs } from "@/shared/lib";
+import { formatCount, useReferenceNowMs } from "@/shared/lib";
 import { Avatar, EmptyState, Pill, Skeleton, StaleBanner } from "@/shared/ui";
-import { SubHeader } from "@/widgets/sub-header";
-import { type PredictionScore, useMyScoreQuery, useRankingQuery } from "@/entities/prediction";
-import { useSessionStore } from "@/entities/session";
+import { SubHeader, SubScrollArea } from "@/widgets/sub-header";
+import type { PredictionScore } from "@/entities/prediction";
+import { useRanking } from "../model/use-ranking";
 
 interface RankingViewProps {
   /** 서버가 미리 조회한 랭킹 — `undefined`면 클라이언트가 조회한다 */
@@ -39,38 +39,15 @@ export function RankingView({
   initialMyScore,
   serverNowMs,
 }: RankingViewProps) {
-  const sessionStatus = useSessionStore((s) => s.status);
-  const storeUserId = useSessionStore((s) => s.user?.id);
-  const userId = sessionStatus === "loading" ? initialUserId : storeUserId;
+  const { ranking, userId, myRank } = useRanking({ initialRanking, initialUserId, initialMyScore, serverNowMs });
 
-  const initialDataUpdatedAt = () =>
-    serverNowMs === undefined ? undefined : serverToClientTime(serverNowMs);
-  const ranking = useRankingQuery({ initialData: initialRanking, initialDataUpdatedAt });
-  const mineInList = userId ? ranking.data?.find((s) => s.userId === userId) : undefined;
-  // 목록에 내가 없을 때만 따로 받는다 — 있으면 같은 줄을 두 번 받을 이유가 없다
-  const scoreUserId = ranking.data && !mineInList ? userId : undefined;
-  const myScore = useMyScoreQuery(scoreUserId, {
-    // 서버가 본 사용자의 키에만 시드한다 — 계정이 바뀌었으면 새로 받는다
-    initialData: scoreUserId !== undefined && scoreUserId === initialUserId ? initialMyScore : undefined,
-    initialDataUpdatedAt,
-  });
-  const mine = mineInList ?? myScore.data ?? null;
-
-  // ⚠ 서버 시각이 먼저다(`data-and-state.md`) — 훅은 무조건 먼저 부른다
-  const clientNowMs = useNowMs();
-  const nowMs = serverNowMs ?? clientNowMs;
+  const nowMs = useReferenceNowMs(serverNowMs);
   const round = nowMs === null ? null : predictionRound(nowMs);
 
   return (
     <>
       <SubHeader title="예측 랭킹" fallbackHref={ROUTES.transferList} />
-      {/*
-        ⚠ `relative` — 순위의 `sr-only`(position:absolute)가 프레임까지 새지 않게 한다.
-        넓은 화면(768px~)에서는 안쪽을 가운데 열로 모은다 — 스크롤 영역은 전체 폭으로 둬야 열 밖에서도 휠이 먹는다.
-        ⚠ `md:[scrollbar-gutter:stable]` — 768px부터는 스크롤바가 보이므로(`no-scrollbar`), 로딩 스켈레톤(안 넘침)에서
-          목록(넘침)으로 바뀔 때 스크롤바 폭만큼 가운데 열이 옆으로 흔들리지 않게 그 자리를 늘 잡아 둔다.
-      */}
-      <main className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto px-5 md:[scrollbar-gutter:stable] pb-[calc(32px+env(safe-area-inset-bottom))]">
+      <SubScrollArea>
         <div className="md:mx-auto md:max-w-[720px] md:pt-4">
           <header className="pt-4">
             {/* 제목은 서브헤더가 이미 보여 준다 — 같은 말을 두 번 그리지 않고 문서 구조에만 둔다(프로필과 같다) */}
@@ -82,18 +59,24 @@ export function RankingView({
           </header>
 
           {/* 내 순위 — 로그인 사용자에게만. 목록 밖이면 따로 받은 점수를 쓴다 */}
-          {userId && (
+          {myRank.state !== "none" && (
             <section aria-labelledby="my-rank-heading" className="mt-4 rounded-lg border border-hairline p-3.5">
               <h2 id="my-rank-heading" className="label-mono">
                 내 순위
               </h2>
-              {mine ? (
-                <ScoreSummary score={mine} />
-              ) : !ranking.data || myScore.isPending ? (
-                <Skeleton className="mt-2 h-[22px] w-40" />
-              ) : (
+              {myRank.state === "ready" && <ScoreSummary score={myRank.score} />}
+              {myRank.state === "loading" && <Skeleton className="mt-2 h-[22px] w-40" />}
+              {myRank.state === "empty" && (
                 <p className="mt-2 text-[13px] leading-[1.6] text-ink-mute">
                   아직 채점된 예측이 없어요.{round ? ` ${round.label} 예측은 그 창이 닫힌 뒤 채점돼요.` : ""}
+                </p>
+              )}
+              {myRank.state === "error" && (
+                <p className="mt-2 text-[13px] leading-[1.6] text-ink-mute">
+                  내 순위를 불러오지 못했어요.{" "}
+                  <button type="button" onClick={myRank.retry} className="hit-area underline underline-offset-2">
+                    다시 시도
+                  </button>
                 </p>
               )}
             </section>
@@ -185,7 +168,7 @@ export function RankingView({
             </>
           )}
         </div>
-      </main>
+      </SubScrollArea>
     </>
   );
 }

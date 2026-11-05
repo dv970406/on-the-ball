@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { ROUTES, env } from "@/shared/config";
 import { SiteInfoLinks } from "@/shared/ui";
-import { SubHeader } from "@/widgets/sub-header";
+import { SubHeader, SubScrollArea } from "@/widgets/sub-header";
 
 /**
  * 개인정보처리방침 — 「개인정보 보호법」 제30조의 기재 사항을 개인정보보호위원회 "개인정보 처리방침 작성지침"의 항목 순서로 적는다
@@ -32,6 +32,9 @@ const SECTIONS = [
   { id: "remedy", title: "권익침해 구제 방법" },
   { id: "changes", title: "처리방침의 변경" },
 ] as const;
+
+/** 절의 항 번호 — 본문의 교차 참조가 쓴다. 절을 끼워도 법정 문서가 틀린 항을 가리키지 않게 손으로 적지 않는다 */
+const sectionNo = (id: (typeof SECTIONS)[number]["id"]) => SECTIONS.findIndex((s) => s.id === id) + 1;
 
 type SectionId = (typeof SECTIONS)[number]["id"];
 
@@ -83,7 +86,7 @@ export function PrivacyView() {
   return (
     <>
       <SubHeader title="개인정보처리방침" fallbackHref={ROUTES.transferList} />
-      <main className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(32px+env(safe-area-inset-bottom))] md:[scrollbar-gutter:stable]">
+      <SubScrollArea>
         <article className="md:mx-auto md:max-w-[720px] md:pt-4">
           <header className="pt-5">
             <h1 className="text-[22px] font-semibold tracking-[-0.6px] text-ink">개인정보처리방침</h1>
@@ -102,7 +105,7 @@ export function PrivacyView() {
             <ol className="mt-2 flex flex-col gap-1 text-[13px] leading-[1.6]">
               {SECTIONS.map((s, i) => (
                 <li key={s.id}>
-                  <a href={`#${s.id}`} className="text-ink-secondary hover:text-ink">
+                  <a href={`#${s.id}`} className="inline-flex min-h-11 items-center text-ink-secondary hover:text-ink">
                     {i + 1}. {s.title}
                   </a>
                 </li>
@@ -145,7 +148,7 @@ export function PrivacyView() {
               <li>관심 목록·응원 구단·알림·댓글·성사 예측과 예측 랭킹 등 서비스 기능 제공</li>
               <li>부정 이용 방지와 서비스 안정성 확보</li>
               <li>이용 통계 분석과 서비스 개선</li>
-              <li>광고 게재와 광고 성과 측정(이용자의 관심사에 맞춘 광고를 포함합니다 — 9항)</li>
+              <li>광고 게재와 광고 성과 측정(이용자의 관심사에 맞춘 광고를 포함합니다 — {sectionNo("behavioral")}항)</li>
             </ul>
           </Section>
 
@@ -180,7 +183,7 @@ export function PrivacyView() {
             </p>
             <dl className="mt-4 flex flex-col gap-2.5">
               <Entry title="Supabase Inc. (미국)">
-                회원 인증, 데이터베이스와 프로필 사진 저장. 1항의 회원 정보와 이용 중 생성된 정보 전부. 데이터는 대한민국(서울) 리전의
+                회원 인증, 데이터베이스와 프로필 사진 저장. {sectionNo("items")}항의 회원 정보와 이용 중 생성된 정보 전부. 데이터는 대한민국(서울) 리전의
                 서버에 저장됩니다.
               </Entry>
               <Entry title="Vercel Inc. (미국)">웹사이트 호스팅과 전송. 접속 IP 주소, 브라우저 정보, 접속 기록.</Entry>
@@ -231,7 +234,7 @@ export function PrivacyView() {
             <ul className={UL}>
               <li>로그인 유지(필수) — 거부하면 로그인이 필요한 기능을 쓸 수 없습니다.</li>
               <li>이용 통계 분석 — Google Analytics가 방문 페이지와 이용 흐름을 집계합니다.</li>
-              <li>광고 — Google AdSense가 광고를 게재하고 성과를 측정합니다(9항).</li>
+              <li>광고 — Google AdSense가 광고를 게재하고 성과를 측정합니다({sectionNo("behavioral")}항).</li>
             </ul>
             <p className={P}>
               이용자는 브라우저 설정에서 쿠키 저장을 거부하거나 저장된 쿠키를 삭제할 수 있습니다(Chrome: 설정 → 개인정보 보호 및 보안 →
@@ -313,7 +316,7 @@ export function PrivacyView() {
 
           <SiteInfoLinks className="mt-10 border-t border-hairline pt-2" />
         </article>
-      </main>
+      </SubScrollArea>
     </>
   );
 }
