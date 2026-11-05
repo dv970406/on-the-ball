@@ -84,7 +84,12 @@ export function usePushToggle(source: PushSource) {
       const existing = await browserStep(getPushSubscription);
       // 옛 공개키에 묶인 구독은 내 것이어도 쓸 수 없다(발송이 거부된다) — 서버의 행을 지우고 새로 받는다
       if (existing !== null && !pushSubscriptionUsesKey(existing, env.vapidPublicKey)) {
-        await supabase.from("profiles_push_subscription").delete().eq("endpoint", existing.endpoint);
+        const { error: staleError } = await supabase.from("profiles_push_subscription").delete().eq("endpoint", existing.endpoint);
+        if (staleError) {
+          // 지우지 못한 채 구독을 버리면 지울 주소를 잃는다 — 여기서 멈추고 다음 시도가 다시 지운다
+          console.error("[push] 옛 공개키 구독 삭제 실패:", staleError);
+          throw new Error(await toWriteErrorMessage(supabase, staleError));
+        }
         await browserStep(() => existing.unsubscribe());
       } else if (existing !== null) {
         const { data, error } = await buildOwnSubscriptionQuery(supabase, existing.endpoint);
@@ -101,7 +106,7 @@ export function usePushToggle(source: PushSource) {
       const subscription = await browserStep(() => subscribePush(env.vapidPublicKey));
       const row = serializePushSubscription(subscription);
       if (row === null) {
-        await subscription.unsubscribe();
+        await browserStep(() => subscription.unsubscribe());
         throw new Error("이 브라우저에서는 알림을 켤 수 없어요.");
       }
 
@@ -117,12 +122,17 @@ export function usePushToggle(source: PushSource) {
        * (`api-and-db.md`의 "설명과 흡수" 표).
        */
       if (error.code === "23505") {
-        const { data: mine } = await buildOwnSubscriptionQuery(supabase, row.endpoint);
+        const { data: mine, error: mineError } = await buildOwnSubscriptionQuery(supabase, row.endpoint);
         if (mine) return;
+        // 확인이 실패한 것을 "남의 행"으로 접으면 방금 저장된 내 구독을 버릴 수 있다 — 구독을 두고 실패만 알린다
+        if (mineError) {
+          console.error("[push] 구독 확인 실패:", mineError);
+          throw new Error(await toWriteErrorMessage(supabase, mineError));
+        }
       }
 
       console.error("[push] 구독 저장 실패:", error);
-      await subscription.unsubscribe();
+      await browserStep(() => subscription.unsubscribe());
       // 23505(남의 행이 그 주소를 쥐고 있다)·23514(브라우저가 준 주소·키가 형식 밖이다)는 사용자가 입력한 값이
       // 아니라서 일반 문구("입력한 내용을 다시 확인해 주세요")가 뜻이 어긋난다 → 할 수 있는 일을 말한다
       if (error.code === "23505" || error.code === "23514") {

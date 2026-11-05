@@ -62,3 +62,13 @@ export interface CommentList {
 
 /** 루트 댓글 정렬 — 인기순(좋아요 − 싫어요) · 최신순. 답글은 정렬하지 않고 작성순이다 */
 export type CommentSort = "top" | "latest";
+
+/**
+ * 표 뮤테이션의 변수 중 조회 쪽 덮어 넣기(`applyPendingVotes`)가 읽는 것 — `features/vote-comment`의 변수가 이것을 잇는다.
+ * ⚠ 이어야 컴파일이 묶는다 — 필드 이름이 갈리면 타입 가드만 조용히 `false`가 되어 "방금 누른 표가 되돌아가는" 사고가 무증상으로 돌아온다.
+ */
+export interface VoteMutationVariables {
+  commentId: number;
+  userId: string;
+  next: CommentVote;
+}

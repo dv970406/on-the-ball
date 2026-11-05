@@ -50,3 +50,10 @@ export interface PredictionScore {
   scored: PredictionScoreRow["scored"];
   rank: PredictionScoreRow["rank"];
 }
+
+/** 예측 뮤테이션의 변수 중 조회 쪽 덮어 넣기(`applyPendingPicks`)가 읽는 것 — `features/predict-deal`의 변수가 이것을 잇는다(사유는 댓글 표의 `VoteMutationVariables`) */
+export interface PickMutationVariables {
+  userId: string;
+  roundKey: string;
+  next: boolean;
+}

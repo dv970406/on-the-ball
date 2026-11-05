@@ -32,7 +32,11 @@ export function usePushStatusQuery(userId: string | undefined) {
       if (support !== "supported") return support;
       if (Notification.permission === "denied") return "denied";
 
-      const subscription = await getPushSubscription();
+      // ⚠ 브라우저 예외는 영문이다 — 화면에 그대로 내보내지 않고 원본은 콘솔에 남긴다(`data-and-state.md`)
+      const subscription = await getPushSubscription().catch((e: unknown) => {
+        console.error("[push] 브라우저 구독 확인 실패:", e);
+        throw new Error("이 브라우저의 알림 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.");
+      });
       // 권한이 `default`로 되돌아갔는데 구독만 남은 경우도 꺼진 것으로 본다(다시 켜면 권한부터 묻는다)
       if (subscription === null || Notification.permission !== "granted") return "off";
       // 옛 공개키에 묶인 구독은 발송이 전부 거부된다 — 받는 중이라고 그리지 않는다(다시 켜면 새로 받는다)

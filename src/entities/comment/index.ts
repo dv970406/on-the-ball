@@ -1,9 +1,10 @@
-// ⚠ "use client" 모듈 포함 — 서버에서는 model/types·api/mappers·api/keys·api/list-query를 직접 import한다.
+// ⚠ "use client" 모듈 포함 — 서버에서는 model/types·api/mappers·api/list-query를 직접 import한다.
 export type {
   Comment,
   CommentList,
   CommentSort,
   CommentVote,
+  VoteMutationVariables,
 } from "./model/types";
 export { commentKeys } from "./api/keys";
 // ⚠ 상한은 서버 안전한 api/mappers에 있다 — SSR 프리페치가 같은 값을 쓰고 화면이 잘림을 말한다

@@ -3,11 +3,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { SIGN_IN_REQUIRED_MESSAGE, requireBrowserSupabase, toWriteErrorMessage } from "@/shared/api";
 import { track, useToast } from "@/shared/lib";
-import { applyPick, myPickOf, predictionKeys, recordSettledPick, type DealPrediction } from "@/entities/prediction";
+import { applyPick, myPickOf, predictionKeys, recordSettledPick, type DealPrediction, type PickMutationVariables } from "@/entities/prediction";
 import { useSessionStore } from "@/entities/session";
 import { transferKeys } from "@/entities/transfer";
 
-export interface PredictDealVariables {
+export interface PredictDealVariables extends PickMutationVariables {
   /**
    * 누른 사람 — 낙관적 갱신·롤백은 **이 사용자의 캐시 하나만** 건드린다(내 표가 "내 행만"이라 키가 사용자별이다).
    * 누른 뒤 계정이 바뀌면 요청을 보내지 않는다.
@@ -112,6 +112,8 @@ export function usePredictDeal(dealId: number) {
     },
 
     onError: (error, { userId, roundKey }, rollback) => {
+      // 줄 서 있는 동안 그 사용자가 떠났다 — 되돌릴 캐시도 알릴 사람도 없다(방금 로그아웃한 화면에 "로그인이 필요해요"가 뜬다)
+      if (useSessionStore.getState().user?.id !== userId) return;
       // 같은 딜에 뒤따라 줄 선 요청이 없을 때만 누르기 직전 값으로 되돌린다(자기 자신은 아직 pending이다) —
       // 있으면 그 요청의 낙관적 갱신을 지우게 된다. 어느 쪽이든 줄 끝에서 서버 값으로 맞춘다.
       const pending = queryClient.isMutating({ mutationKey: predictionKeys.predictMutation(dealId) });
@@ -134,6 +136,8 @@ export function usePredictDeal(dealId: number) {
         // 실패의 흔한 사유가 "결과가 나왔다"(P0001)다 — 화면이 연 사이 딜이 오피셜이 됐으면 카드를 닫으려면 딜 단계도 다시 받아야 한다
         //   이 딜의 상세만이다(사용자 스코프 무관 — `detail(id, userId)`의 앞부분). 다른 딜의 상세까지 다시 받지 않는다
         queryClient.invalidateQueries({ queryKey: transferKeys.detailAll(dealId) });
+        // 보드의 오른쪽 판은 목록 캐시의 딜로 그린다 — 목록도 받아야 판의 카드가 닫힌다. 실패에만 걸리는 경로라 누른 수만큼 조회가 늘지 않는다
+        queryClient.invalidateQueries({ queryKey: transferKeys.lists() });
         return;
       }
       queryClient.invalidateQueries({ queryKey: scope, refetchType: "none" });

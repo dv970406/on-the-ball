@@ -1,21 +1,18 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
+import { useId } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import { ROUTES, predictionRound, transferWindowByKey } from "@/shared/config";
+import { ROUTES } from "@/shared/config";
 import { cn, formatCount } from "@/shared/lib";
 import { Icon, Skeleton, chipClassName } from "@/shared/ui";
 import {
-  latestVotedRound,
-  myPickOf,
   tallyOf,
   yesShare,
   type DealPrediction,
   type PredictionTally,
 } from "@/entities/prediction";
-import { useSessionStore } from "@/entities/session";
-import { usePredictDeal } from "../model/use-predict-deal";
+import { usePredictionChoice } from "../model/use-prediction-choice";
 
 interface PredictionCardProps {
   dealId: number;
@@ -75,48 +72,12 @@ export function PredictionCard({
   className = "mt-3",
 }: PredictionCardProps) {
   const headingId = useId();
-  const status = useSessionStore((s) => s.status);
-  const predict = usePredictDeal(dealId);
-  const requestedRef = useRef<boolean | null>(null);
-
-  // 닫힌 딜은 표가 있는 마지막 회차를, 열린 딜은 지금 받는 회차를 그린다
-  const round = settled
-    ? (() => {
-        const key = latestVotedRound(prediction);
-        return key ? (transferWindowByKey(key) ?? { key, label: key }) : null;
-      })()
-    : nowMs === null
-      ? null
-      : predictionRound(nowMs);
-  const pick = round ? myPickOf(prediction, round.key) : null;
-
-  // 캐시가 따라오면(낙관적 갱신·롤백·재조회로 내 표가 바뀌면) 다시 캐시를 믿는다
-  useEffect(() => {
-    requestedRef.current = null;
-  }, [pick]);
-  // 요청이 끝나도 다시 캐시를 믿는다 — 캐시에 데이터가 없어 낙관적 갱신이 아무것도 고치지 못했으면(다른 탭에서 로그인한 새 키)
-  // `pick`이 그대로라 위 effect가 돌지 않고, 같은 버튼이 "이미 골랐다"로 삼켜졌다
-  useEffect(() => {
-    if (!predict.isPending) requestedRef.current = null;
-  }, [predict.isPending]);
+  const { status, round, pick, choose } = usePredictionChoice({ dealId, settled, prediction, userId, nowMs, onSignInRequired });
 
   if (!round) return null;
 
   const tally = tallyOf(prediction, round.key);
   const revealed = settled || pick !== null;
-
-  const choose = (next: boolean) => {
-    if (status === "loading") return;
-    if (status === "guest" || !userId) {
-      onSignInRequired("성사 여부를 예측하려면");
-      return;
-    }
-    const current = requestedRef.current ?? pick;
-    // 고른 것을 다시 누르면 아무 일도 하지 않는다(거두기가 없다)
-    if (current === next) return;
-    requestedRef.current = next;
-    predict.mutate({ userId, roundKey: round.key, current, next });
-  };
 
   return (
     <section aria-labelledby={headingId} className={cn("rounded-lg border border-hairline p-3.5", className)}>
@@ -141,7 +102,7 @@ export function PredictionCard({
       {!prediction && error && (
         <p className="mt-3 text-[13px] leading-[1.5] text-ink-mute">
           예측을 불러오지 못했어요.{" "}
-          <button type="button" onClick={onRetry} className="font-medium text-ink underline underline-offset-2">
+          <button type="button" onClick={onRetry} className="hit-area font-medium text-ink underline underline-offset-2">
             다시 시도
           </button>
         </p>

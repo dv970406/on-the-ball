@@ -21,10 +21,14 @@ interface WatchSnapshot {
   details: [QueryKey, TransferDeal | null | undefined][];
 }
 
-/** 관심 상태를 뒤집은 사본 — 목록 항목·상세 모두 같은 필드(`isWatched`)를 쓴다 */
-function toggled<T extends Pick<TransferDeal, "id" | "isWatched">>(deal: T, dealId: number): T {
+/**
+ * 목표 관심 상태를 입힌 사본(멱등) — 목록 항목·상세 모두 같은 필드(`isWatched`)를 쓴다.
+ * ⚠ 뒤집지 않는다 — 같은 tick의 두 클릭은 둘 다 "담기"로 나가는데 뒤집으면 캐시만 두 번 뒤집혀 "안 담김"이 되고,
+ *   목록 캐시는 stale 표시뿐이라 다음 마운트까지 거짓으로 남는다.
+ */
+function withWatched<T extends Pick<TransferDeal, "id" | "isWatched">>(deal: T, dealId: number, watched: boolean): T {
   if (deal.id !== dealId) return deal;
-  return { ...deal, isWatched: !deal.isWatched };
+  return deal.isWatched === watched ? deal : { ...deal, isWatched: watched };
 }
 
 /**
@@ -58,18 +62,20 @@ export function useToggleTransferWatch() {
       if (!user) throw new Error(SIGN_IN_REQUIRED_MESSAGE);
 
       if (watched) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("transfer_deal_watch")
           .delete()
           .eq("user_id", user.id)
-          .eq("deal_id", dealId);
+          .eq("deal_id", dealId)
+          .select("deal_id");
         // ⚠ RLS 위반은 에러가 아니라 0행이다 — 다만 여기서는 "이미 빠져 있음"도 목표 상태라
         //   0행을 실패로 승격하지 않는다(멱등).
         if (error) {
           console.error("[transfer-watch] 관심 해제 실패:", error);
           throw new Error(await toWriteErrorMessage(supabase, error));
         }
-        return true;
+        // 실제로 뺀 행이 있을 때만 "바뀌었다"다 — 이미 빠진 딜을 또 뺀 요청을 분석이 세지 않게
+        return data.length > 0;
       }
 
       const { error } = await supabase
@@ -82,7 +88,7 @@ export function useToggleTransferWatch() {
       return !error;
     },
 
-    onMutate: async ({ dealId }) => {
+    onMutate: async ({ dealId, watched }) => {
       // 진행 중인 리페치가 낙관적 값을 덮어쓰지 못하게 먼저 취소한다.
       // ⚠ `isWatched`를 담은 두 캐시(목록·상세)만 취소한다 — `transferKeys.all`로 넓히면 관심과 무관한 조회
       //   (보도 타임라인·구단 목록·응원 구단)까지 되돌려, 처음 받던 중이던 조회가 데이터 없이 멈춘다.
@@ -102,10 +108,10 @@ export function useToggleTransferWatch() {
 
       // setQueryData가 아니라 setQueriesData(복수형) — 캐시가 여러 키에 존재할 수 있다
       queryClient.setQueriesData<TransferDealListItem[]>({ queryKey: transferKeys.lists() }, (old) =>
-        old ? old.map((deal) => toggled(deal, dealId)) : old,
+        old ? old.map((deal) => withWatched(deal, dealId, !watched)) : old,
       );
       queryClient.setQueriesData<TransferDeal | null>({ queryKey: transferKeys.details() }, (old) =>
-        old ? toggled(old, dealId) : old,
+        old ? withWatched(old, dealId, !watched) : old,
       );
 
       return snapshot;

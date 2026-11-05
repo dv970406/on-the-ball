@@ -1,5 +1,5 @@
 // ⚠ "use client" 쿼리 훅을 포함한다 — 서버에서는 아래를 **직접 경로로** 가져간다.
-//    model/types · api/keys · api/mappers (전부 순수·서버 안전)
+//    model/types · api/mappers (전부 순수·서버 안전)
 //    transfer 슬라이스와 같은 형태다(architecture.md의 서버/클라이언트 경계).
 //
 // ⚠ **다른 레이어가 소비하지 않는 것은 올리지 않는다.** `MyProfile`·`ProfileRow`·`PROFILE_SELECT`·

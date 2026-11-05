@@ -9,10 +9,11 @@ import {
   recordSettledVote,
   type CommentList,
   type CommentVote,
+  type VoteMutationVariables,
 } from "@/entities/comment";
 import { useSessionStore } from "@/entities/session";
 
-export interface VoteCommentVariables {
+export interface VoteCommentVariables extends VoteMutationVariables {
   commentId: number;
   /**
    * 누른 사람 — 낙관적 갱신·롤백은 **이 사용자의 목록 캐시 하나만** 건드리고, 목록 조회는 같은 사용자의
@@ -82,7 +83,6 @@ const needsResync = new Set<number>();
  */
 export function useVoteComment(dealId: number) {
   const queryClient = useQueryClient();
-  const user = useSessionStore((s) => s.user);
   const toast = useToast();
 
   return useMutation<{ resync: boolean }, Error, VoteCommentVariables, VoteRollback>({
@@ -91,6 +91,8 @@ export function useVoteComment(dealId: number) {
     mutationFn: async ({ commentId, userId, current, next }) => {
       const supabase = requireBrowserSupabase();
       // 누른 뒤 로그아웃·계정 전환이 끼면 다른 사람 명의로 보내지 않는다(RLS도 막지만 문구가 뭉개진다)
+      // ⚠ 세션은 **실행하는 순간에** 읽는다 — 줄 선 뮤테이션은 만들 때의 클로저를 들고 있어 렌더 때 구독한 값으로는 전환을 보지 못한다
+      const user = useSessionStore.getState().user;
       if (!user || user.id !== userId) throw new Error(SIGN_IN_REQUIRED_MESSAGE);
       const fail = async (error: unknown, what: string) => {
         console.error(`[comment-vote] ${what} 실패:`, error);
@@ -158,8 +160,9 @@ export function useVoteComment(dealId: number) {
     onSuccess: ({ resync }, { commentId, userId, next }) => {
       // 이 표보다 먼저 시작해 나중에 도착하는 조회가 이 표를 빠뜨려도 다시 입힐 수 있게 기억한다
       recordSettledVote(dealId, { commentId, userId, next });
+      // 대상이 없었던 표(0행 — `resync`)는 일어난 일이 아니다 — 세지 않는다
       if (resync) needsResync.add(dealId);
-      track("comment_vote", { deal_id: dealId, value: next });
+      else track("comment_vote", { deal_id: dealId, value: next });
     },
 
     onError: (error, { commentId, userId }, rollback) => {
