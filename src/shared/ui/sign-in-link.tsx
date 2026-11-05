@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { MouseEvent, SyntheticEvent } from "react";
 import { signInWithNext } from "@/shared/config";
-import { currentReturnPath } from "@/shared/lib";
+import { currentReturnPath, isPlainClick } from "@/shared/lib";
 import { buttonClassName } from "./button-class";
 
 /**
@@ -46,7 +46,7 @@ export function SignInLink() {
 
   const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
     const target = syncHref(event.currentTarget);
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    if (!isPlainClick(event)) return;
 
     event.preventDefault();
     router.push(target);

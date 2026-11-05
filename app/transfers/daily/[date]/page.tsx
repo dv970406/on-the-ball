@@ -2,7 +2,7 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { notFound, unstable_rethrow } from "next/navigation";
-import { NOT_FOUND_TITLE, OG_IMAGE, OG_SITE, ROUTES, absoluteUrl } from "@/shared/config";
+import { NOT_FOUND_METADATA, ROUTES, pageMetadata } from "@/shared/config";
 import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
 import { kstDateKey, kstDateLabel, parseKstDateKey } from "@/shared/lib/date-key";
 import { clamp } from "@/shared/lib/text";
@@ -11,9 +11,6 @@ import { queryTransferDay } from "@/entities/transfer/api/list-query";
 import { playerName } from "@/entities/transfer/lib/player-name";
 import type { TransferDay } from "@/entities/transfer/model/types";
 import { TransferDayView } from "@/views/transfer-day";
-
-/** 없는 날·형식이 틀린 키 — `Page`가 `notFound()`를 부르므로 **404 화면과 같은 제목**이어야 한다 */
-const NOT_FOUND_METADATA: Metadata = { title: NOT_FOUND_TITLE };
 
 type DayHead =
   | {
@@ -85,22 +82,10 @@ export async function generateMetadata(props: PageProps<"/transfers/daily/[date]
 
   const description = dayDescription(label, head.day);
   return {
-    title,
-    description,
-    alternates: { canonical: ROUTES.transferDay(date) },
+    ...pageMetadata({ title, description, path: ROUTES.transferDay(date) }),
     // ⚠ 소식이 아직 없는 오늘은 색인하지 않는다 — 빈 화면이 그 날의 검색 결과로 굳지 않게. 소식이 들어오면 다음 크롤이 색인한다.
     //   canonical은 자기 자신이라 `noindex`와 상충하지 않는다(상충은 canonical이 다른 주소를 가리킬 때다 — `nextjs.md` 필터 절).
     ...(head.day.entries.length === 0 ? { robots: { index: false, follow: true } } : {}),
-    // ⚠ openGraph를 채우는 순간 루트 이미지 상속이 사라지므로 `images`를 함께 명시한다. `og:url`은 Next가 만들지 않는다
-    openGraph: {
-      ...OG_SITE,
-      type: "website",
-      title,
-      description,
-      url: absoluteUrl(ROUTES.transferDay(date)),
-      images: OG_IMAGE,
-    },
-    twitter: { card: "summary_large_image", title, description, images: OG_IMAGE },
   };
 }
 

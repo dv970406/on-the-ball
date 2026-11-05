@@ -1,7 +1,7 @@
 import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound, unstable_rethrow } from "next/navigation";
-import { NOT_FOUND_TITLE, OG_IMAGE, OG_SITE, ROUTES, absoluteUrl, boardScopeStartMs, trackedTransferWindow } from "@/shared/config";
+import { NOT_FOUND_METADATA, ROUTES, boardScopeStartIso, pageMetadata, trackedTransferWindow } from "@/shared/config";
 import { createSupabaseServerClient, hasSessionCookie } from "@/shared/api/supabase-server";
 import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
 import { clamp } from "@/shared/lib/text";
@@ -14,9 +14,7 @@ import { splitClubDeals } from "@/entities/transfer/lib/club-deals";
 import { playerName } from "@/entities/transfer/lib/player-name";
 import type { TransferClub, TransferDealListItem } from "@/entities/transfer/model/types";
 import { TransferClubView } from "@/views/transfer-club";
-
-/** 없는 구단·형식이 틀린 코드 — `Page`가 `notFound()`를 부르므로 **404 화면과 같은 제목**이어야 한다 */
-const NOT_FOUND_METADATA: Metadata = { title: NOT_FOUND_TITLE };
+import { prefetchedRows } from "@/shared/api/prefetch";
 
 type ClubHead =
   | {
@@ -36,11 +34,6 @@ type ClubHead =
   /** 구단 표를 받았는데 그 코드가 없다(또는 5대 리그 밖이다) → 404 */
   | { state: "missing" };
 
-/** 분 단위로 내린 ISO — 캐시 키가 요청 수만큼 늘지 않게(보드와 같다) */
-function toMinuteIso(ms: number): string {
-  return new Date(Math.floor(ms / 60_000) * 60_000).toISOString();
-}
-
 /**
  * ⚠ `cache()`로 감싼다 — `generateMetadata`(구단 이름·딜 수)와 `Page`가 같은 데이터를 쓴다. 인자는 **원시값**(코드)이다.
  *
@@ -54,7 +47,7 @@ function toMinuteIso(ms: number): string {
  */
 const fetchClubHead = cache(async (code: string): Promise<ClubHead> => {
   const nowMs = Date.now();
-  const scopeStartIso = toMinuteIso(boardScopeStartMs(nowMs));
+  const scopeStartIso = boardScopeStartIso(nowMs);
   const unknown = { state: "unknown", userId: undefined, nowMs, scopeStartIso } as const;
   try {
     const anon = createSupabaseAnonClient();
@@ -69,14 +62,10 @@ const fetchClubHead = cache(async (code: string): Promise<ClubHead> => {
       signedIn ? supabase.auth.getClaims() : null,
     ]);
     const userId = auth?.data?.claims.sub;
-    const deals = dealsResult.error ? undefined : (dealsResult.data ?? []).map(buildDealListItem);
-    if (dealsResult.error) console.error("[transfers/club/[code]] 딜 목록 조회 실패:", dealsResult.error);
-
-    if (clubsResult.error) {
-      console.error("[transfers/club/[code]] 구단 조회 실패:", clubsResult.error);
-      return { ...unknown, deals, userId };
-    }
-    const clubs = buildClubList(clubsResult.data ?? []);
+    const deals = prefetchedRows("[transfers/club/[code]] 딜 목록 조회", dealsResult)?.map(buildDealListItem);
+    const clubRows = prefetchedRows("[transfers/club/[code]] 구단 조회", clubsResult);
+    if (!clubRows) return { ...unknown, deals, userId };
+    const clubs = buildClubList(clubRows);
     const club = clubs.find((c) => c.code === code);
     if (!club) return { state: "missing" };
     return { state: "found", clubs, club, deals, userId, nowMs, scopeStartIso };
@@ -114,22 +103,7 @@ export async function generateMetadata(props: PageProps<"/transfers/club/[code]"
   const { club, deals, nowMs } = head;
   const title = `${club.shortName} 이적시장 · 영입·방출 소식`;
   const description = clubDescription(club, deals, trackedTransferWindow(nowMs).label);
-  return {
-    title,
-    description,
-    // ⚠ 자기 참조 canonical — 추적 파라미터가 붙은 주소가 별개 페이지로 색인되지 않게
-    alternates: { canonical: ROUTES.transferClub(code) },
-    // ⚠ openGraph를 채우는 순간 루트 이미지 상속이 사라지므로 `images`를 함께 명시한다. `og:url`은 Next가 만들지 않는다
-    openGraph: {
-      ...OG_SITE,
-      type: "website",
-      title,
-      description,
-      url: absoluteUrl(ROUTES.transferClub(code)),
-      images: OG_IMAGE,
-    },
-    twitter: { card: "summary_large_image", title, description, images: OG_IMAGE },
-  };
+  return pageMetadata({ title, description, path: ROUTES.transferClub(code) });
 }
 
 /**

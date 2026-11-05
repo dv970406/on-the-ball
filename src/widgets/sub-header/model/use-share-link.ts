@@ -1,6 +1,6 @@
 "use client";
 
-import { env } from "@/shared/config";
+import { env, isDealDetailPath } from "@/shared/config";
 import { track, useToast } from "@/shared/lib";
 import { preloadKakao, shareToKakao } from "./kakao-share";
 import { shareUrl } from "./share-url";
@@ -11,7 +11,7 @@ import { shareUrl } from "./share-url";
  *   하단 바 판정(`hasBottomBar`)과 같은 기준이다.
  */
 function contentType(): string {
-  return /^\/transfers\/\d+$/.test(window.location.pathname) ? "deal" : "page";
+  return isDealDetailPath(window.location.pathname) ? "deal" : "page";
 }
 
 /**

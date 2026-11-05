@@ -4,7 +4,7 @@ import { notFound, unstable_rethrow } from "next/navigation";
 // ⚠ **새 파서를 만들지 않는다.** 하는 일이 "URL의 [id] → 엄격한 십진수 id"라 게시글 전용이
 //   아니고, 이름은 첫 호출자를 기록할 뿐이다.
 import { parsePostId } from "@/shared/lib/post-id";
-import { NOT_FOUND_TITLE, OG_SITE, ROUTES, absoluteUrl } from "@/shared/config";
+import { NOT_FOUND_METADATA, ROUTES } from "@/shared/config";
 import { createSupabaseServerClient, hasSessionCookie } from "@/shared/api/supabase-server";
 // ⚠ 배럴이 아니라 직접 경로 — 조립·매퍼·단계 라벨은 "use client"가 없어 서버에서 쓸 수 있다.
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -12,7 +12,7 @@ import type { Database } from "@/types/database.types";
 import { buildDealQuery, buildRelatedDealsQuery, buildReportsQuery } from "@/entities/transfer/api/list-query";
 import { buildDeal, buildDealListItem, buildReport } from "@/entities/transfer/api/mappers";
 // 제목·설명은 보드의 `?deal=` 공유와 같은 함수다 — 같은 딜이 어느 주소로 공유되든 같은 말을 한다
-import { dealMetaDescription, dealMetaTitle } from "@/entities/transfer/lib/deal-meta";
+import { dealMetaDescription, dealMetaTitle, dealShareCard } from "@/entities/transfer/lib/deal-meta";
 import type { TransferDeal, TransferDealListItem, TransferReport } from "@/entities/transfer/model/types";
 import { buildCommentListQuery } from "@/entities/comment/api/list-query";
 import { buildCommentList } from "@/entities/comment/api/mappers";
@@ -21,6 +21,7 @@ import { buildMyPredictionsQuery, buildTallyQuery } from "@/entities/prediction/
 import { buildDealPrediction } from "@/entities/prediction/api/mappers";
 import type { DealPrediction } from "@/entities/prediction/model/types";
 import { TransferDetailView } from "@/views/transfer-detail";
+import { prefetchedRows } from "@/shared/api/prefetch";
 
 /**
  * 조회가 실패했을 때(`unknown`) — 화면은 200으로 뜨고 클라이언트 조회로 폴백한다.
@@ -30,8 +31,6 @@ import { TransferDetailView } from "@/views/transfer-detail";
 function fallbackMetadata(dealId: number): Metadata {
   return { title: "딜 상세", alternates: { canonical: ROUTES.transfer(dealId) } };
 }
-/** 없는 딜·형식이 틀린 id — `Page`가 `notFound()`를 부르므로 **404 화면과 같은 제목**이어야 한다. */
-const NOT_FOUND_METADATA: Metadata = { title: NOT_FOUND_TITLE };
 
 type DealHead =
   | {
@@ -102,7 +101,10 @@ async function fetchDealWithRelated(
   dealId: number,
 ): Promise<{ state: "unknown" | "missing" } | { state: "found"; deal: TransferDeal; related: TransferDealListItem[] | undefined }> {
   const { data, error } = await buildDealQuery(supabase, dealId);
-  if (error) return { state: "unknown" };
+  if (error) {
+    console.error("[transfers/[id]] 딜 조회 실패:", error);
+    return { state: "unknown" };
+  }
   if (!data) return { state: "missing" };
   const deal = buildDeal(data);
   return { state: "found", deal, related: await fetchRelatedDeals(supabase, deal) };
@@ -129,10 +131,10 @@ const fetchDealHead = cache(async (dealId: number): Promise<DealHead> => {
     const [
       { data: auth },
       head,
-      { data: reportRows, error: reportsError },
-      { data: commentRows, error: commentsError },
-      { data: tallyRows, error: tallyError },
-      { data: myPredictionRows, error: myPredictionsError },
+      reportsResult,
+      commentsResult,
+      tallyResult,
+      myPredictionsResult,
     ] = await Promise.all([
       // `getClaims()` — 서명 키로 토큰을 로컬 검증한다(GoTrue 왕복 없음 — `proxy.ts` 주석)
       supabase.auth.getClaims(),
@@ -151,12 +153,12 @@ const fetchDealHead = cache(async (dealId: number): Promise<DealHead> => {
 
     // ⚠ 곁다리 조회가 실패해도 **본문은 그대로 내보낸다** — 타임라인만 접는다(`undefined`).
     //   `[]`로 접으면 "보도가 없다"는 다른 뜻이 되어 화면이 거짓말한다.
-    const reports = reportsError ? undefined : (reportRows ?? []).map(buildReport);
-    const comments = commentsError ? undefined : buildCommentList(commentRows ?? []);
-    const prediction =
-      tallyError || myPredictionsError
-        ? undefined
-        : buildDealPrediction(tallyRows ?? [], myPredictionRows ?? []);
+    const reports = prefetchedRows("[transfers/[id]] 보도 타임라인 조회", reportsResult)?.map(buildReport);
+    const commentRows = prefetchedRows("[transfers/[id]] 댓글 조회", commentsResult);
+    const comments = commentRows && buildCommentList(commentRows);
+    const tallyRows = prefetchedRows("[transfers/[id]] 예측 집계 조회", tallyResult);
+    const myPredictionRows = prefetchedRows("[transfers/[id]] 내 예측 조회", myPredictionsResult);
+    const prediction = tallyRows && myPredictionRows && buildDealPrediction(tallyRows, myPredictionRows);
 
     return {
       state: "found",
@@ -189,27 +191,13 @@ export async function generateMetadata(props: PageProps<"/transfers/[id]">): Pro
   if (head.state !== "found") return fallbackMetadata(dealId);
 
   const { deal } = head;
-  const title = dealMetaTitle(deal);
-  const description = dealMetaDescription(deal, head.reports);
-
   return {
-    title,
-    description,
+    title: dealMetaTitle(deal),
+    description: dealMetaDescription(deal, head.reports),
     // ⚠ 자기 참조 canonical — 추적 파라미터가 붙은 URL이 별개 페이지로 색인되는 것을 막는다.
     alternates: { canonical: ROUTES.transfer(dealId) },
-    // ⚠ **`images`를 적지 않는다.** 이 세그먼트의 이미지는 같은 폴더의 `opengraph-image.tsx`(딜마다 그리는 카드)가
-    //   낸다 — 여기에 `images`를 적으면 그 값이 파일 컨벤션을 **이겨서** 카드 대신 사이트 공통 이미지가 나간다(실측).
-    //   `twitter:image`도 그 파일에서 함께 나온다. `og:url`은 Next가 만들어 주지 않아 직접 적는다.
-    openGraph: {
-      ...OG_SITE,
-      type: "article",
-      title,
-      description,
-      url: absoluteUrl(ROUTES.transfer(dealId)),
-      // 화면이 그리는 값과 같은 판정 — "업데이트 N분 전"이 곧 최신 보도 시각이다
-      modifiedTime: deal.latestReportedAt,
-    },
-    twitter: { card: "summary_large_image", title, description },
+    // ⚠ `images`를 넘기지 않는다 — 이 세그먼트의 이미지는 같은 폴더의 `opengraph-image.tsx`가 낸다(`dealShareCard` 주석)
+    ...dealShareCard(deal, head.reports),
   };
 }
 
@@ -224,16 +212,17 @@ export default async function Page(props: PageProps<"/transfers/[id]">) {
   if (head.state === "missing") notFound();
 
   // state가 "unknown"이면 404로 단정하지 않고 화면을 띄운다(클라이언트 조회로 폴백)
+  const found = head.state === "found" ? head : undefined;
   return (
     <TransferDetailView
       dealId={dealId}
-      initialDeal={head.state === "found" ? head.deal : undefined}
-      initialReports={head.state === "found" ? head.reports : undefined}
-      initialComments={head.state === "found" ? head.comments : undefined}
-      initialPrediction={head.state === "found" ? head.prediction : undefined}
-      initialUserId={head.state === "found" ? head.userId : undefined}
-      serverNowMs={head.state === "found" ? head.nowMs : undefined}
-      relatedDeals={head.state === "found" ? head.related : undefined}
+      initialDeal={found?.deal}
+      initialReports={found?.reports}
+      initialComments={found?.comments}
+      initialPrediction={found?.prediction}
+      initialUserId={found?.userId}
+      serverNowMs={found?.nowMs}
+      relatedDeals={found?.related}
     />
   );
 }

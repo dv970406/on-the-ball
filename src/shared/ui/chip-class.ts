@@ -15,7 +15,8 @@ import { cn } from "@/shared/lib/cn";
  */
 export function chipClassName(selected: boolean, className?: string) {
   return cn(
-    "shrink-0 rounded-sm border px-[13px] py-[9px] text-[13px] font-medium leading-none",
+    // `hit-area` — 겉 높이 33px는 그대로 두고 누르는 영역만 44px로 넓힌다. 줄 간격(6~8px)이 넓힌 영역을 다음 칩까지 닿게 하지는 않는다
+    "hit-area shrink-0 rounded-sm border px-[13px] py-[9px] text-[13px] font-medium leading-none",
     "transition-[background-color,border-color] duration-150 ease-otb",
     selected
       ? "border-ink bg-ink text-white"

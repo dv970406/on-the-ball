@@ -1,7 +1,9 @@
-import { RUMOR_CAROUSEL_WINDOW_MS } from "../api/mappers";
 import { credibilityOf, isTopCredibility } from "./credibility";
 import { isDeadStage } from "./stage";
 import type { TransferDealListItem } from "../model/types";
+
+/** "최근 3일 소식" 캐러셀의 창 */
+const RUMOR_CAROUSEL_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
 /**
  * "최근 3일 소식" 캐러셀에 실을 딜 — 최신 보도가 **믿을 만한 출처**(🎖️ 매체 · 🌕🌖 기자 — `isTopCredibility`)이고

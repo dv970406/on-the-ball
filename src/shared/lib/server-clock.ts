@@ -21,3 +21,11 @@ export function serverToClientTime(serverMs: number): number {
   skewMs = skewMs === null ? measured : Math.min(skewMs, measured);
   return serverMs + skewMs;
 }
+
+/**
+ * 쿼리의 `initialDataUpdatedAt` 옵션 값 — 서버가 읽은 시각을 기기 시계로 옮겨 돌려주는 함수(프리페치가 없으면 `undefined`).
+ * ⚠ 서버 시각을 그대로 넣으면 뒤로가기가 되살린 옛 서버 페이로드가 신선한 것으로 앉는다(`nextjs.md` 서버 프리페치 절) — 호출부가 다시 짜지 않는다.
+ */
+export function serverUpdatedAt(serverNowMs: number | undefined): () => number | undefined {
+  return () => (serverNowMs === undefined ? undefined : serverToClientTime(serverNowMs));
+}

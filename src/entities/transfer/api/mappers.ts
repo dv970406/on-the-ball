@@ -31,8 +31,6 @@ import { kstDateKey } from "@/shared/lib/date-key";
  * 한 창의 딜이 이 값을 넘으면 그때 서버 필터로 옮긴다(화면이 잘림을 안내한다).
  */
 export const TRANSFER_DEAL_LIMIT = 200;
-/** "최근 3일 소식" 캐러셀의 창 */
-export const RUMOR_CAROUSEL_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
 const CLUB_COLUMNS = "code, name, short_name, league";
 const DEAL_COLUMNS =
@@ -51,6 +49,9 @@ const REPORT_COLUMNS =
  */
 const LATEST_REPORT_COLUMNS = "source_id, attribution, attributed_to, published_at, body_excerpt, summary_ko";
 
+/** 딜에 임베딩하는 구단 세 자리 — 구단 자리를 바꾸면 여기만 고친다. ⚠ 템플릿 리터럴로 끼운다(`+`로 이으면 타입 추론이 죽는다 — 아래 주석) */
+const DEAL_CLUB_EMBEDS = `from:transfer_club!from_club_code(${CLUB_COLUMNS}), to:transfer_club!to_club_code(${CLUB_COLUMNS}), loan:transfer_club!loan_club_code(${CLUB_COLUMNS})` as const;
+
 /**
  * PostgREST select 문자열의 단일 소스 — 스키마가 바뀌면 여기 한 곳만 고친다.
  *
@@ -66,14 +67,14 @@ const LATEST_REPORT_COLUMNS = "source_id, attribution, attributed_to, published_
  *   `GenericStringError`가 된다(실측). 한 템플릿 리터럴로 둔다.
  */
 export const DEAL_LIST_SELECT =
-  `${DEAL_COLUMNS}, from:transfer_club!from_club_code(${CLUB_COLUMNS}), to:transfer_club!to_club_code(${CLUB_COLUMNS}), loan:transfer_club!loan_club_code(${CLUB_COLUMNS}), suitors:transfer_deal_suitor(position, club:transfer_club(${CLUB_COLUMNS})), transfer_deal_watch(user_id), latest:transfer_news!deal_id(${LATEST_REPORT_COLUMNS})` as const;
+  `${DEAL_COLUMNS}, ${DEAL_CLUB_EMBEDS}, suitors:transfer_deal_suitor(position, club:transfer_club(${CLUB_COLUMNS})), transfer_deal_watch(user_id), latest:transfer_news!deal_id(${LATEST_REPORT_COLUMNS})` as const;
 
 /**
  * 상세 select — 최신 보도 임베딩이 **없다.** 상세는 타임라인 전체를 따로 받으므로
  * (`REPORT_SELECT`) 같은 행을 두 번 받을 이유가 없다.
  */
 export const DEAL_DETAIL_SELECT =
-  `${DEAL_COLUMNS}, from:transfer_club!from_club_code(${CLUB_COLUMNS}), to:transfer_club!to_club_code(${CLUB_COLUMNS}), loan:transfer_club!loan_club_code(${CLUB_COLUMNS}), suitors:transfer_deal_suitor(position, club:transfer_club(${CLUB_COLUMNS})), transfer_deal_watch(user_id)` as const;
+  `${DEAL_COLUMNS}, ${DEAL_CLUB_EMBEDS}, suitors:transfer_deal_suitor(position, club:transfer_club(${CLUB_COLUMNS})), transfer_deal_watch(user_id)` as const;
 
 /**
  * 날짜별 소식 — 그 날의 보도 + 보도가 속한 딜. 딜 쪽에서 보도를 임베딩하지 않고 **보도 쪽에서 딜을** 임베딩한다 —
@@ -82,7 +83,7 @@ export const DEAL_DETAIL_SELECT =
  * ⚠ `transfer_deal!deal_id` — 보도 → 딜 경로를 못박는다(딜 쪽의 `latest:transfer_news!deal_id`와 같은 FK).
  */
 export const DAY_REPORT_SELECT =
-  `${REPORT_COLUMNS}, deal:transfer_deal!deal_id(${DEAL_COLUMNS}, from:transfer_club!from_club_code(${CLUB_COLUMNS}), to:transfer_club!to_club_code(${CLUB_COLUMNS}), loan:transfer_club!loan_club_code(${CLUB_COLUMNS}), suitors:transfer_deal_suitor(position, club:transfer_club(${CLUB_COLUMNS})))` as const;
+  `${REPORT_COLUMNS}, deal:transfer_deal!deal_id(${DEAL_COLUMNS}, ${DEAL_CLUB_EMBEDS}, suitors:transfer_deal_suitor(position, club:transfer_club(${CLUB_COLUMNS})))` as const;
 
 /** 날짜 목록·이웃 날 — 시각과 딜만(날마다 보도·딜 수를 센다) */
 export const DAY_STAMP_SELECT = "published_at, deal_id" as const;
@@ -236,30 +237,32 @@ export function headlineReports<T extends Pick<TransferReport, "publishedAt" | "
 }
 
 /** `DEAL_DETAIL_SELECT`가 돌려주는 행 */
-export interface DealSelectRow {
-  id: TransferDealRow["id"];
-  player: TransferDealRow["player"];
-  player_ko: TransferDealRow["player_ko"];
-  position: TransferDealRow["position"];
-  birth_year: TransferDealRow["birth_year"];
-  nationality: TransferDealRow["nationality"];
-  stage: TransferDealRow["stage"];
-  form: TransferDealRow["form"];
-  loan_clause: TransferDealRow["loan_clause"];
-  loan_fee_text: TransferDealRow["loan_fee_text"];
-  fee_amount: TransferDealRow["fee_amount"];
-  fee_currency: TransferDealRow["fee_currency"];
-  fee_text: TransferDealRow["fee_text"];
-  fee_kind: TransferDealRow["fee_kind"];
-  prev_fee_amount: TransferDealRow["prev_fee_amount"];
-  fee_low_amount: TransferDealRow["fee_low_amount"];
-  fee_high_amount: TransferDealRow["fee_high_amount"];
-  add_on_amount: TransferDealRow["add_on_amount"];
-  contract_text: TransferDealRow["contract_text"];
-  wage_text: TransferDealRow["wage_text"];
-  latest_reported_at: TransferDealRow["latest_reported_at"];
-  report_count: TransferDealRow["report_count"];
-  is_free_agent: TransferDealRow["is_free_agent"];
+export interface DealSelectRow extends Pick<
+  TransferDealRow,
+  "id"
+  | "player"
+  | "player_ko"
+  | "position"
+  | "birth_year"
+  | "nationality"
+  | "stage"
+  | "form"
+  | "loan_clause"
+  | "loan_fee_text"
+  | "fee_amount"
+  | "fee_currency"
+  | "fee_text"
+  | "fee_kind"
+  | "prev_fee_amount"
+  | "fee_low_amount"
+  | "fee_high_amount"
+  | "add_on_amount"
+  | "contract_text"
+  | "wage_text"
+  | "latest_reported_at"
+  | "report_count"
+  | "is_free_agent"
+> {
   from: ClubSelectRow | null;
   to: ClubSelectRow | null;
   /** 지금 임대로 뛰는 구단 */
@@ -432,3 +435,15 @@ export function buildDaySummaries(
     return day ? [{ dateKey: key, reportCount: day.reports, dealCount: day.deals.size, latestAt: day.latestAt }] : [];
   });
 }
+
+/**
+ * 사이트맵의 딜 행 — 상세 URL과 그 lastModified, 구단 화면의 lastModified를 세는 데 쓴다(구단 화면과 같은 `clubDealSide` 판정에 넘긴다).
+ * ⚠ `latest_reported_at`이 lastModified다 — `updated_at`은 파생 컬럼 아무것이나 바뀐 시각이다(`nextjs.md` 사이트맵 절).
+ */
+export const SITEMAP_DEAL_SELECT =
+  `id, latest_reported_at, stage, from_club_code, to_club_code, loan_club_code, transfer_deal_suitor(club_code)` as const;
+
+export type SitemapDealRow = Pick<
+  TransferDealRow,
+  "id" | "latest_reported_at" | "stage" | "from_club_code" | "to_club_code" | "loan_club_code"
+> & { transfer_deal_suitor: { club_code: string }[] };

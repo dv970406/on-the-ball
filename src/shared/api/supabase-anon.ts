@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { env, isSupabaseConfigured } from "@/shared/config";
+import { env, isSupabaseConfigured, SHARED_DATA_TTL_SECONDS } from "@/shared/config";
 import type { Database } from "@/types/database.types";
 
 /**
@@ -11,7 +11,7 @@ import type { Database } from "@/types/database.types";
  * ⚠ 여기에 Next Router Cache(`staleTimes.dynamic`)를 합류시키지 않는다 — 그건 URL로만 키가
  *   잡혀 세션 데이터가 샌다(`nextjs.md`의 "Router Cache는 열지 않는다").
  */
-export const ANON_REVALIDATE = 30;
+export const ANON_REVALIDATE = SHARED_DATA_TTL_SECONDS;
 
 /**
  * 세션 없는 서버용 supabase 클라이언트 — **응답이 모든 익명 요청에 동일할 때만** 쓴다.

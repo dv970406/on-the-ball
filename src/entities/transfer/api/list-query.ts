@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database.types";
 // ⚠ 직접 경로 — 이 파일은 서버 page가 import한다(`"use client"`를 담은 배럴을 거치지 않는다)
-import { type KstDay, kstDateKey, parseKstDateKey } from "@/shared/lib/date-key";
+import { DAY_MS, type KstDay, kstDateKey, parseKstDateKey } from "@/shared/lib/date-key";
 import { DEAD_STAGES } from "../lib/stage";
 import type { TransferDay, TransferDaySummary } from "../model/types";
 import {
@@ -20,7 +20,9 @@ import {
   buildDaySummaries,
   buildTransferDay,
   type DayStampSelectRow,
+  SITEMAP_DEAL_SELECT,
 } from "./mappers";
+import { parseTransferClub } from "../lib/league";
 
 /**
  * 이적시장 쿼리 조립의 **단일 소스** — 훅과 SSR 페이지가 같은 함수를 부른다.
@@ -73,7 +75,7 @@ export function buildRelatedDealsQuery(
   dealId: number,
   clubCodes: string[],
 ) {
-  const codes = [...new Set(clubCodes)].filter((c) => /^[a-z0-9-]+$/.test(c)).join(",");
+  const codes = [...new Set(clubCodes)].filter((c) => parseTransferClub(c) !== null).join(",");
   return supabase
     .from("transfer_deal")
     .select(DEAL_LIST_SELECT)
@@ -184,7 +186,7 @@ export async function queryTransferDay(
  * (하루에 한 번만 바뀐다 — 익명 Data Cache가 요청마다 미스하지 않는다).
  */
 export function daySummaryStartKey(nowMs: number): string {
-  return kstDateKey(nowMs - (TRANSFER_DAY_LIST_DAYS - 1) * 86_400_000);
+  return kstDateKey(nowMs - (TRANSFER_DAY_LIST_DAYS - 1) * DAY_MS);
 }
 
 /**
@@ -226,4 +228,16 @@ export function buildClubListQuery(supabase: SupabaseClient<Database>) {
  */
 export function buildFollowedClubsQuery(supabase: SupabaseClient<Database>) {
   return supabase.from("transfer_club_follow").select(FOLLOWED_CLUB_SELECT);
+}
+
+/**
+ * 사이트맵이 쓰는 딜 한 페이지(`id` 내림차순 — 범위 필터를 걸지 않는다. 상세 URL은 창이 지나도 살아 있다).
+ * ⚠ 한 페이지 크기는 호출부가 `max_rows` 안으로 잡는다 — 넘겨 달라고 해도 응답은 조용히 잘린다.
+ */
+export function buildSitemapDealsQuery(supabase: SupabaseClient<Database>, from: number, to: number) {
+  return supabase
+    .from("transfer_deal")
+    .select(SITEMAP_DEAL_SELECT)
+    .order("id", { ascending: false })
+    .range(from, to);
 }

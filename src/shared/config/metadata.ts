@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { env } from "./env";
 
 /**
@@ -60,4 +61,24 @@ export const OG_SITE = {
  */
 export function absoluteUrl(path: string): string {
   return new URL(path, env.siteUrl).href;
+}
+
+/** 없는 리소스의 메타데이터 — `Page`가 `notFound()`를 부르므로 404 화면과 같은 제목이어야 한다 */
+export const NOT_FOUND_METADATA: Metadata = { title: NOT_FOUND_TITLE };
+
+/**
+ * 색인 대상 화면의 메타데이터 — 제목·설명·canonical·공유 카드(사이트 공통 이미지).
+ *
+ * `openGraph`·`twitter`는 루트와 병합되지 않고 통째로 대체돼 `OG_SITE`·`OG_IMAGE`·`og:url`을 세그먼트마다 함께 실어야 한다. 하나를 빠뜨려도
+ * 빌드는 통과하고 공유 프리뷰에서만 드러나므로 조립을 이 함수 하나가 갖는다. `og:url`은 canonical과 같은 경로다(`nextjs.md` 메타데이터 절).
+ * ⚠ 딜 상세·보드의 `?deal=`은 이 함수를 쓰지 않는다 — 딜마다 그린 카드를 내므로 `dealShareCard`(`entities/transfer/lib/deal-meta.ts`)다.
+ */
+export function pageMetadata({ title, description, path }: { title: string; description: string; path: string }): Metadata {
+  return {
+    title,
+    description,
+    alternates: { canonical: path },
+    openGraph: { ...OG_SITE, type: "website", title, description, url: absoluteUrl(path), images: OG_IMAGE },
+    twitter: { card: "summary_large_image", title, description, images: OG_IMAGE },
+  };
 }

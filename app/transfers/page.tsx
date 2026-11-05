@@ -1,7 +1,7 @@
 import { cache } from "react";
 import type { Metadata } from "next";
 import { unstable_rethrow } from "next/navigation";
-import { OG_IMAGE, OG_SITE, ROUTES, absoluteUrl, boardScopeStartMs } from "@/shared/config";
+import { ROUTES, boardScopeStartIso, pageMetadata } from "@/shared/config";
 import { createSupabaseServerClient, hasSessionCookie } from "@/shared/api/supabase-server";
 import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
 import { parsePostId } from "@/shared/lib/post-id";
@@ -15,32 +15,15 @@ import {
   buildReportsQuery,
 } from "@/entities/transfer/api/list-query";
 import { buildDeal, buildDealListItem, buildFollowedClubs, buildReport } from "@/entities/transfer/api/mappers";
-import { dealCardImage, dealMetaDescription, dealMetaTitle } from "@/entities/transfer/lib/deal-meta";
+import { dealCardImage, dealShareCard } from "@/entities/transfer/lib/deal-meta";
 import type { TransferClub, TransferDeal, TransferDealListItem, TransferReport } from "@/entities/transfer/model/types";
 import { TransferBoardView } from "@/views/transfer-board";
+import { prefetchedRows } from "@/shared/api/prefetch";
 
 const TITLE = "이적시장";
 const DESCRIPTION = "프리미어리그·유럽 5대 리그 이적 소식을 단계별로 모아 봅니다.";
 
-const BOARD_METADATA: Metadata = {
-  title: TITLE,
-  // ⚠ 색인 대상 목록이라 description을 채운다 — 비우면 루트의 사이트 소개 한 줄이 이 화면의
-  //   검색 결과 설명이 된다.
-  description: DESCRIPTION,
-  // ⚠ **canonical에서 리그·정렬·구단·관심·형태 쿼리를 항상 떨어뜨린다.** 같은 집합의 부분·순서만 다른 중복이라
-  //   색인 대상이 아니다(글 목록의 정렬과 같은 처리). `noindex`를 함께 걸지 않는다.
-  alternates: { canonical: ROUTES.transferList },
-  // ⚠ openGraph를 채우는 순간 루트 이미지 상속이 사라지므로 `images`를 함께 명시한다.
-  openGraph: {
-    ...OG_SITE,
-    type: "website",
-    title: TITLE,
-    description: DESCRIPTION,
-    url: absoluteUrl(ROUTES.transferList),
-    images: OG_IMAGE,
-  },
-  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: OG_IMAGE },
-};
+const BOARD_METADATA: Metadata = pageMetadata({ title: TITLE, description: DESCRIPTION, path: ROUTES.transferList });
 
 /**
  * 공유 카드에 그릴 딜 — 보드 주소에 딜이 실려(`?deal=<id>`) 들어왔을 때만 읽는다. 없거나 읽지 못하면 `null`.
@@ -61,10 +44,11 @@ async function fetchSharedDeal(
       buildDealQuery(supabase, dealId),
       buildReportsQuery(supabase, dealId),
     ]);
-    if (dealResult.error || !dealResult.data) return null;
+    if (dealResult.error) console.error("[transfers] 공유 딜 조회 실패:", dealResult.error);
+    if (!dealResult.data) return null;
     return {
       deal: buildDeal(dealResult.data),
-      reports: reportsResult.error ? undefined : (reportsResult.data ?? []).map(buildReport),
+      reports: prefetchedRows("[transfers] 공유 딜의 보도 조회", reportsResult)?.map(buildReport),
     };
   } catch (e) {
     unstable_rethrow(e);
@@ -93,23 +77,7 @@ export async function generateMetadata(props: PageProps<"/transfers">): Promise<
   const shared = await fetchSharedDeal(dealId);
   if (!shared) return BOARD_METADATA;
 
-  const { deal, reports } = shared;
-  const title = dealMetaTitle(deal);
-  const description = dealMetaDescription(deal, reports);
-  const image = dealCardImage(dealId);
-  return {
-    ...BOARD_METADATA,
-    openGraph: {
-      ...OG_SITE,
-      type: "article",
-      title,
-      description,
-      url: absoluteUrl(ROUTES.transfer(dealId)),
-      modifiedTime: deal.latestReportedAt,
-      images: image,
-    },
-    twitter: { card: "summary_large_image", title, description, images: image },
-  };
+  return { ...BOARD_METADATA, ...dealShareCard(shared.deal, shared.reports, dealCardImage(dealId)) };
 }
 
 interface TransferBoard {
@@ -135,11 +103,6 @@ interface TransferBoard {
   scopeStartIso: string;
 }
 
-/** 분 단위로 내린 ISO — 캐시 키가 요청 수만큼 늘지 않게 */
-function toMinuteIso(ms: number): string {
-  return new Date(Math.floor(ms / 60_000) * 60_000).toISOString();
-}
-
 /**
  * ⚠ `cache()`로 감싼다 — 지금은 소비자가 `Page` 하나라 필수는 아니지만(`generateMetadata`는 공유 딜만 따로 읽는다),
  *   **메타데이터가 이 조회를 쓰게 되는 순간 요청당 2회가 된다.** 그때 잊지 않도록 미리 감싼다(다른 목록과 같다).
@@ -148,7 +111,7 @@ function toMinuteIso(ms: number): string {
  */
 const fetchTransferBoard = cache(async (): Promise<TransferBoard> => {
   const nowMs = Date.now();
-  const scopeStartIso = toMinuteIso(boardScopeStartMs(nowMs));
+  const scopeStartIso = boardScopeStartIso(nowMs);
   try {
     /*
      * ⚠ **세션이 없으면 익명 클라이언트로 갈아탄다**(`hasSessionCookie()` 갈림).
@@ -180,14 +143,10 @@ const fetchTransferBoard = cache(async (): Promise<TransferBoard> => {
     // 남았다)도 여기로 와서 `undefined`가 된다.
     // ⚠ `userId`가 없으면 내리지 않는다 — 사용자 확인(`getClaims`)은 실패했는데 조회는 통과하는 구간이 있고, 그 값을
     //   내리면 클라이언트가 비로그인 키에 그 사람의 응원 구단을 앉힌다.
-    const followedClubs =
-      userId && followsResult && !followsResult.error
-        ? buildFollowedClubs(followsResult.data ?? [])
-        : undefined;
-
-    if (dealsResult.error) return { followedClubs, userId, nowMs, scopeStartIso };
+    const follows = followsResult && prefetchedRows("[transfers] 응원 구단 조회", followsResult);
+    const followedClubs = userId && follows ? buildFollowedClubs(follows) : undefined;
     return {
-      deals: (dealsResult.data ?? []).map(buildDealListItem),
+      deals: prefetchedRows("[transfers] 보드 조회", dealsResult)?.map(buildDealListItem),
       followedClubs,
       userId,
       nowMs,

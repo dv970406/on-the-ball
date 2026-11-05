@@ -2,7 +2,7 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { unstable_rethrow } from "next/navigation";
-import { OG_IMAGE, OG_SITE, ROUTES, absoluteUrl } from "@/shared/config";
+import { ROUTES, pageMetadata } from "@/shared/config";
 import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
 // ⚠ 배럴이 아니라 직접 경로 — 조립은 "use client"가 없어 서버에서 쓸 수 있다(훅과 같은 조립이어야 한다)
 import { daySummaryStartKey, queryDaySummaries } from "@/entities/transfer/api/list-query";
@@ -12,21 +12,7 @@ import { TransferDayListView } from "@/views/transfer-day-list";
 const TITLE = "날짜별 이적 소식";
 const DESCRIPTION = "하루 동안 나온 유럽 5대 리그 이적 보도를 딜마다 모아 날짜별로 봅니다.";
 
-export const metadata: Metadata = {
-  title: TITLE,
-  description: DESCRIPTION,
-  alternates: { canonical: ROUTES.transferDays },
-  // ⚠ openGraph를 채우는 순간 루트 이미지 상속이 사라지므로 `images`를 함께 명시한다
-  openGraph: {
-    ...OG_SITE,
-    type: "website",
-    title: TITLE,
-    description: DESCRIPTION,
-    url: absoluteUrl(ROUTES.transferDays),
-    images: OG_IMAGE,
-  },
-  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: OG_IMAGE },
-};
+export const metadata: Metadata = pageMetadata({ title: TITLE, description: DESCRIPTION, path: ROUTES.transferDays });
 
 interface DayList {
   /** 프리페치 결과 — 실패하면 undefined를 넘겨 클라이언트 조회로 폴백한다 */

@@ -1,4 +1,4 @@
-import { ROUTES } from "@/shared/config";
+import { OG_SITE, ROUTES, absoluteUrl } from "@/shared/config";
 // ⚠ 배럴(@/shared/lib)이 아니라 직접 경로 — 배럴은 "use client" 훅을 포함하고, 이 파일은 서버 page들이 쓴다.
 import { clamp } from "@/shared/lib/text";
 import { headlineReports } from "../api/mappers";
@@ -78,5 +78,27 @@ export function dealCardImage(dealId: number) {
     type: "image/png",
     ...DEAL_CARD_SIZE,
     alt: DEAL_CARD_ALT,
+  };
+}
+
+/**
+ * 딜의 공유 카드(`openGraph`·`twitter`) — 딜 상세와 보드의 `?deal=` 공유가 같은 말을 하게 이 함수 하나가 조립한다. `og:url`은 언제나 딜 상세다.
+ * @param images 카드 이미지. ⚠ 딜 상세는 넘기지 않는다 — 같은 폴더의 `opengraph-image.tsx`가 내는데, 메타데이터의 `images`는 파일 컨벤션을 **이겨서** 공통 이미지가 나간다(실측).
+ */
+export function dealShareCard(deal: TransferDeal, reports: TransferReport[] | undefined, images?: ReturnType<typeof dealCardImage>) {
+  const title = dealMetaTitle(deal);
+  const description = dealMetaDescription(deal, reports);
+  return {
+    openGraph: {
+      ...OG_SITE,
+      type: "article" as const,
+      title,
+      description,
+      url: absoluteUrl(ROUTES.transfer(deal.id)),
+      // 화면이 그리는 값과 같은 판정 — "업데이트 N분 전"이 곧 최신 보도 시각이다
+      modifiedTime: deal.latestReportedAt,
+      ...(images ? { images } : {}),
+    },
+    twitter: { card: "summary_large_image" as const, title, description, ...(images ? { images } : {}) },
   };
 }

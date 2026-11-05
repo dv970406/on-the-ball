@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowLeftRight, User } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { cn } from "@/shared/lib";
+import { cn, isPlainClick } from "@/shared/lib";
 import { ROUTES, activeTabHref } from "@/shared/config";
 import { Icon, SignInDialog } from "@/shared/ui";
 import { useSessionStore } from "@/entities/session";
@@ -104,7 +104,7 @@ export function BottomTabBar() {
               aria-current={isActive ? "page" : undefined}
               // ⚠ 수식어 클릭은 가로채지 않는다 — 새 탭·새 창 열기는 브라우저의 기본 동작이다
               onClick={(e) => {
-                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                if (!isPlainClick(e)) return;
                 if (!tab.signInAction || sessionStatus !== "guest") return;
                 e.preventDefault();
                 setAskSignIn(tab);

@@ -72,6 +72,15 @@ export function boardScopeStartMs(nowMs: number): number {
 }
 
 /**
+ * 보드 범위 시작(ISO, **분 단위로 내린 값**) — 쿼리 키와 조회 조건이 같은 문자열을 본다.
+ * 보드와 구단 화면이 같은 키로 캐시를 함께 쓰므로 두 page가 이 함수 하나로 만든다.
+ * ⚠ ms 시각이 URL에 실리면 익명 Data Cache가 매번 미스다(`nextjs.md` — 지금 값은 창 개장 시각이라 내릴 것이 없지만 호출부가 그 규약을 진다).
+ */
+export function boardScopeStartIso(nowMs: number): string {
+  return new Date(Math.floor(boardScopeStartMs(nowMs) / 60_000) * 60_000).toISOString();
+}
+
+/**
  * 예측의 회차 — `closesAt > now`인 **가장 이른** 창(창이 열려 있으면 그 창, 창 사이에는 다음 창). 다음 창 일정이
  * 아직 없으면 `null`이다(그동안은 예측을 받지 않는다 — 시즌마다 사람이 `windows.json`을 갱신한다).
  *

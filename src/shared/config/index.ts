@@ -1,7 +1,10 @@
 export { env, isSupabaseConfigured } from "./env";
+export { LG_MEDIA_QUERY } from "./breakpoints";
+export { SHARED_DATA_TTL_SECONDS } from "./cache";
 export {
   ROUTES,
   hasBottomBar,
+  isDealDetailPath,
   activeTabHref,
   activeNavHref,
   signInWithNext,
@@ -10,7 +13,7 @@ export {
   // 공유 주소도 같은 판정으로 OAuth 복귀 파라미터를 걷는다(파라미터 목록을 호출부에 다시 적지 않는다)
   withoutAuthReturnParams,
 } from "./routes";
-export { OG_IMAGE, OG_SITE, NOT_FOUND_TITLE, absoluteUrl } from "./metadata";
+export { OG_SITE, NOT_FOUND_METADATA, NOT_FOUND_TITLE, absoluteUrl, pageMetadata } from "./metadata";
 // 토큰과 같은 값의 JS 색 — CSS를 읽지 못하는 자리(공유 카드 이미지·매니페스트) 전용
 export { TOKEN_COLORS } from "./colors";
 export { OAUTH_PROVIDERS, OAUTH_PROVIDER_LABEL, type OAuthProvider } from "./oauth";
@@ -22,6 +25,7 @@ export {
   openTransferWindow,
   trackedTransferWindow,
   boardScopeStartMs,
+  boardScopeStartIso,
   predictionRound,
   transferWindowByKey,
   type TransferWindow,

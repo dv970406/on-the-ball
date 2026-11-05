@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect } from "react";
 import { PRETENDARD_CACHED_KEY, PRETENDARD_CSS } from "@/app/fonts";
 

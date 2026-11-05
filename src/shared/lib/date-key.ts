@@ -8,7 +8,7 @@
  * ⚠ 순수 함수다(`"use client"` 없음) — 서버 page·사이트맵이 직접 경로(`@/shared/lib/date-key`)로 가져간다.
  */
 
-const DAY_MS = 86_400_000;
+export const DAY_MS = 86_400_000;
 const KST_OFFSET_MS = 9 * 3_600_000;
 const DATE_KEY = /^(\d{4})-(\d{2})-(\d{2})$/;
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
@@ -21,6 +21,11 @@ export interface KstDay {
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
+
+/** 시각(ms)이 속한 한국 시각 날짜의 일련번호 — 날마다 묶는 계산용이다. 일련번호 × `DAY_MS`를 UTC로 읽으면 곧 한국 시각의 날짜다 */
+export function kstDayNumber(ms: number): number {
+  return Math.floor((ms + KST_OFFSET_MS) / DAY_MS);
+}
 
 /** 시각(ms)이 속한 한국 시각 날짜의 키 */
 export function kstDateKey(ms: number): string {

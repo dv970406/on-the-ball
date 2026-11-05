@@ -6,6 +6,7 @@ import { AuthProvider } from "@/entities/session";
 import { useInAppNavigationTracker } from "@/shared/lib";
 import { ToastViewport } from "@/shared/ui";
 import { useDeferredPretendard } from "./use-deferred-pretendard";
+import { SHARED_DATA_TTL_SECONDS } from "@/shared/config";
 
 /** 전역 프로바이더 — TanStack Query + supabase 세션 동기화 */
 export function AppProviders({ children }: { children: ReactNode }) {
@@ -20,7 +21,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
           queries: {
             // 앱 전역 캐시 신선도 기본값 — 개별 쿼리는 이 값을 상속한다
             // (프로필처럼 더 길게 잡을 때만 훅에서 staleTime을 오버라이드)
-            staleTime: 30_000,
+            staleTime: SHARED_DATA_TTL_SECONDS * 1000,
             retry: 1,
             refetchOnWindowFocus: false,
           },

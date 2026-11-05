@@ -1,32 +1,19 @@
 import { cache } from "react";
 import type { Metadata } from "next";
 import { unstable_rethrow } from "next/navigation";
-import { OG_IMAGE, OG_SITE, ROUTES, absoluteUrl } from "@/shared/config";
+import { ROUTES, pageMetadata } from "@/shared/config";
 import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
 // ⚠ 배럴이 아니라 직접 경로 — 조립·매퍼는 "use client"가 없어 서버에서 쓸 수 있다(훅과 같은 조립이어야 한다)
 import { buildClubListQuery } from "@/entities/transfer/api/list-query";
 import { buildClubList } from "@/entities/transfer/api/mappers";
 import type { TransferClub } from "@/entities/transfer/model/types";
 import { TransferClubListView } from "@/views/transfer-club-list";
+import { prefetchedRows } from "@/shared/api/prefetch";
 
 const TITLE = "구단별 이적시장";
 const DESCRIPTION = "프리미어리그·라리가·분데스리가·세리에 A·리그 1 구단별 영입·방출 소식을 모아 봅니다.";
 
-export const metadata: Metadata = {
-  title: TITLE,
-  description: DESCRIPTION,
-  alternates: { canonical: ROUTES.transferClubs },
-  // ⚠ openGraph를 채우는 순간 루트 이미지 상속이 사라지므로 `images`를 함께 명시한다
-  openGraph: {
-    ...OG_SITE,
-    type: "website",
-    title: TITLE,
-    description: DESCRIPTION,
-    url: absoluteUrl(ROUTES.transferClubs),
-    images: OG_IMAGE,
-  },
-  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: OG_IMAGE },
-};
+export const metadata: Metadata = pageMetadata({ title: TITLE, description: DESCRIPTION, path: ROUTES.transferClubs });
 
 interface ClubList {
   /** 프리페치 결과 — 실패하면 undefined를 넘겨 클라이언트 조회로 폴백한다 */
@@ -46,12 +33,8 @@ const fetchClubs = cache(async (): Promise<ClubList> => {
   try {
     const supabase = createSupabaseAnonClient();
     if (!supabase) return { nowMs };
-    const { data, error } = await buildClubListQuery(supabase);
-    if (error) {
-      console.error("[transfers/club] 구단 목록 조회 실패:", error);
-      return { nowMs };
-    }
-    return { clubs: buildClubList(data ?? []), nowMs };
+    const rows = prefetchedRows("[transfers/club] 구단 목록 조회", await buildClubListQuery(supabase));
+    return { clubs: rows && buildClubList(rows), nowMs };
   } catch (e) {
     unstable_rethrow(e);
     console.error("[transfers/club] 구단 목록 조회 실패:", e);

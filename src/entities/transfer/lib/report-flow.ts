@@ -1,15 +1,10 @@
 import type { TransferReport } from "../model/types";
 import { credibilityOf, isTopCredibility } from "./credibility";
+import { DAY_MS, kstDayNumber } from "@/shared/lib/date-key";
 
 /** 보도 흐름의 기간 — 화면 안 토글이라 URL에 싣지 않는다(보도 정렬과 같은 성격) */
 export type ReportFlowRange = "1w" | "3w" | "all";
 
-const DAY_MS = 86_400_000;
-/**
- * 날짜 경계는 **한국 시각 고정**이다(UTC+9 — 서머타임이 없다).
- * ⚠ `Date`의 지역 시각 메서드를 쓰지 않는다 — 서버(UTC)와 브라우저(기기 시간대)가 다른 날짜로 묶어 하이드레이션이 갈린다.
- */
-const KST_OFFSET_MS = 9 * 3_600_000;
 /**
  * "전체"가 그리는 날 수의 상한 — 넘으면 막대가 1px보다 가늘어진다. 넘을 때는 **보도가 있는 쪽**을 그린다(아래 `reportFlow`).
  */
@@ -41,7 +36,7 @@ export interface ReportFlow {
   peak: ReportFlowDay | null;
 }
 
-const kstDay = (ms: number) => Math.floor((ms + KST_OFFSET_MS) / DAY_MS);
+const kstDay = kstDayNumber;
 
 // 일련번호 × 하루를 UTC로 읽으면 곧 한국 시각의 날짜다(위에서 오프셋을 더해 셌다)
 const monthDay = (day: number) => {

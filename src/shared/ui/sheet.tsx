@@ -130,7 +130,7 @@ export function Sheet({ open, onClose, label, children }: SheetProps) {
           >
             <span aria-hidden className="h-1 w-9 rounded-full bg-hairline-strong" />
           </button>
-          <div className="min-h-0 flex-1 overflow-y-auto py-1">{children}</div>
+          <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto py-1">{children}</div>
         </div>
       </div>
     </>

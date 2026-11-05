@@ -5,10 +5,11 @@ import { ROUTES, absoluteUrl, boardScopeStartMs } from "@/shared/config";
 import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
 // ⚠ 배럴이 아니라 직접 경로 — 조립·매퍼는 "use client"가 없어 서버에서 쓸 수 있다. 구단·날짜 화면과 **같은 조립**이라
 //   사이트맵이 그 화면이 404를 내는 주소(5대 리그 밖 구단·소식이 없는 날)를 싣지 않는다.
-import { buildClubListQuery, daySummaryStartKey, queryDaySummaries } from "@/entities/transfer/api/list-query";
-import { buildClubList } from "@/entities/transfer/api/mappers";
+import { buildClubListQuery, buildSitemapDealsQuery, daySummaryStartKey, queryDaySummaries } from "@/entities/transfer/api/list-query";
+import { type SitemapDealRow, buildClubList } from "@/entities/transfer/api/mappers";
 import { clubDealSide } from "@/entities/transfer/lib/club-deals";
-import type { TransferDaySummary, TransferDeal } from "@/entities/transfer/model/types";
+import type { TransferDaySummary } from "@/entities/transfer/model/types";
+import { prefetchedRows } from "@/shared/api/prefetch";
 
 /**
  * 사이트맵.
@@ -45,32 +46,14 @@ const URL_LIMIT = 50_000;
 const URL_RESERVED = 500;
 const DEAL_URL_LIMIT = URL_LIMIT - URL_RESERVED;
 
-interface DealRow {
-  id: number;
-  latest_reported_at: string;
-  /** 결렬·부인된 딜은 구단 화면에 없다 — 그 화면의 lastModified에서 뺀다(`clubDealSide`) */
-  stage: TransferDeal["stage"];
-  /** 구단 화면의 lastModified를 세는 데 쓴다 — 그 화면이 딜을 고르는 판정(`clubDealSide`)에 그대로 넘긴다 */
-  from_club_code: string | null;
-  to_club_code: string | null;
-  loan_club_code: string | null;
-  transfer_deal_suitor: { club_code: string }[];
-}
-
 /** 딜을 `PAGE_SIZE`씩 넘기며 전부 받는다 — 페이지가 덜 차면 끝이다 */
 async function fetchDealPages(
   supabase: NonNullable<ReturnType<typeof createSupabaseAnonClient>>,
-): Promise<DealRow[]> {
-  const rows: DealRow[] = [];
+): Promise<SitemapDealRow[]> {
+  const rows: SitemapDealRow[] = [];
   for (let from = 0; from < DEAL_URL_LIMIT; from += PAGE_SIZE) {
     const to = Math.min(from + PAGE_SIZE, DEAL_URL_LIMIT) - 1;
-    const { data, error } = await supabase
-      .from("transfer_deal")
-      // 상세도 보드도 `latest_reported_at`(최신 보도 시각)이 lastModified다 — 아래 주석 참고.
-      // ⚠ 범위 필터를 걸지 않는다 — 상세 URL은 창이 지나도 살아 있다(`/transfers/[id]`).
-      .select("id, latest_reported_at, stage, from_club_code, to_club_code, loan_club_code, transfer_deal_suitor(club_code)")
-      .order("id", { ascending: false })
-      .range(from, to);
+    const { data, error } = await buildSitemapDealsQuery(supabase, from, to);
     if (error) throw error;
     rows.push(...data);
     if (data.length < to - from + 1) return rows;
@@ -112,7 +95,7 @@ function staticEntries(transfers: Date | undefined, days: Date | undefined): Met
  * 최신 보도 시각이고, 그런 딜이 없으면 생략한다(요청 시각으로 채우지 않는다).
  * ⚠ 구단 화면이 범위를 `boardScopeStartMs`로 자른다 — 같은 기준으로 세야 화면과 lastmod가 같은 딜을 본다.
  */
-function clubEntries(codes: string[], deals: DealRow[], nowMs: number): MetadataRoute.Sitemap {
+function clubEntries(codes: string[], deals: SitemapDealRow[], nowMs: number): MetadataRoute.Sitemap {
   const scopeStartMs = boardScopeStartMs(nowMs);
   const ref = (code: string | null) => (code === null ? null : { code });
   // 구단 화면과 같은 판정(`clubDealSide`)에 넘길 모양으로 옮긴다 — 걸리는 자리를 여기서 다시 나열하지 않는다
@@ -160,13 +143,7 @@ const fetchEntries = cache(async (): Promise<MetadataRoute.Sitemap> => {
     // ⚠ 구단·날짜는 곁다리다 — 실패해도 딜 URL은 그대로 싣는다(그 묶음만 빠진다). 서로의 결과를 쓰지 않아 병렬로 보낸다
     const [rows, clubs, days] = await Promise.all([
       fetchDealPages(supabase),
-      buildClubListQuery(supabase).then(({ data, error }) => {
-        if (error) {
-          console.error("[sitemap] 구단 조회 실패:", error);
-          return [];
-        }
-        return buildClubList(data ?? []);
-      }),
+      buildClubListQuery(supabase).then((result) => buildClubList(prefetchedRows("[sitemap] 구단 조회", result) ?? [])),
       queryDaySummaries(supabase, daySummaryStartKey(nowMs), nowMs).catch((e: unknown) => {
         console.error("[sitemap] 날짜 목록 조회 실패:", e);
         return [];

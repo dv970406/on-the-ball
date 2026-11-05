@@ -38,7 +38,7 @@ export function StaleBanner({ noun, onRetry }: StaleBannerProps) {
     <p className="px-5 py-3 text-center text-[12px] text-ink-mute-2">
       최신 {noun}
       {objectParticle(noun)} 불러오지 못했어요.{" "}
-      <button type="button" onClick={onRetry} className="underline underline-offset-2">
+      <button type="button" onClick={onRetry} className="hit-area underline underline-offset-2">
         다시 시도
       </button>
     </p>

@@ -3,9 +3,10 @@ export { useScrollRestore } from "./use-scroll-restore";
 // 앱 안의 이동 기록이 있는가 — 화면의 뒤로가기가 사이트를 빠져나가지 않게 하는 판정(사유는 그 파일 주석)
 export { hasInAppHistory, useInAppNavigationTracker } from "./in-app-history";
 export { formatCount, formatRelativeTime } from "./format";
-export { useNowMs } from "./use-now";
+export { useNowMs, useReferenceNowMs } from "./use-now";
+export { isPlainClick } from "./plain-click";
 // 서버 시각 → 기기 시계 기준(쿼리의 initialDataUpdatedAt 등 기기 시계와 빼는 자리) — 사유는 그 파일 주석
-export { serverToClientTime } from "./server-clock";
+export { serverToClientTime, serverUpdatedAt } from "./server-clock";
 export { useFocusTrap } from "./use-focus-trap";
 // 코드로 굴리는 스크롤의 behavior(동작 줄이기면 즉시) — 브라우저에서만 부른다
 export { preferredScrollBehavior } from "./scroll-behavior";
@@ -33,19 +34,17 @@ export {
   lengthOverflow,
   normalizeNickname,
   isPlainNickname,
-  clamp,
   type TextLimit,
 } from "./text";
+// 줄 세운 낙관적 쓰기의 조회 쪽 덮어 넣기(사유는 그 파일 주석)
+export { createPendingOverlay } from "./pending-overlay";
 export { useNextParam } from "./use-next-param";
 export { useDuplicateGuard } from "./use-duplicate-guard";
 // 목록의 **항목별** 가드 — 댓글 삭제처럼 뮤테이션 하나를 여러 항목이 나눠 쓸 때(사유는 그 파일 주석)
 export { useItemGuard } from "./use-item-guard";
-// ⚠ 쿼리 키 조각이라 **서버 안전**하다 — 서버 프리페치가 키를 만들 일이 생기면
-//   배럴이 아니라 "@/shared/lib/query-scope" 직접 경로로.
-export { userScope } from "./query-scope";
 // ⚠ 이 배럴은 "use client" 훅을 포함하므로 서버(proxy·서버 컴포넌트)는 여기서 import 금지.
 //   순수 함수가 필요하면 "@/shared/lib/cn"·"@/shared/lib/format"·"@/shared/lib/post-id"·
 //   "@/shared/lib/text"·"@/shared/lib/query-scope"·"@/shared/lib/search-params"·"@/shared/lib/date-key"를 직접 import.
 //   ⚠ "use client"를 붙이지 않은 shared/ui 컴포넌트도 여기 해당한다 — 배럴을 거치면
 //     서버 렌더 여지를 잃는다(선례: shared/ui/empty-state.tsx).
-//   이 목록이 곧 deep import 화이트리스트다 — 검증은 `pnpm check:conventions`가 한다.
+//   허용 목록의 단일 소스는 `scripts/check-conventions.mjs`의 `DEEP_IMPORT_ALLOWED`다.

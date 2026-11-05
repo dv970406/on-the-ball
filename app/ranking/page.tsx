@@ -1,7 +1,7 @@
 import { cache } from "react";
 import type { Metadata } from "next";
 import { unstable_rethrow } from "next/navigation";
-import { OG_IMAGE, OG_SITE, ROUTES, absoluteUrl } from "@/shared/config";
+import { ROUTES, pageMetadata } from "@/shared/config";
 import { createSupabaseServerClient, hasSessionCookie } from "@/shared/api/supabase-server";
 import { createSupabaseAnonClient } from "@/shared/api/supabase-anon";
 // ⚠ 배럴이 아니라 직접 경로 — 조립·매퍼는 "use client"가 없어 서버에서 쓸 수 있다(훅과 같은 조립이어야 한다)
@@ -9,25 +9,12 @@ import { buildRankingQuery, buildScoreQuery } from "@/entities/prediction/api/li
 import { buildPredictionScore } from "@/entities/prediction/api/mappers";
 import type { PredictionScore } from "@/entities/prediction/model/types";
 import { RankingView } from "@/views/ranking";
+import { prefetchedRows } from "@/shared/api/prefetch";
 
 const TITLE = "예측 랭킹";
 const DESCRIPTION = "이적 딜이 이번 창 안에 성사될지 예측하고, 가장 잘 맞힌 팬의 순위를 봅니다.";
 
-export const metadata: Metadata = {
-  title: TITLE,
-  description: DESCRIPTION,
-  alternates: { canonical: ROUTES.ranking },
-  // ⚠ openGraph를 채우는 순간 루트 이미지 상속이 사라지므로 `images`를 함께 명시한다
-  openGraph: {
-    ...OG_SITE,
-    type: "website",
-    title: TITLE,
-    description: DESCRIPTION,
-    url: absoluteUrl(ROUTES.ranking),
-    images: OG_IMAGE,
-  },
-  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION, images: OG_IMAGE },
-};
+export const metadata: Metadata = pageMetadata({ title: TITLE, description: DESCRIPTION, path: ROUTES.ranking });
 
 interface RankingHead {
   /** 프리페치 결과 — 실패하면 undefined를 넘겨 클라이언트 조회로 폴백한다 */
@@ -74,8 +61,7 @@ const fetchRanking = cache(async (): Promise<RankingHead> => {
       return { userId, myScore: score.data ? buildPredictionScore(score.data) : null };
     };
     const [result, { userId, myScore }] = await Promise.all([buildRankingQuery(anon), mine()]);
-    if (result.error) return { userId, myScore, nowMs };
-    return { ranking: (result.data ?? []).map(buildPredictionScore), userId, myScore, nowMs };
+    return { ranking: prefetchedRows("[ranking] 랭킹 조회", result)?.map(buildPredictionScore), userId, myScore, nowMs };
   } catch (e) {
     // cookies()가 던지는 프레임워크 내부 에러를 삼키면 라우트가 조용히 정적 프리렌더된다
     unstable_rethrow(e);

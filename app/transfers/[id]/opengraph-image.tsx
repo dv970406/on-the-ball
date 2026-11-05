@@ -122,7 +122,10 @@ async function fetchDeal(dealId: number): Promise<DealCard> {
     const supabase = createSupabaseAnonClient();
     if (!supabase) return { state: "unknown" };
     const { data, error } = await buildDealQuery(supabase, dealId);
-    if (error) return { state: "unknown" };
+    if (error) {
+      console.error("[transfers/[id]/opengraph-image] 딜 조회 실패:", error);
+      return { state: "unknown" };
+    }
     return data ? { state: "found", deal: buildDeal(data) } : { state: "missing" };
   } catch (e) {
     // 프레임워크 제어용 에러는 되던진다(`nextjs.md`)

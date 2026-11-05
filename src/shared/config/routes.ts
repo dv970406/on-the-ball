@@ -64,6 +64,11 @@ export function hasBottomBar(pathname: string): boolean {
  */
 const DEAL_DETAIL_PATH = /^\/transfers\/\d+$/;
 
+/** 딜 상세의 경로인가 — 토스트 위치와 공유 분석의 콘텐츠 종류가 같은 판정을 쓴다 */
+export function isDealDetailPath(pathname: string): boolean {
+  return DEAL_DETAIL_PATH.test(pathname);
+}
+
 /**
  * 이 경로에서 **활성인 탭의 href** — 탭바가 없는 화면이면 `null`.
  *

@@ -45,3 +45,13 @@ function getServerSnapshot(): number | null {
 export function useNowMs(): number | null {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
+
+/**
+ * 화면의 기준 시각 — 서버 시각이 있으면 그 값, 없으면 클라이언트 시계(`null`이면 아직 판정 전).
+ * ⚠ 순서를 뒤집으면 갓 받은 서버 시각을 세션에 굳은 시계가 이긴다(`data-and-state.md` 하이드레이션 절). 훅을 `??` 뒤에 두면 조건부 호출이 된다 —
+ *   두 함정을 호출부가 기억하지 않게 이 훅이 갖는다.
+ */
+export function useReferenceNowMs(serverNowMs: number | null | undefined): number | null {
+  const clientNowMs = useNowMs();
+  return serverNowMs ?? clientNowMs;
+}
