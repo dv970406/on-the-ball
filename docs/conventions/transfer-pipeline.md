@@ -149,8 +149,10 @@ BBC 이적 가십·스카이 신문 요약("Papers: …")은 여러 신문의 �
 인터뷰), 그리고 처음 보는 이름 문형에서 선수를 놓친다. 그래서 규칙이 딜 후보로 고른 보도마다 LLM에 **한 번** 물어 한 번에
 얻는다. 단계를 못 읽은 보도 중 선수·이적 낱말이 있는 것(넓힌 후보 — 아래 딜 파생 절)도 묻는다.
 
-**요청과 해석을 두 파일이 나눠 갖는다.** 지시문·출력 형식·사용자 메시지·설정은 `scripts/lib/transfer/judge-prompt.mjs`(순수 함수 —
-같은 행이면 같은 요청), 받은 출력의 해석·저장·실행은 `judge.mjs`다. 지시문을 고치면 모든 판정의 지문이 바뀌므로 고칠 자리를 한 파일에 모은다.
+**요청·해석·실행을 세 파일이 나눠 갖는다.** 지시문·출력 형식·사용자 메시지·설정은 `scripts/lib/transfer/judge-prompt.mjs`(순수 함수 —
+같은 행이면 같은 요청), 받은 출력의 해석은 `judge-parse.mjs`(순수 함수 — API·DB·cheerio 없이 돈다), 호출·저장·재생은 `judge.mjs`다. 지시문을 고치면 모든 판정의 지문이 바뀌므로 고칠 자리를 한 파일에 모은다.
+⚠ 파생 쪽 모듈은 `judge.mjs`를 import하지 않는다 — SDK를 끌어오지 않도록 `judge-parse.mjs`만 본다. 예외는 재생을 부르는 `deal-store.mjs`다.
+판정의 값 컬럼 목록은 `verdict-columns.mjs` 하나다 — 판정 필드를 더하면 파생의 읽기·옛 판정 지키기·재생 대조가 함께 따라온다.
 
 출력 형식(`JUDGE_SCHEMA`)의 **키 순서가 곧 생성 순서다** — 구조화 출력은 스키마의 속성 순서대로 쓴다. 근거 문장·시점을 먼저, 결론
 (`move`·`stage`·구단)을 뒤에 쓰게 해 근거가 결론을 따라 골라지지 않게 한다. 아래 표가 그 순서다:
@@ -280,7 +282,7 @@ BBC 이적 가십·스카이 신문 요약("Papers: …")은 여러 신문의 �
   |---|---|
   | `--derive-only --rejudge-stale` | 판정 지문(`verdict_prompt`)이 지금 지시문의 지문과 다른 행만(실행당 상한 안에서 — 남으면 다시 돌린다). `--rejudge`·`--replay`와 함께 쓰지 않는다. `--dry-run`을 붙이면 묻지 않고 대상 수만 찍는다(비용을 미리 본다) |
   | `--derive-only --rejudge-stale --loan-only` | 그중 **임대를 말하는 보도만**(`mentionsLoan` — 저장된 글의 임대 낱말 또는 요약의 "임대"). 출력 형식에 필드를 더한 변경처럼 일부 보도에만 뜻이 있을 때 비용을 그 보도로 좁힌다 — 나머지 낡은 판정은 새 필드가 없는 것(모른다)으로 읽혀 틀린 값이 되지 않는다 |
-  | `--derive-only --rejudge` | 전부 — 선수 있는 "이동 아님" 행도 포함한다. 실행당 상한을 크게 연다 |
+  | `--derive-only --rejudge` | 전부 — 선수 있는 "이동 아님" 행도 포함한다. 실행당 상한을 크게 열고 시간 예산을 푼다(앞줄만 묻고 멈추면 다시 돌려도 같은 앞줄을 또 과금한다). 끝까지 못 돌면 종료 코드 1이다 — 남은 행은 판정이 이미 있어 다음 실행이 묻지 않는다. `--dry-run`을 붙이면 대상 수만 찍는다 |
 
   ⚠ **판정은 비결정적이다** — 같은 보도를 다시 물으면 일부가 달라진다. `--rejudge`는 지시문을 고쳤을 때만 돌리고, 돌리기 전에 딜에 묶인
   보도의 판정을 떠 둔다(되돌릴 기준이 된다). 지시문의 효과는 고정한 보도 묶음을 **옛 설정과 새 설정으로 함께, 여러 번** 물어
@@ -459,8 +461,10 @@ BBC 이적 가십·스카이 신문 요약("Papers: …")은 여러 신문의 �
 
 ## 이적시장 보드는 `transfer_news`에서 **파생**한다 — 사람의 큐레이션이 없다
 
+파생은 네 파일로 나뉜다 — 순수 파생 `derive-deals.mjs`(`deriveDeals`), 금액 규칙 `deal-fee.mjs`, 판정 대기열 `judge-queue.mjs`(`judgeMode`·`orderJudgeNeeds`), DB 층 `deal-store.mjs`(`loadRows`·`writeDeals`·`runDerivation`). 의존은 `deal-store → derive-deals → deal-fee → judge-queue → judge-parse` 한 방향이고, `derive-deals`는 `deal-store`를 다시 내보내지 않는다(순환).
+
 `transfer_club`·`transfer_deal`은 `transfer_news`와 같은 운영 데이터다. 유일한
-writer는 `scripts/lib/transfer/derive-deals.mjs`(`scripts/sync-transfer-news.mjs`의 마지막
+writer는 `scripts/lib/transfer/deal-store.mjs`(`writeDeals` — `scripts/sync-transfer-news.mjs`의 마지막
 단계, service_role)이고 **정책도 grant도 SELECT뿐**이다 — 앱에는 쓰기 경로가 전혀 없다
 (`api-and-db.md`의 "운영진만 쓰는 데이터는 쓰기 경로를 만들지 않는다"와 같은 판단이다 — 사람이 미리 써
 두는 데이터가 아니라 보도에서 매시 다시 계산되는 데이터라 그 유일 경로가 **파생 스크립트**다).

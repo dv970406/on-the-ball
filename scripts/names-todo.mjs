@@ -20,7 +20,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { connectFromEnv, flag, readAll } from "./lib/sync-db.mjs";
-import { ROW_COLUMNS, boardScopeStartMs, dealKey, deriveDeals, derivationStartMs, loadWindows, normalizePlayer, storedDealSnapshot } from "./lib/transfer/derive-deals.mjs";
+import { boardScopeStartMs, dealKey, deriveDeals, derivationStartMs, loadWindows, normalizePlayer } from "./lib/transfer/derive-deals.mjs";
+import { ROW_COLUMNS, storedDealSnapshot } from "./lib/transfer/deal-store.mjs";
 import { createNameBook, loadGlossary, loadNameCache, loadPlayerDictionary } from "./lib/transfer/names-ko.mjs";
 import { clubDisplay } from "./lib/transfer/club-display.mjs";
 import { canonicalClubName } from "./lib/transfer/clubs.mjs";

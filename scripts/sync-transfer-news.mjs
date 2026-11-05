@@ -32,7 +32,8 @@
  * ⚠ 소스 하나라도 실패하거나 행 단위 저장이 실패하면 종료 코드 1이다 — 읽는 화면이 없어 종료 코드가 유일한 신호다.
  */
 import { clampCp, connectFromEnv, flag } from "./lib/sync-db.mjs";
-import { REPEATED_FAILURE_ATTEMPTS, runDerivation } from "./lib/transfer/derive-deals.mjs";
+import { REPEATED_FAILURE_ATTEMPTS } from "./lib/transfer/derive-deals.mjs";
+import { runDerivation } from "./lib/transfer/deal-store.mjs";
 import * as judgeLib from "./lib/transfer/judge.mjs";
 import { runNotifications } from "./lib/transfer/notify.mjs";
 import { runScoring, syncWindows } from "./lib/transfer/predictions.mjs";

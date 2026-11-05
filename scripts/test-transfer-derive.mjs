@@ -7,7 +7,8 @@
  */
 import { createNameBook } from "./lib/transfer/names-ko.mjs";
 import { isRoundup } from "./lib/transfer/story.mjs";
-import { CARRIED_DAILY_ATTEMPTS, JUDGE_TIER, boardScopeStartMs, clubRecord, createExtractMemo, dealKey, dedupeRows, deriveDeals, derivationStartMs, ROW_COLUMNS, hasRawVerdict, holdStage, judgeMode, normalizePlayer, orderJudgeNeeds, retryDelayMs, windowSpan, isSettledFormChange, writeDeals } from "./lib/transfer/derive-deals.mjs";
+import { CARRIED_DAILY_ATTEMPTS, JUDGE_TIER, boardScopeStartMs, clubRecord, createExtractMemo, dealKey, dedupeRows, deriveDeals, derivationStartMs, hasRawVerdict, holdStage, judgeMode, normalizePlayer, orderJudgeNeeds, retryDelayMs, windowSpan, isSettledFormChange } from "./lib/transfer/derive-deals.mjs";
+import { ROW_COLUMNS, writeDeals } from "./lib/transfer/deal-store.mjs";
 
 const NOW = Date.parse("2026-09-25T00:00:00Z");
 const WINDOWS = [

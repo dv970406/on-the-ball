@@ -62,3 +62,6 @@ export const sameAmount = (a, b) => Math.abs(a - b) < 0.011;
 
 /** 이적료로 믿을 수 있는 상한(백만 단위) — 규칙 추출과 판정 해석이 같은 값을 쓴다. 그 위는 구단 가치·지출 합계 같은 다른 수다 */
 export const MAX_FEE_M = 350;
+
+/** 보도 행의 게시 시각(ms) — 파생과 판정 대기열이 함께 쓴다 */
+export const ts = (r) => Date.parse(r.published_at);

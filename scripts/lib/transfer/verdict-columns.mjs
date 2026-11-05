@@ -20,3 +20,6 @@ export const VERDICT_VALUE_COLUMNS = [
   "verdict_loan_club",
   "verdict_loan_clause",
 ];
+
+/** 그 선수에 대한 LLM 판정 — 다른 선수로 판정했으면(추출이 바뀌어 딜이 옮겨 감) 판정이 없는 것이다 */
+export const verdictOf = (r, key) => (r.verdict_player === key ? (r.verdict ?? null) : null);
