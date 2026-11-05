@@ -37,7 +37,7 @@ shared ← entities ← features ← widgets ← views
 - **deep import 금지**: `@/shared/config/routes` ❌ → `@/shared/config` ✅.
 - 이점: 캡슐화 / 파일 이동에 강함(배럴만 수정) / 단방향 의존 감시 용이.
 - **슬라이스 내부 훅은 배럴에 올리지 않는다.** 배럴은 **다른 레이어가 소비하는 것**만 담는다. 화면 슬라이스의 배럴을 읽는 것은 서버 컴포넌트(`app/**`의 page·layout)인데 서버는 `"use client"` 훅을 **호출할 수 없으므로**(아래 절), 올려 봐야 아무도 부를 수 없는 값이 공개 API에 남는다. 같은 슬라이스 안에서는 상대 경로로 가져온다 — 선례 `shared/ui/sheet.tsx`가 `./use-sheet-drag`를 직접 가져온다.
-  - ⚠ `pnpm check:conventions`는 이 위반을 **잡지 못한다.** 상대 경로 소비도 "현역"으로 세기 때문이다(배럴 미사용 검사의 목적은 죽은 export를 찾는 것이다).
+  - `pnpm check:conventions`가 슬라이스 밖에서 **배럴을 통해** 가져가는 소비자가 없는 export를 잡는다.
 - Vercel `react-best-practices`의 `bundle-barrel-imports`는 **서드파티 라이브러리 배럴**(lucide-react·@mui 등, 최대 수천 개 재export) 대상이다. 내부 슬라이스 배럴은 위 deep-import 금지 규칙을 유지한다. 서드파티는 Next의 `optimizePackageImports` **기본 목록이 이미 커버**한다(`lucide-react` 포함 — `next/dist/server/config.js`의 기본값). next.config에 따로 적지 않는다.
 
 ### ⚠ 배럴의 트리셰이킹은 `package.json`의 `sideEffects` 선언에 달려 있다
@@ -57,17 +57,17 @@ shared ← entities ← features ← widgets ← views
 
 **서버 소비자는 `generateMetadata`와 서버 컴포넌트(page·layout)다.**
 
-- `@/shared/api` — 클라이언트 안전 모듈만 노출. 서버 전용은 **직접 경로**로 import: `@/shared/api/supabase-server`(`next/headers` 의존) · `@/shared/api/supabase-anon`(Next Data Cache 의존).
-- `@/shared/lib` — `"use client"` 훅을 포함한다(목록은 `reuse.md`). **서버에서는 순수 함수를 직접 경로로 import**: `@/shared/lib/cn`·`format`·`post-id`·`text`·`query-scope`·`search-params`·`date-key`. 이 직접 경로 나열이 곧 `shared/lib`의 화이트리스트이고 **단일 소스는 `src/shared/lib/index.ts` 말미의 주석**이다.
+- `@/shared/api` — 클라이언트 안전 모듈만 노출. 서버 전용은 **직접 경로**로 import: `@/shared/api/supabase-server`(`next/headers` 의존) · `@/shared/api/supabase-anon`(Next Data Cache 의존) · `@/shared/api/prefetch`(서버 page의 프리페치 결과 접기).
+- `@/shared/lib` — `"use client"` 훅을 포함한다(목록은 `reuse.md`). **서버에서는 순수 함수를 직접 경로로 import**: `@/shared/lib/cn`·`format`·`post-id`·`text`·`query-scope`·`search-params`·`date-key`. 허용 목록의 단일 소스는 `scripts/check-conventions.mjs`의 `DEEP_IMPORT_ALLOWED`다(소비자가 사라진 경로도 그 검사가 잡는다).
   - `@/shared/ui`도 같다 — 배럴이 클라이언트 컴포넌트를 담으므로, 서버 page가 **렌더가 아니라 값으로** 써야 하는 서버 안전 모듈이 생기면 직접 경로로 가져가고 그 경로를 `check:conventions`의 `DEEP_IMPORT_ALLOWED`에 함께 적는다.
   - ⚠ **`"use client"`를 붙이지 않은 `shared/ui` 컴포넌트도 서버 소비자다.** 배럴을 거치면 서버 렌더 여지를 잃는다 — `empty-state`·`avatar`·`pill`·`skeleton`과 클래스 함수들(`button-class`·`chip-class`)이 `@/shared/lib/cn` 직접 경로를 쓰는 이유다(사유는 `empty-state.tsx` 주석에).
-- `@/entities/profile` — `"use client"` 쿼리 훅 포함. **서버는 `model/types`·`api/mappers`·`api/keys`를 직접 import**(이 세 접미사는 모든 엔티티에 공통으로 열려 있다).
-- `@/entities/transfer` — `"use client"` 쿼리 훅·UI 포함. **서버는 `model/types`·`api/mappers`·`api/keys`·`api/list-query`·`lib/stage`·`lib/route-label`·`lib/player-name`·`lib/fee`·`lib/deal-form`·`lib/deal-meta`·`lib/league`·`lib/club-deals`를 직접 import** — 각 모듈을 어느 서버 라우트가 무엇에 쓰는지는 `reuse.md`의 `@/entities/transfer` 절과 `nextjs.md`의 메타데이터·딜 카드 절이 갖는다. 원칙은 하나다: 서버가 만드는 제목·설명·카드·건수는 **화면과 같은 함수**로 만든다.
+- `@/entities/profile` — `"use client"` 쿼리 훅 포함. **서버는 `model/types`·`api/mappers`를 직접 import**(이 두 접미사는 모든 엔티티에 공통으로 열려 있다).
+- `@/entities/transfer` — `"use client"` 쿼리 훅·UI 포함. **서버는 `model/types`·`api/mappers`·`api/list-query`·`lib/stage`·`lib/route-label`·`lib/player-name`·`lib/fee`·`lib/deal-form`·`lib/deal-meta`·`lib/league`·`lib/club-deals`를 직접 import** — 각 모듈을 어느 서버 라우트가 무엇에 쓰는지는 `reuse.md`의 `@/entities/transfer` 절과 `nextjs.md`의 메타데이터·딜 카드 절이 갖는다. 원칙은 하나다: 서버가 만드는 제목·설명·카드·건수는 **화면과 같은 함수**로 만든다.
   ⚠ 직접 경로는 **서버 소비자의 것이다.** 훅(`memo`·`useMemo` 포함)을 쓰는 화면 조각은 서버에서 렌더되지 않으므로 `"use client"`를 달고 배럴로 가져온다 — 지시어 없이 직접 경로를 쓰면 클라이언트 모듈인데도 `check:conventions`의 `deep-import-client`를 비켜 간다. 필요한 값이 배럴에 없으면 배럴로 올린다(이적 보드의 지수 띠가 상태 톤·라벨을 그렇게 쓴다).
 - `@/entities/prediction` — `"use client"` 쿼리 훅 포함. **서버는 `model/types`·`api/mappers`·`api/list-query`를 직접 import** — `app/transfers/[id]/page.tsx`가 성사 예측(집계 + 내 표)을, `app/ranking/page.tsx`가 랭킹을 클라이언트 훅과 같은 조립으로 프리페치한다.
 - `@/entities/comment` — `"use client"` 쿼리 훅 포함. **서버는 `model/types`·`api/mappers`·`api/list-query`를 직접 import** — `app/transfers/[id]/page.tsx`가 댓글을 클라이언트 훅과 같은 조립(`buildCommentListQuery`)·자르기(`buildCommentList`)로 프리페치한다.
 - `@/entities/push` — 전부 클라이언트다. 알림 상태가 브라우저 API(권한·구독)에서 나와 서버가 쓸 것이 없다.
-- `@/entities/session` — 배럴이 zustand 스토어·Provider·가드를 재export(전부 클라이언트). 순수 함수 `toAuthErrorMessage`는 `lib/auth-error-message`에, 쿼리 키는 `api/keys`에 따로 있다.
+- `@/entities/session` — 배럴이 zustand 스토어·Provider·가드를 재export(전부 클라이언트). 서버 소비자가 없어 직접 경로를 열어 두지 않는다 — 서버에서 필요해지면 그때 순수 모듈을 허용 목록에 더한다.
 - `@/features/sign-in` — 배럴이 `"use client"` 훅(`useOAuthSignIn`)을 포함한다. **서버가 쓰는 순수 함수 `hasPkceVerifier`는 `@/features/sign-in/lib/pkce-verifier` 직접 경로**로 가져간다(`app/(auth)/sign-in/page.tsx`가 선례). features 레이어에도 같은 예외가 성립한다는 뜻이다 — 배럴이 클라이언트 훅을 담고 있으면 서버 소비자는 직접 경로를 쓴다.
 - 선례: `app/transfers/[id]/page.tsx`는 **`"use client"`를 담은 배럴을 하나도 거치지 않는다.** 서버 안전 모듈은 전부 직접 경로로 가져오고, 배럴을 쓰는 곳은 순수 상수만 담은 `@/shared/config`와 서버가 **렌더**하는 뷰(`@/views/transfer-detail`)뿐이다(렌더는 합법 — 아래 절 참고).
 

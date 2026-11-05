@@ -22,7 +22,7 @@ Before any Next.js work, find and read the relevant doc in `node_modules/next/di
 
 ### 규약 문서의 "목록"은 손으로 세지 않는다
 
-위 문서들은 원칙만이 아니라 **목록**을 담고 있다(예외 화이트리스트 · 재사용 헬퍼 · 현역/미사용 UI · deep import 허용 경로). 목록은 코드가 움직이면 조용히 틀려진다 — 손으로 세면 반드시 갈린다.
+위 문서들은 원칙만이 아니라 **목록**을 담고 있다(예외 화이트리스트 · 재사용 헬퍼 · 현역 UI · deep import 허용 경로). 목록은 코드가 움직이면 조용히 틀려진다 — 손으로 세면 반드시 갈린다.
 
 - **코드나 목록을 고쳤으면 `pnpm check:conventions`를 돌린다.** `supabase/tests/run-rls.sh`가 DB에 대해 하는 일을 프론트 규약에 대해 한다.
 - 두 검사의 역할 분담: **DB(RLS·권한·`security definer`)는 `run-rls.sh`**, **프론트(레이어·배럴·스타일 화이트리스트)는 `check:conventions`**.

@@ -22,13 +22,13 @@
 - **`isPlainNickname`** — 닉네임 허용 문자(한글 음절 · 한글 자모 · 영문 · 숫자). **공백도 허용하지 않는다.** DB의 `public.is_plain_nickname`(`profiles_nickname_plain` CHECK)과 **글자 하나까지 같아야 한다** — 갈리면 클라가 통과시킨 값이 23514가 되어 사용자는 한국어 안내 대신 "입력한 내용을 다시 확인해 주세요."를 본다.
   - ⚠ **정규형에 적용한다**(`normalizeNickname`의 결과). 원본으로 판정하면 NFD 한글이 거부되고 꼬리 공백까지 에러가 된다.
   - ⚠ **정규식을 호출부에 다시 적지 말 것**(`parsePostId`·`safeNextPath`와 같은 이유) — 자모 범위 상한 `ㅣ`(U+3163)처럼 글자 하나가 규약이다(사유는 `api-and-db.md` 허용 문자 절).
-- **`clamp(text, max)`** — 코드포인트 단위 말줄임(넘치면 끝에 `…`). **`.slice()`로 직접 자르지 말 것** — UTF-16 코드유닛이라 이모지가 반쪽으로 잘린다. `generateMetadata`의 `<title>`·description 길이 방어가 이 함수를 쓴다. 서버에서는 `@/shared/lib/text` 직접 경로로.
+- **`clamp(text, max)`** — 코드포인트 단위 말줄임(넘치면 끝에 `…`). **`.slice()`로 직접 자르지 말 것** — UTF-16 코드유닛이라 이모지가 반쪽으로 잘린다. `generateMetadata`의 `<title>`·description 길이 방어가 이 함수를 쓴다. 소비자가 서버뿐이라 배럴에 없다 — `@/shared/lib/text` 직접 경로로.
 - **`TextLimit` / `lengthOverflow`** — 길이 한도 **한 쌍**(그래핌=화면 · 코드포인트=DB 정합)과 그 판정. **길이 제한은 이걸로만 건다.**
   - ⚠ **그래핌 길이만 재서 비교하지 말 것.** 그래핌 한도는 DB `char_length` 한도를 함의하지 못하고, 코드포인트 검사를 빠뜨려도 **컴파일·린트·rls 검사 어느 것도 안 잡아준다**(근거는 `api-and-db.md` 길이 한도 절). `parsePostId`·`safeNextPath`와 같은 이유로 규약을 함수 하나가 소유한다.
   - 길이 측정 함수(`codePointLength`·`graphemeLength`)는 `text.ts` 안에 있고 **배럴에 올리지 않았다** — 호출부가 직접 재면 위 함정으로 돌아가기 때문이다. `<input maxLength>`·`.length`도 길이 제한에 쓰지 않는다(UTF-16 코드유닛이라 이모지가 2로 세어진다).
   - 짝이 되는 상수는 features가 갖는다 — `NICKNAME_LIMIT`(`update-profile`). 값 표와 K=10 근거는 `api-and-db.md`.
-- **`kstDateKey(ms)` / `parseKstDateKey(value)` / `kstDateLabel(key)`**(`date-key.ts`) — 한국 시각 날짜 키(`YYYY-MM-DD`)와 그 하루의 경계·읽는 날짜(`"2026년 10월 7일 (수)"`). 날짜별 소식의 주소·404 판정·조회 경계·날짜 목록이 전부 이것을 쓴다. ⚠ **키를 정규식이나 `new Date(key)`로 다시 해석하지 말 것** — `parsePostId`와 같은 이유로 엄격한 한 표기만 받는다(`2026-10-7`·`2026-02-30`은 키가 아니다 → 같은 날의 별칭 URL이 생기지 않는다). ⚠ 하루의 경계는 고정 오프셋(UTC+9)이다 — `Date`의 지역 시각 메서드로 날짜를 묶지 않는다(`data-and-state.md` 하이드레이션 절). 키가 `YYYY-MM-DD`라 **문자열 비교가 곧 날짜 비교**다(미래 판정·다음 날 링크). 서버에서는 `@/shared/lib/date-key` 직접 경로로.
-- **`userScope(userId)`** — 쿼리 키의 사용자 스코프 조각(`undefined` → `"guest"`). ⚠ `"guest"` 리터럴을 호출부가 각자 적지 말 것 — 갈리면 **캐시 키가 조용히 어긋나** 빌드도 린트도 못 잡고 화면만 스켈레톤이 되거나 남의 데이터가 남는다. `transferKeys`가 쓴다. ⚠ `userId: string`인 키(`identityKeys`·`profileKeys`)에는 쓰지 않는다. `api/keys.ts`는 서버 소비자라 **직접 경로**로 가져온다.
+- **`kstDateKey(ms)` / `parseKstDateKey(value)` / `kstDateLabel(key, { weekday })` / `kstDayNumber(ms)` / `DAY_MS`**(`date-key.ts`) — 한국 시각 날짜 키(`YYYY-MM-DD`)와 그 하루의 경계·읽는 날짜(`"2026년 10월 7일 (수)"`). 날짜별 소식의 주소·404 판정·조회 경계·날짜 목록이 전부 이것을 쓴다. ⚠ **키를 정규식이나 `new Date(key)`로 다시 해석하지 말 것** — `parsePostId`와 같은 이유로 엄격한 한 표기만 받는다(`2026-10-7`·`2026-02-30`은 키가 아니다 → 같은 날의 별칭 URL이 생기지 않는다). ⚠ 하루의 경계는 고정 오프셋(UTC+9)이다 — `Date`의 지역 시각 메서드로 날짜를 묶지 않는다(`data-and-state.md` 하이드레이션 절). 키가 `YYYY-MM-DD`라 **문자열 비교가 곧 날짜 비교**다(미래 판정·다음 날 링크). 서버에서는 `@/shared/lib/date-key` 직접 경로로.
+- **`userScope(userId)`** — 쿼리 키의 사용자 스코프 조각(`undefined` → `"guest"`). ⚠ `"guest"` 리터럴을 호출부가 각자 적지 말 것 — 갈리면 **캐시 키가 조용히 어긋나** 빌드도 린트도 못 잡고 화면만 스켈레톤이 되거나 남의 데이터가 남는다. `transferKeys`·`commentKeys`·`predictionKeys`가 쓴다. 소비자가 서버 안전한 `api/keys.ts`뿐이라 배럴에 없다. ⚠ `userId: string`인 키(`identityKeys`·`profileKeys`)에는 쓰지 않는다. `api/keys.ts`는 서버 소비자라 **직접 경로**로 가져온다.
 - **`currentReturnPath()` / `RETURN_PATH_ATTR`** — 로그인 뒤 돌아올 주소. 화면이 그 속성에 단 값이 있으면 그것, 없으면 지금 주소(경로 + 쿼리)다. 상단 바 "로그인"(`SignInLink`)과 `next` 없는 `SignInDialog`가 쓴다. ⚠ **화면이 그대로인데 주소가 다른 화면을 가리키는 자리**는 그 속성을 단다 — 이적 보드는 고른 딜이 상세 경로로 실려, 지금 주소로 돌아오면 상세가 뜬다(`nextjs.md` 2분할 절). ⚠ 누르는 순간에만 부른다(렌더 중에 부르면 서버 HTML과 갈린다).
 - **`useNextParam`** — 현재 URL의 `?next=`. `useSearchParams` 대신 쓴다(그걸 쓰면 화면 프리렌더가 CSR로 떨어진다).
   - ⚠ **읽은 값을 렌더에 쓰는 화면**용이다(로그인 화면의 `redirectTo` 조립). 값이 필요한 시점이 **effect 안뿐**이라면 이걸 쓰지 말고 거기서 직접 읽는다 — 이 훅은 `useSyncExternalStore`로 렌더 중에 읽으므로 렌더타임 의존이 새로 생긴다. 라우트 가드(`use-auth-redirect`)가 그 경우이고, 사유는 그 훅 주석에 있다.
@@ -43,6 +43,10 @@
 - **`useItemGuard<K>()`** — 목록의 **항목별** 중복 실행 가드(`run(id, task)` · `isBusy(id)`). 뮤테이션 하나를 여러 항목이 나눠 쓰는 자리(댓글 삭제)용이다. ⚠ `ref` + `state` + `.finally()`를 호출부마다 다시 짜지 말 것 — 사유는 그 파일 주석과 `data-and-state.md`. ⚠ "항목 수 자체가 불변조건"인 목록(로그인 수단 해제)에는 쓰지 않는다.
 - **`serverToClientTime(serverMs)`** — 서버 시각을 **이 기기 시계** 기준으로 옮긴다(잰 오차의 최솟값을 쓴다 — 지연은 늘 양수라 최솟값이 참 오차에 가깝다). TanStack `initialDataUpdatedAt`처럼 기기 시계와 빼서 신선도를 재는 자리에 쓴다 — 서버 시각을 그대로 넣으면 기기 시계 오차만큼 방금 그린 SSR이 stale이 되거나 옛 페이로드가 신선해진다. ⚠ **화면에 그리는 값에는 쓰지 않는다** — 잰 오차가 기기마다 달라 서버 HTML과 갈린다. 신선도처럼 그려지지 않는 값에만 쓰고, 부르는 자리는 옵션 함수(`initialDataUpdatedAt: () => …` — Query가 만들어질 때 한 번)다. ⚠ **예외는 하이드레이션 뒤에만 도는 시계**다 — 마감 카운트다운(`views/transfer-board`의 `useDeadline`)은 첫 렌더를 서버 시각으로 그리고, 구독이 시작된 뒤의 틱부터 이 오차를 빼 기기 시계를 서버 시계로 옮긴다. 서버 HTML이 그 값을 담지 않으므로 갈릴 것이 없다 — 렌더 중에는 여전히 부르지 않는다.
 - **`preferredScrollBehavior()`** — 코드로 굴리는 스크롤(`scrollTo`·`scrollBy`)의 `behavior`. 동작 줄이기를 켰으면 `auto`, 아니면 `smooth`. ⚠ `matchMedia("(prefers-reduced-motion: reduce)")`를 호출부가 다시 적지 말 것 — CSS 전역 블록은 JS가 넘기는 `behavior`에 닿지 않아, 한 곳만 빠뜨려도 그 스크롤만 미끄러진다. 브라우저에서만 부른다(이벤트 핸들러·effect).
+- **`useReferenceNowMs(serverNowMs)`** — 화면의 기준 시각(`serverNowMs ?? useNowMs()`). ⚠ 호출부가 두 줄을 다시 짜지 말 것 — 순서를 뒤집은 실측 사고와 조건부 훅, 두 함정을 이 훅이 갖는다.
+- **`serverUpdatedAt(serverNowMs)`** — 쿼리의 `initialDataUpdatedAt` 옵션 값(함수). ⚠ 서버 시각을 그대로 넣지 말 것 — 기기 시계로 옮기는 것까지 이 함수가 한다.
+- **`isPlainClick(e)`** — 앱이 가로채도 되는 일반 클릭인가(수정 키·가운데 버튼 제외). ⚠ 조건을 호출부가 다시 적지 말 것 — 하나만 빠져도 그 링크의 새 탭 열기가 깨진다.
+- **`createPendingOverlay({ isEntry, apply })`** — 줄 세운 낙관적 쓰기의 조회 쪽 덮어 넣기(아직 끝나지 않은 쓰기 + 조회 뒤 커밋된 쓰기). 도메인은 엔티티의 래퍼가 갖는다(`applyPendingVotes`·`applyPendingPicks`). 뮤테이션 옵션은 묶지 않는다(`code-quality.md`).
 - `useScrollRestore(ref, screen?)` — 목록 스크롤 위치 저장/복원. 키는 기본이 경로이고, **화면이 그대로인데 경로가 바뀌는 화면**(이적 보드 — 고른 딜이 상세 경로로 실린다)은 고정된 이름을 넘긴다(`TabScrollArea`의 `screen`) — 경로를 키로 두면 고를 때마다 목록이 맨 위로 튄다. 저장은 스크롤이 멎은 뒤 한 번이고(프레임마다 sessionStorage에 쓰지 않는다), 남은 값은 화면을 떠날 때·`pagehide`에 마저 쓴다. ⚠ 위치는 **스크롤 이벤트 때** 읽어 둔다 — 쓰는 시점에 엘리먼트를 다시 읽으면 떠난 뒤의 detached 엘리먼트가 0을 준다.
 - **`hasInAppHistory()` / `useInAppNavigationTracker()`** — 이 탭에 앱 안의 이동으로 쌓인 기록이 있는가. 화면의 뒤로가기(`SubHeader`)가 `router.back()`을 써도 되는지를 이것으로만 가른다. ⚠ **`window.history.length`로 판정하지 말 것** — 탭 전체의 기록이라, 검색 결과에서 같은 탭으로 들어온 사용자를 `back()`이 사이트 밖으로 내보낸다. 추적 훅은 루트(`AppProviders`)에 한 번만 마운트한다 — `history.pushState` 호출을 센다(Next의 이동도, 이적 보드의 `navigateBoard`도 이 메서드를 지난다). ⚠ **경로 변화로 세지 말 것** — `router.replace`(가드의 이동·OAuth 복귀 뒤 목적지)는 경로를 바꾸지만 기록을 쌓지 않아, 세면 복귀 화면의 `back()`이 프로바이더 페이지로 간다.
 - `useFocusTrap` — 오버레이(`Dialog`·`Sheet`) 안에 포커스를 가둔다. ⚠ 초기 포커스는 **`preventScroll: true`** 로 준다(사유는 `styling.md` — 화면 밖에서 올라오는 요소에 그냥 `focus()`하면 앱 프레임이 되돌릴 수 없게 밀린다)
@@ -68,6 +72,7 @@
 - `toDbErrorMessage` — PostgREST/RPC 에러 → 한국어. `P0001`(우리가 띄운 메시지)은 그대로 통과시킨다. 작성자 FK(`…_user_id_fkey`) 위반 23503은 "계정 정보를 찾을 수 없어요"로 접는다(탈퇴·삭제된 계정의 세션이 남은 채 쓴 경우).
 - **`SIGN_IN_REQUIRED_MESSAGE`** — 로그인해야만 성립하는 조회·쓰기를 세션 없이(또는 다른 사람 명의로) 부를 때 훅이 던지는 문구(이중 방어 — 실제 차단은 RLS). `"로그인이 필요해요."`를 훅마다 다시 적지 않는다. 세션이 만료돼 서버가 거부한 쓰기는 이것이 아니라 아래 `toWriteErrorMessage`의 "만료" 문구다.
 - **`toWriteErrorMessage(supabase, error)`** — 로그인이 필요한 쓰기의 에러 → 한국어. 42501이면 세션을 확인해 세션이 없을 때 "로그인이 만료됐어요"로 바꾸고, 나머지는 `toDbErrorMessage`와 같다. 로그인 필수 쓰기 훅은 이것을 쓴다(`data-and-state.md`).
+- **`prefetchedRows(label, result)`**(`@/shared/api/prefetch` 직접 경로) — 서버 프리페치의 목록 결과 접기(실패면 로그 + `undefined`, 성공이면 행 배열). ⚠ `error ? undefined : (data ?? [])`를 다시 짜지 말 것 — PostgREST 에러는 `catch`에 닿지 않아 로그를 빠뜨리기 쉽고, `[]`로 접으면 "없다"가 된다.
 - ⚠ `createSupabaseServerClient`는 배럴에 없다 — `@/shared/api/supabase-server`를 직접 import(`next/headers` 의존).
 - **`createSupabaseAnonClient` / `ANON_REVALIDATE`** (`@/shared/api/supabase-anon` 직접 경로) — 쿠키를 읽지 않는 서버 클라이언트. fetch가 Next Data Cache를 타므로 **응답이 모든 익명 요청에 동일한 조회에만** 쓴다. 새로 만들지 말 것 — 수명 상수가 TanStack `staleTime`과 한 값으로 묶여 있다. 캐시의 한계·함정은 `nextjs.md` 익명 조회 절.
 - **`hasSessionCookie()`** (`supabase-server`) — 이 요청에 세션이 있는지를 **네트워크 없이** 판정. 위 두 클라이언트를 고르는 데만 쓴다. ⚠ `getUser()`로 바꾸거나 판정을 **좁히지 말 것** — 사유는 같은 절.
@@ -77,6 +82,7 @@
 - `AuthProvider` — 세션 동기화의 마운트 지점. `QueryClientProvider` 안쪽에 둔다.
   로직은 `use-session-sync`(`onAuthStateChange` ↔ 스토어 + 유저 전환 시 캐시 리싱크)와
   `use-server-session-check`(로그인 시 1회 서버 검증)가 나눠 갖는다.
+- **`useQueryScope(initialUserId)`** — 쿼리 키의 사용자와 `status`·`ownsPrefetch`(`nextjs.md`). ⚠ `status === "loading" ? initialUserId : storeUserId`를 호출부가 다시 짜지 말 것.
 - `AuthRequired` / `GuestOnly` — 클라이언트 라우트 가드. 렌더 분기만 갖고,
   **이동은 `use-auth-redirect`가 소유한다** — 로그인 후 목적지를 정하는 곳은 앱에서 거기 하나다.
 - **`useLastAuthProvider()`** — 마지막으로 로그인에 성공한 소셜 프로바이더(로그인 화면의 "최근 사용" 배지). ⚠ 순수 리더가 아니라 **훅**을 노출한다 — 그대로 내보내면 호출부마다 "렌더 중에 부르면 하이드레이션이 깨진다"를 기억해야 하는데 그런 방어는 방어가 아니다(`useNextParam`과 같은 형태).
@@ -101,9 +107,9 @@
 - `useUpdateAvatar` / `ACCEPTED_IMAGE_TYPES` — 아바타 업로드(정사각 crop + webp 리사이즈는 슬라이스 내부 `resizeToAvatar`). ⚠ 받는 형식·원본 상한은 **기능마다 다르므로** 각 feature가 갖는다 — 이미지를 받는 기능이 또 생기면 리사이즈 메커니즘만 `shared`로 올리고 형식·상한은 각자 둔다(정사각 crop은 본문 사진에 쓰면 내용이 날아가 형태가 같지 않다).
 
 ## `@/entities/transfer`
-- `useTransferDealListQuery({ userId, scopeStartIso, enabled, initialData, initialDataUpdatedAt, placeholderData })` / `useTransferDealQuery({ dealId, userId, enabled, initialData, initialDataUpdatedAt })` / `useTransferReportsQuery({ dealId, enabled, initialData, initialDataUpdatedAt })` — 보드 목록(범위 안 전부) · 딜 단건 · 상세 보도 타임라인. 인자 형태는 `useCommentListQuery`와 같다.
+- `useSeededDealListQuery({ userId, scopeStartIso, sessionRestored, ownsPrefetch, initialDeals, initialDataUpdatedAt })` / `useTransferDealQuery({ dealId, userId, enabled, initialData, initialDataUpdatedAt })` / `useTransferReportsQuery({ dealId, enabled, initialData, initialDataUpdatedAt })` — 보드 목록(범위 안 전부) · 딜 단건 · 상세 보도 타임라인. 인자 형태는 `useCommentListQuery`와 같다.
   ⚠ `initialData`를 넣으면 `initialDataUpdatedAt`(서버가 읽은 시각 → `serverToClientTime`)도 함께 넣는다 — 빼면 뒤로가기가 되살린 옛 서버 페이로드가 신선한 것으로 앉는다(`nextjs.md`).
-  ⚠ 목록은 서버가 본 사용자와 지금 사용자가 다르면 `initialData`가 아니라 **`withoutWatches`** 사본을 `placeholderData`로 넘긴다(행마다 관심 표시가 붙는 목록이다 — `useTransferBoard`). 딜 단건은 개인화 값이 하나뿐이라 이 규칙 밖이다.
+  ⚠ 목록은 서버가 본 사용자와 지금 사용자가 다르면 `initialData`가 아니라 관심 표시를 지운 사본을 `placeholderData`로 넘긴다(행마다 관심 표시가 붙는 목록이다). 보드와 구단 화면이 같은 키를 쓰므로 이 규칙을 `useSeededDealListQuery` 하나가 갖는다. 딜 단건은 개인화 값이 하나뿐이라 이 규칙 밖이다.
   ⚠ **목록·상세는 `userId`로 스코프된다**(관심 임베딩이 "내 행만"이라 응답 자체가 "나"에 종속된다). **타임라인은 스코프되지 않는다**("나"에 종속된 값이 없다).
   ⚠ **리그·정렬은 쿼리 키에 넣지 않는다** — 서버가 범위 안 딜 **전체**(≤`TRANSFER_DEAL_LIMIT`)를 내리고 뷰(`sortDeals`·`groupDeals`·`dealInLeague`)가 같은 데이터로 계산한다. 필터를 키에 넣으면 `initialData`가 캐시에 닿지 못하는 사고가 난다(`nextjs.md`의 실측 사고와 같은 함정).
   ⚠ `initialData`의 `undefined`(프리페치 안 함·실패)와 `[]`(받았는데 없다)는 다른 뜻이다.
@@ -112,7 +118,7 @@
 - **`buildDealListQuery` / `buildDealQuery` / `buildReportsQuery` / `buildRelatedDealsQuery`**(`api/list-query.ts` — 서버 안전) — 목록·단건·타임라인·같은 구단의 다른 딜(상한 `RELATED_DEAL_LIMIT`) 조립의 단일 소스. 훅과 SSR 페이지가 **같은 함수**를 부른다 — 서버가 정렬·상한·select를 다시 짜면 하이드레이션 직후 목록이 재배열된다.
 - `TRANSFER_DEAL_LIMIT` — 목록 상한(`api/mappers.ts` — SSR과 공유해야 해서 `"use client"`가 아닌 파일에 있다). **화면이 잘림을 안내해야 한다** — 조용히 자르면 그 뒤 항목은 URL을 아는 사람 말고는 도달할 방법이 없다.
 - **`headlineReports(reports, count)`** — 딜을 대표하는 보도(한국어 요약 있는 보도 중 최신 `count`건, 없으면 최신 `count`건). 상세 og description과 보드 판의 "최신 보도"가 함께 쓰고, 서버는 `api/mappers` 직접 경로로 가져간다. ⚠ 대표 문구를 고를 때 `reports[0]`을 직접 쓰지 말 것. ⚠ 목록(최신 보도 1건 임베딩)은 이 판정을 쓰지 않는다 — 캐러셀 카드의 기자·등급과 요지가 같은 보도여야 한다.
-- **`pickRecentRumors(deals, nowMs)`** — "최근 3일 소식" 캐러셀 대상(믿을 만한 출처 · 3일 이내). 믿을 만한 출처는 🎖️ 매체와 🌕·🌖 기자다(`isTopCredibility` — 화면 뱃지와 같은 등급이라 표시와 채택 기준이 갈리지 않는다). ⚠ **최신 보도의 출처로 판정한다** — 목록 select의 최신 보도 임베딩(`limit 1`)만 보므로, 최신 보도의 등급이 낮으면 그 앞의 믿을 만한 보도가 있어도 그 딜은 빠진다(딜마다 보도 전체를 싣는 비용을 들이지 않기로 한 트레이드오프). 결렬 딜도 포함한다. ⚠ `nowMs`를 인자로 받는다(`formatRelativeTime`과 같은 이유) — 매퍼에 넣으면 순수·서버 안전이 깨지고 같은 행이 호출 시점마다 달라진다. 서버 시각이 있으면 그 값을 넘긴다.
+- **`pickRecentRumors(deals, nowMs)`** — "최근 3일 소식" 캐러셀 대상(믿을 만한 출처 · 3일 이내). 믿을 만한 출처는 🎖️ 매체와 🌕·🌖 등급의 기자·매체다(`isTopCredibility` — 화면 뱃지와 같은 등급이라 표시와 채택 기준이 갈리지 않는다). ⚠ **최신 보도의 출처로 판정한다** — 목록 select의 최신 보도 임베딩(`limit 1`)만 보므로, 최신 보도의 등급이 낮으면 그 앞의 믿을 만한 보도가 있어도 그 딜은 빠진다(딜마다 보도 전체를 싣는 비용을 들이지 않기로 한 트레이드오프). 결렬·부인 딜은 싣지 않는다. ⚠ `nowMs`를 인자로 받는다(`formatRelativeTime`과 같은 이유) — 매퍼에 넣으면 순수·서버 안전이 깨지고 같은 행이 호출 시점마다 달라진다. 서버 시각이 있으면 그 값을 넘긴다.
 - **`FeeValue`** — 이적료 칸의 값. 금액이면 `€95M`(mono), 자유계약이 **확인된** 딜이면 `FA(자유 계약)`, 아니면 `미공개`(흐리게). 실제 이적료가 아닌 금액에는 성격을 작게 붙인다(`£86M 요구액` · 임대의 조항 금액은 `£42.5M 의무`) — 금액만 두면 그 값에 이적한 것으로 읽힌다. 칸의 제목이 성격을 말하는 자리(상세 카드 — **`feeKindLabel(deal.feeKind, deal.loanClause)`** — 조항 금액은 조항으로 옵션·의무를 가른다)만 `caption={false}`로 끈다. ⚠ 성격 라벨을 호출부가 다시 적지 말 것 — `Record<transfer_fee_kind, string>` 한 곳이 갖는다(`lib/fee.ts`). ⚠ **빈 이적료를 FA로 추정하지 않는다** — 판정은 `feeLabel`이 단독으로 갖고 근거는 파생기의 `is_free_agent`다(`api-and-db.md`). 이적료 칸을 새로 그릴 때 `formatFee(...) ?? "—"`를 직접 짜지 말 것.
 - **`formatFee({amount, currency})`** — 이적료 표기(`€95M`). 백만 미만은 **천 단위**다(`£250K`) — 백만 단위 소수 1자리로 그리면 `0.25`·`0.3`이 둘 다 `0.3M`이 되고 그 차이가 `0.0M`이 된다. 변동폭(`FeeDelta`)·범위·계약 조건이 전부 이 함수를 지나므로 단위를 호출부가 따로 정하지 않는다. 서버(메타데이터·공유 카드)도 쓰는 순수 함수다. **`formatFeeRange(deal)`** 은 그 딜의 보도 이적료 최소–최대(`€58–95M`, 같으면 한 값, 두 끝의 단위가 다르면 끝마다 — `€500K–1.5M`). 백만 이상은 **저장된 정밀도 그대로**(소수 둘째 자리까지, 꼬리 0은 걷는다 — `€95M`·`€12.5M`·`€1.25M`)다. 자리수를 반올림해 줄이지 않는다 — 줄이면 서로 다른 금액이 같은 글자가 되어 범위 바의 양 끝·헤드라인 금액·범위·변동폭이 서로 다른 말을 한다(`1.25`·`1.3` → 둘 다 `1.3M`). ⚠ `min(prev,fee)–(fee+add)` 공식을 쓰지 않는다 — 하락 딜에서 `€58–58M`로 퇴화한다. 직전 보도 대비 변동폭은 `FeeDelta`가 그린다 — 통화 변환은 하지 않는다(파생기가 `prevFeeAmount`에 같은 통화 값만 넣는다).
 - **`reporterName(report)`**(`lib/reporter.ts` — 배럴에 없다. 슬라이스 밖 소비자가 0이다) — 보도 주체의 한국어 표기(기자는 전체 이름 "벤 제이콥스", 매체는 매체명 "BBC"). 캐러셀·목록·타임라인이 **이것 하나**를 쓴다 — 소스 등록용 영어 라벨을 화면에 따로 그리면 같은 기자가 화면마다 "Fabrizio Romano"·"파브리지오 로마노"로 갈린다. ⚠ **단일 소스는 `scripts/lib/transfer/reporters.json`** 이다(파이프라인이 TS를 못 읽어 JSON이 원본이다). 우선순위는 `bylines → sources → journalists → attributed_to 원문 → source_id`다. ⚠ **가십 칼럼이 인용한 신문의 보도(`attribution = 'cited'`)는 그보다 먼저 `cited` 표기(없으면 칼럼이 적은 원문 표기)다** — 소스가 BBC Sport 피드여도 BBC의 보도가 아니라서, 소스 표기로 떨어뜨리면 팀토크의 이적설이 "BBC"로 그려진다(운영 실측). 접는 규칙(`citedKey`)은 `reporter.ts` 하나가 갖는다.
@@ -125,10 +131,15 @@
 - **`sortReports(reports, sort)`** — 상세 보도 타임라인 정렬(`ReportSort`: `credibility` 공신력순 — 🎖️ > 🌕 … 🌑 > 등재되지 않은 출처, 같은 등급은 최신순 · `latest` 최신순). 등급은 배지와 같은 `credibilityOf`다 — 정렬과 배지가 다른 등급을 말하면 안 된다. 정렬은 쿼리 키에 넣지 않는다(댓글 정렬과 같은 이유).
 - `GROUP_LABEL` / `GROUP_ORDER` — 보드 구간(오피셜·합의 완료·진행 중·루머·결렬·부인)의 라벨·고정 순서. 결렬(`collapsed`)과 부인(`denied`)은 같은 구간이고 뱃지·아이콘(⊗/⊘)이 가른다 — 판정은 `isDeadStage`와 `stage === "denied"` 둘뿐이다.
 - **`CredibilityBadge`**(`ui/credibility-badge.tsx` — 배럴에 없다. 슬라이스 밖 소비자가 0이다). 등급 하나를 그리는 `CredibilityMark`만 배럴에 있다 — 보드의 읽는 법 시트(`views/transfer-board`의 `GuideSheet`)가 범례를 뱃지와 같은 모양으로 그린다. 등급을 그리는 모양을 다른 곳에 다시 만들지 않는다 — 출처 공신력: 🎖️(오피셜에 육박하는 매체에만) 또는 🌑~🌕(그 밖의 매체와 기자 — 5단계). 등급의 단일 소스는 `scripts/lib/transfer/reporters.json`의 `credibility`다 — 매체는 **소스 id**로(같은 "BBC" 표기를 BBC Sport와 BBC 이적 가십이 함께 쓴다), 기자는 보도 주체 표기로 매긴다. 가십 칼럼이 인용한 신문의 보도(`cited`)는 소스 id보다 먼저 **`cited`의 등급(1~5, 🎖️ 없음)** 이다 — 칼럼 소스의 🎖️는 칼럼의 것이지 옮겨 적은 타블로이드의 것이 아니다. 등재되지 않은 출처는 그리지 않는다. ⚠ 🎖은 **U+FE0F를 붙여야** Windows에서 컬러로 그려진다(기본 표시가 글자다). ⚠ 이모지는 `aria-hidden`이고 뜻은 `sr-only` 글자가 진다 — 스크린리더는 이모지를 모양 이름("보름달")으로 읽는다. DB의 `tier`(1·2)는 수집기의 귀속 판정용이라 화면에 쓰지 않는다.
+- **`isLikelyDestination(deal)`** — 행선지 자리를 "유력"이라 말할 수 있는가(살아 있는 루머의 관심 구단뿐). 목록 행과 상세 히어로가 함께 쓴다.
+- **`dealClubs(deal)`** — 딜에 걸린 구단 전부. 리그·구단 필터와 구단 칩이 같은 자리를 보게 하는 단일 소스다(자리마다 뜻이 다른 `clubDealSide`는 대상이 아니다).
+- **`addOnTerms(deal)`** — 옵션 줄의 판정(`null` 줄 없음 · `"none"` 없음 · 금액). 이적료 카드와 `ContractTerms`가 함께 쓴다.
+- **`newestReportId(reports)`** — 레일의 잉크 점이 찍힐 가장 최근 보도.
 - **`routeLabels(deal, { full })` / `destinationClubs(deal)`** — 경로 두 칸의 글자와 행선지 자리의 구단들. 빈 칸의 문구(자유계약 출발 `FA` · 모르는 출발 `미확인` · 아직 정해지지 않은 행선지 `미정`)를 **여기 하나가** 정하고, 관심 구단이 여럿이면 앞 `ROUTE_CLUB_LIMIT`개를 `·`로 잇고 나머지를 `외 N`으로 센다(전부 이으면 목록 행이 세 줄로 부풀어 이적료 칸을 밀어냈다). 엠블럼은 슬라이스 내부의 `CrestStack`이 같은 수만큼 겹치고 나머지를 `+N`으로 접는다 — 이름과 엠블럼이 같은 구단을 가리켜야 한다. ⚠ **경로 카드(`DealRouteCard`)만 전부 적는다** — 폭을 이름에 전부 내줄 수 있는 자리라 접지 않고, `·`로 잇는 대신 **한 줄에 엠블럼 하나 + 정식명 하나**로 세운다. 넓은 화면의 상세 히어로는 가장 유력한 하나만 크게 그리고 `외 N곳`을 단다(전부는 곁 칸의 `SuitorList`가 적는다). 그 밖의 자리(목록 행·미니 카드·캐러셀)는 이 글자를 그대로 쓴다. `full`이면 정식명, 아니면 약칭.
 - `DealRow` / `DealMiniCard` / `RumorCard` / `StatusBadge` / `FeeDelta` / `TransferCrest` — 목록 행 · 미니 카드 · 캐러셀 카드 · 상태 뱃지 · 변동폭 · 구단 엠블럼(`Crest`의 얇은 래퍼 — 코드로 경로를 조립하는 도메인 지식만 갖는다). ⚠ **`DealRow`는 md+에서 표의 한 줄이고, `DealTable` 안에서만 그린다** — 열(상태·선수·경로·이적료·업데이트, `min-[105rem]`에서 변동·보도 추가 — 보드의 왼쪽 레일(`min-[90rem]`)보다 늦게 연다)의 폭·행 사이 디바이더·md+ 행 상자는 **`DealTable`(범위)이 한 번** 건다(행은 표지 `data-deal-row`·`data-deal-cols`만 단다 — 백여 행마다 같은 클래스를 싣지 않는다). 열 머리 `DealTableHead`도 같은 표지라 열 폭의 리터럴은 `ui/deal-table.tsx` 한 곳뿐이다. **칸 배치도 범위가 건다** — 행은 칸 표지(`data-col`)와 모바일 묶음 표지(`data-g` — 범위가 묶음 안의 순서로 이적료·변동폭·상태 뱃지를 찾는다)만 달고 md+ 전용 클래스를 갖지 않는다. 열이나 묶음 안 순서를 바꾸면 `deal-table.tsx`를 함께 고친다. 모바일 묶음은 `md:contents`로 풀어 같은 요소를 열에 놓는다(두 벌 그리지 않는다). ⚠ **표에서는 이름을 자르지 않는다** — 선수명·출발·행선지 약칭(`data-name`)은 md+에서 말줄임 대신 낱말 단위로 줄을 바꾸고, 경로 칸은 행선지 덩어리를 다음 줄로 넘긴다(약칭도 잘리면 어느 구단인지 알 수 없다 — `api-and-db.md`). 행선지가 여럿이면 표에서는 가장 유력한 하나 + `외 N곳`만 적고, 확실한 행선지가 없는 루머면 그 앞에 `유력`을 단다(`ClubRoute` — 전부는 판·상세의 관심 구단 목록이 적는다). ⚠ 목록 항목 컴포넌트(`DealRow`·`DealMiniCard`·`RumorCard`)의 링크는 `data-deal-id`를 단다 — 2분할 폭에서 보드가 클릭을 위임으로 가로채는 표지다(`nextjs.md` 2분할 절). ⚠ 그 항목 컴포넌트는 `memo`다(그래서 `"use client"`다 — `architecture.md`) — 보드는 행을 고를 때마다 다시 그려지므로 넘기는 값은 원시값이거나 목록 캐시의 같은 참조로 둔다. 링크는 `prefetch={false}`다(loading 경계 없는 동적 상세라 뷰포트 프리페치가 받아 오는 것이 거의 없고, 2분할 폭에서는 클릭이 선택으로 가로채진다). ⚠ `CrestStack`(엠블럼 겹치기)은 배럴에 없다 — 슬라이스 밖 소비자가 0이다.
   ⚠ **엠블럼을 직접 `<img>`로 그리지 말 것** — 폴백이 두 갈래인데 둘 다 필요하다: 코드가 비었을 때와, **파일이 없어 404일 때**(새 구단이 생기면 반드시 겪는다). 메커니즘은 `@/shared/ui`의 `Crest`가 갖는다.
 - **딜 상세와 보드의 오른쪽 판(`widgets/deal-panel`)이 함께 그리는 조각** — views와 widgets는 서로 import할 수 없어 여기 둔다. 데이터를 받아 그리기만 하고 features를 모른다(토글·예측은 호출부가 옆에 놓는다). 같은 내용을 새로 짜지 말고 이것을 쓴다.
+  - `DealStatusLine` — 머리 첫 줄(상태 뱃지 · 형태 표지 · 업데이트 · 보도 수).
   - `DealInfoLine` — 정보줄(`영문 대문자 이름 · 포지션 · 출생연도 · 국기 국적`, 있는 항목만). `englishName={false}`는 영문 이름을 제목 옆에 따로 그리는 자리만.
   - `DealRouteCard` — FROM/TO 경로 카드(엠블럼 + 정식명 + 리그, 행선지 자리의 구단은 전부).
   - `ReportItem` — 보도 타임라인의 항목 하나(`<li>` — 부모는 `<ol>`). 레일의 잉크 점(`latest`)은 **가장 최근 보도** 하나에만.
@@ -147,7 +158,7 @@
 - **`splitClubDeals(deals, code)` / `dealLeagueClubs(deal)`**(`lib/club-deals.ts`) — 구단 화면의 구역(영입 · 방출 · 임대로 뛰는 선수 — 빈 구역은 뺀다, 구역 안은 보드의 구간 순서 → 최신순)과 딜에 걸린 5대 리그 구단(딜 상세가 구단 화면으로 잇는 링크). ⚠ 구단이 걸리는 자리(출발·행선지·관심 구단·임대 구단)는 보드의 구단 필터(`dealHasClub`)와 **같고**, 결렬·부인된 딜은 싣지 않는다 — 판정은 `clubDealSide` 하나가 갖는다(사이트맵의 구단 lastModified도 이 판정으로 센다 — 화면에 없는 딜의 시각이 lastmod를 움직이지 않게). 구단 화면의 목록은 **보드와 같은 조회·같은 쿼리 키**를 쓰고 이 함수로 고른다 — 구단을 쿼리 키에 넣지 않는다(`transferKeys` 주석). 그래서 보드 목록이 상한(`TRANSFER_DEAL_LIMIT`)에 닿으면 구단 화면도 잘림을 말한다. 서버(description)는 `lib/club-deals` 직접 경로로.
 - **`useTransferDayQuery({ dateKey, initialData, initialDataUpdatedAt })` / `useTransferDayListQuery({ startKey, initialData, initialDataUpdatedAt })`** — 하루의 소식(딜마다 묶은 그 날의 보도 + 소식이 있는 이전·다음 날)과 최근 날짜 목록. "나"와 무관한 공개 화면이라 키에 유저가 없고 관심 표시가 없다(`TransferDayDeal` — `isWatched`를 필드째 뺐다). 조립은 **`queryTransferDay`·`queryDaySummaries`**(`api/list-query.ts` — 서버 안전, 실패하면 PostgREST 에러를 그대로 던진다)가 갖고 훅과 SSR이 같은 함수를 부른다. 목록의 시작 날은 `daySummaryStartKey(nowMs)`(쿼리 키 — 서버가 정해 내린다). ⚠ 하루의 상한은 `TRANSFER_DAY_REPORT_LIMIT`(한 건 더 받아 잘림을 정확히 판정한다 — 화면이 잘림을 말한다). 그 값은 **응답 크기**가 정한다 — 보도마다 딜을 임베딩해 Data Cache의 항목 한도(2MB)를 넘으면 익명 요청마다 DB로 간다(사유는 그 상수 주석). ⚠ 날짜 목록은 보도 시각을 `max_rows` 크기 **페이지로 넘겨** 받는다 — 한 번에 받으면 성수기에 목록이 조용히 짧아진다. ⚠ 둘 다 `nowMs`보다 늦은 보도를 매퍼가 거른다(조건에 싣지 않는다 — 두 화면의 셈이 같아야 한다).
 - **`groupDayEntries(entries)` / `DayEntry`** — 하루의 소식을 보드의 구간으로(딜의 **지금** 단계 — 그 날의 단계가 아니다) · 딜 하나(머리 + 그 날의 보도, `article` + h3 — 선수 이름이 상세 링크다).
-- ⚠ **`STAGE_GROUP`·`isDeadStage`·`feeDelta`·`ClubRoute`·`WatchMark`는 배럴에 없다** — 슬라이스 밖 소비자가 0이라 올리지 않았다. `STAGE_STATUS`·`STATUS_LABEL`(+ `TransferStatus`)은 배럴에 있다 — 보드의 지수 띠(클라이언트)가 톤별 건수를 센다. 서버 page(og description)는 배럴이 아니라 `lib/stage` 직접 경로로 쓴다. `check:conventions`는 상대 경로 소비를 현역으로 세어 이 유형을 잡지 못하므로 손으로 지킨다.
+- ⚠ **`STAGE_GROUP`·`isDeadStage`·`feeDelta`·`ClubRoute`·`WatchMark`는 배럴에 없다** — 슬라이스 밖 소비자가 0이라 올리지 않았다. `STAGE_STATUS`·`STATUS_LABEL`(+ `TransferStatus`)은 배럴에 있다 — 보드의 지수 띠(클라이언트)가 톤별 건수를 센다. 딜 공유 카드(`opengraph-image`)는 배럴이 아니라 `lib/stage` 직접 경로로 쓴다. `check:conventions`는 상대 경로 소비를 현역으로 세어 이 유형을 잡지 못하므로 손으로 지킨다.
 - **딜 형태(임대) — `lib/deal-form.ts`가 단일 소스다.** 형태(진전과 직교하는 축)를 상태 뱃지에 곱하지 않고 **글자 표지 하나**로 따로 그린다.
   - `DEAL_FORM`(`Record<형태, { mark, label, noun }>`) · **`dealFormMark(deal)`**(표지 `임대·의무` + 스크린리더 문구 — 완전 이적·모름은 `null`) ·
     `dealFormLabel(deal)`(상세의 "형태" 줄) · `dealNoun(form)`(제목·알림의 "임대"/"이적") · **`loanNote(deal, { full })`**("빌라 임대 중" —
@@ -158,7 +169,7 @@
   - ⚠ **형태를 모르는 딜(`form` null)을 완전 이적으로 짐작하지 않는다** — 표지를 그리지 않을 뿐 "완전 이적"이라 말하지 않는다.
   - ⚠ **출발(`fromClub`)은 늘 보유 구단이다** — 지금 임대로 뛰는 구단(`loanClub`)은 경로 밖 한 줄이다. 세 구단을 화살표로 이으면 연쇄 이적으로 읽힌다.
   - ⚠ 알림 스크립트(`notify.mjs`의 `FORM_NOUN`)가 `noun`의 사본을 갖고 테스트가 대조한다 — `DEAL_FORM`은 한 줄에 `키: { mark, label, noun },` 꼴을 지킨다.
-- **`dealMetaTitle(deal)` / `dealMetaDescription(deal, reports)` / `dealCardImage(dealId)`**(`lib/deal-meta.ts` — 배럴에 없다. 서버 라우트(page·`opengraph-image`)만 쓴다) — 딜의 공유 제목·설명과 카드 이미지(`app/transfers/[id]/opengraph-image.tsx`의 주소·치수·대체 문구 — 그 파일도 치수·대체 문구를 `DEAL_CARD_SIZE`·`DEAL_CARD_ALT`에서 가져간다). 딜 상세와 보드의 `?deal=` 공유가 **같은 함수**를 쓴다 — 같은 딜이 어느 주소로 공유되든 같은 카드여야 한다(`nextjs.md` 딜 카드 절). ⚠ 딜 상세 자신은 `dealCardImage`를 쓰지 않는다(메타데이터의 `images`가 파일 컨벤션을 이긴다).
+- **`dealMetaTitle(deal)` / `dealMetaDescription(deal, reports)` / `dealCardImage(dealId)` / `dealShareCard(deal, reports, images?)`**(`lib/deal-meta.ts` — 배럴에 없다. 서버 라우트(page·`opengraph-image`)만 쓴다) — 딜의 공유 제목·설명과 카드 이미지(`app/transfers/[id]/opengraph-image.tsx`의 주소·치수·대체 문구 — 그 파일도 치수·대체 문구를 `DEAL_CARD_SIZE`·`DEAL_CARD_ALT`에서 가져간다). 딜 상세와 보드의 `?deal=` 공유가 **같은 함수**를 쓴다 — 같은 딜이 어느 주소로 공유되든 같은 카드여야 한다(`nextjs.md` 딜 카드 절). ⚠ 딜 상세 자신은 `dealCardImage`를 쓰지 않는다(메타데이터의 `images`가 파일 컨벤션을 이긴다).
 - 서버 소비자의 직접 경로 목록은 `architecture.md`가 갖는다(단일 소스는 `scripts/check-conventions.mjs`의 `DEEP_IMPORT_ALLOWED`).
 
 ## `@/entities/push`
@@ -192,8 +203,8 @@
 - 서버에서는 배럴 대신 `model/types`·`api/mappers`·`api/list-query`를 직접 import.
 
 ## `@/features/predict-deal`
-- `PredictionCard({ dealId, settled, prediction, error, onRetry, userId, nowMs, onSignInRequired, headingLevel })` — 딜 상세(와 보드의 오른쪽 판)의 성사 예측 카드. 제목 단계는 놓인 자리를 따른다 — 기본 `h2`, 판 안은 `h3`. 고르기 전에는 참여 수만, 고른 뒤(또는 결과가 나온 뒤)에 비율을 보여 준다(먼저 본 비율을 따라 고르면 예측이 아니라 쏠림이다). 결과가 나오면(`settled` — 합의 완료·오피셜) 버튼을 걷는다. 다음 창 일정이 없으면 그리지 않는다.
-- ⚠ 훅(`usePredictDeal`)은 배럴에 없다 — 카드가 유일한 호출부다. 낙관적 갱신 + 같은 딜의 요청을 `scope`로 한 줄 + "목표 표로 수렴"하는 요청 + 실패만 줄 끝에서 재동기화 + 조회 쪽 덮어 넣기(`useVoteComment`와 같은 형태). 가드는 없고 거두기도 없다(DB에 DELETE 경로가 없다 — `api-and-db.md` 딜 성사 예측 절).
+- `PredictionCard({ dealId, settled, prediction, error, onRetry, userId, nowMs, onSignInRequired, headingLevel, className })` — 딜 상세(와 보드의 오른쪽 판)의 성사 예측 카드. 제목 단계는 놓인 자리를 따른다 — 기본 `h2`, 판 안은 `h3`. 고르기 전에는 참여 수만, 고른 뒤(또는 결과가 나온 뒤)에 비율을 보여 준다(먼저 본 비율을 따라 고르면 예측이 아니라 쏠림이다). 결과가 나오면(`settled` — 합의 완료·오피셜) 버튼을 걷는다. 다음 창 일정이 없으면 그리지 않는다.
+- ⚠ 훅(`usePredictDeal`·`usePredictionChoice`)은 배럴에 없다 — 카드가 유일한 호출부다. 낙관적 갱신 + 같은 딜의 요청을 `scope`로 한 줄 + "목표 표로 수렴"하는 요청 + 실패만 줄 끝에서 재동기화 + 조회 쪽 덮어 넣기(`useVoteComment`와 같은 형태). 가드는 없고 거두기도 없다(DB에 DELETE 경로가 없다 — `api-and-db.md` 딜 성사 예측 절).
 - ⚠ 회차는 DB 트리거가 정한다 — 화면의 `predictionRound(nowMs)`는 그릴 자리와 낙관적 갱신의 자리를 고를 뿐이다.
 
 ## `@/features/follow-club`
@@ -221,7 +232,7 @@
 - ⚠ 이미 담긴 딜을 다시 담으면 **23505를 성공으로 흡수한다**(멱등 — `api-and-db.md`의 "설명과 흡수" 표).
 
 ## `@/features/sign-in` · `sign-out` · `link-identity`
-- `useOAuthSignIn` — 소셜 로그인 시작. ⚠ **`start()` 안에 중복 실행 가드가 있다** — `signInWithOAuth`는 호출마다 새 PKCE code_verifier를 덮어쓰므로 두 호출이 겹치면 돌아온 code를 교환할 수 없다(`data-and-state.md`). `hasPkceVerifier`(서버는 `@/features/sign-in/lib/pkce-verifier` 직접 경로)는 복귀 화면이 교환 대기를 판정하는 데 쓴다.
+- `useOAuthSignIn` — 소셜 로그인 시작. ⚠ **`start()` 안에 중복 실행 가드가 있다** — `signInWithOAuth`는 호출마다 새 PKCE code_verifier를 덮어쓰므로 두 호출이 겹치면 돌아온 code를 교환할 수 없다(`data-and-state.md`). `hasPkceVerifier`(`@/features/sign-in/lib/pkce-verifier` 직접 경로 — 소비자가 서버뿐이라 배럴에 없다)는 복귀 화면이 교환 대기를 판정하는 데 쓴다.
 - `useSignOut` — 로그아웃. ⚠ `scope: "local"`을 명시한다(기본값이 `global`이라 다른 기기까지 revoke된다). 이동은 가드가 한다(`markSignOutIntent`).
 - `useLinkIdentity` / `useUnlinkIdentity` — 로그인 수단 연결·해제. ⚠ **맨 `mutate`를 내보내지 않는다** — 가드가 훅 안에 있고 `start`/`remove`만 노출해야 호출자가 가드를 복제할 필요가 없다. ⚠ 해제는 **boolean 전역 잠금**이다 — 지켜야 하는 것이 "목록이 0개가 되지 않는다"라 항목별 가드로는 못 지킨다(`data-and-state.md`).
 
@@ -232,40 +243,43 @@
   ⚠ 예측 랭킹은 `ROUTES.ranking`(`/ranking`)이다 — 탭이 아니라 서브헤더 화면이라 `activeTabHref`·`hasBottomBar`에 없다(데스크톱 상단 바의 내비에는 있다 — `activeNavHref`).
   ⚠ 이적시장은 **`ROUTES.transferList`**(`/transfers`) · `ROUTES.transfer(id)`(`/transfers/[id]`)다. 상세에는 탭바가 없다 — `activeTabHref`가 목록 경로만 센다.
   ⚠ `ROUTES.home`(`/`)은 화면이 아니라 이적시장으로의 리다이렉트다(`app/page.tsx`) — 링크 목적지로 쓰지 말고 실제 화면 경로를 쓴다.
+- **`boardScopeStartIso(nowMs)`** — 보드 범위 시작(분 단위 ISO). 보드와 구단 화면의 쿼리 키·조회 조건이 이 값 하나를 본다 — page가 각자 내리지 않는다.
+- **`LG_MEDIA_QUERY`** — `lg:`와 같은 단위의 미디어 쿼리 문자열. **`SHARED_DATA_TTL_SECONDS`** — 익명 Data Cache와 TanStack `staleTime`이 함께 쓰는 수명.
 - **`openTransferWindow(nowMs)` / `trackedTransferWindow(nowMs)` / `boardScopeStartMs(nowMs)`**(`transfer-window.ts`) — 이적 창 일정. 창의 기간은 리그별 일정을 합친 것이다(개장 = 가장 먼저 여는 리그, 마감 = 가장 늦게 닫는 리그). `openTransferWindow`는 **지금 열려 있는 창**(없으면 `null`) — 헤더의 "마감까지" 카운트다운은 이 값이 있을 때만 그리고 마감에 닿으면 스스로 사라진다. `trackedTransferWindow`는 보드가 추적하는 창(개장한 가장 최근 창 — 창 사이에는 방금 닫힌 창)으로 헤더의 창 이름이 쓰고, `boardScopeStartMs`는 그 창의 개장 시각(보드에 실을 딜의 하한)이다. ⚠ **단일 소스는 `scripts/lib/transfer/windows.json`** 이다 — 딜 파생 스크립트(Node)가 이 TS를 import할 수 없어 JSON이 원본이고, 이 파일은 그 JSON을 그대로 읽는다. **시즌마다 사람이 갱신한다**(`api-and-db.md`의 운영 JSON 절).
 - **`predictionRound(nowMs)` / `transferWindowByKey(key)`** — 예측의 회차(`closesAt > now`인 가장 이른 창 — 창 사이에는 다음 창, 일정이 없으면 `null`)와 키로 창 찾기. ⚠ 회차 판정은 DB 트리거(`transfer_deal_prediction_open`)와 **같은 규칙**이다 — 저장되는 회차는 DB가 정하고 화면은 그릴 자리를 고른다. DB 사본(`transfer_window`)은 파생 스크립트가 같은 JSON에서 맞춘다.
+- **`isDealDetailPath(pathname)`** — 딜 상세 경로인가(토스트 위치와 공유 분석이 함께 쓴다).
 - **`hasBottomBar(pathname)` / `activeTabHref(pathname)`** — 화면 아래에 고정 바(탭바 또는 딜 상세의 관심 토글 바)가 있는지와 활성인 탭. 탭바(`widgets`)는 `activeTabHref`를, 토스트(`shared/ui`)는 `hasBottomBar`를 본다. ⚠ 하단 고정 바를 새로 두는 화면이 생기면 `hasBottomBar`에 더한다 — 빠뜨리면 토스트가 그 바의 CTA를 덮는다. 딜 상세는 **경로 모양**(`/transfers/<십진수>`)으로 센다 — `/transfers/` 접두로 넓히면 같은 접두의 서브헤더 화면(구단별·날짜별)에서 토스트가 없는 바 자리만큼 떠서 뜬다. ⚠ 새 목록 경로가 생기면 여기부터 고친다 — 빠뜨리면 그 화면에서 **탭바가 사라지고 토스트가 탭바 자리로 내려간다.** 값이 유한하지 않은 경로(`/…/category/[slug]` 같은)가 생기면 정확 일치 배열이 아니라 접두 판정으로 둔다.
 - **`activeNavHref(pathname)`** — 데스크톱 상단 바(`TopBar`)에서 활성인 내비 항목. 탭바 판정(`activeTabHref`)과 다르다 — 딜 상세(`/transfers/[id]`)도 "이적시장"이다(상세는 이적시장 안의 화면이고, 상단 바는 상세에서도 남는다). 내비 항목을 더하면 여기도 함께 고친다.
 - ⚠ **`hasBottomBar`는 폭을 모른다.** 하단 고정 바는 `lg`(1024px)부터 없으므로(탭바는 상단 바로 올라가고 딜 상세의 하단 바도 숨는다) 폭 조건은 소비자가 클래스로 건다(`ToastViewport`의 `lg:` 위치). 경로 판정에 폭을 섞지 않는다 — 서버 렌더에는 폭이 없다.
-- `signInWithNext(pathname)` / `withNext(path, next)` — 복귀 경로를 붙인 URL. 이 형태를 만드는 곳이 가드·`SignInDialog`·`AuthStatus`로 여럿이라 여기로 모았다. ⚠ **OAuth 복귀 파라미터(`code`·`error`·`error_code`·`error_description`·`state`)는 실을 때 걷는다**(슬라이스 내부 `withoutAuthReturnParams` — 나머지 쿼리는 그대로). `next` 안에 감싸인 `code`는 분석의 `code` 걷어내기를 피해 가고, 로그인 뒤 끝난 복귀를 화면이 다시 읽는다. `safeNextPath`도 돌려줄 때 같은 함수로 한 번 더 걷는다 — 파라미터 목록을 호출부에 다시 적지 않는다. ⚠ 액션 컨트롤에서 이걸로 **직접 이동하지 않는다** — `SignInDialog`가 안내를 끼고 그 안에서 부른다(예외는 라벨이 "로그인"인 컨트롤).
+- `signInWithNext(pathname)` / `withNext(path, next)` — 복귀 경로를 붙인 URL. 이 형태를 만드는 곳이 가드·`SignInDialog`·`AuthStatus`로 여럿이라 여기로 모았다. ⚠ **OAuth 복귀 파라미터(`code`·`error`·`error_code`·`error_description`·`state`)는 실을 때 걷는다**(`withoutAuthReturnParams` — 나머지 쿼리는 그대로). `next` 안에 감싸인 `code`는 분석의 `code` 걷어내기를 피해 가고, 로그인 뒤 끝난 복귀를 화면이 다시 읽는다. `safeNextPath`도 돌려줄 때 같은 함수로 한 번 더 걷는다 — 파라미터 목록을 호출부에 다시 적지 않는다. ⚠ 액션 컨트롤에서 이걸로 **직접 이동하지 않는다** — `SignInDialog`가 안내를 끼고 그 안에서 부른다(예외는 라벨이 "로그인"인 컨트롤).
 - **`withoutAuthReturnParams(path)`** — 경로 + 쿼리에서 OAuth 복귀 파라미터만 걷는다(나머지 표기는 그대로). `withNext`·`safeNextPath`와 공유 주소(`widgets/sub-header`의 `shareUrl`)가 같은 판정을 쓴다 — 파라미터 목록을 호출부에 다시 적지 않는다.
 - **`safeNextPath(next, origin)`** — `?next=` 값을 앱 내부 경로로만 통과시킨다. **직접 문자열 검사를 짜지 말 것** — `startsWith("/") && !startsWith("//")`로는 `/\evil.com`도 `/..//evil.com`도 못 막는다(둘 다 실제로 뚫렸다).
 - **`OAUTH_PROVIDERS` / `OAUTH_PROVIDER_LABEL`** — 지원 소셜 프로바이더의 단일 소스. `supabase/config.toml`의 `[auth.external.*]`와 갈리면 안 된다. ⚠ `shared`에 있는 이유는 로그인(`features/sign-in`)과 계정 연결(`features/link-identity`)이 같은 목록을 써야 하는데 features끼리는 import할 수 없어서다.
 - **`avatarUrl(path)` / `AVATAR_BUCKET`** — 아바타 **경로** → 공개 URL. ⚠ DB에는 전체 URL이 아니라 경로만 저장한다(호스트가 환경마다 다르다: 로컬 `127.0.0.1:64321` ↔ 원격 `*.supabase.co`). 조립은 이 함수 한 곳에서만. 버킷명 문자열도 여기서 가져다 쓴다(`features/update-profile`이 선례).
 - **`publicStorageUrl(bucket, path)`**(`shared/config/storage.ts` — 배럴에 없다) — 공개 버킷 경로 → URL 조립의 **단일 소스**. 새 공개 버킷이 생기면 이 함수를 감싸는 버킷별 함수를 `shared/config`에 두고 그것을 배럴로 노출한다(`avatarUrl`이 선례). 호출부가 버킷 URL을 직접 조립하지 않는다.
-- **`OG_IMAGE` / `OG_SITE` / `NOT_FOUND_TITLE` / `absoluteUrl(path)`** — 세그먼트가 `openGraph`를 채울 때 함께 싣는 이미지·사이트 공통 값(`siteName`·`locale`), 없는 리소스의 메타데이터 제목(404 화면과 같아야 한다), 그리고 앱 경로 → 절대 URL. ⚠ `new URL(path, env.siteUrl)`을 호출부가 각자 짜지 말 것 — 사이트맵·`robots.txt`·`og:url` 셋이 **같은 URL**을 가리켜야 검색엔진·공유 플랫폼이 한 주소를 대표로 본다(canonical과도 같은 경로여야 한다).
-- **`env`** — `NEXT_PUBLIC_*` 환경변수의 단일 소스(`supabaseUrl`·`supabaseAnonKey`·`siteUrl`·`googleSiteVerification`·`naverSiteVerification`·`gaId`·`vapidPublicKey`·`kakaoJsKey`·`adsenseClient`·`adsenseSlots`·`contactEmail`). **`process.env`를 호출부에서 다시 읽지 말 것** — `proxy.ts`가 화면·훅과 같은 supabase 인스턴스를 봐야 세션 쿠키가 어긋나지 않는다.
+- **`pageMetadata({ title, description, path })` / `NOT_FOUND_METADATA` / `NOT_FOUND_TITLE` / `OG_SITE` / `absoluteUrl(path)`** — 색인 대상 화면의 메타데이터 조립(공유 카드까지), 없는 리소스의 메타데이터·제목(404 화면과 같아야 한다), 사이트 공통 값, 그리고 앱 경로 → 절대 URL. ⚠ `openGraph`를 페이지마다 다시 짜지 말 것 — 하나를 빠뜨려도 빌드는 통과하고 공유 프리뷰에서만 드러난다. ⚠ `new URL(path, env.siteUrl)`을 호출부가 각자 짜지 말 것 — 사이트맵·`robots.txt`·`og:url` 셋이 **같은 URL**을 가리켜야 검색엔진·공유 플랫폼이 한 주소를 대표로 본다(canonical과도 같은 경로여야 한다).
+- **`env`** — `NEXT_PUBLIC_*` 환경변수의 단일 소스(`supabaseUrl`·`supabaseAnonKey`·`siteUrl`·`googleSiteVerification`·`naverSiteVerification`·`gaId`·`vapidPublicKey`·`kakaoJsKey`·`adsenseClient`·`adsenseSlots`·`contactEmail`·`crestVersion`). **`process.env`를 호출부에서 다시 읽지 말 것** — `proxy.ts`가 화면·훅과 같은 supabase 인스턴스를 봐야 세션 쿠키가 어긋나지 않는다.
   - `siteUrl`은 `og:image`를 절대 URL로 만드는 `metadataBase`(루트 layout)용이다. `NEXT_PUBLIC_SITE_URL` → Vercel 주소(운영 배포는 `VERCEL_PROJECT_PRODUCTION_URL`, 프리뷰는 `VERCEL_URL`) → `localhost:3000` 순으로 폴백한다. ⚠ 운영에서 `VERCEL_URL`로 떨어뜨리지 않는다 — 배포마다 바뀌는 주소라 canonical·사이트맵이 배포마다 다른 URL을 가리킨다.
   - `gaId`는 GA4 측정 ID다 — 형식(`G-…`)이 아니면 빈 값으로 접힌다(깨진 스크립트를 싣느니 측정을 끈다).
   - `contactEmail`은 운영자 연락처다 — 개인정보처리방침(보호책임자 연락처)과 서비스 소개(문의처)에 그대로 실린다. 법정 기재 사항이라 운영 빌드에는 반드시 채운다(비면 두 화면이 "준비 중"을 그린다).
   - `kakaoJsKey`는 카카오 **JavaScript 키**다(공유 버튼의 "카카오톡으로 공유") — 비어 있으면 그 항목을 그리지 않는다. ⚠ 소셜 로그인의 REST API 키와 다른 키이고, 카카오 개발자 콘솔에 등록한 사이트 도메인에서만 동작한다.
   - `vapidPublicKey`는 웹 푸시의 **공개키**다 — 비어 있으면 화면이 알림 자리를 그리지 않는다. ⚠ 짝이 되는 비밀키를 여기 두지 않는다(이 모듈은 클라이언트 번들에 실린다 — 발송 스크립트의 환경에만 있다).
-- **`TOKEN_COLORS`** — 디자인 토큰과 같은 값의 JS 색 상수. **CSS를 읽지 못하는 자리 전용**이다(딜 공유 카드 이미지 · 웹 앱 매니페스트). 화면 컴포넌트의 `style`에 쓰지 않는다. 단일 소스는 `globals.css`의 `@theme`이고 이건 그 사본이다 — 토큰 값을 바꾸면 함께 고친다.
+- **`TOKEN_COLORS`** — 디자인 토큰과 같은 값의 JS 색 상수. **CSS를 읽지 못하는 자리 전용**이다(딜 공유 카드 이미지 · 웹 앱 매니페스트 · 뷰포트의 `themeColor`). 화면 컴포넌트의 `style`에 쓰지 않는다. 단일 소스는 `globals.css`의 `@theme`이고 이건 그 사본이다 — 토큰 값을 바꾸면 함께 고친다.
 - **`isSupabaseConfigured()`** — env가 채워졌는지. 값이 비어도 빌드는 성공해야 하므로 `env`는 throw하지 않는다 → **가드는 호출부의 책임**이고, 그 가드를 각자 짜지 말고 이걸 쓴다(`proxy.ts`가 선례).
 
 ## `@/shared/ui`
 **현역(지금 화면이 실제로 쓰는 것)** — 새로 만들기 전 여기부터 확인:
-`Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·`chipClassName`·`Dialog`·`SignInDialog`·`SignInLink`·`Sheet`·`SheetItem`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`·`StaleBanner`·`Crest`·`AdSlot`·`SiteInfoLinks`
+`Button`·`buttonClassName`·`Icon`·`Skeleton`·`EmptyState`·`chipClassName`·`textLinkClassName`·`Dialog`·`SignInDialog`·`SignInLink`·`Sheet`·`SheetItem`·`ToastViewport`·`Pill`·`Avatar`·`Wordmark`·`TextField`·`StaleBanner`·`Crest`·`AdSlot`·`SiteInfoLinks`
 
 **현재 미사용인 자산은 두지 않는다** — 호출부가 0인 export는 `pnpm check:conventions`가 막는다. 남겨야 할 이유가 있으면 사유와 함께 `scripts/check-conventions.mjs`의 `DOCUMENTED_UNUSED`에 적는다.
 
-> ⚠ 이 두 목록은 **실사용 여부로만 판정한다** — 손으로 세지 말고 **`pnpm check:conventions`** 를 돌린다(호출부 0인 export를 전수로 뽑아 준다).
+> ⚠ 이 목록은 **실사용 여부로만 판정한다** — 손으로 세지 말고 **`pnpm check:conventions`** 를 돌린다(호출부 0인 export를 전수로 뽑아 준다).
 > **이 문서의 존재 이유가 "새로 만들기 전 확인"이라 목록이 틀리면 문서가 없느니만 못하다.** UI를 추가·제거하면 여기부터 고친다.
 
 - **`Crest`** — 엠블럼류 이미지 + 하이드레이션 전 실패 감지 + 모노그램 폴백의 **공통 메커니즘**. `entities/transfer`의 `TransferCrest`가 이걸 감싼다(도메인 지식은 호출부가 `src`·`label`로 넘긴다). `"use client"` — 실패 감지가 `useEffect` + `onError`를 함께 쓴다. ⚠ `onError`만으로는 부족하다 — SSR HTML의 `<img>`는 **하이드레이션 전에** 실패할 수 있고 그러면 이벤트가 지나가 버린다(마운트 시 `complete && naturalWidth === 0`을 함께 확인하는 이유). `next/image`가 아니라 `<img>`다(`avatar.tsx`와 같은 판단 — 자산이 이미 목표 크기라 최적화 파이프라인이 줄 이득이 없다). ⚠ `Avatar`로 대신하지 말 것 — `rounded-full` + `object-cover`라 방패 모양 엠블럼의 모서리가 잘린다.
-- **`AdSlot({ slot })`** — 애드센스 수동 광고 자리 하나("광고" 라벨 + 높이 예약 + 스크립트 로드). `slot`은 `env.adsenseSlots`의 값이고, 게시자 ID나 `slot`이 비면 아무것도 그리지 않는다. ⚠ 광고 스크립트를 직접 싣거나 `adsbygoogle.push`를 호출부가 다시 짜지 말 것 — 경로가 바뀔 때 새 요소를 만드는 것과 이중 요청 방어가 이 컴포넌트에 있다. 둘 곳·두지 않을 곳은 `nextjs.md` 광고 절.
+- **`AdSlot({ slot, className })`** — 애드센스 수동 광고 자리 하나("광고" 라벨 + 높이 예약 + 스크립트 로드). `slot`은 `env.adsenseSlots`의 값이고, 게시자 ID나 `slot`이 비면 아무것도 그리지 않는다. ⚠ 광고 스크립트를 직접 싣거나 `adsbygoogle.push`를 호출부가 다시 짜지 말 것 — 경로가 바뀔 때 새 요소를 만드는 것과 이중 요청 방어가 이 컴포넌트에 있다. 둘 곳·두지 않을 곳은 `nextjs.md` 광고 절.
 - **`SiteInfoLinks`** — 화면 끝의 사이트 정보 링크(서비스 소개 · 개인정보처리방침). 사이트 공통 푸터가 없어 화면마다 자기 스크롤 영역 끝에 둔다(보드 · 프로필 · 두 문서 화면, 로그인 화면은 처리 고지 한 줄이 대신한다). ⚠ 개인정보처리방침은 **비로그인도 닿는 자리**에서 링크해야 한다(개인정보 보호법 제30조 · 애드센스 심사) — 보드에서 걷어내려면 비로그인이 닿는 다른 자리를 먼저 만든다.
-- `chipClassName(selected)` — 칩의 클래스만. **`rounded-sm`(6px)** 이다 — 칩이라고 알약이 아니다(`styling.md`). 이동이면 링크(`<Link>`, 이적 보드 필터는 `BoardLink`)에, 선택이면 `button`에 이 클래스를 입힌다(앵커 안에 `button`을 넣지 않는다). 분리 사유는 `Button`↔`buttonClassName`과 같다.
+- `chipClassName(selected, className?)` — 칩의 클래스만. 겉 33px에 누르는 영역은 `hit-area`로 44px다. **`rounded-sm`(6px)** 이다 — 칩이라고 알약이 아니다(`styling.md`). 이동이면 링크(`<Link>`, 이적 보드 필터는 `BoardLink`)에, 선택이면 `button`에 이 클래스를 입힌다(앵커 안에 `button`을 넣지 않는다). 분리 사유는 `Button`↔`buttonClassName`과 같다.
 - `Dialog` / `Sheet`(+`SheetItem`) — 확인 대화상자 / 하단 시트. 포커스 가둠은 `@/shared/lib`의 `useFocusTrap`.
   - `Sheet`는 화면 하단에 붙는 **edge-to-edge** 시트다(`styling.md`). "닫기" 행을 두지 않는다. 넓은 프레임(768px~)에서는 하단 가운데 최대폭 패널이 된다(`Dialog`도 가운데 최대폭 카드).
   - ⚠ 그래버는 `button aria-label="닫기"`다 — 터치 스크린리더·키보드의 유일한 탈출구라 `div`로 되돌리지 말 것(사유는 `styling.md` 바텀시트 절).
@@ -307,6 +321,7 @@
 - `AuthShell` — 인증 화면의 공통 껍데기.
 - `AuthStatus` — **비로그인일 때의 로그인 링크**만 그린다(로그인 상태에서는 `null`). ⚠ 라벨이 "로그인"이라 `SignInDialog`를 거치지 않고 곧바로 이동한다 — 목적지가 라벨에 적혀 있어 한 단계 더 묻는 것이 방해다.
   ⚠ 계정 관련 동작(닉네임 표시·로그아웃)을 여기 되넣지 않는다 — 프로필 화면과 두 곳으로 갈린다. 프로필 진입은 하단 탭바(`lg`부터는 `TopBar`)가 상시 제공하고, **로그아웃은 `views/profile`이 단독으로 갖는다.**
+- **`SubScrollArea` / `RestoringSubScrollArea`**(`@/widgets/sub-header`) — 서브헤더 화면의 스크롤 영역. 항목을 눌렀다 돌아오는 목록은 복원 변형을 쓴다. ⚠ 목차 앵커가 있는 문서 화면에는 복원을 켜지 않는다.
 - `DealPanel({ deal, userId, nowMs, active, onSignInRequired })` — 넓은 화면의 이적 보드에서 고른 딜을 오른쪽에 펼치는 판. 부모 높이를 채우고 본문은 스스로 스크롤(스크롤바를 숨기지 않는다), 아래에 "전체 화면" 링크와 관심 토글을 고정한다.
   - 상세로 가는 링크("전체 보기"·"전체 화면")는 `prefetch={false}`다 — 보드 행(`DealRow`)과 같은 사유(loading 경계 없는 동적 상세라 뷰포트 프리페치가 받아 오는 것이 없다).
   - `deal`은 **보드 목록 캐시의 딜**이다 — 관심 토글의 낙관적 갱신이 목록 캐시를 고치므로 판이 곧바로 따라온다. 판이 딜을 다시 받지 않는다.

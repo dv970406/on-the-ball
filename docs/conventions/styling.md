@@ -108,9 +108,9 @@ function cardClassName(peek: boolean) {
 
 | 유틸 | 뜻 | 쓰는 자리 |
 |---|---|---|
-| `label-mono` | 칸 라벨(작은 대문자 mono) | FROM/TO · 이적료 성격 · 통계 칸 · "마감까지" · 랭킹 열 머리 |
-| `section-title` | 섹션 제목(h2/h3의 모양) | 프로필 섹션 · 딜 상세 곁 칸 · 보드 판 · 구단 목록의 리그 · 구단 화면의 같은 리그 구단 · 날짜 화면의 구간 |
-| `hit-area` | 누르는 영역을 최소 44×44px로 넓힌다 | 글자·작은 버튼 컨트롤 |
+| `label-mono` | 칸 라벨(작은 대문자 mono) | FROM/TO · 이적료 성격 · 통계 칸 · "마감까지" · 랭킹 열 머리 · 예측 카드 · 내 순위 · 경로 카드의 형태 |
+| `section-title` | 섹션 제목(h2/h3의 모양) | 프로필 섹션 · 딜 상세 곁 칸 · 보드 판 · 구단 목록의 리그 · 구단 화면의 같은 리그 구단 · 날짜 화면의 구간 · 서비스 소개·개인정보처리방침의 절 |
+| `hit-area` | 누르는 영역을 최소 44×44px로 넓힌다 | 글자·작은 버튼 컨트롤 · 칩(`chipClassName`) |
 | `no-scrollbar` | 768px 미만에서 스크롤바 숨김 | 앱 프레임 안의 스크롤 영역 |
 
 - **판정은 클래스 문자열이 아니라 뜻이다.** 지금 모양이 같아도 뜻이 다른 자리는 쓰지 않는다 — `SubHeader`의 화면 이름은
@@ -122,6 +122,7 @@ function cardClassName(peek: boolean) {
   다른 position 유틸과 섞지 않고, 같은 요소에 `after:*`를 얹지 않는다.
   - 나란히 놓인 컨트롤은 넓어진 영역이 **겹치지 않을 간격**을 둔다(겹치면 뒤의 것이 이긴다 — 두 글자 링크는 좌우로 12px 가까이
     넓어진다). 칸이 붙은 세그먼트는 `min-w-11`로 폭을 잡아 옆으로 넓히지 않는다.
+  - ⚠ **가로로 흐르는 줄의 `overflow-y-hidden`도 넓힌 영역을 자른다** — 칩 줄은 `py-[5.5px] -my-[5.5px]`로 잘림 경계를 44px까지 넓힌다(겉 위치는 그대로 — `views/transfer-board/ui/filter-rail.tsx`).
   - ⚠ **조상에 `overflow-hidden`이 있으면 넓힌 영역이 잘린다** — 모서리를 깎으려고 그룹에 `overflow-hidden`을 걸지 말고
     양 끝 칸을 직접 둥근다(`report-flow-chart.tsx`).
 - ⚠ `check:conventions`는 CSS 파일을 보지 않는다 — `@utility`에 `rounded-full`·그림자·`backdrop-blur`·에메랄드를 담으면
@@ -136,7 +137,7 @@ function cardClassName(peek: boolean) {
     컨트롤이라 어떤 원칙으로도 나뉘지 않는다. 그래서 **자리를 센다.**
   - ⚠ **에메랄드가 나타나는 자리는 아래가 전부다.** 새로 칠하려면 이 표와
     `scripts/check-conventions.mjs`의 `bg-primary`·`text-primary` 항목에 함께 적는다 —
-    `pnpm check:conventions`가 양방향으로 대조한다(알약·그림자 예외와 같은 장치).
+    `pnpm check:conventions`가 **그 상수**를 코드와 양방향으로 대조한다(알약·그림자 예외와 같은 장치 — 진짜 목록은 상수이고 이 표는 설명이다). 표는 사람이 함께 고친다.
 
     | 자리 | 무엇 |
     |---|---|
@@ -155,7 +156,7 @@ function cardClassName(peek: boolean) {
     (검사는 **주석을 걷어낸 소스**를 훑는다 — 주석에 적힌 `bg-primary`는 세지 않는다.)
 
   - ⚠ **리터럴만 세면 새는 자리가 있다.** `Pill variant="green"`은 `bg-primary`를 간접으로 쓰므로 리터럴 대조를 구조적으로 통과할 수 없다 — 실제로 그 경로로 목록 카드에 에메랄드가 카드 수만큼 들어왔는데 검사도 이 표도 알지 못했다. 그래서 `check-conventions.mjs`가 `variant="green"`도 함께 센다. **에메랄드를 감싼 컴포넌트를 새로 만들면 그 prop도 검사에 등재한다.**
-  - ⚠ **그마저도 리터럴일 때만 보인다.** `variant={ok ? "green" : …}` 같은 동적 값은 어떤 문자열 대조도 통과하므로, 검사가 **`Pill variant={` 자체를 금지**한다 — 에메랄드가 걸린 prop은 리터럴로 쓴다.
+  - ⚠ **그마저도 리터럴일 때만 보인다.** `variant={ok ? "green" : …}` 같은 동적 값은 어떤 문자열 대조도 통과하므로, 검사가 **`Pill`의 동적 `variant`와 `confirmTone={`를 금지**한다(속성 순서·줄바꿈과 무관하게) — 에메랄드가 걸린 prop은 리터럴로 쓴다. `bg-`·`text-` 밖의 표면(`border-primary` 등)도 검사가 자리를 센다.
 
   - ⚠ **색이 정보를 혼자 지지 않는다.** 에메랄드(#3ecf8e)는 흰 배경 대비가 **1.99:1**이라
     WCAG의 비텍스트 최소 3:1에 못 미친다 — 이 색에 **글자나 형태 없는 표시를 싣지 않는다.**
@@ -222,14 +223,8 @@ function cardClassName(peek: boolean) {
 
 ### 알약(`rounded-full`) 예외
 
-알약으로 두기로 한 컨트롤을 여기 적는다. **이 목록에 없으면 `rounded-sm`이다.**
-
-| 자리 | 파일 |
-|---|---|
-| (지금은 없다) | — |
-
-⚠ 알약 컨트롤을 새로 두려면 이 표와 `scripts/check-conventions.mjs`의 `STYLE_ALLOWED["rounded-full"]`에
-**함께** 적는다 — 한쪽만 적으면 검사가 실패한다.
+알약으로 둘 컨트롤은 **표로 예외를 받는다. 표에 없으면 `rounded-sm`이다** — 예외를 받는 일이 생기면 여기 `| 자리 | 파일 |` 표를 두고,
+`scripts/check-conventions.mjs`의 `STYLE_ALLOWED["rounded-full"]`에 함께 적는다(검사는 그 상수를 코드와 대조한다).
 
 **이 규칙이 말하는 "버튼"은 라벨을 담은 직사각형 컨트롤이다.** 그 밖의 `rounded-full`은 애초에 이 규칙의 대상이 아니므로 예외 목록에 넣지 않는다:
 
@@ -239,9 +234,10 @@ function cardClassName(peek: boolean) {
 | 원형 아이콘 **컨테이너**(클릭 불가) | 히트 영역도 아닌 순수 장식 | `shared/ui/empty-state.tsx` |
 | 아바타·`Pill`·워드마크의 볼 | 컨트롤이 아닌 **표시 요소** | `avatar` · `pill` · `wordmark` · `profile-view`의 아바타 스켈레톤·업로드 스피너 |
 | 바텀시트 **그래버**(36×4px 바) | 누르는 컨트롤이 아니라 **드래그 어포던스** — 아래로 끌면 시트가 따라 내려간다 | `shared/ui/sheet.tsx` |
+| 하단 탭바의 탭 링크·컨테이너(`rounded-[22px]`·`rounded-[28px]`) | 라벨을 담은 직사각형 버튼이 아니라 **떠 있는 내비 표면**이다(`Sheet`·`Dialog`의 서피스 라운드와 같은 계열) | `widgets/bottom-tab-bar/ui/bottom-tab-bar.tsx` |
 | 이적시장 **상태 뱃지**·**관심 표시 원**·**결렬 X 원·부인 빗금 원**·**보도 타임라인 점** | 누르는 컨트롤이 아니라 상태·경로·시간순을 그리는 표시 요소다 | `entities/transfer/ui/status-badge.tsx` · `watch-mark.tsx` · `club-route.tsx` · `report-item.tsx` |
 
-⚠ 위의 알약 예외 표와 이 "대상이 아닌 것" 표는 **`pnpm check:conventions`가 대조한다** — 목록에 없는 `rounded-full`이 생기면 검사가 실패한다. 그림자·`backdrop-blur` 예외도 같다.
+⚠ `pnpm check:conventions`가 `STYLE_ALLOWED`를 코드와 대조한다 — 목록에 없는 `rounded-full`이 생기면 검사가 실패한다. 그림자·`backdrop-blur` 예외도 같다. 이 표들은 그 상수의 설명이라 사람이 함께 고친다.
 ⚠ 다만 검사가 대조하는 것은 **파일 경로**이고 행 수가 아니다 — 개수는 적지 않는다(`AGENTS.md`).
 
 경계가 헷갈리는 대비 선례:
@@ -266,7 +262,7 @@ Tailwind는 소스 텍스트에서 클래스 후보를 훑으므로 `` `[clip-pa
 조립하면 **그 유틸이 아예 생성되지 않아 도형이 통짜 사각형으로 나온다** — 빌드는 조용히 통과한다.
 arbitrary 값 안의 공백은 `_`로 쓴다. 값이 정말 런타임이면(비율에 따라 움직이는 좌표) 그 부분만 `style`로 준다.
 
-### 브랜드 버튼 예외 — 소셜 로그인 2개
+### 브랜드 버튼 예외 — 카카오·구글 로그인
 
 `views/sign-in/ui/provider-button.tsx`의 카카오·구글 버튼은 **이 디자인 시스템의 통제 밖**이다.
 버튼 색·로고·문구를 각 프로바이더의 브랜드 가이드가 강제하고, 카카오는 심사에서 지적 대상이다.
@@ -298,8 +294,7 @@ resting 상태의 카드·목록·헤더는 **여전히 flat + 1px 헤어라인*
 ### 바텀시트는 화면 하단에 **붙는다**(edge-to-edge)
 
 `Sheet`는 좌·우·하단 여백 0으로 화면 하단에 붙고 **상단 모서리만** 둥글다(`rounded-t-[20px]`).
-한때 `inset-x-2 bottom-2 rounded-xl`로 떠 있는 카드였는데,
-그 형태는 맨 아래에 "닫기" 행을 요구한다 — 여백이 있으면 스크림을 눌러 닫는다는 것이 읽히지 않아서다.
+떠 있는 카드 형태로 두지 않는다 — 맨 아래에 "닫기" 행을 요구한다. 여백이 있으면 스크림을 눌러 닫는다는 것이 읽히지 않아서다.
 
 - 하단 여백 대신 **`pb-[max(8px,env(safe-area-inset-bottom))]`** 로 홈 인디케이터를 피한다
   (`max(고정값, env(safe-area-inset-bottom))` 관용구는 `BottomTabBar`가 선례다 — 그쪽은 `bottom`에 건다).
@@ -311,7 +306,7 @@ resting 상태의 카드·목록·헤더는 **여전히 flat + 1px 헤어라인*
   **시트 안 활성 컨트롤이 0개**가 되는데, 그때 이 버튼이 유일한 탈출구다.
   높이도 44px(`py-5` + 바 4px)로 잡는다 — 짚어야 끌 수 있는 띠라 히트 영역 기준을 지킨다.
 - 항목 사이에 **헤어라인을 긋지 않는다.** 좌우 여백이 없어 구분선이 화면을 가로지르는 선이 된다.
-- ⚠ 라운드 20px은 **서피스** 값이라 "버튼 6px" 규칙과 무관하다(카드 14px · `Dialog` 16px과 같은 계열).
+- ⚠ 라운드 20px은 **서피스** 값이라 "버튼 6px" 규칙과 무관하다(카드 12px · `Dialog` 16px과 같은 계열).
 - 넓은 프레임(768px~)에서는 화면 전체 폭으로 깔지 않고 **하단 가운데 최대폭 패널**이 된다(`md:mx-auto md:max-w-[480px]`).
   하단에 붙고 상단만 둥근 형태는 그대로다.
 

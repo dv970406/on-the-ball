@@ -138,7 +138,7 @@ Router Cache는 **URL로만 키가 잡히고 세션은 키에 들어가지 않�
 
 → 그래서 **캐시 수명을 공유하는 것은 둘뿐이다** — `ANON_REVALIDATE`(Data Cache)와 TanStack
 `staleTime`. 둘 다 **사용자 비의존 데이터**에만 걸려서 URL·쿼리키로 정직하게 갈린다.
-하나를 바꾸면 둘을 함께 바꾼다.
+값은 `SHARED_DATA_TTL_SECONDS`(`@/shared/config`) 하나다.
 
 ### ⚠ `cacheComponents`를 켜지 않는다
 
@@ -180,7 +180,7 @@ Router Cache는 **URL로만 키가 잡히고 세션은 키에 들어가지 않�
 | `app/transfers/daily/[date]/page.tsx` | 그 날의 보도(딜마다 묶음 · 상한 `TRANSFER_DAY_REPORT_LIMIT`) + 소식이 있는 이전·다음 날(`queryTransferDay` — 훅과 같은 조립) (+ 서버 시각 — 다음 날이 미래면 잇지 않는다) |
 | `app/ranking/page.tsx` | 랭킹 상위 `RANKING_LIMIT`줄 + 내 점수(로그인 사용자만 — 상위 목록 밖이면 "내 순위" 칸이 이것으로 그려진다. `null`은 채점된 표 없음, `undefined`는 프리페치 안 함. 서버가 본 사용자의 키에만 `initialData`로 넣는다) (+ `userId` · 서버 시각) |
 
-- ⚠ **`initialData`에는 서버가 읽은 시각을 함께 준다**(`initialDataUpdatedAt: () => serverToClientTime(serverNowMs)` —
+- ⚠ **`initialData`에는 서버가 읽은 시각을 함께 준다**(`initialDataUpdatedAt: serverUpdatedAt(serverNowMs)`(`@/shared/lib`) —
   댓글 목록이 선례. 서버 시각을 그대로 넣지 말고 기기 시계로 옮긴다 — 쿼리가 기기 시계와 빼서 신선도를 잰다).
   안 주면 "지금 받은 것"으로 취급되는데, **뒤로가기는 Next가 보관한 옛 서버 페이로드를 되살린다** — 그 옛 데이터가
   신선한 것으로 캐시에 앉아 staleTime 동안 다시 받지 않았다(실측: 닉네임을 바꾸고 돌아와도 옛 표기가 남았다).
@@ -188,6 +188,8 @@ Router Cache는 **URL로만 키가 잡히고 세션은 키에 들어가지 않�
   (로그아웃·계정 전환 — 댓글의 내 표). 사용자 스코프 키가 바뀐 뒤 옛 사용자의 개인화가 새 키에 사실처럼 앉는다 →
   개인화를 지운 사본을 `placeholderData`로만 쓴다. 개인화 값이 **하나뿐이고 그 값을 그리는 컨트롤이 세션으로
   갈라 그리는** 조회(딜 단건의 `isWatched` — `WatchToggle`의 3분기)는 이 규칙 밖이다.
+- ⚠ **PostgREST 에러는 던지지 않고 값으로 돌아온다** — `catch`에 닿지 않으므로 그대로 흘리면 크롤러가 스켈레톤을 받아도 로그에 흔적이 없다. 목록 결과는
+  `prefetchedRows(label, result)`(`@/shared/api/prefetch`)로 접는다 — 실패면 로그 + `undefined`, 성공이면 행 배열이다.
 - **프리페치는 최적화일 뿐이다.** 실패하면 `undefined`를 넘겨 클라이언트 조회 경로로
   폴백한다 — 그래서 조회 결과를 `found`/`missing`/`unknown` 셋으로 가른다.
   ⚠ **`null`·`[]`과 `undefined`를 구분해야 하는 값이 있다** — 보도 타임라인은 `[]`가 "보도가 없다"이고
@@ -224,7 +226,7 @@ Router Cache는 **URL로만 키가 잡히고 세션은 키에 들어가지 않�
 `transferKeys.list(userId, …)`·`transferKeys.detail(id, userId)`가 그렇다. 서버가 로그인 사용자 기준으로 채운 데이터를
 클라이언트가 세션 복원 전 `undefined` 키로 찾으면 **캐시에 닿지 못하고 다시 조회한다** —
 그 순간 화면이 스켈레톤으로 되돌아가 SSR이 헛일이 된다.
-→ 페이지가 `initialUserId`를 함께 내리고, view가 복원 전까지 그 값을 키로 쓴다.
+→ 페이지가 `initialUserId`를 함께 내리고, 화면이 `useQueryScope(initialUserId)`로 복원 전까지 그 값을 키로 쓴다.
 → ⚠ **같은 스코프의 쿼리를 갖는 하위 컴포넌트까지 흘려보낸다.** 뷰에서 멈추면 그 아래가
   첫 렌더에 다른 키로 **같은 데이터를 한 번 더** 받는다(첫 응답은 아무도 안 읽는 키에 남는다).
 → 같은 이유로 **프리페치가 있으면 세션 복원을 기다리지 않는다**(`enabled`를 열어 둔다).
@@ -249,7 +251,7 @@ Router Cache는 **URL로만 키가 잡히고 세션은 키에 들어가지 않�
 #### ⚠ 프리페치를 붙이면 렌더 중 시계를 읽는 코드가 전부 깨진다
 
 시각에 의존하는 판정·표시는 **`nowMs`를 인자로 받고**, SSR 화면은 그 값으로 **서버 시각**을 흘려보낸다
-(`serverNowMs ?? useNowMs()` — 순서의 근거는 `data-and-state.md` 하이드레이션 절). 프리페치가 없는 화면만
+(`useReferenceNowMs(serverNowMs)` — 순서의 근거는 `data-and-state.md` 하이드레이션 절). 프리페치가 없는 화면만
 마운트 후에 그려지므로 그냥 `useNowMs()`면 된다.
 ⚠ **그 값을 받는 컴포넌트까지 끝까지 흘려보낸다** — 뷰에서 멈추면 그 아래가 서버에서 `null`을
 보고 다른 분기를 탄다(실제로 **마감된 항목을 참여 가능한 상태로 SSR한** 적이 있다).
@@ -269,7 +271,7 @@ path로 둘 수 있는 것은 **닫힌 유한 분류**(DB enum 같은)뿐이다 
   두면 누를 때마다 전체 페이지가 리로드된다.
 - ⚠ **query 필터는 서버를 부르지 않는다.** 목록은 범위 안 전체를 SSR로 한 번 내리고 필터·정렬을 뷰가
   계산하므로, 필터를 바꾼다고 서버가 새로 줄 것이 없다. `<Link>`·`router.push`면 동적 라우트라 클릭마다
-  서버 렌더 왕복을 기다린 뒤에야 화면이 바뀐다 → `href`를 가진 앵커로 두고 **일반 클릭만** 가로채
+  서버 렌더 왕복을 기다린 뒤에야 화면이 바뀐다 → `href`를 가진 앵커로 두고 **일반 클릭만**(`isPlainClick`) 가로채
   `window.history.pushState`로 주소만 바꾼다(`views/transfer-board`의 `BoardLink`·`navigateBoard`).
   Next가 이 메서드를 감싸 라우터 기록에 반영하므로 뒤로가기·상세 왕복에도 필터가 남는다. 수정 키 클릭(새 탭)은
   가로채지 않는다. **path 분류는 `<Link>`로 남긴다** — 서버가 그 분류의 `<title>`·H1을 새로 그려야 한다.
@@ -336,7 +338,7 @@ path로 둘 수 있는 것은 **닫힌 유한 분류**(DB enum 같은)뿐이다 
   판 없는 기준선 296ms). 판 안의 조회(보도·예측)는 미디어 쿼리(`useSyncExternalStore` — 서버 스냅샷 `false`)가 그 폭을 확인한
   뒤에만 연다(`DealPanel`의 `active`) — 가려진 판이 모바일에서 조회를 내지 않게. 렌더 중에 `window`를 읽지 않는다.
   선택 표시(`aria-current`·막대)는 그 폭이 확인됐을 때만 그린다 — 모바일에는 "고른 항목"이라는 상태가 없다.
-- ⚠ **폭 판정은 CSS와 같은 단위(rem)로 쓴다** — JS의 미디어 쿼리가 `(min-width: 64rem)`이고 CSS가 `lg:`(64rem)다. px로 두면
+- ⚠ **폭 판정은 CSS와 같은 단위(rem)로 쓴다** — JS의 미디어 쿼리(`LG_MEDIA_QUERY` — `@/shared/config`)가 `(min-width: 64rem)`이고 CSS가 `lg:`(64rem)다. px로 두면
   브라우저 글꼴 크기를 키운 사용자에게서 둘이 갈려, 판이 숨겨진 폭인데 클릭이 선택으로 가로채져 상세로 갈 길이 없다.
 - **키보드 이동은 J(다음)·K(이전)만이다** — ↑·↓는 페이지 스크롤 키라 가로채지 않는다. 판정은 `e.code`(`KeyJ`·`KeyK`)다
   (한글 입력 상태에서 `e.key`는 "ㅓ"·"ㅏ"). 입력칸·조합 중(`isComposing`)·이미 처리된 키(`defaultPrevented`)·**모달이 열려
@@ -459,9 +461,9 @@ path로 둘 수 있는 것은 **닫힌 유한 분류**(DB enum 같은)뿐이다 
   읽는 값이라 `openGraph.url`을 **명시**한다 — 조립은 `absoluteUrl(ROUTES.…)`(`@/shared/config`)이고,
   canonical과 같은 경로여야 한다(둘이 갈리면 검색엔진과 공유 플랫폼이 다른 URL을 대표로 본다).
   ⚠ **예외는 보드의 `?deal=` 공유 하나다**(아래 딜 카드 절) — 카드가 말하는 대상이 그 딜이라 `og:url`이 딜 상세를 가리킨다.
-- ⚠ **`openGraph`를 채우는 세그먼트는 `OG_SITE`를 스프레드한다**(`siteName`·`locale`). 루트의
+- ⚠ **`openGraph`에는 `OG_SITE`(`siteName`·`locale`)가 함께 실려야 한다.** 루트의
   `openGraph`는 세그먼트 값과 병합되지 않고 통째로 대체되어 루트에 한 번 적어 두는 방법이 없다
-  (`OG_IMAGE`와 같은 함정). `og:locale`은 `ko_KR`(OGP의 `언어_지역`)이다.
+  (`images`와 같은 함정). 그래서 조립을 `pageMetadata`(`@/shared/config`)가 갖는다. `og:locale`은 `ko_KR`(OGP의 `언어_지역`)이다.
 - **색인 대상 화면은 `description`을 채운다.** 비우면 루트의 사이트 소개 한 줄이 그 리소스의 검색
   결과 설명·공유 카드가 된다(실측). 화면이 그리는 값으로 만든다 — 딜 상세는 **한국어 요약이 있는 가장 최근
   보도**의 요약, 그런 보도가 없으면 최신 보도의 영문 발췌, 그것도 없으면 이적 경로 + 상태 라벨 — 어느 쪽이든 120자에서
@@ -497,21 +499,21 @@ path로 둘 수 있는 것은 **닫힌 유한 분류**(DB enum 같은)뿐이다 
 `openGraph`를 직접 반환하는 순간 **통째로 대체되어 이미지가 빠진다**(실측 — 상세만 이미지 없는
 카드로 나갔다). `twitter`도 마찬가지다.
 
-→ `openGraph`를 채우는 라우트에서는 `images`를 **명시**한다(`app/transfers/page.tsx`의 `OG_IMAGE`).
+→ 색인 대상 화면은 `pageMetadata({ title, description, path })`로 만든다 — `images`·`OG_SITE`·`og:url`·`twitter`를 함께 싣는다.
   검증은 `curl`로 실제 응답의 `og:image` 유무를 본다 — 빌드는 조용히 통과한다.
 
 #### 딜 상세의 카드는 딜마다 그린다 (`opengraph-image.tsx`)
 
 `app/transfers/[id]/opengraph-image.tsx`가 선수·상태·경로·이적료를 한 장으로 그린다 — 단톡방·커뮤니티에 붙인
-링크가 사이트 공통 그림이 아니라 **그 딜의 카드**로 보이게 한다. 다른 세그먼트는 공통 이미지(`OG_IMAGE`)를 쓴다.
+링크가 사이트 공통 그림이 아니라 **그 딜의 카드**로 보이게 한다. 다른 세그먼트는 공통 이미지(`pageMetadata`)를 쓴다.
 임대 계열이면 상태 뱃지 옆에 형태 표지를, 선수가 다른 구단에 임대 중이면 경로 아래 "○○ 임대 중"을 그린다 — 화면과 같은 함수
 (`dealFormMark`·`loanNote` — `entities/transfer/lib/deal-form.ts`)다. 경로만 보면 완전 이적으로 읽힌다.
 
 - ⚠ **보드 주소에 딜이 실린 경우(`/transfers?deal=<id>`)도 같은 카드를 낸다.** 넓은 화면에서 고른 딜은 상세 경로로
   실리지만(위 2분할 절), 이 형태가 로그인 복귀 주소이고 그 전에 공유된 링크가 남아 있다 — 그 주소에 목록의 공통 카드가 나가
   받는 사람이 무슨 딜인지 알 수 없었다(실측: 카카오톡). 보드의 `generateMetadata`가 `?deal=`을 화면과 같은 판정(첫 값 · `parsePostId`)으로 읽어
-  `openGraph`·`twitter`만 그 딜의 것으로 바꾼다 — 제목·설명은 상세와 같은 함수(`dealMetaTitle`·`dealMetaDescription`),
-  이미지는 이 파일의 주소(`dealCardImage` — `entities/transfer/lib/deal-meta.ts`).
+  `openGraph`·`twitter`만 그 딜의 것으로 바꾼다 — 공유 카드는 상세와 같은 함수(`dealShareCard` — `entities/transfer/lib/deal-meta.ts`),
+  이미지는 이 파일의 주소(`dealCardImage`).
   - ⚠ **`<title>`·`description`·canonical은 목록의 것 그대로다.** 화면 안에서 다른 딜을 고르면 주소만 바뀌고 메타데이터는
     다시 만들어지지 않아, 탭 제목을 딜로 바꾸면 처음 딜에 굳는다.
   - ⚠ **`og:url`은 딜 상세다**(위 og:url 규칙의 예외). 좁은 화면에는 판이 없어 그 주소를 연 사람이 그 딜을 볼 수 없고,

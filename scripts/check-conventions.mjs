@@ -31,6 +31,8 @@ const DEEP_IMPORT_ALLOWED = new Set([
   "@/shared/api/supabase-server",
   // 익명 서버 클라이언트 — Data Cache가 서버 전용이라 supabase-server와 같은 취급이다
   "@/shared/api/supabase-anon",
+  // 프리페치 결과 접기 — 서버 page들이 같은 판정(`[]` ≠ 실패)·같은 로그로 접는다
+  "@/shared/api/prefetch",
   "@/shared/lib/cn",
   "@/shared/lib/format",
   "@/shared/lib/post-id",
@@ -61,11 +63,10 @@ const DEEP_IMPORT_ALLOWED = new Set([
   "@/entities/transfer/lib/league",
   // 구단의 영입·방출 구역 — 구단 page의 description이 화면과 같은 구역·건수를 말한다
   "@/entities/transfer/lib/club-deals",
-  "@/entities/session/lib/auth-error-message",
   "@/features/sign-in/lib/pkce-verifier",
 ]);
 /** `@/entities/<slice>/...` 형태로 모든 엔티티에 공통 허용되는 서버 안전 경로 */
-const DEEP_IMPORT_ALLOWED_ENTITY_SUFFIX = ["model/types", "api/mappers", "api/keys"];
+const DEEP_IMPORT_ALLOWED_ENTITY_SUFFIX = ["model/types", "api/mappers"];
 
 
 /**
@@ -161,7 +162,8 @@ const STYLE_ALLOWED = {
    *   variant는 **리터럴이어야 한다**는 규칙 자체를 검사로 만든다(허용 목록이 비어 있다).
    *   `Button variant={…}`는 에메랄드와 무관해 대상이 아니다.
    */
-  "Pill variant={": [],
+  // 에메랄드 확인 버튼을 동적 값으로 넘기면 아래 리터럴 대조를 비켜 간다 — `Pill variant={`와 같은 이유
+  "confirmTone={": [],
   // 에메랄드 확인 버튼 — `bg-primary` 리터럴이 아니라 위 대조에 걸리지 않던 자리
   'confirmTone="primary"': ["src/shared/ui/sign-in-dialog.tsx"],
   'variant="green"': [
@@ -175,6 +177,20 @@ const STYLE_ALLOWED = {
     "src/features/vote-comment/ui/comment-vote-buttons.tsx",
   ],
 };
+
+/**
+ * 문자열 하나로 잡히지 않는 스타일 대조 — 속성 순서·줄바꿈이 끼어도 잡아야 하는 형태다(`STYLE_ALLOWED`와 같은 양방향 검사).
+ */
+const STYLE_PATTERN_ALLOWED = [
+  // `Pill`의 variant는 리터럴이어야 한다 — `<Pill className="x" variant={v}>`도 같다
+  { label: "Pill의 동적 variant", re: /<Pill\b[^>]*\bvariant=\{/, allowed: [] },
+  // 에메랄드의 다른 표면(`bg-`·`text-`는 위 표가 센다). dialog.tsx의 `border-primary`는 확인 버튼의 테두리다
+  {
+    label: "에메랄드의 다른 표면",
+    re: /\b(?:border|fill|stroke|ring|outline|decoration|accent|caret)-primary\b/,
+    allowed: ["src/shared/ui/dialog.tsx"],
+  },
+];
 
 /** FSD 레이어 서열. 하위는 상위를 import할 수 없다. */
 const LAYER_RANK = { shared: 0, entities: 1, features: 2, widgets: 3, views: 4, app: 5 };
@@ -249,6 +265,9 @@ function importSpecifiers(code) {
   // `import "x"` 부수효과 import
   const bare = /(?:^|\n)\s*import\s*["']([^"']+)["']/g;
   while ((m = bare.exec(code))) specs.push(m[1]);
+  // 동적 `import("x")`도 레이어·deep 검사의 대상이다 — 지연 로드라고 경계가 달라지지 않는다
+  const dynamic = /\bimport\(\s*["']([^"']+)["']\s*\)/g;
+  while ((m = dynamic.exec(code))) specs.push(m[1]);
   return specs;
 }
 
@@ -334,10 +353,10 @@ const exportedNames = new Set();
 
 for (const barrel of barrels) {
   const dir = barrel.slice(0, -"/index.ts".length);
-  for (const { name, from } of barrelExports(code.get(barrel))) {
+  for (const { name } of barrelExports(code.get(barrel))) {
     exportedNames.add(name);
-    // 배럴을 통해 쓰거나(`@/entities/post`) 소스 모듈을 직접 쓰거나(deep·상대경로) 둘 중 하나면 현역이다
-    const used = isImported(dir, name) || isImported(join(dir, from.replace(/^\.\//, "")), name);
+    // **배럴을 통해** 쓰는 소비자가 있어야 현역이다. 서버의 직접 경로·슬라이스 안 상대 경로 소비는 배럴이 공개할 이유가 아니다(`architecture.md`)
+    const used = isImported(dir, name);
     const documented = DOCUMENTED_UNUSED.get(name);
 
     if (used && documented) {
@@ -393,6 +412,8 @@ for (const f of files) {
 // 4. deep import 화이트리스트 + 클라이언트 파일의 deep import 금지
 // ─────────────────────────────────────────────────────────────
 
+const deepUsed = new Set();
+const deepSuffixUsed = new Set();
 for (const f of files) {
   const r = rel(f);
   const isClient = /^\s*["']use client["']/.test(raw.get(f));
@@ -411,6 +432,11 @@ for (const f of files) {
       DEEP_IMPORT_ALLOWED.has(spec) ||
       (layer === "entities" && DEEP_IMPORT_ALLOWED_ENTITY_SUFFIX.includes(suffix));
 
+    if (allowed) {
+      deepUsed.add(spec);
+      if (layer === "entities") deepSuffixUsed.add(suffix);
+    }
+
     if (!allowed) {
       fail("deep-import", `${r} → ${spec} (배럴을 거치거나 화이트리스트에 등재한다)`);
     } else if (isClient) {
@@ -420,6 +446,14 @@ for (const f of files) {
       );
     }
   }
+}
+
+// 탈출구는 줄어들 길이 있어야 한다 — 소비자가 사라진 경로가 남으면 쓰지 않는 탈출구가 열린 채로 있다
+for (const spec of DEEP_IMPORT_ALLOWED) {
+  if (!deepUsed.has(spec)) fail("deep-import-stale", `${spec}가 DEEP_IMPORT_ALLOWED에 있는데 소비자가 없다 — 목록에서 뺀다`);
+}
+for (const suffix of DEEP_IMPORT_ALLOWED_ENTITY_SUFFIX) {
+  if (!deepSuffixUsed.has(suffix)) fail("deep-import-stale", `엔티티 공통 접미사 ${suffix}의 소비자가 없다 — 목록에서 뺀다`);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -491,6 +525,19 @@ for (const [needle, allowed] of Object.entries(STYLE_ALLOWED)) {
   }
 }
 
+for (const { label, re, allowed } of STYLE_PATTERN_ALLOWED) {
+  const seen = new Set();
+  for (const f of files) {
+    if (!re.test(code.get(f))) continue;
+    const r = rel(f);
+    seen.add(r);
+    if (!allowed.includes(r)) fail("style-exception", `${r}: ${label} — styling.md의 예외 목록에 없다`);
+  }
+  for (const r of allowed) {
+    if (!seen.has(r)) fail("style-exception", `${r}: ${label}가 사라졌다 — 예외 목록에서 뺀다`);
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 // 7. 규약 문서가 가리키는 경로가 실재하는가 (양방향)
 //    AGENTS.md "사라진 심볼·파일을 규칙의 주어로 삼지 않는다"를 기계가 대조한다 —
@@ -506,8 +553,8 @@ const DOC_FILES = [
 ];
 
 /** 백틱 토큰 중 **경로꼴**만 판정한다. 라우트 문자열·Tailwind 유틸·SQL 식별자는 대상이 아니다. */
-const DOC_PATH_PREFIX = /^(@\/|src\/|app\/|supabase\/|scripts\/|docs\/|\.claude\/)/;
-const DOC_PATH_EXT = /\.(ts|tsx|md|sql|sh|css|json)$/;
+const DOC_PATH_PREFIX = /^(@\/|src\/|app\/|supabase\/|scripts\/|docs\/|\.claude\/|shared\/|entities\/|features\/|widgets\/|views\/)/;
+const DOC_PATH_EXT = /\.(ts|tsx|mjs|md|sql|sh|css|json)$/;
 /**
  * 판정 대상에서 빼는 것 — 애초에 실물을 가리키지 않는 표기다.
  * 글로브(별표를 낀 경로) · 마이그레이션 파일명 템플릿(YYYY…) · 명령문(공백 포함) · 외부 패키지.

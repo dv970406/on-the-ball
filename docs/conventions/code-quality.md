@@ -62,7 +62,7 @@ per-call 콜백이 **상위 레이어의 결정**(이동 목적지, 입력창 �
 - **좋은 예(따를 것):**
   - `ROUTES`·`signInWithNext` — 경로 문자열을 하드코딩하지 않고 가드·`SignInDialog`·탭바가 **같은 단일 소스**를 참조(응집도).
   - `DEAL_LIST_SELECT` 등 select 문자열 상수 — 스키마가 바뀌면 한 곳만 고친다(응집도).
-  - `requireBrowserSupabase` — 10곳 넘게 반복되던 null 가드를 한 번에 한국어 에러로(중복 3회 이상 + 형태가 진짜 같음).
+  - `requireBrowserSupabase` — 호출부마다 반복될 null 가드를 한 번에 한국어 에러로(중복 3회 이상 + 형태가 진짜 같음).
   - `validateNickname`(`features/update-profile`) — 길이·정규형·허용 문자 검증을 슬라이스 하나가 소유하고 뷰는 문구만 받는다(응집도).
   - 낙관적 업데이트 `onMutate → onError → onSettled` — 같은 규약을 모든 낙관적 쓰기 훅이 공유(예측 가능성).
   - `Crest`(`@/shared/ui`) ↔ `TransferCrest`(`entities/transfer`) — 도메인을 모르는 순수 메커니즘(이미지 + 하이드레이션 전 실패 감지 + 모노그램 폴백)은 `shared`가, 코드로 경로를 조립하는 도메인 지식은 엔티티의 얇은 래퍼가 갖는다. 여러 엔티티가 같은 메커니즘을 써야 할 때 entities끼리 import할 수 없는 것이 FSD의 구조적 제약이라, 그런 메커니즘은 소비처 수와 무관하게 `shared`에 둔다 — `avatarUrl`·`OAUTH_PROVIDERS`가 `shared`에 있는 것과 같은 사정이라 "성급한 추상화"가 아니라 "공유해야만 하는 메커니즘" 쪽으로 판단한다.
