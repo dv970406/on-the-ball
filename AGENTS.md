@@ -14,11 +14,13 @@ Before any Next.js work, find and read the relevant doc in `node_modules/next/di
 @docs/conventions/nextjs.md
 @docs/conventions/data-and-state.md
 @docs/conventions/styling.md
-@docs/conventions/api-and-db.md
-@docs/conventions/reuse.md
 @docs/conventions/code-quality.md
 
-- **이적 파이프라인**(`scripts/sync-transfer-news.mjs` · `scripts/lib/transfer/**` · `scripts/test-transfer-*.mjs` · `scripts/eval-transfer.mjs` · `scripts/bench-transfer-judge.mjs`)을 만지기 전에는 **`docs/conventions/transfer-pipeline.md`를 읽는다.** 위처럼 @import하지 않는 이유는 그 규칙이 앱 작업에 쓰이지 않아 매 세션 실을 필요가 없어서다 — 앱이 읽는 파생 데이터의 계약은 `api-and-db.md`에 있다.
+아래 문서는 **작업 성격에 따라 그때 읽는다.** 세션마다 싣는 지시문에는 글자 수 상한이 있어 전부 @import하면 뒤쪽 문서가 조용히 잘린다 — 매 세션 필요한 원칙만 위에 싣고, 참조 성격의 문서는 조건부로 둔다.
+
+- **`docs/conventions/reuse.md`** — 새 유틸·훅·컴포넌트를 만들거나 `shared`·`entities`·`features`·`widgets`의 배럴을 건드리기 전에 읽는다. 이미 있는 헬퍼의 목록과 각 헬퍼의 함정이 거기 있다 — 읽지 않고 만들면 같은 로직이 두 벌 생긴다.
+- **`docs/conventions/api-and-db.md`** — 마이그레이션·RLS·`security definer` 함수·`entities/*/api`의 조회 조립·`supabase/tests`·supabase 클라이언트 호출을 만지기 전에 읽는다. 쓰기 경로·정책·컬럼 권한·길이 한도의 규약과 테이블별 계약이 거기 있다.
+- **이적 파이프라인**(`scripts/sync-transfer-news.mjs` · `scripts/lib/transfer/**` · `scripts/test-transfer-*.mjs` · `scripts/eval-transfer.mjs` · `scripts/bench-transfer-judge.mjs`)을 만지기 전에는 **`docs/conventions/transfer-pipeline.md`를 읽는다.** 그 규칙은 앱 작업에 쓰이지 않는다 — 앱이 읽는 파생 데이터의 계약은 `api-and-db.md`에 있다.
 
 ### 규약 문서의 "목록"은 손으로 세지 않는다
 
