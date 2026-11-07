@@ -5,9 +5,6 @@ import { dealFormLabel, } from "../lib/deal-form";
 import { addOnTerms, feeKindLabel, formatFee } from "../lib/fee";
 import type { TransferDeal } from "../model/types";
 
-/** 값이 없는 칸 — 전부 같은 글자(`—`)로 말한다 */
-const EMPTY = "—";
-
 interface ContractTermsProps {
   deal: TransferDeal;
   className?: string;
@@ -23,6 +20,8 @@ interface ContractTermsProps {
  * - 주급·계약은 원문 표기 그대로다(원화 환산은 하지 않는다 — 하드코딩 환율은 거짓 숫자다).
  * - **형태는 알 때만** 둔다(완전 이적 포함) — 모르면 줄이 없다(완전 이적으로 짐작하지 않는다). 임대료는 대표 금액이 조항 금액일 때
  *   따로 저장된 원문 표기(`loanFeeText`)이고, 있을 때만 둔다.
+ * - **값이 없는 줄은 두지 않는다** — 주급·계약·직전 보도도 보도된 값이 있을 때만이다. 전부 없으면 한 줄로 "아직 없다"고 말한다.
+ *   `—` 둘만 남은 목록은 정보가 없는데 카드 한 장을 차지했다(대부분의 딜이 그랬다).
  */
 export function ContractTerms({ deal, className }: ContractTermsProps) {
   const fee = (amount: number | null) => formatFee({ amount, currency: deal.feeCurrency });
@@ -41,9 +40,14 @@ export function ContractTerms({ deal, className }: ContractTermsProps) {
   }
   // 대표 금액이 곧 임대료면 위의 금액 줄이 그것이다 — 같은 금액을 두 줄로 그리지 않는다
   if (deal.loanFeeText !== null && deal.feeKind !== "loan_fee") rows.push({ label: "임대료", value: deal.loanFeeText });
-  rows.push({ label: "주급", value: deal.wageText ?? EMPTY });
-  rows.push({ label: "계약", value: deal.contractText ?? EMPTY });
-  if (deal.feeAmount !== null) rows.push({ label: "직전 보도", value: fee(deal.prevFeeAmount) ?? EMPTY });
+  if (deal.wageText !== null) rows.push({ label: "주급", value: deal.wageText });
+  if (deal.contractText !== null) rows.push({ label: "계약", value: deal.contractText });
+  const prev = deal.feeAmount !== null ? fee(deal.prevFeeAmount) : null;
+  if (prev !== null) rows.push({ label: "직전 보도", value: prev });
+
+  if (rows.length === 0) {
+    return <p className={cn("py-2.5 text-[12px] text-ink-mute", className)}>아직 보도된 계약 조건이 없어요</p>;
+  }
 
   return (
     <dl className={cn("text-[13px]", className)}>

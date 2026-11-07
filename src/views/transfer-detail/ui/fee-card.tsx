@@ -1,9 +1,17 @@
 // ⚠ `"use client"`가 없다 — 상호작용이 없는 렌더러라 지시어를 달 이유가 없다. 지금 소비자는 클라이언트 뷰라 배럴로 가져온다.
-import { FeeDelta, FeeValue, type TransferDeal, addOnTerms, clauseNote, feeKindLabel, formatFee, formatFeeRange } from "@/entities/transfer";
+import type { ReactNode } from "react";
+import {
+  FeeDelta,
+  FeeValue,
+  type TransferDeal,
+  addOnTerms,
+  clauseNote,
+  feeDelta,
+  feeKindLabel,
+  formatFee,
+  formatFeeRange,
+} from "@/entities/transfer";
 import { cn } from "@/shared/lib/cn";
-
-/** 값이 없는 칸 — 전부 같은 글자(`—`)로 말한다 */
-const EMPTY = "—";
 
 interface FeeCardProps {
   deal: TransferDeal;
@@ -21,6 +29,8 @@ interface FeeCardProps {
  *   아니라는 것을 금액 바로 아래에서 말한다. 임대료가 따로 있으면 함께 적는다.
  *
  * ⚠ 이 KV의 모든 칸은 **라벨 위 · 값 아래**다. 칸 구분은 헤어라인이고 그림자는 없다.
+ * ⚠ **값이 있는 칸만 둔다** — 직전 보도 대비(변동이 있을 때) · 보도 범위 · 계약 · 주급. `—`만 든 칸은 정보가 없는데 자리를 차지했다
+ *   (계약·주급은 대부분의 딜에 없다). 칸이 홀수면 마지막 칸이 두 칸 폭을 쓰고, 하나도 없으면 KV 자체가 없다(계약 조건 목록 `ContractTerms`와 같은 판단).
  * ⚠ 숫자는 전부 `font-mono tabular-nums` — `FeeDelta`는 안에서 그 클래스를 갖는다.
  */
 export function FeeCard({ deal, className }: FeeCardProps) {
@@ -29,16 +39,15 @@ export function FeeCard({ deal, className }: FeeCardProps) {
 
   const hasFee = fee !== null;
   const condition = hasFee ? clauseNote(deal) : null;
-  // 금액 칸 둘이 빠지면 계약·주급이 첫 줄이 된다 — 선 규칙이 칸 번호로 정해지므로 번호를 당긴다
-  const offset = hasFee ? 2 : 0;
+  const range = hasFee ? formatFeeRange(deal) : null;
 
-  /** 2×2 KV — 짝수 칸은 왼쪽 선, 3·4번째 칸은 위쪽 선 */
-  const cell = (index: number) =>
-    cn(
-      "p-[11px_14px]",
-      index % 2 === 1 && "border-l border-hairline-cool",
-      index >= 2 && "border-t border-hairline-cool",
-    );
+  /** 2열 KV의 칸 — 값이 있는 것만 */
+  const cells: { label: string; value: ReactNode }[] = [];
+  // 색(상승 primary-deep · 하락 crimson)은 `FeeDelta`가 갖고 방향은 아이콘이 함께 진다
+  if (hasFee && feeDelta(deal) !== null) cells.push({ label: "직전 보도 대비", value: <FeeDelta deal={deal} className="text-[14px]" /> });
+  if (range !== null) cells.push({ label: "보도 범위", value: range });
+  if (deal.contractText !== null) cells.push({ label: "계약", value: deal.contractText });
+  if (deal.wageText !== null) cells.push({ label: "주급", value: deal.wageText });
 
   return (
     <section
@@ -80,41 +89,25 @@ export function FeeCard({ deal, className }: FeeCardProps) {
         )}
       </div>
 
-      {/*
-        ⚠ 이적료가 없으면(FA · 미공개) **금액에 딸린 두 칸(직전 보도 대비 · 보도 범위)을 통째로 뺀다** —
-          비교할 금액이 없는 칸은 늘 `—`라 정보가 없다. 남는 계약·주급 두 칸이 한 줄이 된다.
-      */}
-      <dl className="grid grid-cols-2 border-t border-hairline-cool">
-        {hasFee && (
-          <>
-            <div className={cell(0)}>
-              <dt className="label-mono">직전 보도 대비</dt>
-              {/* 색(상승 primary-deep · 하락 crimson)은 `FeeDelta`가 갖고 방향은 아이콘이 함께 진다 */}
-              <dd className="mt-1">
-                <FeeDelta deal={deal} className="text-[14px]" />
-              </dd>
+      {/* 짝수 칸은 왼쪽 선, 셋째 칸부터는 위쪽 선 — 칸이 홀수면 마지막 칸이 줄 전체를 쓴다 */}
+      {cells.length > 0 && (
+        <dl className="grid grid-cols-2 border-t border-hairline-cool">
+          {cells.map((cell, index) => (
+            <div
+              key={cell.label}
+              className={cn(
+                "p-[11px_14px]",
+                index % 2 === 1 && "border-l border-hairline-cool",
+                index >= 2 && "border-t border-hairline-cool",
+                index === cells.length - 1 && index % 2 === 0 && "col-span-2",
+              )}
+            >
+              <dt className="label-mono">{cell.label}</dt>
+              <dd className="mt-1 font-mono text-[14px] tabular-nums text-ink">{cell.value}</dd>
             </div>
-            <div className={cell(1)}>
-              <dt className="label-mono">보도 범위</dt>
-              <dd className="mt-1 font-mono text-[14px] tabular-nums text-ink">
-                {formatFeeRange(deal) ?? EMPTY}
-              </dd>
-            </div>
-          </>
-        )}
-        <div className={cell(offset)}>
-          <dt className="label-mono">계약</dt>
-          <dd className="mt-1 font-mono text-[14px] tabular-nums text-ink">
-            {deal.contractText ?? EMPTY}
-          </dd>
-        </div>
-        <div className={cell(offset + 1)}>
-          <dt className="label-mono">주급</dt>
-          <dd className="mt-1 font-mono text-[14px] tabular-nums text-ink">
-            {deal.wageText ?? EMPTY}
-          </dd>
-        </div>
-      </dl>
+          ))}
+        </dl>
+      )}
     </section>
   );
 }

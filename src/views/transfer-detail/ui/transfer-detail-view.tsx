@@ -147,8 +147,12 @@ export function TransferDetailView({
    * `null`이면 닫혀 있다. 뷰가 소유한다(`Dialog`가 `absolute`라 — `SignInDialog` 주석).
    */
   const [signInAction, setSignInAction] = useState<string | null>(null);
-  /** 댓글이 기본 선택이다(좁은 화면의 탭 — 넓은 화면에서는 두 패널이 다 보여 이 값이 아무것도 가리지 않는다) */
-  const [tab, setTab] = useState<DetailTabKey>("comments");
+  /**
+   * 보도 타임라인이 기본 선택이다(좁은 화면의 탭 — 넓은 화면에서는 두 패널이 다 보여 이 값이 아무것도 가리지 않는다).
+   * 댓글을 기본으로 두면 들어오자마자 "아직 댓글이 없어요"가 보이고 핵심인 보도는 탭을 눌러야 나왔다 — 거의 모든 딜이 댓글보다
+   * 보도가 많다. 넓은 화면의 좌우 순서(보도 → 댓글)와도 같다.
+   */
+  const [tab, setTab] = useState<DetailTabKey>("reports");
   /** 방금 담은 사람에게만 알림 안내를 낸다 — 판정(토스트가 걷힌 뒤 · 알림이 꺼져 있을 때)은 훅이 갖는다 */
   const nudge = usePushNudge({ dealId, watched: deal?.isWatched === true, userId: session.userId });
   /**
@@ -289,9 +293,9 @@ export function TransferDetailView({
                   selected={tab}
                   onSelect={setTab}
                   tabs={[
+                    { key: "reports", label: "보도 타임라인", count: reportCount },
                     // 댓글 + 답글 합계. 상한에 잘렸으면 `+`를 붙인다 — 받은 것만 센 숫자다
                     { key: "comments", label: "댓글", count: commentCount },
-                    { key: "reports", label: "보도 타임라인", count: reportCount },
                   ]}
                 />
 

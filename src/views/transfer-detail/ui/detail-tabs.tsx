@@ -24,7 +24,7 @@ export const detailTabId = (key: DetailTabKey) => `transfer-detail-tab-${key}`;
 export const detailPanelId = (key: DetailTabKey) => `transfer-detail-panel-${key}`;
 
 /**
- * 상세 하단 탭 바 — `댓글 N | 보도 타임라인 N`.
+ * 상세 하단 탭 바 — `보도 타임라인 N | 댓글 N`(순서·기본 선택의 사유는 뷰의 `tab` 주석).
  *
  * ⚠ **`role="tablist"`는 키보드 모델을 약속한다**(`code-quality.md` "롤은 키보드 모델을 약속한다") —
  *   화살표로 옆 탭에 옮겨 가는 roving tabindex를 함께 구현한다. 선택된 탭만 Tab 순서에 들어가고

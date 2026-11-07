@@ -25,12 +25,16 @@ interface ClubRouteProps {
  *   잘린 구단 이름은 어느 구단인지 알 수 없다(`Team.shortName`과 같은 판단).
  * ⚠ 빈 칸의 문구는 `routeLabels`가 정한다 — 자유계약의 출발은 `FA`, 아직 정해지지 않은 행선지는 `미정`.
  * ⚠ 행선지 자리에 구단이 여럿이면(여러 구단이 노리는 루머) 엠블럼을 겹쳐 그리고(`CrestStack`) 이름은 `routeLabels`가
- *   접은 글자(앞 셋 + `외 N`)를 **두 줄까지** 흘린다 — 한 줄 `truncate`면 세 번째 구단이 잘려 `외 N`의 수가 거짓이 된다.
+ *   접은 글자(앞 셋 + `외 N`)를 **두 줄까지** 흘린다 — 한 줄로 자르면 세 번째 구단이 잘려 `외 N`의 수가 거짓이 된다.
+ * ⚠ **이름을 자르지 않는다 — 들지 않으면 덩어리째 줄을 바꾼다**(`flex-wrap`). 모바일 행에서 출발 덩어리·엠블럼 묶음·행선지 나열이
+ *   한 줄을 나누면 출발 약칭이 `맨…`·`필라델피아 유…`로 잘렸다(실측) — 잘린 약칭은 어느 구단인지 알 수 없다(표의 규칙과 같다,
+ *   `DealTable`). 행선지 덩어리가 들지 않으면 화살표 아래 다음 줄로 내려가고, 한 낱말이 칸보다 길 때만 그 안에서 꺾는다
+ *   (`break-keep` + `overflow-wrap:anywhere`).
  * ⚠ 표지(`data-name` — 이름 글자, `data-route-to` — 행선지 덩어리, 구단이 여럿이면 `"stacked"`)는 표의 범위(`DealTable`)가 md+에서 잘림을 풀고 줄을
  *   바꾸는 데 쓴다. 이 컴포넌트는 폭을 모른다 — 캐러셀·미니 카드에서는 표지가 아무 일도 하지 않는다.
  * ⚠ 행선지 자리에 구단이 여럿이면 **표(md+)에서는 가장 유력한 하나 + `외 N곳`** 한 덩어리(`data-route-lead`)로 바꿔 그린다 — 엠블럼
  *   겹치기 + 이름 셋을 그대로 두면 경로 칸이 늘 두 줄로 꺾여 표의 행 높이가 들쭉날쭉했다. 전부는 보드의 오른쪽 판(lg+)과 딜 상세의
- *   관심 구단 목록이 적는다(넓은 화면의 상세 히어로 `RouteHero`와 같은 판단). 모바일 행은 지금 모양 그대로다.
+ *   관심 구단 목록이 적는다(넓은 화면의 상세 히어로 `RouteHero`와 같은 판단). 모바일 행은 엠블럼 겹치기 + 이름 나열 그대로다.
  *   두 덩어리를 함께 싣고 범위가 하나만 보이게 한다(`display: none` — 가린 쪽은 스크린리더에도 읽히지 않는다).
  * ⚠ 확실한 행선지 없이 관심 구단만 있는 살아 있는 루머는 표(md+)에서 그 구단 앞에 `유력`을 단다(`data-route-likely` — 관심 구단이
  *   하나뿐이어도). 이름 하나만 적으면 행선지로 읽힌다(상세 히어로의 "TO · 유력"과 같은 판단). 결렬·부인은 달지 않는다 — 유력하지 않다.
@@ -61,16 +65,15 @@ export function ClubRoute({ deal, size, className, "data-col": dataCol }: ClubRo
     <span
       data-col={dataCol}
       className={cn(
-        "flex min-w-0 items-center gap-[5px] text-[12px] text-ink-mute",
-        stacked ? "items-start" : "whitespace-nowrap",
-        note && "flex-wrap gap-y-0.5",
+        "flex min-w-0 flex-wrap items-center gap-x-[5px] gap-y-0.5 text-[12px] text-ink-mute",
+        stacked && "items-start",
         className,
       )}
     >
       <DealFormMark deal={deal} />
       <span className="inline-flex min-w-0 items-center gap-[5px]">
         <TransferCrest club={deal.fromClub} size={size} />
-        <span data-name="" className="truncate">
+        <span data-name="" className="break-keep [overflow-wrap:anywhere]">
           {label.from}
         </span>
       </span>
@@ -108,7 +111,8 @@ export function ClubRoute({ deal, size, className, "data-col": dataCol }: ClubRo
         <span
           data-name=""
           className={cn(
-            stacked ? "line-clamp-2 whitespace-normal" : "truncate",
+            "break-keep [overflow-wrap:anywhere]",
+            stacked && "line-clamp-2",
             dead && "line-through decoration-hairline-strong",
           )}
         >
