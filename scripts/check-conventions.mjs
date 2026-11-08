@@ -481,6 +481,9 @@ for (const f of files) {
   // `continue;`·`continue label;` — 문장으로만 잡는다(주석은 걷어낸 소스라 설명문에 걸리지 않는다)
   if (/\bcontinue\s*(?:[A-Za-z_$][\w$]*\s*)?;/.test(c))
     fail("banned-api", `${r}: \`continue\` — 건너뛸 항목은 filter·flatMap이나 조건으로 거른다(code-quality.md)`);
+  // 글자 크기 하한 — 클래스로 쓴 px만 본다(CSS 파일의 `@utility`·인라인 style은 보지 않는다 — styling.md "글자 크기 하한")
+  const tinyText = c.match(/\btext-\[(?:\d|10)(?:\.\d+)?px\]/);
+  if (tinyText) fail("banned-api", `${r}: ${tinyText[0]} — 화면 글자는 11px 미만으로 쓰지 않는다(styling.md "글자 크기 하한")`);
 }
 
 const routeFiles = files.map(rel).filter((r) => /^app\/.*\/route\.tsx?$/.test(r));

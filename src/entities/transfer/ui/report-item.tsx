@@ -87,7 +87,7 @@ function ReportBody({ report, latest, nowMs, clock }: ReportItemProps) {
           </b>
           <time
             dateTime={report.publishedAt}
-            className="ml-auto shrink-0 whitespace-nowrap font-mono text-[10px] tabular-nums text-ink-mute-2"
+            className="ml-auto shrink-0 whitespace-nowrap font-mono text-[11px] tabular-nums text-ink-mute-2"
           >
             {clock
               ? formatClockTime(report.publishedAt)

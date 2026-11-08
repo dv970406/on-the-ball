@@ -151,7 +151,7 @@ export function ReportFlowChart({ title, reports, error, onRetry, nowMs, classNa
             })}
           </svg>
           {/* 날짜 축 — 처음 · 가운데 · 끝. SVG 글자는 가로로 늘어나므로 HTML로 둔다 */}
-          <div aria-hidden className="mt-1.5 flex justify-between font-mono text-[10px] tabular-nums text-ink-mute-2">
+          <div aria-hidden className="mt-1.5 flex justify-between font-mono text-[11px] tabular-nums text-ink-mute-2">
             <span>{flow.days[0]?.label}</span>
             {mid && <span>{mid.label}</span>}
             <span>{flow.days.at(-1)?.label}</span>

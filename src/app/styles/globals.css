@@ -165,7 +165,7 @@ button:not(:disabled) {
 
 /* 칸 라벨 — 카드·표 안의 작은 대문자 mono 라벨(FROM/TO·이적료 성격·통계 칸·"마감까지") */
 @utility label-mono {
-  @apply font-mono text-[10px] uppercase tracking-[0.5px] text-ink-mute-2;
+  @apply font-mono text-[11px] uppercase tracking-[0.5px] text-ink-mute-2;
 }
 
 /* 섹션 제목 — 프로필 섹션·딜 상세 곁 칸·보드 판의 h2/h3. 제목 단계는 놓인 자리가 정하고 모양은 이것 하나다 */

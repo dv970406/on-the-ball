@@ -50,7 +50,7 @@ export function CommentItem({ comment, reply, isMine, nowMs, actions, children }
           <span className="truncate font-medium text-ink">{comment.authorNickname}</span>
           {isMine && (
             // 16px 알약 — 상태 표시라 CTA 셈에 들어가지 않는다(styling.md 에메랄드 표). 글자가 뜻을 진다
-            <Pill variant="green" className="h-4 shrink-0 px-[5px] py-0 text-[10px]">
+            <Pill variant="green" className="h-4 shrink-0 px-[5px] py-0 text-[11px]">
               나
             </Pill>
           )}

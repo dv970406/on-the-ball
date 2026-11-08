@@ -38,7 +38,7 @@ export function CrestStack({ clubs, size, className }: CrestStackProps) {
       ))}
       {rest > 0 && (
         <span
-          className="inline-grid place-items-center rounded-sm border border-canvas bg-canvas-soft font-mono text-[10px] leading-none text-ink-mute"
+          className="inline-grid place-items-center rounded-sm border border-canvas bg-canvas-soft font-mono text-[11px] leading-none text-ink-mute"
           style={{ width: size, height: size, marginLeft: -overlap }}
         >
           +{rest}

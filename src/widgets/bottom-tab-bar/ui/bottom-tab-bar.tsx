@@ -88,7 +88,7 @@ export function BottomTabBar() {
               <span className={cn("flex items-center justify-center", isActive && "text-primary")}>
                 <Icon as={tab.icon} size={20} />
               </span>
-              <span className="text-[10px] font-medium leading-none">{tab.label}</span>
+              <span className="text-[11px] font-medium leading-none">{tab.label}</span>
             </>
           );
           const className = cn(

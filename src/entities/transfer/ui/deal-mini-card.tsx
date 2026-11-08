@@ -56,7 +56,7 @@ export const DealMiniCard = memo(function DealMiniCard({ deal, nowMs }: DealMini
           <TransferCrest club={destinationClubs(deal)[0] ?? null} size={28} />
           <time
             dateTime={deal.latestReportedAt}
-            className="ml-auto whitespace-nowrap font-mono text-[10px] tabular-nums text-ink-mute"
+            className="ml-auto whitespace-nowrap font-mono text-[11px] tabular-nums text-ink-mute"
           >
             {formatRelativeTime(deal.latestReportedAt, nowMs)}
           </time>

@@ -79,7 +79,7 @@ export function GroupTabs({ counts, active, onJump, trailing }: GroupTabsProps) 
               )}
             >
               {GROUP_LABEL[key]}
-              <span className="font-mono text-[10px] tabular-nums opacity-60">{counts[key]}</span>
+              <span className="font-mono text-[11px] tabular-nums opacity-60">{counts[key]}</span>
             </button>
           ))}
         </nav>

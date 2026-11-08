@@ -64,7 +64,7 @@ export const RumorCard = memo(function RumorCard({ deal, report, nowMs, priority
           <span className="truncate font-medium">{reporterName(report)}</span>
           <time
             dateTime={report.publishedAt}
-            className="ml-auto shrink-0 whitespace-nowrap font-mono text-[10px] tabular-nums text-ink-mute-2"
+            className="ml-auto shrink-0 whitespace-nowrap font-mono text-[11px] tabular-nums text-ink-mute-2"
           >
             {formatRelativeTime(report.publishedAt, nowMs)}
           </time>
