@@ -228,6 +228,57 @@ export const SOURCES = [
     verification: { issuerHandle: null, method: "profile-review", checkedAt: "2026-09-25" },
     measured: { note: "라리가. 14일 6건, 이적 속보는 드물다(방송·저술 홍보 위주). 소개·활동이 본인과 일치." },
   },
+  // 2026-11-14 추가 — 국내 팬 커뮤니티 공신력 조사(구단별 표·팬카페)에서 1~1.5티어로 반복해 꼽힌 담당 기자.
+  {
+    id: "bsky:mcnicholas",
+    label: "James McNicholas (The Athletic)",
+    kind: "bluesky",
+    tier: 1,
+    defaultAttribution: "verified_author",
+    enabled: true,
+    config: { handle: "gunnerblog.bsky.social" },
+    verification: { issuerHandle: "bsky.app", checkedAt: "2026-11-14" },
+    measured: { note: "아스널. 최근 14일 10건(이적 1 — 창이 닫힌 시기), 여름 창 22건 중 이적 17건. ⚠ 동명의 배우 계정이 따로 있다." },
+  },
+  {
+    id: "bsky:sjohnson",
+    label: "Simon Johnson (The Athletic)",
+    kind: "bluesky",
+    tier: 1,
+    defaultAttribution: "verified_author",
+    enabled: true,
+    config: { handle: "sjohnsonsport.bsky.social" },
+    // The Athletic이 발급한 검증 기록이 있으나 isValid:false다 — 배지 대신 링크한 기사의 기자란으로 확인했다.
+    verification: { issuerHandle: null, method: "byline-links", checkedAt: "2026-11-14" },
+    measured: { note: "첼시. 최근 14일 4건, 여름 창 58건 중 이적 36건. 링크한 The Athletic 기사 3/3 기자란 \"By Simon Johnson\"." },
+  },
+  {
+    id: "bsky:twomey",
+    label: "Liam Twomey (The Athletic)",
+    kind: "bluesky",
+    tier: 1,
+    defaultAttribution: "verified_author",
+    enabled: true,
+    config: { handle: "liamtwomey.bsky.social" },
+    verification: { issuerHandle: "theathletic.com", checkedAt: "2026-11-14" },
+    measured: { note: "첼시. 최근 14일 3건, 여름 창 26건 중 이적 12건. 분석 기사 위주라 단독은 드물다." },
+  },
+  {
+    id: "bsky:edwards",
+    label: "Luke Edwards (Telegraph)",
+    kind: "bluesky",
+    tier: 2,
+    defaultAttribution: "verified_author",
+    enabled: true,
+    config: { handle: "lukeedwardstele.bsky.social" },
+    // 텔레그래프 기사가 402(유료벽)로 막혀 기자란을 대조하지 못했다 — 소개·활동으로 확인했다.
+    verification: { issuerHandle: null, method: "profile-review", checkedAt: "2026-11-14" },
+    measured: {
+      note:
+        "뉴캐슬. 최근 14일 2건, 여름 창 16건 중 이적 5건. 소개가 텔레그래프, 링크가 전부 telegraph.co.uk 뉴캐슬 기사, 뉴캐슬 담당" +
+        " 동료(워·호프·더글러스)가 팔로우한다. 꺼 둔 텔레그래프 RSS를 일부 대신한다.",
+    },
+  },
 
   // ────────────────────────────────────────────────────────────────
   // Telegram — t.me/s/<channel> 공개 미리보기 파싱. 인증 불필요.
@@ -422,10 +473,14 @@ export const SOURCES = [
     kind: "rss",
     tier: 2,
     defaultAttribution: "outlet",
-    enabled: true,
+    enabled: false,
     config: { url: "https://www.football.london/west-ham-united-fc/?service=rss" },
-    measured: { note: "주 5건 수준으로 드물다." },
-    retentionHours: 96.8,
+    measured: {
+      note:
+        "⚠ 꺼 둔다(2026-11-14): 피드가 비었다 — item 0건, lastBuildDate 2024-06-10. 같은 사이트의 다른 웨스트햄 주소 셋도 비어 있다." +
+        " 웨스트햄은 다른 경로(스탠더드 등)가 덮는다. 피드가 되살아나면 다시 잰다.",
+    },
+    retentionHours: null,
   },
   {
     id: "rss:chronicle-nufc",
@@ -478,8 +533,9 @@ export const SOURCES = [
     tier: 2,
     defaultAttribution: "outlet",
     enabled: true,
-    config: { url: "https://www.football-italia.net/feed/" },
-    measured: { note: "세리에 A 영어 매체. 20건." },
+    // 2026-11-14: www 주소가 301로 넘어가 새 주소로 바꿨다(따라가면 같은 20건).
+    config: { url: "https://football-italia.net/feed/" },
+    measured: { note: "세리에 A 영어 매체. 20건 중 18건이 현지 매체(gazzetta.it 등) 외부 링크를 단 재인용 — 등급 1의 근거." },
     retentionHours: 17.2,
   },
   {
@@ -565,13 +621,53 @@ export const SOURCES = [
     defaultAttribution: "outlet",
     enabled: true,
     config: { url: googleNews("Sami Mokbel") },
-    measured: { perDay30d: 0.4, note: "7일 3건. 무료로는 커버 불가에 가깝다는 사실을 드러내기 위한 소스." },
+    measured: {
+      perDay30d: 0.4,
+      note:
+        "7일 3건. 무료로는 커버 불가에 가깝다는 사실을 드러내기 위한 소스. 2026-11-14 재측정: 7일 5건, 전부 BBC 원문 — BBC RSS에" +
+        " 기자란이 없어 그의 BBC 기사에 기자 등급이 붙는 경로는 이 피드다.",
+    },
+  },
+  // 2026-11-14 추가 — 1티어로 꼽히지만 Bluesky·텔레그램 경로가 없는 기자. 7일 물량은 아래 각 항목.
+  {
+    id: "gnews:whitwell",
+    label: "Google News — Laurie Whitwell",
+    kind: "rss",
+    tier: 2,
+    defaultAttribution: "outlet",
+    enabled: true,
+    config: { url: googleNews("Laurie Whitwell") },
+    measured: { note: "맨유(The Athletic). 7일 20건(NYT 원문 8). Bluesky는 2025-03 이후 멈춤." },
+  },
+  {
+    id: "gnews:stone",
+    label: "Google News — Simon Stone",
+    kind: "rss",
+    tier: 2,
+    defaultAttribution: "outlet",
+    enabled: true,
+    // ⚠ 이름만 찾으면 동명의 연극·영화 연출가 기사가 절반 섞인다(100건 중 연극 리뷰 다수) — 'football'을 붙이면 53건 중 0건이다.
+    config: { url: googleNews("Simon Stone", "football") },
+    measured: { note: "맨유(BBC). 7일 15건(BBC 8). BBC RSS에 기자란이 없어 그의 BBC 기사에 기자 등급이 붙는 경로는 이 피드다." },
+  },
+  {
+    id: "gnews:cortegana",
+    label: "Google News — Mario Cortegana",
+    kind: "rss",
+    tier: 2,
+    defaultAttribution: "outlet",
+    enabled: true,
+    config: { url: googleNews("Mario Cortegana") },
+    measured: { note: "레알(The Athletic). 7일 3~7건, NYT 원문이 직접 잡힌다 — 단 본인이 쓰지 않은 NYT 기사도 섞인다. 라리가 1티어의 유일한 직접 경로." },
   },
 ];
 
-/** Google News 검색 RSS — 따옴표로 감싼 정확 일치 검색 */
-function googleNews(query) {
-  const q = encodeURIComponent(`"${query}"`);
+/**
+ * Google News 검색 RSS — 따옴표로 감싼 정확 일치 검색.
+ * `context`는 따옴표 밖에 붙는 낱말이다 — 동명이인이 있는 이름을 좁힌다(사이먼 스톤 ↔ 연극 연출가).
+ */
+function googleNews(query, context = "") {
+  const q = encodeURIComponent(`"${query}"${context ? ` ${context}` : ""}`);
   return `https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`;
 }
 
