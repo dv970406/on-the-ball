@@ -121,7 +121,7 @@ export function GuideSheet({ open, onClose }: GuideSheetProps) {
             }
             markClassName="items-center"
           >
-            달이 찰수록 믿을 만한 기자·매체예요. 표시가 없으면 아직 평가하지 않은 출처예요.
+            달이 찰수록 믿을 만한 기자·매체예요. 같은 기자라도 잘 아는 구단·리그의 딜에서는 더 높게 매겨요. 표시가 없으면 아직 평가하지 않은 출처예요.
           </GuideRow>
         </ul>
       </div>

@@ -3,6 +3,7 @@
 import { type ReactNode, useMemo, useState } from "react";
 import { cn } from "@/shared/lib";
 import { Skeleton } from "@/shared/ui";
+import type { CredibilityDeal } from "../lib/credibility";
 import { REPORT_FLOW_RANGE_LABEL, type ReportFlowRange, reportFlow, reportFlowSummary } from "../lib/report-flow";
 import type { TransferReport } from "../model/types";
 
@@ -11,6 +12,8 @@ interface ReportFlowChartProps {
   title: ReactNode;
   /** `undefined`면 아직 받지 못한 것(로딩 또는 실패) — `[]`는 "받았는데 없다" */
   reports: TransferReport[] | undefined;
+  /** 보도들이 붙은 딜 — "믿을 만한 출처"를 배지와 같은 범위 등급으로 가른다 */
+  deal: CredibilityDeal;
   error: Error | null;
   onRetry: () => void;
   /** 기간의 끝 — `serverNowMs ?? useNowMs()`는 호출부가 한다 */
@@ -40,11 +43,11 @@ const SCALE_FLOOR = 4;
  *   항목별 내용은 바로 옆 보도 타임라인이 같은 데이터를 목록으로 준다.
  * - 기간은 1주 · 3주 · 전체. 기본은 3주이고, 3주 안에 보도가 없으면(지난 창의 딜) 전체로 연다.
  */
-export function ReportFlowChart({ title, reports, error, onRetry, nowMs, className }: ReportFlowChartProps) {
+export function ReportFlowChart({ title, reports, deal, error, onRetry, nowMs, className }: ReportFlowChartProps) {
   const [picked, setPicked] = useState<ReportFlowRange | null>(null);
-  const recent = useMemo(() => (reports ? reportFlow(reports, "3w", nowMs).total : 0), [reports, nowMs]);
+  const recent = useMemo(() => (reports ? reportFlow(reports, deal, "3w", nowMs).total : 0), [reports, deal, nowMs]);
   const range: ReportFlowRange = picked ?? (recent > 0 ? "3w" : "all");
-  const flow = useMemo(() => (reports ? reportFlow(reports, range, nowMs) : null), [reports, range, nowMs]);
+  const flow = useMemo(() => (reports ? reportFlow(reports, deal, range, nowMs) : null), [reports, deal, range, nowMs]);
 
   const max = flow ? Math.max(1, ...flow.days.map((d) => d.top + d.other)) : 1;
   // 눈금의 꼭대기는 최소 4건이다 — 하루 1건뿐인 딜이 플롯 높이를 꽉 채우면 "보도가 몰렸다"로 읽힌다

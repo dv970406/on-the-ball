@@ -82,7 +82,9 @@ export const SOURCES = [
     kind: "bluesky",
     tier: 2,
     defaultAttribution: "verified_author",
-    enabled: true,
+    // ⚠ 꺼 둔다(2026-11-15): 공신력 1(국내 구단 표·여론)이고 2026-09-10~11-14 본인 글 46건 중 딜에 닿은 것이 0건이다
+    //   (최근 30글 중 이적 글 2건). 같은 소식은 온스테인·제이콥스가 먼저 낸다. 계정은 활동 중이다 — 등급이 오르면 다시 잰다.
+    enabled: false,
     config: { handle: "migueldelaney.bsky.social" },
     verification: { issuerHandle: "bsky.app", checkedAt: "2026-08-29" },
     measured: { perDay30d: 2.27 },
@@ -306,7 +308,10 @@ export const SOURCES = [
     //   메시지는 0%다. 단 🚨/EXCL/BREAKING 서명이 붙은 메시지는 그의 Bluesky 글과
     //   25/25(100%) 일치했으므로 그 패턴에 한해 원저자로 귀속한다 — 나머지는 저장하지 않는다.
     defaultAttribution: null,
-    enabled: true,
+    // ⚠ 꺼 둔다(2026-11-15): 서명 글은 `bsky:ornstein`이 이미 받는다 — 2026-09-10~11-14 26건 중 85%가 ±24시간 안에 그의
+    //   Bluesky 글과 같았고 Bluesky가 대개 5분 먼저였다. 이 채널에만 있는 딜은 0건이고, 서명 패턴에 걸린 비(非)온스테인 글
+    //   (경기 안내)이 온스테인으로 저장된 일이 있었다. 최근 20글 중 서명 글 4건, 나머지는 광고·일반 뉴스다.
+    enabled: false,
     config: {
       channel: "David_Ornstein",
       official: false,
@@ -533,10 +538,11 @@ export const SOURCES = [
     tier: 2,
     defaultAttribution: "outlet",
     enabled: true,
-    // 2026-11-14: www 주소가 301로 넘어가 새 주소로 바꿨다(따라가면 같은 20건).
-    config: { url: "https://football-italia.net/feed/" },
-    measured: { note: "세리에 A 영어 매체. 20건 중 18건이 현지 매체(gazzetta.it 등) 외부 링크를 단 재인용 — 등급 1의 근거." },
-    retentionHours: 17.2,
+    // 2026-11-15: 이적 카테고리 피드로 좁혔다 — 본 피드는 경기·일반 기사가 섞여 2026-09-30~11-14 1,475건 중 딜에 닿은 것이
+    //   42건이었고, 이 피드가 덮는 기간의 딜 연결 보도는 그대로 남는다(실측 5/5). 20항목(하루 6건꼴 — 사흘치)이라 매시 수집이면 한도에 걸리지 않는다.
+    config: { url: "https://football-italia.net/category/transfer-market/feed/" },
+    measured: { note: "세리에 A 영어 매체. 본 피드 20건 중 18건이 현지 매체(gazzetta.it 등) 외부 링크를 단 재인용 — 등급 1의 근거. 이 매체만 화면에 올리는 딜이 있다(단독 11, 재인용)." },
+    retentionHours: 76.9,
   },
   {
     id: "rss:gffn",
@@ -545,7 +551,8 @@ export const SOURCES = [
     tier: 2,
     defaultAttribution: "outlet",
     enabled: true,
-    config: { url: "https://www.getfootballnewsfrance.com/feed" },
+    // `/feed`는 301로 `/feed/`에 넘어간다 — 새 주소로 적는다(같은 항목)
+    config: { url: "https://www.getfootballnewsfrance.com/feed/" },
     measured: { note: "리그 1 영어 매체. 10건." },
     retentionHours: 22.6,
   },
@@ -572,9 +579,11 @@ export const SOURCES = [
     tier: 2,
     defaultAttribution: "outlet",
     enabled: true,
-    config: { url: "https://sempremilan.com/feed" },
-    measured: { note: "밀란 팬 매체(영어). 100건 중 81건이 한 필자." },
-    retentionHours: 113.4,
+    // 2026-11-15: 이적 카테고리 피드로 좁혔다 — 본 피드는 2026-10-15~11-14 658건 중 딜에 닿은 것이 42건이었고, 이 피드로는
+    //   100건(한 달치)에 41건이 남는다. 본 피드와 겹치는 항목은 100건 중 37건뿐이라 실제로 걸러진 목록이다.
+    config: { url: "https://sempremilan.com/category/transfer-news/feed" },
+    measured: { note: "밀란 팬 매체(영어). 본 피드 100건 중 81건이 한 필자. 제목 머리에 원 보도 주체(GdS:·Moretto: 등)를 단다 — 귀속은 아직 읽지 않는다." },
+    retentionHours: 739,
   },
   {
     id: "rss:telegraph-football",

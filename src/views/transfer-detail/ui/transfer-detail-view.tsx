@@ -278,6 +278,7 @@ export function TransferDetailView({
                   <ReportFlowChart
                     title={<h2 className={WIDE_CARD_TITLE}>보도 흐름</h2>}
                     reports={reports.list}
+                    deal={deal}
                     error={reports.error}
                     onRetry={() => reports.refetch()}
                     nowMs={nowMs}
@@ -322,6 +323,7 @@ export function TransferDetailView({
                     <PanelHeading count={reportCount}>보도 타임라인</PanelHeading>
                     <ReportTimeline
                       reports={reports.list}
+                      deal={deal}
                       error={reports.error}
                       onRetry={() => reports.refetch()}
                       nowMs={nowMs}

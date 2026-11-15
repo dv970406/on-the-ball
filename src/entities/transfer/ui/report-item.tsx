@@ -3,11 +3,14 @@
 import { cn } from "@/shared/lib/cn";
 import { formatClockTime, formatRelativeTime } from "@/shared/lib/format";
 import { reporterName } from "../lib/reporter";
+import type { CredibilityDeal } from "../lib/credibility";
 import type { TransferReport } from "../model/types";
 import { CredibilityBadge } from "./credibility-badge";
 
 interface ReportItemProps {
   report: TransferReport;
+  /** 그 보도가 붙은 딜 — 공신력 배지가 범위 등급을 이 딜의 구단으로 푼다 */
+  deal: CredibilityDeal;
   /** 레일의 점을 잉크로 칠한다 — **가장 최근 보도** 하나만(정렬과 무관하게 같은 보도가 잉크다) */
   latest: boolean;
   /** 기준 시각 — `serverNowMs ?? useNowMs()`는 호출부가 한다 */
@@ -30,7 +33,7 @@ interface ReportItemProps {
  *   (`styling.md` "대상이 아닌 것").
  * ⚠ 부모는 `<ol>`이다 — 항목 사이 선은 이 항목이 갖고(`first:border-t-0`) 목록은 선을 긋지 않는다.
  */
-export function ReportItem({ report, latest, nowMs, clock }: ReportItemProps) {
+export function ReportItem({ report, deal, latest, nowMs, clock }: ReportItemProps) {
   return (
     <li className="border-t border-hairline-cool first:border-t-0">
       {report.originalUrl ? (
@@ -45,6 +48,7 @@ export function ReportItem({ report, latest, nowMs, clock }: ReportItemProps) {
         >
           <ReportBody
             report={report}
+            deal={deal}
             latest={latest}
             nowMs={nowMs}
             clock={clock}
@@ -55,6 +59,7 @@ export function ReportItem({ report, latest, nowMs, clock }: ReportItemProps) {
         <div className={ROW_CLASS}>
           <ReportBody
             report={report}
+            deal={deal}
             latest={latest}
             nowMs={nowMs}
             clock={clock}
@@ -68,7 +73,7 @@ export function ReportItem({ report, latest, nowMs, clock }: ReportItemProps) {
 const ROW_CLASS = "grid grid-cols-[14px_1fr] gap-2.5 py-3";
 
 /** 행의 내용 — 링크든 아니든 같은 것을 그린다 */
-function ReportBody({ report, latest, nowMs, clock }: ReportItemProps) {
+function ReportBody({ report, deal, latest, nowMs, clock }: ReportItemProps) {
   return (
     <>
       <span className="flex justify-center pt-[5px]" aria-hidden>
@@ -81,7 +86,7 @@ function ReportBody({ report, latest, nowMs, clock }: ReportItemProps) {
       </span>
       <div className="min-w-0">
         <div className="flex items-center gap-[7px] text-[12px]">
-          <CredibilityBadge report={report} />
+          <CredibilityBadge report={report} deal={deal} />
           <b className="truncate font-medium text-ink">
             {reporterName(report)}
           </b>

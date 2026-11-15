@@ -1,6 +1,6 @@
 // ⚠ 배럴이 아니라 직접 경로다 — `"use client"`가 없어 서버 렌더 여지를 남긴다(`pill.tsx`와 같은 이유)
 import { cn } from "@/shared/lib/cn";
-import { credibilityOf, type Credibility } from "../lib/credibility";
+import { credibilityOf, type Credibility, type CredibilityDeal } from "../lib/credibility";
 import type { TransferReport } from "../model/types";
 
 /**
@@ -24,6 +24,8 @@ const MEDAL_LABEL = "공신력 높은 매체";
 
 interface CredibilityBadgeProps {
   report: Pick<TransferReport, "sourceId" | "attribution" | "attributedTo">;
+  /** 그 보도가 붙은 딜 — 범위 등급(구단·리그마다 다른 등급)을 이 딜의 구단으로 푼다(`credibilityOf`) */
+  deal: CredibilityDeal;
   className?: string;
 }
 
@@ -50,9 +52,12 @@ export function CredibilityMark({ value, className }: { value: Credibility; clas
   );
 }
 
-/** 출처 공신력 뱃지 — 🎖️(오피셜에 육박하는 매체) 또는 🌑~🌕(그 밖의 매체·기자 5단계). 등재되지 않은 출처면 그리지 않는다. */
-export function CredibilityBadge({ report, className }: CredibilityBadgeProps) {
-  const c = credibilityOf(report);
+/**
+ * 출처 공신력 뱃지 — 🎖️(오피셜에 육박하는 매체) 또는 🌑~🌕(그 밖의 매체·기자 5단계). 등재되지 않은 출처면 그리지 않는다.
+ * 같은 기자라도 딜에 걸린 구단에 따라 등급이 다를 수 있다(메디나는 아틀레티코 딜에서만 🌕) — 그래서 딜을 함께 받는다.
+ */
+export function CredibilityBadge({ report, deal, className }: CredibilityBadgeProps) {
+  const c = credibilityOf(report, deal);
   if (c === null) return null;
   return <CredibilityMark value={c} className={className} />;
 }

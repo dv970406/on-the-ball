@@ -1,5 +1,5 @@
 import type { TransferReport } from "../model/types";
-import { credibilityOf, isTopCredibility } from "./credibility";
+import { type CredibilityDeal, credibilityOf, isTopCredibility } from "./credibility";
 import { DAY_MS, kstDayNumber } from "@/shared/lib/date-key";
 
 /** 보도 흐름의 기간 — 화면 안 토글이라 URL에 싣지 않는다(보도 정렬과 같은 성격) */
@@ -60,7 +60,7 @@ function spokenDay(day: number): string {
  *
  * ⚠ **보도의 단계·이적료는 싣지 않는다.** 공개된 `transfer_news.stage`·`fee_amount`는 규칙 판정이고 딜 단계는 비공개
  *   LLM 판정이 정한다 — 보도별 단계로 흐름선을 그리면 뱃지와 다른 말을 한다. 그래서 날짜(`publishedAt`)와 출처 등급
- *   (배지와 같은 `credibilityOf`)만 쓴다.
+ *   (배지와 같은 `credibilityOf` — 그 딜의 구단으로 범위 등급을 푼다)만 쓴다.
  * - 기간의 끝은 기준 시각의 날이다(`nowMs` — 호출부가 `serverNowMs ?? useNowMs()`로 준다). 아직 모르면 가장 최근 보도의 날.
  * - "전체"의 시작은 가장 이른 보도의 날이되 최소 1주는 그린다(점 하나짜리 차트는 흐름이 아니다).
  * - ⚠ "전체"가 상한(`MAX_DAYS`)을 넘으면 **끝을 가장 최근 보도의 날로 당긴다** — 기준 시각에 묶어 두면 반년 넘게 조용한 딜은
@@ -69,6 +69,7 @@ function spokenDay(day: number): string {
  */
 export function reportFlow(
   reports: TransferReport[],
+  deal: CredibilityDeal,
   range: ReportFlowRange,
   nowMs: number | null,
 ): ReportFlow {
@@ -95,7 +96,7 @@ export function reportFlow(
   for (const { r, day } of stamped) {
     const slot = days[day - start];
     if (slot) {
-      if (isTopCredibility(credibilityOf(r))) slot.top += 1;
+      if (isTopCredibility(credibilityOf(r, deal))) slot.top += 1;
       else slot.other += 1;
     }
   }

@@ -1,5 +1,5 @@
 import type { ReportSort, TransferDeal, TransferGroupKey, TransferReport, TransferSort } from "../model/types";
-import { credibilityOf, credibilityRank } from "./credibility";
+import { type CredibilityDeal, credibilityOf, credibilityRank } from "./credibility";
 import { GROUP_LABEL, GROUP_ORDER, STAGE_GROUP } from "./stage";
 
 /**
@@ -59,23 +59,27 @@ export function groupDeals<T extends Pick<TransferDeal, "stage">>(
 
 /**
  * 보도 타임라인 정렬 — `credibility`는 공신력 높은 순(🎖️ > 🌕 … 🌑 > 등재되지 않은 출처), 같은 등급끼리는 최신순.
- * `latest`는 게시 시각 최신순이다.
+ * `latest`는 게시 시각 최신순이다. 등급은 배지와 같은 `credibilityOf`라 보도들이 붙은 딜(`deal`)을 함께 받는다.
  * ⚠ 시계를 읽지 않는 순수 계산이라 서버 HTML과 하이드레이션의 순서가 같다 — 등급도 같은 JSON(`reporters.json`)에서 온다.
  * ⚠ 원본 배열을 바꾸지 않는다 — 쿼리 캐시의 배열이 그대로 들어온다.
  */
 export function sortReports<
   T extends Pick<TransferReport, "sourceId" | "attribution" | "attributedTo" | "publishedAt">,
->(reports: readonly T[], sort: ReportSort): T[] {
+>(reports: readonly T[], sort: ReportSort, deal: CredibilityDeal): T[] {
   // 시각으로 비교한다 — 문자열 비교는 같은 초 안의 "06+00:00"·"06.45+00:00"(소수 초를 생략한 표기)를 로케일 정렬 규칙에 따라 뒤집는다
   const latestFirst = (a: T, b: T) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt);
   if (sort === "latest") return reports.slice().sort(latestFirst);
-  const rank = new Map(reports.map((r) => [r, credibilityRank(credibilityOf(r))]));
+  const rank = new Map(reports.map((r) => [r, credibilityRank(credibilityOf(r, deal))]));
   return reports.slice().sort((a, b) => (rank.get(b) ?? 0) - (rank.get(a) ?? 0) || latestFirst(a, b));
 }
 
 /** 가장 최근 보도의 id — 레일의 잉크 점은 정렬과 무관하게 이 보도 하나다(`ReportItem`). 상세와 판이 같은 보도에 점을 찍는다 */
-export function newestReportId<T extends Pick<TransferReport, "id" | "publishedAt" | "sourceId" | "attribution" | "attributedTo">>(
+export function newestReportId<T extends Pick<TransferReport, "id" | "publishedAt">>(
   reports: readonly T[] | undefined,
 ): T["id"] | undefined {
-  return reports ? sortReports(reports, "latest")[0]?.id : undefined;
+  // 같은 시각이면 앞의 것 — `sortReports(…, "latest")`의 안정 정렬과 같은 보도를 고른다
+  return reports?.reduce<T | undefined>(
+    (newest, r) => (newest === undefined || Date.parse(r.publishedAt) > Date.parse(newest.publishedAt) ? r : newest),
+    undefined,
+  )?.id;
 }

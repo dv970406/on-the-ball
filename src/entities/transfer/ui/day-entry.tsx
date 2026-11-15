@@ -51,6 +51,7 @@ export function DayEntry({ entry }: DayEntryProps) {
           <ReportItem
             key={report.id}
             report={report}
+            deal={deal}
             latest={i === 0 && Date.parse(report.publishedAt) === Date.parse(deal.latestReportedAt)}
             nowMs={null}
             clock

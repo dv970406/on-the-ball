@@ -119,6 +119,7 @@ export function DealPanel({ deal, userId, nowMs, active, onSignInRequired }: Dea
           className="mt-7"
           title={<h3 className="section-title">보도 흐름</h3>}
           reports={reports.data}
+          deal={deal}
           error={reports.error}
           onRetry={() => reports.refetch()}
           nowMs={nowMs}
@@ -172,7 +173,7 @@ export function DealPanel({ deal, userId, nowMs, active, onSignInRequired }: Dea
           {latest !== undefined && latest.length > 0 && (
             <ol className="mt-1">
               {latest.map((report) => (
-                <ReportItem key={report.id} report={report} latest={report.id === newestId} nowMs={nowMs} />
+                <ReportItem key={report.id} report={report} deal={deal} latest={report.id === newestId} nowMs={nowMs} />
               ))}
             </ol>
           )}

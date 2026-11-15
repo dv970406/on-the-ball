@@ -1,4 +1,4 @@
-import { credibilityOf } from "./credibility";
+import { type CredibilityDeal, credibilityOf } from "./credibility";
 import type { TransferDealListItem, TransferSort } from "../model/types";
 
 /** 최신 보도가 이보다 오래된 루머는 "식은 루머"다 — 기본으로 접는다 */
@@ -19,11 +19,11 @@ export function isStaleRumor(deal: Pick<TransferDealListItem, "latestReportedAt"
  * ⚠ `nowMs`를 인자로 받는다(`pickRecentRumors`와 같은 이유) — 렌더 중 시계를 읽지 않는다.
  */
 export function rumorHeat(
-  deal: Pick<TransferDealListItem, "reportCount" | "latestReport" | "latestReportedAt">,
+  deal: Pick<TransferDealListItem, "reportCount" | "latestReport" | "latestReportedAt"> & CredibilityDeal,
   nowMs: number | null,
 ): number {
   let heat = Math.min(deal.reportCount, 5) * 2;
-  const c = deal.latestReport === null ? null : credibilityOf(deal.latestReport);
+  const c = deal.latestReport === null ? null : credibilityOf(deal.latestReport, deal);
   if (c !== null) heat += c.kind === "medal" ? 3 : c.level >= 4 ? 2 : c.level === 3 ? 1 : 0;
   if (nowMs !== null) {
     const age = nowMs - new Date(deal.latestReportedAt).getTime();
@@ -42,7 +42,9 @@ export function rumorHeat(
  *
  * 접힌 행도 HTML에는 남긴다(`hidden`) — 색인 화면의 본문 SSR·구간 점프·스크롤 복원이 그대로다(`nextjs.md`의 탭 규약과 같다).
  */
-export function splitHotRumors<T extends Pick<TransferDealListItem, "reportCount" | "latestReport" | "latestReportedAt">>(
+export function splitHotRumors<
+  T extends Pick<TransferDealListItem, "reportCount" | "latestReport" | "latestReportedAt"> & CredibilityDeal,
+>(
   deals: readonly T[],
   nowMs: number | null,
   sort: TransferSort,

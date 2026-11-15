@@ -30,7 +30,7 @@ export function pickRecentRumors(
       return (
         !isDeadStage(deal.stage) &&
         report !== null &&
-        isTopCredibility(credibilityOf(report)) &&
+        isTopCredibility(credibilityOf(report, deal)) &&
         new Date(report.publishedAt).getTime() >= since
       );
     })

@@ -1,13 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { type ReportSort, type TransferReport, ReportItem, sortReports, newestReportId } from "@/entities/transfer";
+import { type ReportSort, type TransferDeal, type TransferReport, ReportItem, sortReports, newestReportId } from "@/entities/transfer";
 import { cn } from "@/shared/lib";
 import { Skeleton, StaleBanner } from "@/shared/ui";
 
 interface ReportTimelineProps {
   /** `undefined`면 아직 받지 못한 것(로딩 또는 실패) — `[]`는 "받았는데 없다" */
   reports: TransferReport[] | undefined;
+  /** 보도들이 붙은 딜 — 공신력(배지·공신력순 정렬)이 이 딜의 구단으로 범위 등급을 푼다 */
+  deal: TransferDeal;
   /** 타임라인 조회 실패 — 본문은 그대로 두고 이 자리에서만 알린다 */
   error: Error | null;
   onRetry: () => void;
@@ -37,9 +39,9 @@ const SORT_OPTIONS: { key: ReportSort; label: string }[] = [
  * ⚠ **제목 줄이 없다** — 좁은 화면에서는 탭이, 넓은 화면에서는 뷰가 단 제목이 제목과 건수를 대신한다.
  *   패널의 접근성 이름도 탭이 준다(`aria-labelledby` — 뷰가 패널을 감싼다).
  */
-export function ReportTimeline({ reports, error, onRetry, nowMs }: ReportTimelineProps) {
+export function ReportTimeline({ reports, deal, error, onRetry, nowMs }: ReportTimelineProps) {
   const [sort, setSort] = useState<ReportSort>("credibility");
-  const sorted = useMemo(() => (reports ? sortReports(reports, sort) : undefined), [reports, sort]);
+  const sorted = useMemo(() => (reports ? sortReports(reports, sort, deal) : undefined), [reports, sort, deal]);
   // 레일의 잉크 점 — 정렬과 무관하게 가장 최근 보도 하나(서버가 최신순으로 주지만 순서에 기대지 않는다)
   const latestId = useMemo(() => newestReportId(reports), [reports]);
 
@@ -96,7 +98,7 @@ export function ReportTimeline({ reports, error, onRetry, nowMs }: ReportTimelin
         // lg 높이 상한 — 스크롤 영역(`<main>`, lg에서 크기 컨테이너)의 70%라 박스가 늘 한 화면 안에 든다
         <ol className="lg:max-h-[70cqh] lg:overflow-y-auto">
           {sorted.map((report) => (
-            <ReportItem key={report.id} report={report} latest={report.id === latestId} nowMs={nowMs} />
+            <ReportItem key={report.id} report={report} deal={deal} latest={report.id === latestId} nowMs={nowMs} />
           ))}
         </ol>
       )}

@@ -10,8 +10,9 @@
  */
 import { extractTransfer } from "./lib/transfer/extract.mjs";
 import { existsSync, readFileSync } from "node:fs";
-import { detectClubs, isKnownClub } from "./lib/transfer/clubs.mjs";
-import { clubDisplay, presetClubs } from "./lib/transfer/club-display.mjs";
+import { detectClubs, isKnownClub, knownClubNames } from "./lib/transfer/clubs.mjs";
+import { clubCode, clubDisplay, presetClubs } from "./lib/transfer/club-display.mjs";
+import { slugify } from "./lib/sync-db.mjs";
 import { normalizePlayer } from "./lib/transfer/derive-deals.mjs";
 import { SOURCES } from "./lib/transfer/registry.mjs";
 
@@ -331,18 +332,43 @@ for (const [wrong, right] of Object.entries(glossary.corrections ?? {})) {
   }
 }
 
-// reporters.json credibility — 매체는 소스 id(registry)로, 기자는 보도 주체 표기로 매긴다. 값은 "medal" 또는 1~5
+// reporters.json credibility — 매체는 소스 id(registry)로, 기자는 보도 주체 표기로 매긴다. 값은 "medal" 또는 1~5,
+// 또는 범위 등급 { default, leagues?, clubs? } — 리그 키는 프리셋의 5대 리그 이름, 구단 키는 transfer_club.code
+// (프리셋 구단은 그 code, 프리셋 밖 구단은 구단 사전 정규명의 slugify — 딜 파생이 코드를 만드는 규칙과 같다).
+// 모르는 키는 어느 딜에도 맞지 않아 조용히 default로 떨어진다 — 그래서 여기서 막는다.
 {
   const rep = readJson("./lib/transfer/reporters.json");
   const cred = rep.credibility ?? {};
+  const clubCodes = new Set(knownClubNames().map((name) => clubCode(name) ?? slugify(name)));
+  const isGrade = (v, medal) => (medal && v === "medal") || (Number.isInteger(v) && v >= 1 && v <= 5);
+  /** 등급 하나 또는 범위 등급의 형식 — 틀린 곳을 문장으로 돌려준다(맞으면 null) */
+  const gradeProblem = (v, medal) => {
+    const allowed = medal ? `"medal" 또는 1~5` : "1~5";
+    if (v === null || typeof v !== "object" || Array.isArray(v)) return isGrade(v, medal) ? null : `${allowed} 또는 범위 등급`;
+    const extra = Object.keys(v).filter((k) => !["default", "leagues", "clubs"].includes(k));
+    if (extra.length) return `범위 등급의 키는 default·leagues·clubs뿐이다(${extra.join(",")})`;
+    if (!isGrade(v.default, medal)) return `범위 등급의 default가 ${allowed}가 아니다`;
+    if (v.leagues === undefined && v.clubs === undefined) return "범위가 없는 범위 등급 — 숫자 하나로 적는다";
+    for (const [lg, g] of Object.entries(v.leagues ?? {})) {
+      if (!LEAGUES.includes(lg)) return `leagues["${lg}"]: 5대 리그 이름(${LEAGUES.join("·")})이 아니다`;
+      if (!isGrade(g, medal)) return `leagues["${lg}"]: ${allowed}`;
+    }
+    for (const [code, g] of Object.entries(v.clubs ?? {})) {
+      if (!clubCodes.has(code)) return `clubs["${code}"]: 구단 코드가 아니다(프리셋 code 또는 구단 사전 정규명의 slugify)`;
+      if (!isGrade(g, medal)) return `clubs["${code}"]: ${allowed}`;
+    }
+    return null;
+  };
   const names = new Set([...Object.values(rep.journalists), ...Object.values(rep.sources), ...Object.values(rep.bylines ?? {})]);
   for (const [id, v] of Object.entries(cred.outlets ?? {})) {
     if (!SOURCES.some((s) => s.id === id)) bad(`reporters.json credibility.outlets["${id}"]는 registry에 없는 소스다`);
-    if (v !== "medal" && !(Number.isInteger(v) && v >= 1 && v <= 5)) bad(`reporters.json credibility.outlets["${id}"]: "medal" 또는 1~5`);
+    const problem = gradeProblem(v, true);
+    if (problem) bad(`reporters.json credibility.outlets["${id}"]: ${problem}`);
   }
   for (const [name, v] of Object.entries(cred.journalists ?? {})) {
     if (!names.has(name) && !Object.values(rep.cited ?? {}).some((c) => c.ko === name)) bad(`reporters.json credibility.journalists["${name}"]: journalists·sources·cited에 없는 보도 주체 표기다(아무 보도에도 붙지 않는다)`);
-    if (!(Number.isInteger(v) && v >= 1 && v <= 5)) bad(`reporters.json credibility.journalists["${name}"]: 1~5`);
+    const problem = gradeProblem(v, false);
+    if (problem) bad(`reporters.json credibility.journalists["${name}"]: ${problem}`);
   }
   // cited — 가십 칼럼이 인용한 신문. 키는 접힌 표기(소문자·앞의 the와 영숫자 아닌 글자 제거 — 규칙은 reporter.ts의 citedKey),
   // 등급은 1~5뿐이다(칼럼이 옮겨 적은 글이라 🎖️는 없다). 등급을 비우면 ko 표기가 credibility.journalists에 있거나 `unrated: true`(등급 없이 표기만)여야 한다.
@@ -353,7 +379,7 @@ for (const [wrong, right] of Object.entries(glossary.corrections ?? {})) {
     else if (c.credibility === undefined) {
       // unrated — 근거가 약해 등급을 매기지 않은 매체(표기만). 등급을 잊은 항목과 가르려고 명시한다
       if (!c.unrated && !(c.ko in (cred.journalists ?? {}))) bad(`reporters.json cited["${key}"]: 등급이 없으면 ko("${c.ko}")가 credibility.journalists에 있거나 unrated: true여야 한다`);
-    } else if (!(Number.isInteger(c.credibility) && c.credibility >= 1 && c.credibility <= 5)) bad(`reporters.json cited["${key}"]: credibility는 1~5("medal" 없음)`);
+    } else if (gradeProblem(c.credibility, false)) bad(`reporters.json cited["${key}"]: credibility — ${gradeProblem(c.credibility, false)}("medal" 없음)`);
   }
 }
 

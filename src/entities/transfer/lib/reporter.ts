@@ -1,5 +1,6 @@
 import reporters from "../../../../scripts/lib/transfer/reporters.json";
 import type { TransferReport } from "../model/types";
+import type { GradeEntry } from "./credibility";
 
 /**
  * 보도 주체 표기의 **단일 소스는 `scripts/lib/transfer/reporters.json`**이다 — 파이프라인(요약 등)과
@@ -16,10 +17,13 @@ const SOURCES: Record<string, string> = reporters.sources;
 /** RSS 기사의 기자 이름(byline) → 표기. 등재된 기자면 매체보다 먼저다 */
 export const BYLINES: Record<string, string> = reporters.bylines;
 
-/** 인용된 신문 한 곳의 표기·등급 — 등급이 비면 `credibility.journalists`를 표기로 찾는다(기자를 인용한 항목) */
+/**
+ * 인용된 신문 한 곳의 표기·등급 — 등급이 비면 `credibility.journalists`를 표기로 찾는다(기자를 인용한 항목).
+ * 등급은 1~5 또는 범위 등급(구단·리그마다 다른 등급 — `credibility.ts`의 `GradeEntry`)이다.
+ */
 export interface CitedOutlet {
   ko: string;
-  credibility?: number;
+  credibility?: GradeEntry;
 }
 const CITED: Record<string, CitedOutlet> = reporters.cited;
 
@@ -39,7 +43,19 @@ function citedKey(outlet: string): string {
 export function citedOutletOf(report: Pick<TransferReport, "attribution" | "attributedTo">): CitedOutlet | undefined {
   if (report.attribution !== "cited" || report.attributedTo === null) return undefined;
   // "Gazzetta dello Sport via Glasgow Times"는 앞 신문의 보도를 뒤 매체가 옮긴 것 — 원 보도 주체는 앞이다
-  return CITED[citedKey(report.attributedTo)] ?? CITED[citedKey(report.attributedTo.split(/\s+via\s+/iu)[0])];
+  const origin = report.attributedTo.split(/\s+via\s+/iu)[0];
+  return [report.attributedTo, ...citedTailVariants(origin)].map((o) => CITED[citedKey(o)]).find((c) => c !== undefined);
+}
+
+/**
+ * 칼럼이 신문 표기 뒤에 붙이는 꼬리를 하나씩 걷은 표기들 — 링크 표시(", external") → 경로(" on X"·" on Patreon") →
+ * 언어(" – in Spanish"·", in Catalan"). 꼬리째 접으면 "Marca – in Spanish"가 등재된 마르카에 닿지 않아 등급이 빠졌다(운영 실측).
+ * ⚠ 단계마다 찾는다 — 경로 꼬리가 키의 일부인 항목이 있다("Alan Nixon on Patreon" → `alannixononpatreon`).
+ */
+function citedTailVariants(outlet: string): string[] {
+  const linkless = outlet.replace(/,\s*external$/iu, "");
+  const pathless = linkless.replace(/\s+on\s+(?:X|Twitter|Patreon|Instagram)$/iu, "");
+  return [outlet, linkless, pathless, pathless.replace(/\s*[,–-]\s*in\s+[A-Za-z]+$/u, "")];
 }
 
 /**

@@ -150,7 +150,7 @@ export const DealRow = memo(function DealRow({ deal, nowMs, hidden, reportScale,
             <span className="ml-auto inline-flex shrink-0 items-center gap-[5px] whitespace-nowrap text-ink-mute">
               {report && (
                 <>
-                  <CredibilityBadge report={report} />
+                  <CredibilityBadge report={report} deal={deal} />
                   {reporterName(report)}
                 </>
               )}

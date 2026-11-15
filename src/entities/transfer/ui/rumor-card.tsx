@@ -60,7 +60,7 @@ export const RumorCard = memo(function RumorCard({ deal, report, nowMs, priority
         className="block rounded-lg border border-hairline bg-canvas px-4 py-3.5 transition-colors duration-150 ease-otb active:bg-canvas-soft"
       >
         <div className="flex items-center gap-[7px] text-[12px] text-ink">
-          <CredibilityBadge report={report} />
+          <CredibilityBadge report={report} deal={deal} />
           <span className="truncate font-medium">{reporterName(report)}</span>
           <time
             dateTime={report.publishedAt}
