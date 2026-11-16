@@ -14,7 +14,7 @@ import { prefetchedRows } from "@/shared/api/prefetch";
 /**
  * 사이트맵.
  *
- * ⚠ **홈(`/`)을 넣지 않는다.** `app/page.tsx`가 `/transfers`로 리다이렉트하는데, 사이트맵에 실린
+ * ⚠ **홈(`/`)을 넣지 않는다.** `/`는 `/transfers`로 리다이렉트되는데(`next.config.ts`의 `redirects`), 사이트맵에 실린
  *   URL이 리다이렉트면 Search Console이 "리다이렉션이 있는 페이지"로 제외 처리한다.
  *   목적지인 `/transfers`가 이미 들어 있으므로 잃는 것이 없다.
  *

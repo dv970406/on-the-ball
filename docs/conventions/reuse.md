@@ -242,7 +242,7 @@
   ⚠ 서비스 소개·개인정보처리방침은 `ROUTES.about`(`/about`)·`ROUTES.privacy`(`/privacy`)다 — 조회 없는 정적 문서 화면(서브헤더 화면, 탭바 없음)이다. 개인정보처리방침은 **실제로 수집하는 항목만** 적는다 — 수집 항목·외부 서비스(위탁사)가 바뀌는 작업을 하면 그 문서(`views/privacy`)도 함께 고치고 시행일을 올린다.
   ⚠ 예측 랭킹은 `ROUTES.ranking`(`/ranking`)이다 — 탭이 아니라 서브헤더 화면이라 `activeTabHref`·`hasBottomBar`에 없다(데스크톱 상단 바의 내비에는 있다 — `activeNavHref`).
   ⚠ 이적시장은 **`ROUTES.transferList`**(`/transfers`) · `ROUTES.transfer(id)`(`/transfers/[id]`)다. 상세에는 탭바가 없다 — `activeTabHref`가 목록 경로만 센다.
-  ⚠ `ROUTES.home`(`/`)은 화면이 아니라 이적시장으로의 리다이렉트다(`app/page.tsx`) — 링크 목적지로 쓰지 말고 실제 화면 경로를 쓴다.
+  ⚠ `ROUTES.home`(`/`)은 화면이 아니라 이적시장으로의 리다이렉트다(`next.config.ts`의 `redirects`) — 링크 목적지로 쓰지 말고 실제 화면 경로를 쓴다.
 - **`boardScopeStartIso(nowMs)`** — 보드 범위 시작(분 단위 ISO). 보드와 구단 화면의 쿼리 키·조회 조건이 이 값 하나를 본다 — page가 각자 내리지 않는다.
 - **`LG_MEDIA_QUERY`** — `lg:`와 같은 단위의 미디어 쿼리 문자열. **`SHARED_DATA_TTL_SECONDS`** — 익명 Data Cache와 TanStack `staleTime`이 함께 쓰는 수명.
 - **`openTransferWindow(nowMs)` / `trackedTransferWindow(nowMs)` / `boardScopeStartMs(nowMs)`**(`transfer-window.ts`) — 이적 창 일정. 창의 기간은 리그별 일정을 합친 것이다(개장 = 가장 먼저 여는 리그, 마감 = 가장 늦게 닫는 리그). `openTransferWindow`는 **지금 열려 있는 창**(없으면 `null`) — 헤더의 "마감까지" 카운트다운은 이 값이 있을 때만 그리고 마감에 닿으면 스스로 사라진다. `trackedTransferWindow`는 보드가 추적하는 창(개장한 가장 최근 창 — 창 사이에는 방금 닫힌 창)으로 헤더의 창 이름이 쓰고, `boardScopeStartMs`는 그 창의 개장 시각(보드에 실을 딜의 하한)이다. ⚠ **단일 소스는 `scripts/lib/transfer/windows.json`** 이다 — 딜 파생 스크립트(Node)가 이 TS를 import할 수 없어 JSON이 원본이고, 이 파일은 그 JSON을 그대로 읽는다. **시즌마다 사람이 갱신한다**(`api-and-db.md`의 운영 JSON 절).

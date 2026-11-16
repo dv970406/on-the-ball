@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { NextConfig } from "next";
+// 설정 파일은 경로 별칭(`@/`)을 풀지 못한다 — 의존이 없는 순수 상수 파일이라 상대 경로로 가져온다
+import { ROUTES } from "./src/shared/config/routes";
 
 /**
  * 엠블럼 폴더의 **내용 지문** — 엠블럼 주소에 `?v=`로 붙는다(`TransferCrest`). 파일을 더하거나 바꾸면 값이 바뀌어 주소가 바뀐다.
@@ -44,6 +46,19 @@ const nextConfig: NextConfig = {
       "./app/icon.svg",
       "./app/opengraph-image.png",
     ],
+  },
+
+  /*
+   * `/`는 화면이 아니라 이적시장으로의 리다이렉트다(`nextjs.md` 라우트 그룹 절).
+   *
+   * ⚠ **page(`redirect()`)가 아니라 여기에 둔다.** 설정 리다이렉트는 proxy보다 먼저 판정돼 함수를 하나도 거치지 않는다 —
+   *   page에 두면 캐시된 307인데도 proxy 함수를 먼저 타서, 함수가 식어 있을 때 첫 진입이 그 콜드 스타트만큼 늦다
+   *   (운영 실측: 식은 상태 742ms · 데워진 상태 약 110ms, 정적 응답은 약 20ms).
+   * ⚠ `permanent: false`(307)다 — 진입 화면은 바뀔 수 있는데 308은 브라우저가 영구히 기억한다.
+   * 쿼리는 목적지로 그대로 넘어간다(공유 주소의 UTM이 남는다).
+   */
+  async redirects() {
+    return [{ source: ROUTES.home, destination: ROUTES.transferList, permanent: false }];
   },
 
   async headers() {
