@@ -16,7 +16,7 @@ import type { Comment } from "@/entities/comment";
 import { isReplyTargetMissing, useWriteComment, validateComment } from "@/features/write-comment";
 
 /** 답글 대상 — 입력칸의 자리와 placeholder(`{닉네임}님에게 답글`)를 정한다 */
-export interface ReplyTarget {
+interface ReplyTarget {
   commentId: number;
   nickname: string;
 }

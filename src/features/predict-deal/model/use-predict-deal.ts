@@ -7,7 +7,7 @@ import { applyPick, myPickOf, predictionKeys, recordSettledPick, type DealPredic
 import { useSessionStore } from "@/entities/session";
 import { transferKeys } from "@/entities/transfer";
 
-export interface PredictDealVariables extends PickMutationVariables {
+interface PredictDealVariables extends PickMutationVariables {
   /**
    * 누른 사람 — 낙관적 갱신·롤백은 **이 사용자의 캐시 하나만** 건드린다(내 표가 "내 행만"이라 키가 사용자별이다).
    * 누른 뒤 계정이 바뀌면 요청을 보내지 않는다.

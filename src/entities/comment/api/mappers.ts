@@ -24,7 +24,7 @@ export const COMMENT_SELECT =
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 
 /** COMMENT_SELECT가 돌려주는 행의 형태 — 컬럼 타입은 생성 타입에서 뽑는다 */
-export type CommentSelectRow = Pick<
+type CommentSelectRow = Pick<
   CommentRow,
   | "id"
   | "deal_id"
@@ -44,7 +44,7 @@ function toVote(value: number | undefined): CommentVote {
   return value === 1 || value === -1 ? value : 0;
 }
 
-export function buildComment(row: CommentSelectRow): Comment {
+function buildComment(row: CommentSelectRow): Comment {
   const myVote = toVote(row.my_vote[0]?.value);
   return {
     id: row.id,

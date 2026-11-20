@@ -11,7 +11,7 @@ import { useSessionStore } from "@/entities/session";
  * ⚠ 두 값은 **함께** 검사해야 한다. 판정은 `lengthOverflow`가 소유한다.
  *   규약은 `docs/conventions/api-and-db.md`의 "길이 한도는 두 단위로 겹쳐 건다".
  */
-export const COMMENT_LIMIT: TextLimit = { grapheme: 300, codePoint: 3000 };
+const COMMENT_LIMIT: TextLimit = { grapheme: 300, codePoint: 3000 };
 
 /**
  * 댓글 입력 검증 — 통과하면 `null`, 아니면 사용자에게 보일 한국어 문구.
@@ -47,7 +47,7 @@ export function isReplyTargetMissing(error: Error | null): boolean {
   return error?.message === REPLY_TARGET_MISSING_MESSAGE;
 }
 
-export interface WriteCommentInput {
+interface WriteCommentInput {
   content: string;
   /** null = 루트 댓글. 깊이 1 제한은 DB 트리거가 P0001로 거부한다(사유가 그대로 노출된다) */
   parentId: number | null;

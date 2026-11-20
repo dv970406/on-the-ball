@@ -7,7 +7,7 @@ import {
 import type { BoardGroup } from "../model/use-transfer-board";
 
 /** 진행 중 구간의 소구간 하나(합의 임박·협상 중) — `splitProgress`의 반환 원소 */
-export type ProgressSubgroup = ReturnType<typeof splitProgress<TransferDealListItem>>[number];
+type ProgressSubgroup = ReturnType<typeof splitProgress<TransferDealListItem>>[number];
 
 /** 구간 하나가 화면에 놓이는 모양 — `BoardSections`가 이대로 그리고, 오른쪽 판의 기본 선택이 `ordered`를 본다 */
 export interface GroupLayout {

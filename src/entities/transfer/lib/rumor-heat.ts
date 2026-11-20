@@ -2,14 +2,14 @@ import { type CredibilityDeal, credibilityOf } from "./credibility";
 import type { TransferDealListItem, TransferSort } from "../model/types";
 
 /** 최신 보도가 이보다 오래된 루머는 "식은 루머"다 — 기본으로 접는다 */
-export const RUMOR_STALE_MS = 7 * 24 * 60 * 60 * 1000;
+const RUMOR_STALE_MS = 7 * 24 * 60 * 60 * 1000;
 /** 루머 구간에서 기본으로 펼쳐 보이는 건수 — 나머지는 "더 보기" 뒤에 있다 */
 export const HOT_RUMORS_DEFAULT = 10;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** 최신 보도가 `RUMOR_STALE_MS`보다 오래됐는가. `nowMs`가 없으면(서버 시각 없는 첫 프레임) 식었다고 보지 않는다 */
-export function isStaleRumor(deal: Pick<TransferDealListItem, "latestReportedAt">, nowMs: number | null): boolean {
+function isStaleRumor(deal: Pick<TransferDealListItem, "latestReportedAt">, nowMs: number | null): boolean {
   return nowMs !== null && nowMs - new Date(deal.latestReportedAt).getTime() > RUMOR_STALE_MS;
 }
 
@@ -18,7 +18,7 @@ export function isStaleRumor(deal: Pick<TransferDealListItem, "latestReportedAt"
  * 가십 칼럼의 한 줄에서 나온 보도 1건짜리(대부분)는 낮고, 여러 매체가 이어 쓰거나 🎖️·🌕 출처가 쓴 루머가 높다.
  * ⚠ `nowMs`를 인자로 받는다(`pickRecentRumors`와 같은 이유) — 렌더 중 시계를 읽지 않는다.
  */
-export function rumorHeat(
+function rumorHeat(
   deal: Pick<TransferDealListItem, "reportCount" | "latestReport" | "latestReportedAt"> & CredibilityDeal,
   nowMs: number | null,
 ): number {

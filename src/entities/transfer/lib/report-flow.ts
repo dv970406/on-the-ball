@@ -17,7 +17,7 @@ export const REPORT_FLOW_RANGE_LABEL: Record<ReportFlowRange, string> = {
   all: "전체",
 };
 
-export interface ReportFlowDay {
+interface ReportFlowDay {
   /** 한국 시각 날짜의 일련번호(1970-01-01부터) */
   day: number;
   /** `10/2` */
@@ -28,7 +28,7 @@ export interface ReportFlowDay {
   other: number;
 }
 
-export interface ReportFlow {
+interface ReportFlow {
   days: ReportFlowDay[];
   total: number;
   top: number;

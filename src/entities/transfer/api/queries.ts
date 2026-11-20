@@ -66,7 +66,7 @@ interface UseTransferDealListQueryArgs extends PrefetchFreshness {
  *   (호출부가 그 판정을 갖는다).
  * ⚠ `initialData`의 **키 `userId`·`scopeStartIso`도 서버가 준 값이어야 한다.**
  */
-export function useTransferDealListQuery({
+function useTransferDealListQuery({
   userId,
   scopeStartIso,
   enabled = true,

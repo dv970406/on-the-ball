@@ -3,7 +3,7 @@ import type { DealPrediction, PredictionTally } from "../model/types";
 /**
  * 비율을 보여 주는 최소 표 수 — 그보다 적으면 표 수만 그린다. 세 표 중 두 표를 "67%"로 그리면 팬 다수의 의견처럼 읽힌다.
  */
-export const MIN_VOTES_FOR_SHARE = 5;
+const MIN_VOTES_FOR_SHARE = 5;
 
 /** 한 회차의 집계 — 표가 없으면 0 */
 export function tallyOf(prediction: DealPrediction | undefined, roundKey: string): PredictionTally {
@@ -40,7 +40,7 @@ export function yesShare(tally: PredictionTally): number | null {
  * 표 하나를 옮긴 집계 — 낙관적 갱신이 쓴다. `from`이 `null`이면 새 표, 같으면 그대로다.
  * ⚠ 0 밑으로 내려가지 않는다 — 캐시가 낡아 내 표가 집계에 아직 없을 수 있다(다음 조회가 맞춘다).
  */
-export function moveVote(tally: PredictionTally, from: boolean | null, to: boolean): PredictionTally {
+function moveVote(tally: PredictionTally, from: boolean | null, to: boolean): PredictionTally {
   if (from === to) return tally;
   const next = { ...tally };
   if (from === true) next.yes = Math.max(0, next.yes - 1);

@@ -22,7 +22,7 @@ export interface PredictionTally {
 }
 
 /** 내 표 하나 */
-export interface MyPrediction {
+interface MyPrediction {
   roundKey: PredictionRow["round_key"];
   /** true = 성사 · false = 불발 */
   willHappen: PredictionRow["will_happen"];

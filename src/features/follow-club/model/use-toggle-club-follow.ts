@@ -6,7 +6,7 @@ import { track, useToast } from "@/shared/lib";
 import { useSessionStore } from "@/entities/session";
 import { compareClubs, transferKeys, type TransferClub } from "@/entities/transfer";
 
-export interface ToggleClubFollowVariables {
+interface ToggleClubFollowVariables {
   club: TransferClub;
   /** 지금 응원 구단인가 — `true`면 풀고(delete), `false`면 고른다(insert) */
   following: boolean;

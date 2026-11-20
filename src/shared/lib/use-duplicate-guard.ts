@@ -7,13 +7,13 @@ import { useEffect, useRef } from "react";
  *
  * ⚠ **`isPending`(boolean)을 받지 않는 이유가 이 훅의 핵심이다.** 아래 해제 절 참고.
  */
-export interface GuardedMutation {
+interface GuardedMutation {
   status: "idle" | "pending" | "success" | "error";
   /** 시도할 때마다 새로 찍히는 시각. 같은 결과가 연속돼도 이 값이 달라진다 */
   submittedAt: number;
 }
 
-export interface DuplicateGuard {
+interface DuplicateGuard {
   /** 이미 진행 중인가. **이벤트 핸들러 안에서만** 부른다(렌더 중 ref 읽기 금지) */
   isLocked: () => boolean;
   /** 잠근다. 뮤테이션이 끝나는 렌더에서 저절로 풀린다 */

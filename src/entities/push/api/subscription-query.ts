@@ -5,7 +5,7 @@ import type { Database } from "@/types/database.types";
  * 구독 한 건의 select — **클라이언트가 읽을 수 있는 것은 이 컬럼뿐이다.** 암호화 키(`p256dh`·`auth`)는 SELECT grant가
  * 없어(발송만 읽는다) 실으면 42501이다.
  */
-export const OWN_SUBSCRIPTION_SELECT = "endpoint" as const;
+const OWN_SUBSCRIPTION_SELECT = "endpoint" as const;
 
 /**
  * "이 주소의 구독이 **내 행으로** 서버에 있는가" — 알림 상태 조회와 알림 켜기(남의 구독을 넘겨받지 않기)가 같은 판정을 쓴다.

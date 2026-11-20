@@ -9,7 +9,7 @@ import { env } from "@/shared/config";
  *
  * ⚠ 화면 조회(`page_view`)는 여기 없다 — gtag가 주소 변화를 스스로 센다(보드 필터의 `pushState`도 포함).
  */
-export interface AnalyticsEvents {
+interface AnalyticsEvents {
   /** 소셜 로그인 버튼을 눌러 프로바이더로 넘어간다 */
   sign_in_start: { method: string };
   /** 로그인이 끝나 목적지로 이동한다(GA4 권장 이벤트) */

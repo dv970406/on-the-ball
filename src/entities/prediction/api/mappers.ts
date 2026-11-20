@@ -29,9 +29,9 @@ export const SCORE_SELECT =
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 
-export type TallySelectRow = Pick<PredictionTallyRow, "round_key" | "yes_count" | "no_count">;
+type TallySelectRow = Pick<PredictionTallyRow, "round_key" | "yes_count" | "no_count">;
 export type MyPredictionSelectRow = Pick<PredictionRow, "round_key" | "will_happen">;
-export type ScoreSelectRow = Pick<PredictionScoreRow, "user_id" | "points" | "hits" | "scored" | "rank"> & {
+type ScoreSelectRow = Pick<PredictionScoreRow, "user_id" | "points" | "hits" | "scored" | "rank"> & {
   profile: Pick<ProfileRow, "nickname" | "avatar_path"> | null;
 };
 

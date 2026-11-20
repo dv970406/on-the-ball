@@ -6,7 +6,7 @@ import { track, useToast } from "@/shared/lib";
 import { useSessionStore } from "@/entities/session";
 import { transferKeys, type TransferDeal, type TransferDealListItem } from "@/entities/transfer";
 
-export interface ToggleWatchVariables {
+interface ToggleWatchVariables {
   dealId: number;
   /** 지금 관심 상태 — `true`면 빼고(delete), `false`면 담는다(insert) */
   watched: boolean;

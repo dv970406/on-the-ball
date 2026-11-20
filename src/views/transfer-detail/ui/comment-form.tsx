@@ -19,7 +19,7 @@ interface CommentFormProps {
 }
 
 /** 입력칸 외곽 — 44px · 1px 선 · radius 8, 포커스 시 잉크 선. 비로그인 트리거와 공유한다 */
-export const COMMENT_FIELD_BOX =
+const COMMENT_FIELD_BOX =
   "flex h-11 items-center gap-1.5 rounded-md border border-hairline-strong bg-canvas pl-3 pr-1 transition-colors duration-150 ease-otb";
 
 /**
@@ -27,7 +27,7 @@ export const COMMENT_FIELD_BOX =
  * 에메랄드를 하나 더 칠하지 않는다(styling.md "한 화면의 에메랄드는 하나"). 빈 값이면 꺼진다.
  * 누르는 영역은 최소 폭 44 + `hit-area`가 위아래로만 넓혀 44px를 채운다(폭이 이미 44 이상이라 옆 `취소`를 덮지 않는다).
  */
-export const COMMENT_SUBMIT =
+const COMMENT_SUBMIT =
   "hit-area h-[34px] min-w-11 shrink-0 whitespace-nowrap rounded-sm bg-ink px-3 text-[13px] font-medium text-white transition-colors duration-150 ease-otb disabled:bg-canvas-soft disabled:text-ink-faint";
 
 /**

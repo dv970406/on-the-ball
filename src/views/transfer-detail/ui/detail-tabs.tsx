@@ -5,7 +5,7 @@ import { cn } from "@/shared/lib";
 
 export type DetailTabKey = "comments" | "reports";
 
-export interface DetailTab {
+interface DetailTab {
   key: DetailTabKey;
   label: string;
   /** 탭 옆 건수 — 아직 모르면(로딩·실패) `null`이라 숫자를 그리지 않는다 */

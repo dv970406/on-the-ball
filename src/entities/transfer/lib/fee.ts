@@ -28,7 +28,7 @@ const CLAUSE_FEE_LABEL: Record<TransferLoanClause, { label: string; caption: str
 };
 
 /** 성격을 모르는 금액(규칙이 읽은 것)의 라벨 */
-export const UNKNOWN_FEE_KIND_LABEL = "추정 이적료";
+const UNKNOWN_FEE_KIND_LABEL = "추정 이적료";
 
 /**
  * 금액 칸의 제목 — 성격을 알면 그 라벨, 모르면 "추정 이적료". 조항 금액은 딜의 조항(`loanClause`)으로 옵션·의무를 가른다.
@@ -100,13 +100,13 @@ export function formatFee({
  *   못한 것이라, FA는 파생기가 문장에서 자유계약을 확인한 딜(`isFreeAgent`)에만 붙인다.
  *   "틀린 칸보다 빈 칸"(`api-and-db.md`) — 나머지는 "미공개"다.
  */
-export type FeeLabel =
+type FeeLabel =
   | { kind: "fee"; text: string }
   | { kind: "free"; text: string }
   | { kind: "unknown"; text: string };
 
-export const FREE_AGENT_LABEL = "FA(자유 계약)";
-export const UNDISCLOSED_FEE_LABEL = "미공개";
+const FREE_AGENT_LABEL = "FA(자유 계약)";
+const UNDISCLOSED_FEE_LABEL = "미공개";
 
 export function feeLabel(
   deal: Pick<TransferDeal, "feeAmount" | "feeCurrency" | "isFreeAgent">,
@@ -117,7 +117,7 @@ export function feeLabel(
   return { kind: "unknown", text: UNDISCLOSED_FEE_LABEL };
 }
 
-export interface FeeDeltaValue {
+interface FeeDeltaValue {
   direction: "up" | "down";
   /** `€10M` — 절댓값. 부호는 아이콘(`ArrowUp`/`ArrowDown`)이 진다 */
   text: string;

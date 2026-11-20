@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 
-export interface ItemGuard<K> {
+interface ItemGuard<K> {
   /**
    * 그 항목이 아직 처리 중이 아니면 잠그고 `task`를 실행한다. 끝나면(성공·실패 무관) 푼다.
    * 이미 처리 중이면 아무 일도 하지 않는다 — **이벤트 핸들러 안에서** 부른다.

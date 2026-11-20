@@ -12,7 +12,7 @@ interface UseRankingArgs {
 }
 
 /** "내 순위" 칸의 상태 — 비로그인에게는 칸이 없다(`none`) */
-export type MyRank =
+type MyRank =
   | { state: "none" | "loading" | "empty" }
   | { state: "ready"; score: PredictionScore }
   | { state: "error"; retry: () => void };

@@ -13,7 +13,7 @@
  */
 import { withoutAuthReturnParams } from "@/shared/config";
 
-export type ShareSource = "kakaotalk" | "share_sheet" | "link_copy";
+type ShareSource = "kakaotalk" | "share_sheet" | "link_copy";
 
 /** 공유로 들어왔다는 표식 — GA4가 이 값으로 공유 유입을 묶고, 딜 상세의 공유 담기 안내가 이 값으로 공유 방문을 알아본다 */
 export const SHARE_UTM_MEDIUM = "share";

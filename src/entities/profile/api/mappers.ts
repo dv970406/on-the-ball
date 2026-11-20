@@ -8,7 +8,7 @@ import type { MyProfile, ProfileRow } from "../model/types";
 export const PROFILE_SELECT = "id, nickname, avatar_path";
 
 /** PROFILE_SELECT가 돌려주는 행 — 컬럼 타입은 생성 타입에서 뽑는다 */
-export type ProfileSelectRow = Pick<ProfileRow, "id" | "nickname" | "avatar_path">;
+type ProfileSelectRow = Pick<ProfileRow, "id" | "nickname" | "avatar_path">;
 
 /** row(snake) → 도메인(camel) */
 export function buildProfile(row: ProfileSelectRow): MyProfile {

@@ -113,7 +113,7 @@ function toLeague(value: string | null): TransferLeague | null {
     : null;
 }
 
-export function buildClub(row: ClubSelectRow | null): TransferClub | null {
+function buildClub(row: ClubSelectRow | null): TransferClub | null {
   if (!row) return null;
   return {
     code: row.code,
@@ -141,7 +141,7 @@ export function buildClubList(rows: ClubSelectRow[]): TransferClub[] {
 }
 
 /** `FOLLOWED_CLUB_SELECT`가 돌려주는 행 */
-export interface FollowedClubSelectRow {
+interface FollowedClubSelectRow {
   club: ClubSelectRow | null;
 }
 
@@ -151,7 +151,7 @@ export function buildFollowedClubs(rows: FollowedClubSelectRow[]): TransferClub[
 }
 
 /** `REPORT_COLUMNS`가 돌려주는 행 — 컬럼 타입은 생성 타입에서 뽑는다 */
-export type ReportSelectRow = Pick<
+type ReportSelectRow = Pick<
   TransferNewsRow,
   | "id"
   | "deal_id"
@@ -199,7 +199,7 @@ export function buildReport(row: ReportSelectRow): TransferReport {
 }
 
 /** `LATEST_REPORT_COLUMNS`가 돌려주는 행 */
-export type LatestReportSelectRow = Pick<
+type LatestReportSelectRow = Pick<
   TransferNewsRow,
   "source_id" | "attribution" | "attributed_to" | "published_at" | "body_excerpt" | "summary_ko"
 >;
@@ -237,7 +237,7 @@ export function headlineReports<T extends Pick<TransferReport, "publishedAt" | "
 }
 
 /** `DEAL_DETAIL_SELECT`가 돌려주는 행 */
-export interface DealSelectRow extends Pick<
+interface DealSelectRow extends Pick<
   TransferDealRow,
   "id"
   | "player"
@@ -308,7 +308,7 @@ export function buildDeal(row: DealSelectRow): TransferDeal {
 }
 
 /** `DEAL_LIST_SELECT`가 돌려주는 행 — 상세 행 + 최신 보도 1건(배열이다: `limit 1`이라 0~1개) */
-export interface DealListSelectRow extends DealSelectRow {
+interface DealListSelectRow extends DealSelectRow {
   latest: LatestReportSelectRow[] | null;
 }
 
@@ -352,7 +352,7 @@ export const TRANSFER_DAY_STAMP_PAGE = 1_000;
 export const TRANSFER_DAY_STAMP_MAX_PAGES = 10;
 
 /** `DAY_REPORT_SELECT`가 돌려주는 행 — 보도 + 딜(관심 임베딩 없음) */
-export interface DayReportSelectRow extends ReportSelectRow {
+interface DayReportSelectRow extends ReportSelectRow {
   deal: Omit<DealSelectRow, "transfer_deal_watch"> | null;
 }
 

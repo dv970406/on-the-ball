@@ -56,7 +56,7 @@ export function buildDealListQuery(supabase: SupabaseClient<Database>, scopeStar
 }
 
 /** 상세의 "같은 구단의 다른 딜" 상한 */
-export const RELATED_DEAL_LIMIT = 6;
+const RELATED_DEAL_LIMIT = 6;
 
 /**
  * 같은 구단(출발·행선지)이 걸린 다른 딜 — 최신 보도순. 상세가 다른 딜로 가는 크롤 경로가 된다.
@@ -128,7 +128,7 @@ export function buildDayReportsQuery(supabase: SupabaseClient<Database>, startIs
  * 소식이 있는 이웃 날 — `before`면 그 시각 **이전**의 가장 늦은 보도, `after`면 그 시각 **이후**의 가장 이른 보도(딜에 묶인 것만).
  * 날짜 화면의 "이전 날 · 다음 날" 링크가 소식이 없는 날(404)을 가리키지 않게 한다. 경계 규약은 `buildDayReportsQuery`와 같다.
  */
-export function buildNeighborDayQuery(
+function buildNeighborDayQuery(
   supabase: SupabaseClient<Database>,
   boundaryIso: string,
   direction: "before" | "after",
@@ -145,7 +145,7 @@ export function buildNeighborDayQuery(
  *   캐시 키가 요청마다 달라진다. 페이지 범위(`range`)는 URL에 실려 페이지마다 캐시 키가 따로다(사이트맵의 딜 페이지와 같다).
  * ⚠ 정렬에 `id`를 더한다 — 같은 시각의 행이 페이지 경계에서 빠지거나 두 번 세지지 않게.
  */
-export function buildDayStampsQuery(supabase: SupabaseClient<Database>, sinceIso: string, from: number) {
+function buildDayStampsQuery(supabase: SupabaseClient<Database>, sinceIso: string, from: number) {
   return supabase
     .from("transfer_news")
     .select(DAY_STAMP_SELECT)

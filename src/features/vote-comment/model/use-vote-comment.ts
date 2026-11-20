@@ -13,7 +13,7 @@ import {
 } from "@/entities/comment";
 import { useSessionStore } from "@/entities/session";
 
-export interface VoteCommentVariables extends VoteMutationVariables {
+interface VoteCommentVariables extends VoteMutationVariables {
   commentId: number;
   /**
    * 누른 사람 — 낙관적 갱신·롤백은 **이 사용자의 목록 캐시 하나만** 건드리고, 목록 조회는 같은 사용자의

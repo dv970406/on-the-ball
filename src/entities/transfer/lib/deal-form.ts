@@ -9,7 +9,7 @@ import type { TransferDeal, TransferDealForm, TransferLoanClause } from "../mode
  *   **한 줄에 `키: { mark, label, noun },` 꼴**을 지킨다.
  * ⚠ 진행 중 임대(`loan_standing`)는 보도의 형태라 딜에 오지 않지만(DB CHECK) 타입이 enum 그대로라 채워 둔다(임대와 같은 표기).
  */
-export const DEAL_FORM: Record<TransferDealForm, { mark: string | null; label: string; noun: string | null }> = {
+const DEAL_FORM: Record<TransferDealForm, { mark: string | null; label: string; noun: string | null }> = {
   permanent: { mark: null, label: "완전 이적", noun: null },
   loan: { mark: "임대", label: "임대", noun: "임대" },
   loan_convert: { mark: "완전 영입", label: "임대 후 완전 영입", noun: "완전 영입" },

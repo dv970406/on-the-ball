@@ -53,7 +53,7 @@ export function hasVisibleChar(value: string): boolean {
  * ⚠ **이걸 `graphemeLength`로 대체하지 말 것.** 사용자에게 보이는 한도는 그래핌이지만
  *   DB가 강제하는 단위는 여전히 코드포인트라, 두 검사는 **함께** 가야 한다 → `lengthOverflow`.
  */
-export function codePointLength(value: string): number {
+function codePointLength(value: string): number {
   return [...value].length;
 }
 
@@ -88,7 +88,7 @@ const graphemeSegmenter =
  * ⚠ 긴 문자열에는 비싸다 — 20,000자 기준 1.5ms로 `codePointLength`(0.1ms)의 14배다(실측).
  *   그래서 본문(20,000자 한도)에는 쓰지 않는다. 제목 120자는 0.011ms라 렌더 중에도 무방하다.
  */
-export function graphemeLength(value: string): number {
+function graphemeLength(value: string): number {
   if (!graphemeSegmenter) return codePointLength(value);
   // 배열로 펼치지 않고 이터레이터만 돌린다 — 세는 게 목적이라 세그먼트를 담아둘 이유가 없다.
   const segments = graphemeSegmenter.segment(value)[Symbol.iterator]();

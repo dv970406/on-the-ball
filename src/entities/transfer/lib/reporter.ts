@@ -21,7 +21,7 @@ export const BYLINES: Record<string, string> = reporters.bylines;
  * 인용된 신문 한 곳의 표기·등급 — 등급이 비면 `credibility.journalists`를 표기로 찾는다(기자를 인용한 항목).
  * 등급은 1~5 또는 범위 등급(구단·리그마다 다른 등급 — `credibility.ts`의 `GradeEntry`)이다.
  */
-export interface CitedOutlet {
+interface CitedOutlet {
   ko: string;
   credibility?: GradeEntry;
 }

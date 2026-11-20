@@ -91,8 +91,8 @@ export function isSettledStage(stage: TransferStage): boolean {
 }
 
 /** 진행 중 구간의 소구간 — 뱃지 톤과 같은 갈림(합의 임박 · 협상 중). 라벨은 `STATUS_LABEL`을 그대로 쓴다 */
-export type ProgressSubgroupKey = Extract<TransferStatus, "imminent" | "talks">;
-export const PROGRESS_SUBGROUPS = ["imminent", "talks"] as const satisfies readonly ProgressSubgroupKey[];
+type ProgressSubgroupKey = Extract<TransferStatus, "imminent" | "talks">;
+const PROGRESS_SUBGROUPS = ["imminent", "talks"] as const satisfies readonly ProgressSubgroupKey[];
 
 /**
  * 진행 중 구간을 합의 임박(메디컬·개인 조건·합의) / 협상 중(제안·협상)으로 가른다 — 입력 순서는 그대로다.

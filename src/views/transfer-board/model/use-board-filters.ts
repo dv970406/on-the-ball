@@ -13,7 +13,7 @@ import {
 import { type BoardQuery, dealIdOfBoardPath } from "../lib/board-href";
 
 /** 보드 필터 — 리그·정렬·구단·관심·형태(`BoardQuery`) + 판에 연 딜. **URL이 소유한다**(공유 링크·뒤로가기가 필터를 잃지 않게) */
-export interface BoardFilters extends BoardQuery {
+interface BoardFilters extends BoardQuery {
   /**
    * 목록·상세 2분할(lg+)에서 오른쪽 판에 연 딜 — `null`이면 화면 순서상 첫 딜이다.
    * 고르면 주소가 그 딜의 상세 경로(`/transfers/<id>` — `boardDealHref`)가 된다. 로그인 복귀 주소(`next`)와 옛 공유 링크는

@@ -3,14 +3,14 @@ import { groupDeals, sortDeals } from "./sort";
 import { isDeadStage } from "./stage";
 
 /** 구단 화면에서 딜이 놓이는 자리 — 그 구단이 데려오려는 선수 · 내보내는 선수 · 지금 임대로 데리고 있는 선수 */
-export type ClubDealSide = "in" | "out" | "loan";
+type ClubDealSide = "in" | "out" | "loan";
 
 /** 구단 화면의 구역 순서 — 팬이 먼저 찾는 것(누가 오는가)이 앞이다 */
-export const CLUB_DEAL_SIDES = ["in", "out", "loan"] as const satisfies readonly ClubDealSide[];
+const CLUB_DEAL_SIDES = ["in", "out", "loan"] as const satisfies readonly ClubDealSide[];
 // 구역을 더하면 순서 배열에서 빠뜨린 값이 컴파일 에러가 된다
 const _SIDES_EXHAUSTIVE: Exclude<ClubDealSide, (typeof CLUB_DEAL_SIDES)[number]> extends never ? true : never = true;
 
-export const CLUB_DEAL_SIDE_LABEL: Record<ClubDealSide, string> = {
+const CLUB_DEAL_SIDE_LABEL: Record<ClubDealSide, string> = {
   in: "영입",
   out: "방출",
   loan: "임대로 뛰는 선수",
@@ -47,7 +47,7 @@ export function clubDealSide(deal: ClubSlots, code: string): ClubDealSide | null
   return null;
 }
 
-export interface ClubDealGroup<T> {
+interface ClubDealGroup<T> {
   side: ClubDealSide;
   label: string;
   deals: T[];

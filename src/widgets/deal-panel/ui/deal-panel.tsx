@@ -28,7 +28,7 @@ import { cn, formatCount, } from "@/shared/lib";
 import { Icon, Skeleton, StaleBanner, buttonClassName } from "@/shared/ui";
 import { useDwell } from "./use-dwell";
 
-export interface DealPanelProps {
+interface DealPanelProps {
   /** 보드 목록 캐시의 딜 — 관심 토글의 낙관적 갱신이 이 캐시를 고치므로 누르는 즉시 이 판이 따라온다 */
   deal: TransferDealListItem;
   /** 뷰가 정한 쿼리 스코프(세션 복원 전에는 서버가 본 사용자) — 예측 조회·관심 토글이 이 키를 쓴다 */

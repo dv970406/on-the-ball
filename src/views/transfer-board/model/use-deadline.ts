@@ -3,7 +3,7 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { serverToClientTime, useNowMs } from "@/shared/lib";
 
-export interface DeadlineParts {
+interface DeadlineParts {
   days: number;
   hours: number;
   minutes: number;
